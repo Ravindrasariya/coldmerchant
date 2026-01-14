@@ -102,19 +102,19 @@ export default function HomePage() {
           <div className="flex h-16 items-center px-4 md:px-6 gap-4 md:gap-6">
             {/* Brand */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-                <PackagePlus className="h-5 w-5 text-primary-foreground" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
+                <PackagePlus className="h-6 w-6 text-primary-foreground" />
               </div>
-              <div className="flex flex-col justify-between h-10">
-                <span className="font-bold text-lg leading-tight text-primary">Vyapar Vriddhi</span>
-                <span className="text-[10px] leading-tight">
+              <div className="flex flex-col h-12 justify-center">
+                <span className="font-bold text-xl leading-tight text-primary">Vyapar Vriddhi</span>
+                <span className="text-[10px] leading-none mt-1">
                   by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
                 </span>
               </div>
             </div>
 
             {/* Navigation Tabs - Desktop (hidden on mobile) */}
-            <nav className="hidden md:flex flex-1 overflow-x-auto">
+            <nav className="hidden md:flex flex-1 justify-center overflow-x-auto">
               <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
                 <TabsTrigger 
                   value="stock-entry" 
@@ -167,12 +167,12 @@ export default function HomePage() {
                   <div className="flex flex-col h-full">
                     <div className="p-4 border-b">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
-                          <PackagePlus className="h-5 w-5 text-primary-foreground" />
+                        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
+                          <PackagePlus className="h-6 w-6 text-primary-foreground" />
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-lg leading-tight text-primary">Vyapar Vriddhi</span>
-                          <span className="text-[10px] leading-tight">
+                        <div className="flex flex-col h-12 justify-center">
+                          <span className="font-bold text-xl leading-tight text-primary">Vyapar Vriddhi</span>
+                          <span className="text-[10px] leading-none mt-1">
                             by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
                           </span>
                         </div>
