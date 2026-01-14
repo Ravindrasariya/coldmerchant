@@ -461,8 +461,6 @@ export function StockRegisterCard() {
                 <CardContent className="pt-0 pb-3 px-4">
                   <div className="space-y-2">
                     {lotsWithMetrics.map(({ lot, metrics }, lotIndex) => {
-                      const lotFarmerTotal = metrics.totalAmount ?? 0;
-                      const lotFarmerDue = lotFarmerTotal > 0 ? lotFarmerTotal - (entry.amountPaid ? parseFloat(entry.amountPaid) / lotsWithMetrics.length : 0) : 0;
                       const lotColdTotal = metrics.coldStoreTotalCharges ?? 0;
                       const lotColdDue = metrics.coldStoreRemaining ?? 0;
                       
@@ -493,17 +491,6 @@ export function StockRegisterCard() {
                               <span className="font-semibold text-green-600 dark:text-green-400">{metrics.remainingToSell}</span>
                               <span className="text-muted-foreground">/{metrics.actualSellableBags}</span>
                             </div>
-                            {lotFarmerTotal > 0 && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground">{t("Farmer Total", "किसान कुल")}</span>{" "}
-                                <span className="font-medium">Rs. {lotFarmerTotal.toFixed(0)}</span>
-                                <span className="text-muted-foreground mx-1">|</span>
-                                <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
-                                <span className={`font-medium ${lotFarmerDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                                  Rs. {lotFarmerDue > 0 ? lotFarmerDue.toFixed(0) : "0"}
-                                </span>
-                              </div>
-                            )}
                             {lotColdTotal > 0 && (
                               <div className="flex items-center gap-1">
                                 <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
