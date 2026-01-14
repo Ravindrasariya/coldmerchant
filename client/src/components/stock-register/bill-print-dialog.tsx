@@ -73,6 +73,16 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
 
   const grandTotal = calculateGrandTotal();
 
+  const getSizeBilingual = (size: string) => {
+    const sizeMap: Record<string, string> = {
+      "Large": "Large / बड़ा",
+      "Medium": "Medium / मध्यम",
+      "Small": "Small / छोटा",
+      "Wastage": "Wastage / बर्बादी",
+    };
+    return sizeMap[size] || size;
+  };
+
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -83,7 +93,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
       if (lot.cutType === "gate_cut" && lot.size) {
         breakdownHtml = `
           <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin-top: 12px;">
-            <p style="margin: 0;"><span style="color: #666;">Size / आकार:</span> ${lot.size}</p>
+            <p style="margin: 0;"><span style="color: #666;">Size / आकार:</span> ${getSizeBilingual(lot.size)}</p>
             ${lot.pricePerKg ? `<p style="margin: 4px 0 0 0;"><span style="color: #666;">Price/kg / मूल्य प्रति किलो:</span> ₹${parseFloat(lot.pricePerKg).toFixed(2)}</p>` : ""}
           </div>
         `;
@@ -96,7 +106,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
           const amount = bd.totalAmount ? parseFloat(bd.totalAmount) : weight * price;
           return `
             <tr>
-              <td style="padding: 8px 12px; border-bottom: 1px solid #ddd;">${bd.size}</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid #ddd;">${getSizeBilingual(bd.size)}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bd.numberOfBags}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${weight > 0 ? weight.toFixed(2) : "—"}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${price.toFixed(2)}` : "—"}</td>
@@ -307,7 +317,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
 
                   {lot.cutType === "gate_cut" && lot.size && (
                     <div className="text-sm bg-gray-100 rounded p-3">
-                      <p><span className="text-gray-600">Size / आकार:</span> {lot.size}</p>
+                      <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
                       {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat(lot.pricePerKg).toFixed(2)}</p>}
                     </div>
                   )}
@@ -330,7 +340,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                           const amount = bd.totalAmount ? parseFloat(bd.totalAmount) : weight * price;
                           return (
                             <tr key={bd.id || bdIndex} className="border-b border-gray-200">
-                              <td className="py-2 px-3">{bd.size}</td>
+                              <td className="py-2 px-3">{getSizeBilingual(bd.size)}</td>
                               <td className="py-2 px-3 text-right font-mono">{bd.numberOfBags}</td>
                               <td className="py-2 px-3 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
                               <td className="py-2 px-3 text-right font-mono">{price > 0 ? `₹${price.toFixed(2)}` : "—"}</td>
