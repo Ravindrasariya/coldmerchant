@@ -492,6 +492,58 @@ export class DatabaseStorage implements IStorage {
       .where(eq(merchants.id, id));
     return merchant;
   }
+
+  // Transaction Item operations
+  async getTransactionItemById(id: number, merchantId: number): Promise<TransactionItem | undefined> {
+    const [item] = await db.select().from(transactionItems)
+      .where(and(eq(transactionItems.id, id), eq(transactionItems.merchantId, merchantId)));
+    return item;
+  }
+
+  async updateTransactionItem(id: number, merchantId: number, data: Partial<TransactionItem>): Promise<TransactionItem | undefined> {
+    const [updated] = await db.update(transactionItems)
+      .set(data)
+      .where(and(eq(transactionItems.id, id), eq(transactionItems.merchantId, merchantId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteTransactionItem(id: number, merchantId: number): Promise<void> {
+    await db.delete(transactionItems)
+      .where(and(eq(transactionItems.id, id), eq(transactionItems.merchantId, merchantId)));
+  }
+
+  async addTransactionItem(item: InsertTransactionItem): Promise<TransactionItem> {
+    const [created] = await db.insert(transactionItems).values(item).returning();
+    return created;
+  }
+
+  // Adjust inventory (for returning bags when items are modified/removed)
+  async adjustInventory(lotId: number, breakdownId: number | null, merchantId: number, bagsDelta: number): Promise<void> {
+    if (breakdownId) {
+      // Bilty cut - adjust breakdown and recalc lot
+      const breakdown = await this.getBagBreakdownById(breakdownId, merchantId);
+      if (breakdown) {
+        const currentRemaining = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
+        const newRemaining = Math.max(0, currentRemaining + bagsDelta);
+        await this.updateBagBreakdown(breakdownId, merchantId, { remainingBags: newRemaining });
+      }
+      // Recalculate lot total from all breakdowns
+      const allBreakdowns = await db.select().from(bagBreakdowns)
+        .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+      const totalRemaining = allBreakdowns
+        .filter(b => b.size !== "Wastage")
+        .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
+      await this.updateLot(lotId, merchantId, { remainingBags: totalRemaining });
+    } else {
+      // Gate cut - adjust lot directly
+      const lot = await this.getLotById(lotId, merchantId);
+      if (lot) {
+        const newRemaining = Math.max(0, lot.remainingBags + bagsDelta);
+        await this.updateLot(lotId, merchantId, { remainingBags: newRemaining });
+      }
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -866,6 +866,208 @@ export async function registerRoutes(
     }
   });
 
+  // PUT /api/transactions/:id/items - Update transaction items (add/remove/update bags)
+  app.put("/api/transactions/:id/items", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const transactionId = parseInt(req.params.id);
+      
+      const existingTxn = await storage.getTransactionById(transactionId, merchantId);
+      if (!existingTxn) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const { items } = req.body; // Array of { id?, inventoryKey?, bagsMoved, action: 'update'|'add'|'remove' }
+      if (!items || !Array.isArray(items)) {
+        return res.status(400).json({ message: "Items array is required" });
+      }
+      
+      const changes: { field: string; oldValue: string | number | null; newValue: string | number | null }[] = [];
+      let newTotalBags = 0;
+      let newTotalNetWeight = 0;
+      let newTotalCostOfGoods = 0;
+      
+      // Process item changes
+      for (const itemChange of items) {
+        if (itemChange.action === 'remove' && itemChange.id) {
+          // Remove item - return bags to inventory
+          const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
+          if (existingItem) {
+            // Return bags to inventory (positive delta = add back)
+            await storage.adjustInventory(existingItem.lotId, existingItem.breakdownId, merchantId, existingItem.bagsMoved);
+            await storage.deleteTransactionItem(itemChange.id, merchantId);
+            
+            changes.push({
+              field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}`,
+              oldValue: `${existingItem.bagsMoved} bags`,
+              newValue: "Removed"
+            });
+          }
+        } else if (itemChange.action === 'update' && itemChange.id) {
+          // Update bag count
+          const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
+          if (existingItem && itemChange.bagsMoved !== existingItem.bagsMoved) {
+            const bagsDelta = existingItem.bagsMoved - itemChange.bagsMoved; // positive = returning bags
+            
+            // Validate: can't take more than available + current allocation
+            if (bagsDelta < 0) {
+              // Taking more bags - check availability
+              const lot = await storage.getLotById(existingItem.lotId, merchantId);
+              let availableBags = 0;
+              if (existingItem.breakdownId) {
+                const breakdown = await storage.getBagBreakdownById(existingItem.breakdownId, merchantId);
+                availableBags = (breakdown?.remainingBags ?? breakdown?.numberOfBags ?? 0);
+              } else {
+                availableBags = lot?.remainingBags ?? 0;
+              }
+              if (Math.abs(bagsDelta) > availableBags) {
+                return res.status(400).json({ message: `Not enough bags available for S#${existingItem.serialNumber}` });
+              }
+            }
+            
+            // Adjust inventory
+            await storage.adjustInventory(existingItem.lotId, existingItem.breakdownId, merchantId, bagsDelta);
+            
+            // Calculate new values
+            const pricePerKg = parseFloat(existingItem.pricePerKgSnapshot || "0");
+            const avgBagWeight = existingItem.bagsMoved > 0 
+              ? parseFloat(existingItem.netWeight || "0") / existingItem.bagsMoved 
+              : 50;
+            const newNetWeight = itemChange.bagsMoved * avgBagWeight;
+            const newCostOfGoods = newNetWeight * pricePerKg;
+            
+            await storage.updateTransactionItem(itemChange.id, merchantId, {
+              bagsMoved: itemChange.bagsMoved,
+              netWeight: newNetWeight.toString(),
+              costOfGoods: newCostOfGoods.toString()
+            });
+            
+            changes.push({
+              field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}`,
+              oldValue: `${existingItem.bagsMoved} bags`,
+              newValue: `${itemChange.bagsMoved} bags`
+            });
+            
+            newTotalBags += itemChange.bagsMoved;
+            newTotalNetWeight += newNetWeight;
+            newTotalCostOfGoods += newCostOfGoods;
+          } else if (existingItem) {
+            // No change, keep existing values
+            newTotalBags += existingItem.bagsMoved;
+            newTotalNetWeight += parseFloat(existingItem.netWeight || "0");
+            newTotalCostOfGoods += parseFloat(existingItem.costOfGoods || "0");
+          }
+        } else if (itemChange.action === 'add' && itemChange.inventoryKey) {
+          // Add new item from inventory
+          const [lotIdStr, breakdownPart] = (itemChange.inventoryKey || "").split("-");
+          const lotId = parseInt(lotIdStr);
+          const breakdownId = breakdownPart === "lot" ? null : parseInt(breakdownPart);
+          
+          const lot = await storage.getLotById(lotId, merchantId);
+          if (!lot) {
+            return res.status(400).json({ message: `Lot ${lotId} not found` });
+          }
+          
+          // Get stock entry for serial number
+          const entries = await storage.getStockEntriesByMerchant(merchantId);
+          const entry = entries.find(e => e.id === lot.stockEntryId);
+          
+          // Calculate available bags
+          let availableBags = 0;
+          let pricePerKg = parseFloat(lot.pricePerKg || "0");
+          let size = lot.size;
+          
+          if (breakdownId) {
+            const breakdown = await storage.getBagBreakdownById(breakdownId, merchantId);
+            availableBags = breakdown?.remainingBags ?? breakdown?.numberOfBags ?? 0;
+            pricePerKg = parseFloat(breakdown?.pricePerKg || lot.pricePerKg || "0");
+            size = breakdown?.size || null;
+          } else {
+            availableBags = lot.remainingBags;
+          }
+          
+          if (itemChange.bagsMoved > availableBags) {
+            return res.status(400).json({ message: `Not enough bags available (${availableBags})` });
+          }
+          
+          // Deduct from inventory (negative delta = take bags)
+          await storage.adjustInventory(lotId, breakdownId, merchantId, -itemChange.bagsMoved);
+          
+          // Calculate values
+          const avgBagWeight = 50; // Default assumption
+          const netWeight = itemChange.bagsMoved * avgBagWeight;
+          const costOfGoods = netWeight * pricePerKg;
+          
+          // Create the transaction item
+          const newItem = await storage.addTransactionItem({
+            transactionId,
+            merchantId,
+            lotId,
+            breakdownId,
+            serialNumber: entry?.serialNumber || 0,
+            coldStoreName: lot.coldStoreName,
+            potatoType: lot.potatoType,
+            size,
+            bagsMoved: itemChange.bagsMoved,
+            netWeight: netWeight.toString(),
+            pricePerKgSnapshot: pricePerKg.toString(),
+            costOfGoods: costOfGoods.toString()
+          });
+          
+          changes.push({
+            field: `item_S#${entry?.serialNumber || 0}_${size || 'Mixed'}`,
+            oldValue: null,
+            newValue: `Added ${itemChange.bagsMoved} bags`
+          });
+          
+          newTotalBags += itemChange.bagsMoved;
+          newTotalNetWeight += netWeight;
+          newTotalCostOfGoods += costOfGoods;
+        } else if (itemChange.action === 'keep' && itemChange.id) {
+          // Keep existing item unchanged
+          const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
+          if (existingItem) {
+            newTotalBags += existingItem.bagsMoved;
+            newTotalNetWeight += parseFloat(existingItem.netWeight || "0");
+            newTotalCostOfGoods += parseFloat(existingItem.costOfGoods || "0");
+          }
+        }
+      }
+      
+      // Recalculate profit/loss
+      const revenue = parseFloat(existingTxn.revenue || "0");
+      const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
+      const otherCharges = parseFloat(existingTxn.otherCharges || "0");
+      const newProfitLoss = revenue - newTotalCostOfGoods - transportationCharges - otherCharges;
+      
+      // Update transaction totals
+      await storage.updateTransaction(transactionId, merchantId, {
+        totalBags: newTotalBags,
+        totalNetWeight: newTotalNetWeight.toString(),
+        totalCostOfGoods: newTotalCostOfGoods.toString(),
+        profitLoss: newProfitLoss.toString()
+      });
+      
+      // Record edit history
+      if (changes.length > 0) {
+        await storage.createTransactionEditHistory({
+          transactionId,
+          merchantId,
+          userId,
+          changeSet: changes
+        });
+      }
+      
+      // Return updated transaction
+      const updatedTxn = await storage.getTransactionById(transactionId, merchantId);
+      res.json(updatedTxn);
+    } catch (error) {
+      console.error("Error updating transaction items:", error);
+      res.status(500).json({ message: "Failed to update transaction items" });
+    }
+  });
+
   // GET /api/merchants/:id - Get merchant details (for print receipt)
   app.get("/api/merchants/:id", requireMerchant, async (req, res) => {
     try {

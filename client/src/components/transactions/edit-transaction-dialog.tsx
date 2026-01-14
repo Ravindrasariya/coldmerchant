@@ -10,19 +10,46 @@ import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronUp, History, Save } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronDown, ChevronUp, History, Save, Plus, Trash2 } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface TransactionItem {
   id: number;
+  lotId: number;
+  breakdownId: number | null;
   serialNumber: number;
   coldStoreName: string;
   potatoType: string | null;
   size: string | null;
   bagsMoved: number;
   netWeight: string | null;
+}
+
+interface UnsoldInventoryItem {
+  breakdownId: number | null;
+  lotId: number;
+  serialNumber: number;
+  coldStoreName: string;
+  potatoType: string;
+  size: string | null;
+  remainingBags: number;
+}
+
+interface EditableItem {
+  id?: number;
+  lotId: number;
+  breakdownId: number | null;
+  serialNumber: number;
+  coldStoreName: string;
+  potatoType: string | null;
+  size: string | null;
+  bagsMoved: number;
+  originalBags: number;
+  inventoryKey?: string;
+  action: 'keep' | 'update' | 'add' | 'remove';
 }
 
 interface EditHistoryChange {
@@ -110,10 +137,19 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const { t } = useLanguage();
   const { toast } = useToast();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [selectedInventory, setSelectedInventory] = useState<string>("");
+  const [newItemBags, setNewItemBags] = useState<number>(0);
 
   const { data: transaction, isLoading } = useQuery<TransactionWithHistory>({
     queryKey: ["/api/transactions", transactionId],
     enabled: !!transactionId && open,
+  });
+
+  const { data: unsoldInventory } = useQuery<UnsoldInventoryItem[]>({
+    queryKey: ["/api/inventory/unsold"],
+    enabled: open && showAddItem,
   });
 
   const form = useForm<EditTransactionFormData>({
@@ -138,6 +174,18 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
         revenue: transaction.revenue ? parseFloat(transaction.revenue) : undefined,
       });
+      setEditableItems(transaction.items.map(item => ({
+        id: item.id,
+        lotId: item.lotId,
+        breakdownId: item.breakdownId,
+        serialNumber: item.serialNumber,
+        coldStoreName: item.coldStoreName,
+        potatoType: item.potatoType,
+        size: item.size,
+        bagsMoved: item.bagsMoved,
+        originalBags: item.bagsMoved,
+        action: 'keep' as const
+      })));
     }
   }, [transaction, form]);
 
@@ -148,6 +196,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       toast({
         title: t("Transaction Updated", "लेनदेन अपडेट किया गया"),
         description: t("Changes saved successfully", "परिवर्तन सफलतापूर्वक सहेजे गए"),
@@ -162,6 +211,83 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       });
     },
   });
+
+  const updateItemsMutation = useMutation({
+    mutationFn: async () => {
+      const itemsToSend = editableItems.map(item => ({
+        id: item.id,
+        inventoryKey: item.inventoryKey,
+        bagsMoved: item.bagsMoved,
+        action: item.action
+      }));
+      return apiRequest("PUT", `/api/transactions/${transactionId}/items`, { items: itemsToSend });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      toast({
+        title: t("Items Updated", "आइटम अपडेट किए गए"),
+        description: t("Transaction items saved successfully", "लेनदेन आइटम सफलतापूर्वक सहेजे गए"),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message || t("Failed to update items", "आइटम अपडेट करने में विफल"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleBagCountChange = (index: number, newBags: number) => {
+    setEditableItems(items => items.map((item, i) => {
+      if (i !== index) return item;
+      return {
+        ...item,
+        bagsMoved: newBags,
+        action: item.id ? (newBags !== item.originalBags ? 'update' : 'keep') : 'add'
+      };
+    }));
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setEditableItems(items => items.map((item, i) => {
+      if (i !== index) return item;
+      if (item.id) {
+        return { ...item, action: 'remove' as const };
+      }
+      return item;
+    }).filter((item, i) => i !== index || item.id));
+  };
+
+  const handleAddItem = () => {
+    if (!selectedInventory || newItemBags <= 0) return;
+    
+    const inv = unsoldInventory?.find(i => 
+      `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory
+    );
+    if (!inv) return;
+    
+    setEditableItems(items => [...items, {
+      lotId: inv.lotId,
+      breakdownId: inv.breakdownId,
+      serialNumber: inv.serialNumber,
+      coldStoreName: inv.coldStoreName,
+      potatoType: inv.potatoType,
+      size: inv.size,
+      bagsMoved: newItemBags,
+      originalBags: 0,
+      inventoryKey: selectedInventory,
+      action: 'add' as const
+    }]);
+    
+    setSelectedInventory("");
+    setNewItemBags(0);
+    setShowAddItem(false);
+  };
+
+  const hasItemChanges = editableItems.some(item => item.action !== 'keep');
 
   const onSubmit = (data: EditTransactionFormData) => {
     updateMutation.mutate(data);
@@ -205,18 +331,104 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           </div>
         ) : transaction ? (
           <div className="space-y-6">
-            <div className="bg-muted/50 p-4 rounded-md space-y-2">
-              <h4 className="font-medium text-sm">{t("Items in Transaction", "लेनदेन में आइटम")}</h4>
-              {transaction.items.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}</span>
-                  <span>{item.bagsMoved} {t("bags", "बोरी")} ({parseFloat(item.netWeight || "0").toFixed(1)} kg)</span>
+            <div className="bg-muted/50 p-4 rounded-md space-y-3">
+              <div className="flex justify-between items-center">
+                <h4 className="font-medium text-sm">{t("Items in Transaction", "लेनदेन में आइटम")}</h4>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowAddItem(!showAddItem)}
+                  data-testid="button-add-item"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  {t("Add Lot", "लॉट जोड़ें")}
+                </Button>
+              </div>
+
+              {showAddItem && (
+                <div className="border rounded-md p-3 space-y-2 bg-background">
+                  <Label className="text-xs">{t("Select from Inventory", "इन्वेंट्री से चुनें")}</Label>
+                  <Select value={selectedInventory} onValueChange={setSelectedInventory}>
+                    <SelectTrigger data-testid="select-inventory">
+                      <SelectValue placeholder={t("Choose lot", "लॉट चुनें")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {unsoldInventory?.map((inv) => (
+                        <SelectItem 
+                          key={`${inv.lotId}-${inv.breakdownId || 'lot'}`} 
+                          value={`${inv.lotId}-${inv.breakdownId || 'lot'}`}
+                        >
+                          S#{inv.serialNumber} - {inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"} ({inv.remainingBags} {t("available", "उपलब्ध")})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder={t("Bags", "बोरी")}
+                      value={newItemBags || ""}
+                      onChange={(e) => setNewItemBags(parseInt(e.target.value) || 0)}
+                      className="w-24"
+                      data-testid="input-new-item-bags"
+                    />
+                    <Button type="button" size="sm" onClick={handleAddItem} data-testid="button-confirm-add">
+                      {t("Add", "जोड़ें")}
+                    </Button>
+                  </div>
                 </div>
-              ))}
+              )}
+
+              {editableItems.map((item, index) => 
+                item.action === 'remove' ? null : (
+                  <div key={item.id || `new-${index}`} className="flex items-center gap-2 text-sm">
+                    <span className="flex-1">
+                      S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
+                    </span>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.bagsMoved}
+                      onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
+                      className="w-20 h-8"
+                      data-testid={`input-item-bags-${index}`}
+                    />
+                    <span className="text-muted-foreground text-xs">{t("bags", "बोरी")}</span>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive"
+                      onClick={() => handleRemoveItem(index)}
+                      data-testid={`button-remove-item-${index}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
+              )}
+
               <div className="border-t pt-2 mt-2 flex justify-between font-medium">
                 <span>{t("Total", "कुल")}</span>
-                <span>{transaction.totalBags} {t("bags", "बोरी")} ({parseFloat(transaction.totalNetWeight || "0").toFixed(1)} kg)</span>
+                <span>
+                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)} {t("bags", "बोरी")}
+                </span>
               </div>
+
+              {hasItemChanges && (
+                <Button 
+                  type="button" 
+                  className="w-full" 
+                  onClick={() => updateItemsMutation.mutate()}
+                  disabled={updateItemsMutation.isPending}
+                  data-testid="button-save-items"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {updateItemsMutation.isPending ? t("Saving Items...", "आइटम सहेज रहा है...") : t("Save Item Changes", "आइटम परिवर्तन सहेजें")}
+                </Button>
+              )}
             </div>
 
             <Form {...form}>
