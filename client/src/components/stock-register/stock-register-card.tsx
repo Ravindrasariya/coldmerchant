@@ -374,12 +374,7 @@ export function StockRegisterCard() {
                             "border-orange-500 text-orange-600"
                           }
                         >
-                          {isFarmerPaid ? t("Farmer Paid", "किसान भुगतान") : 
-                           farmerAmountPaid > 0 ? (
-                             <>{t("Farmer Due", "किसान बाकी")} - ₹{farmerRemainingDue.toFixed(0)}</>
-                           ) : (
-                             <>{t("Farmer Due", "किसान बाकी")} - ₹{entryTotalAmount.toFixed(0)}</>
-                           )}
+                          {isFarmerPaid ? t("Farmer Paid", "किसान भुगतान") : t("Farmer Due", "किसान बाकी")}
                         </Badge>
                       )}
                       
@@ -392,12 +387,7 @@ export function StockRegisterCard() {
                             "border-violet-500 text-violet-600"
                           }
                         >
-                          {isColdStorePaid ? t("Cold Paid", "कोल्ड भुगतान") : 
-                           entryColdStorePaid > 0 ? (
-                             <>{t("Cold Due", "कोल्ड बाकी")} - ₹{coldStoreRemainingDue.toFixed(0)}</>
-                           ) : (
-                             <>{t("Cold Due", "कोल्ड बाकी")} - ₹{entryColdStoreTotalCharges.toFixed(0)}</>
-                           )}
+                          {isColdStorePaid ? t("Cold Paid", "कोल्ड भुगतान") : t("Cold Due", "कोल्ड बाकी")}
                         </Badge>
                       )}
                       
@@ -477,8 +467,8 @@ export function StockRegisterCard() {
                     <span className="text-muted-foreground">/{totalActual}</span>
                   </div>
                   
-                  <div className="mt-3 pt-3 border-t flex flex-wrap gap-4 text-sm">
-                    {entryTotalAmount > 0 && (
+                  {entryTotalAmount > 0 && (
+                    <div className="mt-3 pt-3 border-t text-sm">
                       <div className="flex flex-col gap-0.5">
                         <div>
                           <span className="text-muted-foreground">{t("Total Farmer Amount:", "किसान की कुल राशि:")}</span>{" "}
@@ -498,30 +488,8 @@ export function StockRegisterCard() {
                           </div>
                         )}
                       </div>
-                    )}
-                    
-                    {entryColdStoreTotalCharges > 0 && (
-                      <div className="flex flex-col gap-0.5">
-                        <div>
-                          <span className="text-muted-foreground">{t("Total Cold Charges:", "कुल कोल्ड शुल्क:")}</span>{" "}
-                          <span className="font-semibold text-violet-600 dark:text-violet-400">₹{entryColdStoreTotalCharges.toFixed(0)}</span>
-                        </div>
-                        {entryColdStorePaid > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">{t("Cold Paid:", "कोल्ड भुगतान:")}</span>{" "}
-                            <span className="font-medium text-green-600 dark:text-green-400">₹{entryColdStorePaid.toFixed(0)}</span>
-                            {coldStoreRemainingDue > 0 && (
-                              <>
-                                <span className="text-muted-foreground"> | </span>
-                                <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
-                                <span className="font-semibold text-purple-600 dark:text-purple-400">₹{coldStoreRemainingDue.toFixed(0)}</span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </CardHeader>
                 
                 <CardContent className="pt-0">
