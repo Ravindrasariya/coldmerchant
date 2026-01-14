@@ -115,15 +115,24 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         title: t("Sale Recorded", "बिक्री दर्ज हो गई"),
         description: t(`${variables.quantity} bags marked as sold.`, `${variables.quantity} बोरी बेची गई।`),
       });
-      // Update local state
-      setLots(prevLots => prevLots.map(lot => ({
-        ...lot,
-        bagBreakdowns: lot.bagBreakdowns.map(bd => 
+      // Update local state including lot remainingBags
+      setLots(prevLots => prevLots.map(lot => {
+        const updatedBreakdowns = lot.bagBreakdowns.map(bd => 
           bd.id === variables.breakdownId 
             ? { ...bd, remainingBags: data.remainingBags }
             : bd
-        )
-      })));
+        );
+        // Recalculate lot's remaining from updated breakdowns
+        const lotRemaining = updatedBreakdowns.reduce((sum, bd) => {
+          if (bd.size === "Wastage") return sum;
+          return sum + (bd.remainingBags ?? bd.numberOfBags);
+        }, 0);
+        return {
+          ...lot,
+          remainingBags: lotRemaining,
+          bagBreakdowns: updatedBreakdowns
+        };
+      }));
       setSellQuantities(prev => ({ ...prev, [variables.breakdownId]: 0 }));
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
     },
