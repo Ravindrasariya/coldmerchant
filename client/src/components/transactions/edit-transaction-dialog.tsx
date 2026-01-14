@@ -252,13 +252,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   };
 
   const handleRemoveItem = (index: number) => {
-    setEditableItems(items => items.map((item, i) => {
-      if (i !== index) return item;
-      if (item.id) {
-        return { ...item, action: 'remove' as const };
+    setEditableItems(items => {
+      const item = items[index];
+      if (!item) return items;
+      
+      // If it's a newly added item (no id), just filter it out
+      if (!item.id) {
+        return items.filter((_, i) => i !== index);
       }
-      return item;
-    }).filter((item, i) => i !== index || item.id));
+      
+      // If it's an existing item, mark for removal (will be hidden but sent to server)
+      return items.map((it, i) => 
+        i === index ? { ...it, action: 'remove' as const } : it
+      );
+    });
   };
 
   const handleAddItem = () => {
