@@ -110,6 +110,9 @@ export async function registerRoutes(
           pricePerKg: lotData.cutType === "gate_cut" && lotData.pricePerKg 
             ? lotData.pricePerKg.toString() 
             : null,
+          coldStoreChargesPerBag: lotData.coldStoreChargesPerBag 
+            ? lotData.coldStoreChargesPerBag.toString() 
+            : null,
           remainingBags: lotData.originalBags,
         });
 
@@ -206,10 +209,16 @@ export async function registerRoutes(
             if (existingLot && lotData.remainingBags !== undefined) {
               compareField('remainingBags', existingLot.remainingBags, lotData.remainingBags, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.coldStoreChargesPerBag !== undefined) {
+              compareField('coldStoreChargesPerBag', existingLot.coldStoreChargesPerBag, lotData.coldStoreChargesPerBag, lotLabel, 'lot', lotData.id);
+            }
 
             // Update existing lot
             await storage.updateLot(lotData.id, merchantId, {
               remainingBags: lotData.remainingBags,
+              coldStoreChargesPerBag: lotData.coldStoreChargesPerBag !== undefined 
+                ? (lotData.coldStoreChargesPerBag ? lotData.coldStoreChargesPerBag.toString() : null)
+                : undefined,
             });
 
             // Handle bag breakdowns for bilty cut
