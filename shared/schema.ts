@@ -87,12 +87,46 @@ export const stockEntryEditHistory = pgTable("stock_entry_edit_history", {
   changeSet: jsonb("change_set").notNull(), // Array of { scope, entityId, label, changes: [{ field, oldValue, newValue }] }
 });
 
+// Transactions - "Load A Truck" transactions
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  transactionNumber: integer("transaction_number").notNull(),
+  partyName: text("party_name"),
+  advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }),
+  transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
+  otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),
+  revenue: decimal("revenue", { precision: 12, scale: 2 }),
+  totalBags: integer("total_bags").notNull(),
+  totalNetWeight: decimal("total_net_weight", { precision: 12, scale: 2 }),
+  totalCostOfGoods: decimal("total_cost_of_goods", { precision: 12, scale: 2 }),
+  profitLoss: decimal("profit_loss", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Transaction Items - each lot selection in a transaction
+export const transactionItems = pgTable("transaction_items", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull().references(() => transactions.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  lotId: integer("lot_id").notNull().references(() => lots.id),
+  serialNumber: integer("serial_number").notNull(), // cached from stock entry
+  coldStoreName: text("cold_store_name").notNull(), // cached
+  bagsMoved: integer("bags_moved").notNull(),
+  netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
+  pricePerKgSnapshot: decimal("price_per_kg_snapshot", { precision: 10, scale: 2 }),
+  costOfGoods: decimal("cost_of_goods", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
   stockEntries: many(stockEntries),
   lots: many(lots),
   bagBreakdowns: many(bagBreakdowns),
+  transactions: many(transactions),
+  transactionItems: many(transactionItems),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -149,6 +183,29 @@ export const bagBreakdownsRelations = relations(bagBreakdowns, ({ one }) => ({
   }),
 }));
 
+export const transactionsRelations = relations(transactions, ({ one, many }) => ({
+  merchant: one(merchants, {
+    fields: [transactions.merchantId],
+    references: [merchants.id],
+  }),
+  items: many(transactionItems),
+}));
+
+export const transactionItemsRelations = relations(transactionItems, ({ one }) => ({
+  transaction: one(transactions, {
+    fields: [transactionItems.transactionId],
+    references: [transactions.id],
+  }),
+  merchant: one(merchants, {
+    fields: [transactionItems.merchantId],
+    references: [merchants.id],
+  }),
+  lot: one(lots, {
+    fields: [transactionItems.lotId],
+    references: [lots.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertMerchantSchema = createInsertSchema(merchants).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -156,6 +213,8 @@ export const insertStockEntrySchema = createInsertSchema(stockEntries).omit({ id
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
 export const insertBagBreakdownSchema = createInsertSchema(bagBreakdowns).omit({ id: true, createdAt: true });
 export const insertStockEntryEditHistorySchema = createInsertSchema(stockEntryEditHistory).omit({ id: true, changedAt: true });
+export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, transactionNumber: true });
+export const insertTransactionItemSchema = createInsertSchema(transactionItems).omit({ id: true, createdAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -175,6 +234,12 @@ export type InsertBagBreakdown = z.infer<typeof insertBagBreakdownSchema>;
 
 export type StockEntryEditHistory = typeof stockEntryEditHistory.$inferSelect;
 export type InsertStockEntryEditHistory = z.infer<typeof insertStockEntryEditHistorySchema>;
+
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+
+export type TransactionItem = typeof transactionItems.$inferSelect;
+export type InsertTransactionItem = z.infer<typeof insertTransactionItemSchema>;
 
 // Change types for edit history
 export type FieldChange = {
@@ -229,6 +294,25 @@ export const stockEntryFormSchema = z.object({
 export type BagBreakdownForm = z.infer<typeof bagBreakdownFormSchema>;
 export type LotForm = z.infer<typeof lotFormSchema>;
 export type StockEntryForm = z.infer<typeof stockEntryFormSchema>;
+
+// Transaction form schemas for frontend
+export const transactionItemFormSchema = z.object({
+  lotId: z.coerce.number().min(1, "Lot is required"),
+  bagsMoved: z.coerce.number().min(1, "Number of bags is required"),
+  netWeight: z.coerce.number().optional(),
+});
+
+export const transactionFormSchema = z.object({
+  partyName: z.string().optional(),
+  advancePayment: z.coerce.number().optional(),
+  transportationCharges: z.coerce.number().optional(),
+  otherCharges: z.coerce.number().optional(),
+  revenue: z.coerce.number().optional(),
+  items: z.array(transactionItemFormSchema).min(1, "At least one lot is required"),
+});
+
+export type TransactionItemForm = z.infer<typeof transactionItemFormSchema>;
+export type TransactionForm = z.infer<typeof transactionFormSchema>;
 
 // Dropdown options
 export const DISTRICTS = ["Ujjain", "Shajapur", "Indore", "Dewas", "Agar Malwa"] as const;
