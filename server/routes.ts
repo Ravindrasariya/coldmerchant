@@ -600,5 +600,116 @@ export async function registerRoutes(
     }
   });
 
+  // Transaction Routes
+  // GET /api/transactions - Get all transactions for the merchant
+  app.get("/api/transactions", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const txns = await storage.getTransactionsByMerchant(merchantId);
+      res.json(txns);
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      res.status(500).json({ message: "Failed to fetch transactions" });
+    }
+  });
+
+  // GET /api/inventory/unsold - Get unsold inventory for selection in transactions
+  app.get("/api/inventory/unsold", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const inventory = await storage.getUnsoldInventory(merchantId);
+      res.json(inventory);
+    } catch (error) {
+      console.error("Error fetching unsold inventory:", error);
+      res.status(500).json({ message: "Failed to fetch unsold inventory" });
+    }
+  });
+
+  // POST /api/transactions - Create a new transaction (Load a Truck)
+  app.post("/api/transactions", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { partyName, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
+
+      if (!items || items.length === 0) {
+        return res.status(400).json({ message: "At least one item is required" });
+      }
+
+      // Validate all lots exist and have enough bags
+      for (const item of items) {
+        const lot = await storage.getLotById(item.lotId, merchantId);
+        if (!lot) {
+          return res.status(400).json({ message: `Lot ${item.lotId} not found` });
+        }
+        if (lot.remainingBags < item.bagsMoved) {
+          return res.status(400).json({ 
+            message: `Not enough bags in lot. Available: ${lot.remainingBags}, Requested: ${item.bagsMoved}` 
+          });
+        }
+      }
+
+      // Get next transaction number
+      const transactionNumber = await storage.getNextTransactionNumber(merchantId);
+
+      // Calculate totals
+      let totalBags = 0;
+      let totalNetWeight = 0;
+      let totalCostOfGoods = 0;
+
+      const transactionItems = await Promise.all(items.map(async (item: any) => {
+        const lot = await storage.getLotById(item.lotId, merchantId);
+        const entry = await storage.getStockEntryById(lot!.stockEntryId, merchantId);
+        
+        const pricePerKg = lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+        const netWeight = item.netWeight || 0;
+        const costOfGoods = netWeight * pricePerKg;
+
+        totalBags += item.bagsMoved;
+        totalNetWeight += netWeight;
+        totalCostOfGoods += costOfGoods;
+
+        return {
+          merchantId,
+          lotId: item.lotId,
+          serialNumber: entry?.serialNumber || 0,
+          coldStoreName: lot?.coldStoreName || "",
+          bagsMoved: item.bagsMoved,
+          netWeight: netWeight.toString(),
+          pricePerKgSnapshot: pricePerKg.toString(),
+          costOfGoods: costOfGoods.toString(),
+        };
+      }));
+
+      // Calculate profit/loss
+      const revenueNum = parseFloat(revenue) || 0;
+      const advanceNum = parseFloat(advancePayment) || 0;
+      const transportNum = parseFloat(transportationCharges) || 0;
+      const otherNum = parseFloat(otherCharges) || 0;
+      const profitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
+
+      const transaction = await storage.createTransaction(
+        {
+          merchantId,
+          transactionNumber,
+          partyName: partyName || null,
+          advancePayment: advancePayment ? advancePayment.toString() : null,
+          transportationCharges: transportationCharges ? transportationCharges.toString() : null,
+          otherCharges: otherCharges ? otherCharges.toString() : null,
+          revenue: revenue ? revenue.toString() : null,
+          totalBags,
+          totalNetWeight: totalNetWeight.toString(),
+          totalCostOfGoods: totalCostOfGoods.toString(),
+          profitLoss: profitLoss.toString(),
+        },
+        transactionItems
+      );
+
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+      res.status(500).json({ message: "Failed to create transaction" });
+    }
+  });
+
   return httpServer;
 }

@@ -1,9 +1,12 @@
 import { 
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
+  transactions, transactionItems,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
-  type StockEntryEditHistory, type InsertStockEntryEditHistory, type ChangeSet
+  type StockEntryEditHistory, type InsertStockEntryEditHistory, type ChangeSet,
+  type Transaction, type InsertTransaction,
+  type TransactionItem, type InsertTransactionItem
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -57,6 +60,12 @@ export interface IStorage {
   // Edit History operations
   createEditHistory(stockEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<StockEntryEditHistory>;
   getEditHistory(stockEntryId: number, merchantId: number): Promise<(StockEntryEditHistory & { userName?: string })[]>;
+  
+  // Transaction operations
+  getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: TransactionItem[] })[]>;
+  createTransaction(transaction: InsertTransaction & { transactionNumber: number }, items: Omit<InsertTransactionItem, 'transactionId'>[]): Promise<Transaction & { items: TransactionItem[] }>;
+  getNextTransactionNumber(merchantId: number): Promise<number>;
+  getUnsoldInventory(merchantId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -294,6 +303,87 @@ export class DatabaseStorage implements IStorage {
     }));
     
     return result;
+  }
+
+  // Transaction operations
+  async getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: TransactionItem[] })[]> {
+    const txns = await db.select().from(transactions)
+      .where(eq(transactions.merchantId, merchantId))
+      .orderBy(desc(transactions.createdAt));
+    
+    const result = await Promise.all(txns.map(async (txn) => {
+      const items = await db.select().from(transactionItems)
+        .where(eq(transactionItems.transactionId, txn.id));
+      return { ...txn, items };
+    }));
+    
+    return result;
+  }
+
+  async createTransaction(
+    transaction: InsertTransaction & { transactionNumber: number }, 
+    items: Omit<InsertTransactionItem, 'transactionId'>[]
+  ): Promise<Transaction & { items: TransactionItem[] }> {
+    const [created] = await db.insert(transactions).values(transaction).returning();
+    
+    const createdItems: TransactionItem[] = [];
+    for (const item of items) {
+      const [createdItem] = await db.insert(transactionItems)
+        .values({ ...item, transactionId: created.id })
+        .returning();
+      createdItems.push(createdItem);
+      
+      // Decrement remaining bags on the lot
+      const lot = await this.getLotById(item.lotId, item.merchantId);
+      if (lot) {
+        const newRemaining = Math.max(0, lot.remainingBags - item.bagsMoved);
+        await this.updateLot(item.lotId, item.merchantId, { remainingBags: newRemaining });
+      }
+    }
+    
+    return { ...created, items: createdItems };
+  }
+
+  async getNextTransactionNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select()
+      .from(transactions)
+      .where(eq(transactions.merchantId, merchantId))
+      .orderBy(desc(transactions.transactionNumber))
+      .limit(1);
+    
+    return result ? result.transactionNumber + 1 : 1;
+  }
+
+  async getUnsoldInventory(merchantId: number): Promise<any[]> {
+    const allLots = await db.select().from(lots)
+      .where(eq(lots.merchantId, merchantId));
+    
+    const unsoldLots = allLots.filter(lot => lot.remainingBags > 0);
+    
+    const result = await Promise.all(unsoldLots.map(async (lot) => {
+      const [entry] = await db.select().from(stockEntries)
+        .where(eq(stockEntries.id, lot.stockEntryId));
+      
+      const breakdowns = await db.select().from(bagBreakdowns)
+        .where(eq(bagBreakdowns.lotId, lot.id));
+      
+      return {
+        lotId: lot.id,
+        serialNumber: entry?.serialNumber || 0,
+        coldStoreName: lot.coldStoreName,
+        farmerName: entry?.farmerName || "",
+        potatoType: lot.potatoType,
+        quality: lot.quality,
+        cutType: lot.cutType,
+        size: lot.size,
+        pricePerKg: lot.pricePerKg,
+        remainingBags: lot.remainingBags,
+        originalBags: lot.originalBags,
+        bagBreakdowns: breakdowns,
+      };
+    }));
+    
+    return result.sort((a, b) => a.serialNumber - b.serialNumber);
   }
 }
 
