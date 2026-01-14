@@ -337,6 +337,9 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   const totalCost = parseFloat(transaction.totalCostOfGoods || "0");
   const revenue = parseFloat(transaction.revenue || "0");
   const profitLoss = parseFloat(transaction.profitLoss || "0");
+  
+  // Get unique bag sizes from transaction items
+  const bagTypes = Array.from(new Set(transaction.items.map(item => item.size).filter(Boolean))) as string[];
 
   return (
     <Card className="hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
@@ -345,6 +348,11 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline">#{transaction.transactionNumber}</Badge>
+              {bagTypes.map((size) => (
+                <Badge key={size} variant="secondary" className="text-xs">
+                  {size}
+                </Badge>
+              ))}
               {transaction.partyName && (
                 <span className="font-semibold">{transaction.partyName}</span>
               )}
