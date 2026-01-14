@@ -635,17 +635,50 @@ export async function registerRoutes(
         return res.status(400).json({ message: "At least one item is required" });
       }
 
-      // Validate all lots exist and have enough bags
+      // Parse inventoryKey and validate
+      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number }[] = [];
+      
       for (const item of items) {
-        const lot = await storage.getLotById(item.lotId, merchantId);
+        // Parse inventoryKey format: "lotId-breakdownId" or "lotId-lot"
+        const [lotIdStr, breakdownPart] = (item.inventoryKey || "").split("-");
+        const lotId = parseInt(lotIdStr);
+        const breakdownId = breakdownPart === "lot" ? null : parseInt(breakdownPart);
+        
+        if (isNaN(lotId)) {
+          return res.status(400).json({ message: "Invalid lot selection" });
+        }
+
+        const lot = await storage.getLotById(lotId, merchantId);
         if (!lot) {
-          return res.status(400).json({ message: `Lot ${item.lotId} not found` });
+          return res.status(400).json({ message: `Lot ${lotId} not found` });
         }
-        if (lot.remainingBags < item.bagsMoved) {
-          return res.status(400).json({ 
-            message: `Not enough bags in lot. Available: ${lot.remainingBags}, Requested: ${item.bagsMoved}` 
-          });
+
+        // Check available bags based on breakdown or lot
+        if (breakdownId) {
+          const breakdown = await storage.getBagBreakdownById(breakdownId, merchantId);
+          if (!breakdown) {
+            return res.status(400).json({ message: `Breakdown ${breakdownId} not found` });
+          }
+          const available = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
+          if (available < item.bagsMoved) {
+            return res.status(400).json({ 
+              message: `Not enough bags. Available: ${available}, Requested: ${item.bagsMoved}` 
+            });
+          }
+        } else {
+          if (lot.remainingBags < item.bagsMoved) {
+            return res.status(400).json({ 
+              message: `Not enough bags in lot. Available: ${lot.remainingBags}, Requested: ${item.bagsMoved}` 
+            });
+          }
         }
+
+        parsedItems.push({
+          lotId,
+          breakdownId,
+          bagsMoved: item.bagsMoved,
+          netWeight: item.netWeight || 0,
+        });
       }
 
       // Get next transaction number
@@ -656,11 +689,25 @@ export async function registerRoutes(
       let totalNetWeight = 0;
       let totalCostOfGoods = 0;
 
-      const transactionItems = await Promise.all(items.map(async (item: any) => {
+      const transactionItems = await Promise.all(parsedItems.map(async (item) => {
         const lot = await storage.getLotById(item.lotId, merchantId);
         const entry = await storage.getStockEntryById(lot!.stockEntryId, merchantId);
         
-        const pricePerKg = lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+        // Get price from breakdown if available, otherwise from lot
+        let pricePerKg = 0;
+        let size: string | null = null;
+        if (item.breakdownId) {
+          const breakdown = await storage.getBagBreakdownById(item.breakdownId, merchantId);
+          pricePerKg = breakdown?.pricePerKg ? parseFloat(breakdown.pricePerKg) : 0;
+          size = breakdown?.size || null;
+        }
+        if (pricePerKg === 0 && lot?.pricePerKg) {
+          pricePerKg = parseFloat(lot.pricePerKg);
+        }
+        if (!size) {
+          size = lot?.size || null;
+        }
+        
         const netWeight = item.netWeight || 0;
         const costOfGoods = netWeight * pricePerKg;
 
@@ -671,8 +718,10 @@ export async function registerRoutes(
         return {
           merchantId,
           lotId: item.lotId,
+          breakdownId: item.breakdownId,
           serialNumber: entry?.serialNumber || 0,
           coldStoreName: lot?.coldStoreName || "",
+          size,
           bagsMoved: item.bagsMoved,
           netWeight: netWeight.toString(),
           pricePerKgSnapshot: pricePerKg.toString(),
@@ -682,7 +731,6 @@ export async function registerRoutes(
 
       // Calculate profit/loss
       const revenueNum = parseFloat(revenue) || 0;
-      const advanceNum = parseFloat(advancePayment) || 0;
       const transportNum = parseFloat(transportationCharges) || 0;
       const otherNum = parseFloat(otherCharges) || 0;
       const profitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;

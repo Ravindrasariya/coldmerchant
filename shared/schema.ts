@@ -110,8 +110,10 @@ export const transactionItems = pgTable("transaction_items", {
   transactionId: integer("transaction_id").notNull().references(() => transactions.id, { onDelete: "cascade" }),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   lotId: integer("lot_id").notNull().references(() => lots.id),
+  breakdownId: integer("breakdown_id").references(() => bagBreakdowns.id), // null for gate_cut lots
   serialNumber: integer("serial_number").notNull(), // cached from stock entry
   coldStoreName: text("cold_store_name").notNull(), // cached
+  size: text("size"), // cached size for display
   bagsMoved: integer("bags_moved").notNull(),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   pricePerKgSnapshot: decimal("price_per_kg_snapshot", { precision: 10, scale: 2 }),

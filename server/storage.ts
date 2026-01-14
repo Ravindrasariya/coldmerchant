@@ -333,11 +333,33 @@ export class DatabaseStorage implements IStorage {
         .returning();
       createdItems.push(createdItem);
       
-      // Decrement remaining bags on the lot
-      const lot = await this.getLotById(item.lotId, item.merchantId);
-      if (lot) {
-        const newRemaining = Math.max(0, lot.remainingBags - item.bagsMoved);
-        await this.updateLot(item.lotId, item.merchantId, { remainingBags: newRemaining });
+      // Decrement remaining bags on the breakdown (if exists) or lot
+      if (item.breakdownId) {
+        // Decrement from breakdown
+        const breakdown = await this.getBagBreakdownById(item.breakdownId, item.merchantId);
+        if (breakdown) {
+          const currentRemaining = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
+          const newRemaining = Math.max(0, currentRemaining - item.bagsMoved);
+          await this.updateBagBreakdown(item.breakdownId, item.merchantId, { remainingBags: newRemaining });
+        }
+        // Also update lot total remaining (sum of all non-wastage breakdowns)
+        const lot = await this.getLotById(item.lotId, item.merchantId);
+        if (lot) {
+          const allBreakdowns = await db.select().from(bagBreakdowns)
+            .where(eq(bagBreakdowns.lotId, item.lotId));
+          const totalRemaining = allBreakdowns
+            .filter(b => b.size !== "Wastage")
+            .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
+          // Subtract current item's bags from total since we just updated breakdown
+          await this.updateLot(item.lotId, item.merchantId, { remainingBags: totalRemaining - item.bagsMoved });
+        }
+      } else {
+        // Gate cut lot - decrement directly from lot
+        const lot = await this.getLotById(item.lotId, item.merchantId);
+        if (lot) {
+          const newRemaining = Math.max(0, lot.remainingBags - item.bagsMoved);
+          await this.updateLot(item.lotId, item.merchantId, { remainingBags: newRemaining });
+        }
       }
     }
     
@@ -360,40 +382,60 @@ export class DatabaseStorage implements IStorage {
     
     const unsoldLots = allLots.filter(lot => lot.remainingBags > 0);
     
-    const result = await Promise.all(unsoldLots.map(async (lot) => {
+    const results: any[] = [];
+    
+    for (const lot of unsoldLots) {
       const [entry] = await db.select().from(stockEntries)
         .where(eq(stockEntries.id, lot.stockEntryId));
       
       const breakdowns = await db.select().from(bagBreakdowns)
         .where(eq(bagBreakdowns.lotId, lot.id));
       
-      // Calculate available bags excluding wastage
-      let availableBags = lot.remainingBags;
       if (breakdowns.length > 0) {
-        // For bilty_cut: sum remainingBags from non-wastage breakdowns
-        availableBags = breakdowns
-          .filter(b => b.size !== "Wastage")
-          .reduce((sum, b) => sum + (b.remainingBags || b.numberOfBags || 0), 0);
+        // For bilty_cut: return one entry per non-wastage breakdown
+        for (const breakdown of breakdowns) {
+          if (breakdown.size === "Wastage") continue;
+          
+          const availableBags = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
+          if (availableBags <= 0) continue;
+          
+          results.push({
+            breakdownId: breakdown.id,
+            lotId: lot.id,
+            serialNumber: entry?.serialNumber || 0,
+            coldStoreName: lot.coldStoreName,
+            farmerName: entry?.farmerName || "",
+            potatoType: lot.potatoType,
+            quality: lot.quality,
+            cutType: lot.cutType,
+            size: breakdown.size,
+            pricePerKg: breakdown.pricePerKg || lot.pricePerKg,
+            remainingBags: availableBags,
+            originalBags: breakdown.numberOfBags,
+          });
+        }
+      } else {
+        // For gate_cut: return single entry for the lot
+        if (lot.remainingBags > 0) {
+          results.push({
+            breakdownId: null,
+            lotId: lot.id,
+            serialNumber: entry?.serialNumber || 0,
+            coldStoreName: lot.coldStoreName,
+            farmerName: entry?.farmerName || "",
+            potatoType: lot.potatoType,
+            quality: lot.quality,
+            cutType: lot.cutType,
+            size: lot.size,
+            pricePerKg: lot.pricePerKg,
+            remainingBags: lot.remainingBags,
+            originalBags: lot.originalBags,
+          });
+        }
       }
-      
-      return {
-        lotId: lot.id,
-        serialNumber: entry?.serialNumber || 0,
-        coldStoreName: lot.coldStoreName,
-        farmerName: entry?.farmerName || "",
-        potatoType: lot.potatoType,
-        quality: lot.quality,
-        cutType: lot.cutType,
-        size: lot.size,
-        pricePerKg: lot.pricePerKg,
-        remainingBags: availableBags,
-        originalBags: lot.originalBags,
-        bagBreakdowns: breakdowns,
-      };
-    }));
+    }
     
-    // Filter out lots with no available (non-wastage) bags
-    return result.filter(r => r.remainingBags > 0).sort((a, b) => a.serialNumber - b.serialNumber);
+    return results.sort((a, b) => a.serialNumber - b.serialNumber);
   }
 }
 

@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface UnsoldInventoryItem {
+  breakdownId: number | null;
   lotId: number;
   serialNumber: number;
   coldStoreName: string;
@@ -42,7 +43,7 @@ interface UnsoldInventoryItem {
 }
 
 const transactionItemSchema = z.object({
-  lotId: z.coerce.number().min(1, "Lot is required"),
+  inventoryKey: z.string().min(1, "Selection is required"),
   bagsMoved: z.coerce.number().min(1, "Must move at least 1 bag"),
   netWeight: z.coerce.number().optional(),
 });
@@ -80,9 +81,19 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
       transportationCharges: undefined,
       otherCharges: undefined,
       revenue: undefined,
-      items: [{ lotId: 0, bagsMoved: 0, netWeight: undefined }],
+      items: [{ inventoryKey: "", bagsMoved: 0, netWeight: undefined }],
     },
   });
+
+  // Helper to generate unique key for inventory item
+  const getInventoryKey = (item: UnsoldInventoryItem) => {
+    return `${item.lotId}-${item.breakdownId || 'lot'}`;
+  };
+
+  // Helper to find inventory item by key
+  const findInventoryByKey = (key: string) => {
+    return inventory.find(inv => getInventoryKey(inv) === key);
+  };
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -101,8 +112,8 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     let totalCostOfGoods = 0;
 
     watchedItems.forEach((item) => {
-      const lot = inventory.find((inv) => inv.lotId === item.lotId);
-      const pricePerKg = lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+      const invItem = findInventoryByKey(item.inventoryKey);
+      const pricePerKg = invItem?.pricePerKg ? parseFloat(invItem.pricePerKg) : 0;
       const netWeight = Number(item.netWeight) || 0;
       const costOfGoods = netWeight * pricePerKg;
 
@@ -152,13 +163,13 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     createMutation.mutate(data);
   };
 
-  const getSelectedLotIds = () => {
-    return watchedItems.map((item) => item.lotId).filter((id) => id > 0);
+  const getSelectedKeys = () => {
+    return watchedItems.map((item) => item.inventoryKey).filter((key) => key && key.length > 0);
   };
 
   const getItemCost = (item: typeof watchedItems[0]) => {
-    const lot = inventory.find((inv) => inv.lotId === item.lotId);
-    const pricePerKg = lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+    const invItem = findInventoryByKey(item.inventoryKey);
+    const pricePerKg = invItem?.pricePerKg ? parseFloat(invItem.pricePerKg) : 0;
     const netWeight = Number(item.netWeight) || 0;
     const cost = netWeight * pricePerKg;
     return isNaN(cost) ? 0 : cost;
@@ -201,7 +212,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => append({ lotId: 0, bagsMoved: 0, netWeight: undefined })}
+                onClick={() => append({ inventoryKey: "", bagsMoved: 0, netWeight: undefined })}
                 data-testid="button-add-lot"
               >
                 <Plus className="h-4 w-4 mr-1" />
@@ -211,9 +222,9 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
 
             {fields.map((field, index) => {
               const selectedItem = watchedItems[index];
-              const selectedLot = inventory.find((inv) => inv.lotId === selectedItem?.lotId);
+              const selectedInv = findInventoryByKey(selectedItem?.inventoryKey || "");
               const itemCost = getItemCost(selectedItem);
-              const selectedLotIds = getSelectedLotIds();
+              const selectedKeys = getSelectedKeys();
 
               return (
                 <Card key={field.id}>
@@ -222,12 +233,12 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                       <div className="col-span-5">
                         <Label className="text-xs">{t("Lot", "लॉट")}</Label>
                         <Select
-                          value={selectedItem?.lotId?.toString() || ""}
+                          value={selectedItem?.inventoryKey || ""}
                           onValueChange={(value) => {
-                            form.setValue(`items.${index}.lotId`, parseInt(value));
-                            const lot = inventory.find((inv) => inv.lotId === parseInt(value));
-                            if (lot) {
-                              form.setValue(`items.${index}.bagsMoved`, lot.remainingBags);
+                            form.setValue(`items.${index}.inventoryKey`, value);
+                            const inv = findInventoryByKey(value);
+                            if (inv) {
+                              form.setValue(`items.${index}.bagsMoved`, inv.remainingBags);
                             }
                           }}
                         >
@@ -236,12 +247,18 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                           </SelectTrigger>
                           <SelectContent>
                             {inventory
-                              .filter((inv) => !selectedLotIds.includes(inv.lotId) || inv.lotId === selectedItem?.lotId)
-                              .map((inv) => (
-                                <SelectItem key={inv.lotId} value={inv.lotId.toString()}>
-                                  S#{inv.serialNumber} - {inv.coldStoreName} ({inv.remainingBags} {t("bags", "बोरी")})
-                                </SelectItem>
-                              ))}
+                              .filter((inv) => {
+                                const key = getInventoryKey(inv);
+                                return !selectedKeys.includes(key) || key === selectedItem?.inventoryKey;
+                              })
+                              .map((inv) => {
+                                const key = getInventoryKey(inv);
+                                return (
+                                  <SelectItem key={key} value={key}>
+                                    S#{inv.serialNumber} - {inv.coldStoreName} - {inv.size || "Mixed"} ({inv.remainingBags} {t("bags", "बोरी")})
+                                  </SelectItem>
+                                );
+                              })}
                           </SelectContent>
                         </Select>
                       </div>
@@ -251,7 +268,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                         <Input
                           type="number"
                           {...form.register(`items.${index}.bagsMoved`)}
-                          max={selectedLot?.remainingBags || 999}
+                          max={selectedInv?.remainingBags || 999}
                           data-testid={`input-bags-${index}`}
                         />
                       </div>
@@ -288,12 +305,12 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                       </div>
                     </div>
 
-                    {selectedLot && (
+                    {selectedInv && (
                       <div className="text-xs text-muted-foreground grid grid-cols-4 gap-2">
-                        <span>{selectedLot.potatoType}</span>
-                        <span>{selectedLot.quality}</span>
-                        <span>{selectedLot.pricePerKg ? `₹${selectedLot.pricePerKg}/kg` : "—"}</span>
-                        <span>{t("Available:", "उपलब्ध:")} {selectedLot.remainingBags}</span>
+                        <span>{selectedInv.potatoType}</span>
+                        <span>{selectedInv.quality} - {selectedInv.size || "Mixed"}</span>
+                        <span>{selectedInv.pricePerKg ? `₹${selectedInv.pricePerKg}/kg` : "—"}</span>
+                        <span>{t("Available:", "उपलब्ध:")} {selectedInv.remainingBags}</span>
                       </div>
                     )}
                   </CardContent>
