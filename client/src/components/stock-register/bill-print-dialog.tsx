@@ -91,16 +91,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     const lotsHtml = entry.lots.map((lot) => {
       let breakdownHtml = "";
       
-      if (lot.cutType === "gate_cut" && lot.size) {
-        breakdownHtml = `
-          <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin-top: 12px;">
-            <p style="margin: 0;"><span style="color: #666;">Size / आकार:</span> ${getSizeBilingual(lot.size)}</p>
-            ${lot.pricePerKg ? `<p style="margin: 4px 0 0 0;"><span style="color: #666;">Price/kg / मूल्य प्रति किलो:</span> ₹${parseFloat(lot.pricePerKg).toFixed(2)}</p>` : ""}
-          </div>
-        `;
-      }
-      
-      if (lot.cutType === "bilty_cut" && lot.bagBreakdowns.length > 0) {
+      if (lot.bagBreakdowns.length > 0) {
         const rows = lot.bagBreakdowns.map((bd) => {
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
@@ -131,6 +122,13 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               ${rows}
             </tbody>
           </table>
+        `;
+      } else if (lot.cutType === "gate_cut" && lot.size) {
+        breakdownHtml = `
+          <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin-top: 12px;">
+            <p style="margin: 0;"><span style="color: #666;">Size / आकार:</span> ${getSizeBilingual(lot.size)}</p>
+            ${lot.pricePerKg ? `<p style="margin: 4px 0 0 0;"><span style="color: #666;">Price/kg / मूल्य प्रति किलो:</span> ₹${parseFloat(lot.pricePerKg).toFixed(2)}</p>` : ""}
+          </div>
         `;
       }
 
@@ -316,14 +314,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                     </div>
                   </div>
 
-                  {lot.cutType === "gate_cut" && lot.size && (
-                    <div className="text-sm bg-gray-100 rounded p-3">
-                      <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
-                      {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat(lot.pricePerKg).toFixed(2)}</p>}
-                    </div>
-                  )}
-
-                  {lot.cutType === "bilty_cut" && lot.bagBreakdowns.length > 0 && (
+                  {lot.bagBreakdowns.length > 0 ? (
                     <table className="w-full text-sm mt-3 border-collapse">
                       <thead>
                         <tr className="border-b bg-gray-100">
@@ -351,6 +342,11 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                         })}
                       </tbody>
                     </table>
+                  ) : lot.cutType === "gate_cut" && lot.size && (
+                    <div className="text-sm bg-gray-100 rounded p-3">
+                      <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
+                      {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat(lot.pricePerKg).toFixed(2)}</p>}
+                    </div>
                   )}
 
                   {lot.remarks && (
