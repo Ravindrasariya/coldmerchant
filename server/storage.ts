@@ -44,12 +44,14 @@ export interface IStorage {
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: number, merchantId: number, data: Partial<Lot>): Promise<Lot | undefined>;
   getLotsByStockEntry(stockEntryId: number, merchantId: number): Promise<Lot[]>;
+  getLotById(id: number, merchantId: number): Promise<Lot | undefined>;
   
   // Bag Breakdown operations
   createBagBreakdown(breakdown: InsertBagBreakdown): Promise<BagBreakdown>;
   updateBagBreakdown(id: number, merchantId: number, data: Partial<BagBreakdown>): Promise<BagBreakdown | undefined>;
   deleteBagBreakdown(id: number, merchantId: number): Promise<void>;
   getBagBreakdownsByLot(lotId: number, merchantId: number): Promise<BagBreakdown[]>;
+  getBagBreakdownById(id: number, merchantId: number): Promise<BagBreakdown | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -222,6 +224,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(lots.stockEntryId, stockEntryId), eq(lots.merchantId, merchantId)));
   }
 
+  async getLotById(id: number, merchantId: number): Promise<Lot | undefined> {
+    const [lot] = await db.select().from(lots)
+      .where(and(eq(lots.id, id), eq(lots.merchantId, merchantId)));
+    return lot || undefined;
+  }
+
   // Bag Breakdown operations
   async createBagBreakdown(breakdown: InsertBagBreakdown): Promise<BagBreakdown> {
     const [created] = await db.insert(bagBreakdowns).values(breakdown).returning();
@@ -244,6 +252,12 @@ export class DatabaseStorage implements IStorage {
   async getBagBreakdownsByLot(lotId: number, merchantId: number): Promise<BagBreakdown[]> {
     return await db.select().from(bagBreakdowns)
       .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+  }
+
+  async getBagBreakdownById(id: number, merchantId: number): Promise<BagBreakdown | undefined> {
+    const [breakdown] = await db.select().from(bagBreakdowns)
+      .where(and(eq(bagBreakdowns.id, id), eq(bagBreakdowns.merchantId, merchantId)));
+    return breakdown || undefined;
   }
 }
 

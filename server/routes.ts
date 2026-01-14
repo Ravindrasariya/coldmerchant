@@ -227,6 +227,59 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/bag-breakdowns/:id/sell - Mark bags as sold for a specific breakdown
+  app.post("/api/bag-breakdowns/:id/sell", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const breakdownId = parseInt(req.params.id);
+      const { quantity } = req.body;
+
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Invalid quantity. Must be a positive number." });
+      }
+
+      // Get the breakdown
+      const breakdown = await storage.getBagBreakdownById(breakdownId, merchantId);
+      
+      if (!breakdown) {
+        return res.status(404).json({ message: "Breakdown not found" });
+      }
+
+      const currentRemaining = breakdown.remainingBags ?? breakdown.numberOfBags;
+      if (quantity > currentRemaining) {
+        return res.status(400).json({ 
+          message: `Cannot sell ${quantity} bags. Only ${currentRemaining} remaining.` 
+        });
+      }
+
+      // Update the breakdown
+      const newRemaining = currentRemaining - quantity;
+      await storage.updateBagBreakdown(breakdownId, merchantId, {
+        remainingBags: newRemaining,
+      });
+
+      // Update the lot's remaining bags
+      const lot = await storage.getLotById(breakdown.lotId, merchantId);
+      if (lot) {
+        const allBreakdowns = await storage.getBagBreakdownsByLot(breakdown.lotId, merchantId);
+        const totalRemaining = allBreakdowns.reduce((sum, bd) => {
+          if (bd.size === "Wastage") return sum;
+          if (bd.id === breakdownId) return sum + newRemaining;
+          return sum + (bd.remainingBags ?? bd.numberOfBags);
+        }, 0);
+        
+        await storage.updateLot(breakdown.lotId, merchantId, {
+          remainingBags: totalRemaining,
+        });
+      }
+
+      res.json({ success: true, remainingBags: newRemaining });
+    } catch (error) {
+      console.error("Error marking bags as sold:", error);
+      res.status(500).json({ message: "Failed to mark bags as sold" });
+    }
+  });
+
   // ============= ADMIN ROUTES =============
   
   // GET /api/admin/merchants - Get all merchants (admin only)
