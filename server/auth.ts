@@ -86,8 +86,10 @@ export function setupAuth(app: Express) {
           const merchant = await storage.getMerchant(user.merchantId);
           merchantName = merchant?.name;
         }
+        // Remove password from response
+        const { password: _, ...userWithoutPassword } = user;
         res.status(200).json({
-          ...user,
+          ...userWithoutPassword,
           merchantName,
         });
       });
@@ -112,8 +114,10 @@ export function setupAuth(app: Express) {
       const merchant = await storage.getMerchant(req.user.merchantId);
       merchantName = merchant?.name;
     }
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = req.user;
     res.json({
-      ...req.user,
+      ...userWithoutPassword,
       merchantName,
     });
   });
