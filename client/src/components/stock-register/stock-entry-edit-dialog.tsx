@@ -58,6 +58,7 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    coldStoreChargesPerBag: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
@@ -84,6 +85,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [lots, setLots] = useState(entry.lots.map(lot => ({
     ...lot,
+    coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
     bagBreakdowns: lot.bagBreakdowns.map(bd => ({
       ...bd,
       remainingBags: bd.remainingBags ?? bd.numberOfBags,
@@ -289,6 +291,16 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   ) => {
     const newLots = [...lots];
     (newLots[lotIndex].bagBreakdowns[breakdownIndex] as any)[field] = value;
+    setLots(newLots);
+  };
+
+  const handleLotFieldChange = (
+    lotIndex: number,
+    field: string,
+    value: number | null
+  ) => {
+    const newLots = [...lots];
+    (newLots[lotIndex] as any)[field] = value;
     setLots(newLots);
   };
 
@@ -598,6 +610,39 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     </div>
                   </CardContent>
                 )}
+                
+                {/* Cold Store Charges Section - applies to all cut types */}
+                <CardContent className="pt-0 border-t">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-md">
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Cold Store Charges/Bag", "कोल्ड स्टोर शुल्क/बोरी")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="h-8"
+                        placeholder="₹0"
+                        value={lot.coldStoreChargesPerBag ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          handleLotFieldChange(lotIndex, "coldStoreChargesPerBag", val === "" ? null : parseFloat(val));
+                        }}
+                        data-testid={`edit-coldstore-charge-${lotIndex}`}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
+                      <p className="font-medium mt-1">{lot.originalBags}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">{t("Cold Store Due", "कोल्ड स्टोर बकाया")}</Label>
+                      <p className="font-medium text-orange-600 dark:text-orange-400 mt-1">
+                        {lot.coldStoreChargesPerBag !== null 
+                          ? `₹${(lot.originalBags * (lot.coldStoreChargesPerBag as number)).toFixed(2)}`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>

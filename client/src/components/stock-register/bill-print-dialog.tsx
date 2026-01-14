@@ -33,6 +33,7 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    coldStoreChargesPerBag: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;

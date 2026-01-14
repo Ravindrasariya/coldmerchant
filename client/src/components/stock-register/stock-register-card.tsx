@@ -41,6 +41,7 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    coldStoreChargesPerBag: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
@@ -92,6 +93,9 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const sellableBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
   const wastageBreakdowns = lot.bagBreakdowns.filter(bd => bd.size === "Wastage");
   
+  const coldStoreChargesPerBag = lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null;
+  const coldStoreDue = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : null;
+  
   return {
     originalBags: lot.originalBags,
     wastageBags,
@@ -101,6 +105,8 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     totalWeight,
     totalAmount,
     pricePerKg: lot.pricePerKg ? parseFloat(lot.pricePerKg) : null,
+    coldStoreChargesPerBag,
+    coldStoreDue,
     sellableBreakdowns,
     wastageBreakdowns,
   };
@@ -544,6 +550,18 @@ export function StockRegisterCard() {
                             <div className="mt-2 text-sm text-muted-foreground">
                               <span>{t("Price:", "मूल्य:")}</span>{" "}
                               <span className="font-medium text-foreground">₹{metrics.pricePerKg}/kg</span>
+                            </div>
+                          )}
+
+                          {metrics.coldStoreDue !== null && (
+                            <div className="mt-2 text-sm">
+                              <span className="text-muted-foreground">{t("Cold Store Due:", "कोल्ड स्टोर बकाया:")}</span>{" "}
+                              <span className="font-medium text-orange-600 dark:text-orange-400">
+                                ₹{metrics.coldStoreDue.toFixed(2)}
+                              </span>
+                              <span className="text-xs text-muted-foreground ml-1">
+                                ({metrics.originalBags} × ₹{metrics.coldStoreChargesPerBag})
+                              </span>
                             </div>
                           )}
                           
