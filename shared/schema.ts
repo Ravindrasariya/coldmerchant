@@ -58,6 +58,7 @@ export const lots = pgTable("lots", {
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // charges per bag from cold store
+  coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges
   remainingBags: integer("remaining_bags").notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -141,12 +142,13 @@ export const cashEntries = pgTable("cash_entries", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   direction: text("direction").notNull(), // "inward" or "outflow"
   receiptType: text("receipt_type"), // For inward: "cash_received", "account_received"
-  expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer"
+  expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"
   paymentMode: text("payment_mode"), // For outflow: "cash", "account_transfer"
   partyName: text("party_name"), // For inward: buyer name from transactions
   partyVillage: text("party_village"), // For inward: buyer location
   farmerName: text("farmer_name"), // For farmer outflow
   farmerVillage: text("farmer_village"), // For farmer outflow
+  coldStoreName: text("cold_store_name"), // For cold store charge payment outflow
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
@@ -163,6 +165,16 @@ export const cashEntryAllocations = pgTable("cash_entry_allocations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Cold Store Charge Allocations - tracks which lots a cold store payment was applied to (FIFO)
+export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations", {
+  id: serial("id").primaryKey(),
+  cashEntryId: integer("cash_entry_id").notNull().references(() => cashEntries.id, { onDelete: "cascade" }),
+  lotId: integer("lot_id").notNull().references(() => lots.id),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -173,6 +185,7 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   transactionItems: many(transactionItems),
   cashEntries: many(cashEntries),
   cashEntryAllocations: many(cashEntryAllocations),
+  coldStoreChargeAllocations: many(coldStoreChargeAllocations),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -291,6 +304,21 @@ export const cashEntryAllocationsRelations = relations(cashEntryAllocations, ({ 
   }),
 }));
 
+export const coldStoreChargeAllocationsRelations = relations(coldStoreChargeAllocations, ({ one }) => ({
+  cashEntry: one(cashEntries, {
+    fields: [coldStoreChargeAllocations.cashEntryId],
+    references: [cashEntries.id],
+  }),
+  lot: one(lots, {
+    fields: [coldStoreChargeAllocations.lotId],
+    references: [lots.id],
+  }),
+  merchant: one(merchants, {
+    fields: [coldStoreChargeAllocations.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertMerchantSchema = createInsertSchema(merchants).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -303,6 +331,7 @@ export const insertTransactionItemSchema = createInsertSchema(transactionItems).
 export const insertTransactionEditHistorySchema = createInsertSchema(transactionEditHistory).omit({ id: true, changedAt: true });
 export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, createdAt: true });
 export const insertCashEntryAllocationSchema = createInsertSchema(cashEntryAllocations).omit({ id: true, createdAt: true });
+export const insertColdStoreChargeAllocationSchema = createInsertSchema(coldStoreChargeAllocations).omit({ id: true, createdAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -337,6 +366,9 @@ export type InsertCashEntry = z.infer<typeof insertCashEntrySchema>;
 
 export type CashEntryAllocation = typeof cashEntryAllocations.$inferSelect;
 export type InsertCashEntryAllocation = z.infer<typeof insertCashEntryAllocationSchema>;
+
+export type ColdStoreChargeAllocation = typeof coldStoreChargeAllocations.$inferSelect;
+export type InsertColdStoreChargeAllocation = z.infer<typeof insertColdStoreChargeAllocationSchema>;
 
 // Change types for edit history
 export type FieldChange = {
@@ -423,6 +455,6 @@ export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
 export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
-export const EXPENSE_TYPES = ["salary", "general_expense", "grading", "hammali", "farmer"] as const;
+export const EXPENSE_TYPES = ["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
