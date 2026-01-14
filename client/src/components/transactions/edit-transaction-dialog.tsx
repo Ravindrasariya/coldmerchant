@@ -27,6 +27,9 @@ interface TransactionItem {
   size: string | null;
   bagsMoved: number;
   netWeight: string | null;
+  pricePerKgSnapshot: string | null;
+  costOfGoods: string | null;
+  revenue: string | null;
 }
 
 interface UnsoldInventoryItem {
@@ -37,6 +40,7 @@ interface UnsoldInventoryItem {
   potatoType: string;
   size: string | null;
   remainingBags: number;
+  pricePerKg: string | null;
 }
 
 interface EditableItem {
@@ -51,6 +55,10 @@ interface EditableItem {
   originalBags: number;
   netWeight: number;
   originalNetWeight: number;
+  pricePerKg: number;
+  costOfGoods: number;
+  revenue: number;
+  originalRevenue: number;
   inventoryKey?: string;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
@@ -96,7 +104,6 @@ const editTransactionSchema = z.object({
   amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
-  revenue: z.coerce.number().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -171,7 +178,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       amountReceived: undefined,
       transportationCharges: undefined,
       otherCharges: undefined,
-      revenue: undefined,
     },
   });
 
@@ -185,7 +191,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
-        revenue: transaction.revenue ? parseFloat(transaction.revenue) : undefined,
       });
       setEditableItems(transaction.items.map(item => ({
         id: item.id,
@@ -199,6 +204,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         originalBags: item.bagsMoved,
         netWeight: parseFloat(item.netWeight || "0"),
         originalNetWeight: parseFloat(item.netWeight || "0"),
+        pricePerKg: parseFloat(item.pricePerKgSnapshot || "0"),
+        costOfGoods: parseFloat(item.costOfGoods || "0"),
+        revenue: parseFloat(item.revenue || "0"),
+        originalRevenue: parseFloat(item.revenue || "0"),
         action: 'keep' as const
       })));
     }
@@ -237,6 +246,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         inventoryKey: item.inventoryKey,
         bagsMoved: item.bagsMoved,
         netWeight: item.netWeight,
+        revenue: item.revenue,
         action: item.action
       }));
       return apiRequest("PUT", `/api/transactions/${transactionId}/items`, { items: itemsToSend });
@@ -278,9 +288,25 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
       const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
+      const newCostOfGoods = newWeight * item.pricePerKg;
       return {
         ...item,
         netWeight: newWeight,
+        costOfGoods: newCostOfGoods,
+        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+      };
+    }));
+  };
+
+  const handleRevenueChange = (index: number, newRevenue: number) => {
+    setEditableItems(items => items.map((item, i) => {
+      if (i !== index) return item;
+      const hasChanges = item.bagsMoved !== item.originalBags || 
+                        item.netWeight !== item.originalNetWeight ||
+                        newRevenue !== item.originalRevenue;
+      return {
+        ...item,
+        revenue: newRevenue,
         action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
       };
     }));
@@ -320,6 +346,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     );
     if (!inv) return;
     
+    const pricePerKg = parseFloat(inv.pricePerKg || "0");
+    const costOfGoods = newItemWeight * pricePerKg;
+    
     setEditableItems(items => [...items, {
       lotId: inv.lotId,
       breakdownId: inv.breakdownId,
@@ -331,6 +360,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       originalBags: 0,
       netWeight: newItemWeight,
       originalNetWeight: 0,
+      pricePerKg: pricePerKg,
+      costOfGoods: costOfGoods,
+      revenue: 0,
+      originalRevenue: 0,
       inventoryKey: selectedInventory,
       action: 'add' as const
     }]);
@@ -442,7 +475,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       placeholder={t("Bags", "बोरी")}
                       value={newItemBags || ""}
                       onChange={(e) => setNewItemBags(parseInt(e.target.value) || 0)}
-                      className="w-24"
+                      className="w-24 no-spinner"
                       data-testid="input-new-item-bags"
                     />
                     <Input
@@ -452,7 +485,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       placeholder={t("Weight (Kg)", "वजन (किग्रा)")}
                       value={newItemWeight || ""}
                       onChange={(e) => setNewItemWeight(parseFloat(e.target.value) || 0)}
-                      className="w-28"
+                      className="w-28 no-spinner"
                       data-testid="input-new-item-weight"
                     />
                     <Button type="button" size="sm" onClick={handleAddItem} data-testid="button-confirm-add">
@@ -462,36 +495,55 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </div>
               )}
 
-              {editableItems.map((item, index) => 
-                item.action === 'remove' ? null : (
-                  <div key={item.id || `new-${index}`} className="flex items-center gap-2 text-sm flex-wrap">
-                    <span className="flex-1 min-w-[150px]">
+              {/* Header row */}
+              <div className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
+                <span>{t("Lot Details", "लॉट विवरण")}</span>
+                <span className="text-right">{t("Bags", "बोरी")}</span>
+                <span className="text-right">{t("Weight", "वजन")}</span>
+                <span className="text-right">{t("Revenue", "राजस्व")}</span>
+                <span className="text-right">{t("P&L", "लाभ/हानि")}</span>
+                <span></span>
+              </div>
+
+              {editableItems.map((item, index) => {
+                if (item.action === 'remove') return null;
+                const itemCost = item.netWeight * item.pricePerKg;
+                const itemPL = item.revenue - itemCost;
+                return (
+                  <div key={item.id || `new-${index}`} className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 items-center text-sm py-1">
+                    <span className="truncate text-xs">
                       S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
                     </span>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.bagsMoved}
-                        onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
-                        className="w-16 h-8"
-                        data-testid={`input-item-bags-${index}`}
-                      />
-                      <span className="text-muted-foreground text-xs">{t("bags", "बोरी")}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={item.netWeight === 0 ? "" : item.netWeight}
-                        onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
-                        className="w-20 h-8"
-                        placeholder="0"
-                        data-testid={`input-item-weight-${index}`}
-                      />
-                      <span className="text-muted-foreground text-xs">{t("Kg", "किग्रा")}</span>
-                    </div>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.bagsMoved || ""}
+                      onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
+                      className="h-8 text-right no-spinner"
+                      data-testid={`input-item-bags-${index}`}
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={item.netWeight || ""}
+                      onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
+                      className="h-8 text-right no-spinner"
+                      placeholder="0"
+                      data-testid={`input-item-weight-${index}`}
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      value={item.revenue || ""}
+                      onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
+                      className="h-8 text-right no-spinner"
+                      placeholder="₹0"
+                      data-testid={`input-item-revenue-${index}`}
+                    />
+                    <span className={`text-right text-xs font-medium ${itemPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {itemPL >= 0 ? "+" : ""}₹{itemPL.toFixed(0)}
+                    </span>
                     <Button 
                       type="button" 
                       variant="ghost" 
@@ -503,15 +555,30 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                )
-              )}
+                );
+              })}
 
-              <div className="border-t pt-2 mt-2 flex justify-between font-medium text-sm">
+              {/* Totals row - aligned with inputs */}
+              <div className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
                 <span>{t("Total", "कुल")}</span>
-                <span className="flex gap-3">
-                  <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)} {t("bags", "बोरी")}</span>
-                  <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)} {t("Kg", "किग्रा")}</span>
+                <span className="text-right h-8 flex items-center justify-end">
+                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)}
                 </span>
+                <span className="text-right h-8 flex items-center justify-end">
+                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)}
+                </span>
+                <span className="text-right h-8 flex items-center justify-end">
+                  ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(0)}
+                </span>
+                <span className={`text-right h-8 flex items-center justify-end ${
+                  editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 
+                    ? "text-green-600 dark:text-green-400" 
+                    : "text-red-600 dark:text-red-400"
+                }`}>
+                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "+" : ""}
+                  ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0).toFixed(0)}
+                </span>
+                <span></span>
               </div>
 
               {hasItemChanges && (
@@ -605,19 +672,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="revenue"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Revenue", "राजस्व")} (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-revenue" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div>
+                    <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
+                    <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
+                      ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(0)}
+                      <span className="text-xs text-muted-foreground ml-2">({t("sum of lot revenues", "लॉट राजस्व का योग")})</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -651,8 +712,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </div>
 
                 <ProfitLossDisplay 
-                  totalCostOfGoods={parseFloat(transaction.totalCostOfGoods || "0")}
-                  revenue={form.watch("revenue") || 0}
+                  totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight * i.pricePerKg), 0)}
+                  revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0)}
                   transportationCharges={form.watch("transportationCharges") || 0}
                   otherCharges={form.watch("otherCharges") || 0}
                 />
