@@ -1188,6 +1188,7 @@ export async function registerRoutes(
 
       // Determine if FIFO should be applied
       const applyFIFO = (direction === "inward" && !!partyName) || 
+                        (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 
       // Create the cash entry with FIFO allocation in a single transaction
