@@ -59,7 +59,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     .reduce((sum, bd) => sum + bd.numberOfBags, 0);
   
   const actualSellableBags = lot.originalBags - wastageBags;
-  const remainingToSell = lot.remainingBags;
+  const remainingToSell = Math.min(lot.remainingBags, actualSellableBags);
   const soldBags = actualSellableBags - remainingToSell;
   
   let totalWeight = 0;
