@@ -405,14 +405,17 @@ export function StockRegisterCard() {
                   
                   <div className="mt-2 text-sm">
                     <span className="text-muted-foreground">{t("Total:", "कुल:")}</span>{" "}
-                    <span className="text-primary font-bold">{totalRemaining}</span>
-                    <span className="text-muted-foreground">/</span>
-                    <span className="font-medium">{totalActual}</span>
                     {totalWastage > 0 && (
-                      <span className="text-muted-foreground ml-1">
-                        ({totalWastage} {t("Wastage", "कचरा")})
-                      </span>
+                      <>
+                        <span className="font-medium">{totalActual}/{totalOriginal}</span>
+                        <span className="text-muted-foreground ml-1">
+                          ({totalWastage} {t("Wastage", "कचरा")})
+                        </span>
+                        <span className="text-muted-foreground">, </span>
+                      </>
                     )}
+                    <span className="text-primary font-bold">{totalRemaining}</span>
+                    <span className="text-muted-foreground">/{totalActual}</span>
                   </div>
                 </CardHeader>
                 
@@ -458,6 +461,13 @@ export function StockRegisterCard() {
                             </div>
                             
                             <div className="text-sm">
+                              {metrics.wastageBags > 0 && (
+                                <>
+                                  <span className="text-muted-foreground">{t("Original", "मूल")} #</span>
+                                  <span className="font-medium">{metrics.originalBags}</span>
+                                  <span className="text-muted-foreground">, {t("Actual", "वास्तविक")} </span>
+                                </>
+                              )}
                               <span className="font-mono font-bold text-primary">{metrics.remainingToSell}</span>
                               <span className="text-muted-foreground">/{metrics.actualSellableBags}</span>
                               {metrics.wastageBags > 0 && (
