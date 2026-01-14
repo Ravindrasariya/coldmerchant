@@ -18,6 +18,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
 import { StockRegisterTable } from "@/components/stock-register/stock-register-table";
 import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/hooks/use-language";
 import { 
   PackagePlus, 
   ClipboardList, 
@@ -31,6 +32,7 @@ import {
 export default function HomePage() {
   const [, setLocation] = useLocation();
   const { user, logoutMutation, changePasswordMutation } = useAuth();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("stock-entry");
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
@@ -132,17 +134,17 @@ export default function HomePage() {
                 {user?.isSystemAdmin && (
                   <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
                     <Settings className="h-4 w-4 mr-2" />
-                    Admin Panel
+                    {t("Admin Panel", "एडमिन पैनल")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
                   <KeyRound className="h-4 w-4 mr-2" />
-                  Change Password
+                  {t("Change Password", "पासवर्ड बदलें")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
                   <LogOut className="h-4 w-4 mr-2" />
-                  Logout
+                  {t("Logout", "लॉगआउट")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -155,20 +157,20 @@ export default function HomePage() {
           <TabsList className="grid w-full max-w-md grid-cols-2 mx-auto">
             <TabsTrigger value="stock-entry" className="flex items-center gap-2" data-testid="tab-stock-entry">
               <PackagePlus className="h-4 w-4" />
-              Stock Entry
+              {t("Stock Entry", "स्टॉक एंट्री")}
             </TabsTrigger>
             <TabsTrigger value="stock-register" className="flex items-center gap-2" data-testid="tab-stock-register">
               <ClipboardList className="h-4 w-4" />
-              Stock Register
+              {t("Stock Register", "स्टॉक रजिस्टर")}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="stock-entry" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Stock Entry</h1>
+                <h1 className="text-2xl font-semibold">{t("Stock Entry", "स्टॉक एंट्री")}</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Record new potato purchases from farmers
+                  {t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")}
                 </p>
               </div>
             </div>
@@ -180,9 +182,9 @@ export default function HomePage() {
           <TabsContent value="stock-register" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Stock Register</h1>
+                <h1 className="text-2xl font-semibold">{t("Stock Register", "स्टॉक रजिस्टर")}</h1>
                 <p className="text-sm text-muted-foreground mt-1">
-                  View and manage all stock entries
+                  {t("View and manage all stock entries", "सभी स्टॉक एंट्री देखें और प्रबंधित करें")}
                 </p>
               </div>
             </div>
@@ -192,10 +194,10 @@ export default function HomePage() {
 
         <footer className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
           <div>
-            Need help? Please reach out to <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
+            {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
           </div>
           <div>
-            Powered by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+            {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
           </div>
         </footer>
       </main>
@@ -207,57 +209,57 @@ export default function HomePage() {
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isFirstLoginDialog ? "Set New Password" : "Change Password"}</DialogTitle>
+            <DialogTitle>{isFirstLoginDialog ? t("Set New Password", "नया पासवर्ड सेट करें") : t("Change Password", "पासवर्ड बदलें")}</DialogTitle>
           </DialogHeader>
           {isFirstLoginDialog && (
             <p className="text-sm text-muted-foreground">
-              Please set a new password to continue. This is required on first login.
+              {t("Please set a new password to continue. This is required on first login.", "जारी रखने के लिए कृपया नया पासवर्ड सेट करें। पहले लॉगिन पर यह आवश्यक है।")}
             </p>
           )}
           <div className="space-y-4 py-4">
             {!isFirstLoginDialog && (
               <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
+                <Label htmlFor="current-password">{t("Current Password", "वर्तमान पासवर्ड")}</Label>
                 <Input
                   id="current-password"
                   type="password"
                   value={passwordForm.currentPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder="Enter current password"
+                  placeholder={t("Enter current password", "वर्तमान पासवर्ड दर्ज करें")}
                   data-testid="input-current-password"
                 />
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{t("New Password", "नया पासवर्ड")}</Label>
               <Input
                 id="new-password"
                 type="password"
                 value={passwordForm.newPassword}
                 onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                placeholder="Enter new password (min 6 characters)"
+                placeholder={t("Enter new password (min 6 characters)", "नया पासवर्ड दर्ज करें (न्यूनतम 6 अक्षर)")}
                 data-testid="input-new-password"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Label htmlFor="confirm-password">{t("Confirm New Password", "नए पासवर्ड की पुष्टि करें")}</Label>
               <Input
                 id="confirm-password"
                 type="password"
                 value={passwordForm.confirmPassword}
                 onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                placeholder="Confirm new password"
+                placeholder={t("Confirm new password", "नए पासवर्ड की पुष्टि करें")}
                 data-testid="input-confirm-password"
               />
               {passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword && (
-                <p className="text-sm text-destructive">Passwords do not match</p>
+                <p className="text-sm text-destructive">{t("Passwords do not match", "पासवर्ड मेल नहीं खाते")}</p>
               )}
             </div>
           </div>
           <DialogFooter>
             {!isFirstLoginDialog && (
               <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
-                Cancel
+                {t("Cancel", "रद्द करें")}
               </Button>
             )}
             <Button
@@ -274,7 +276,7 @@ export default function HomePage() {
               {changePasswordMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              {isFirstLoginDialog ? "Set Password" : "Change Password"}
+              {isFirstLoginDialog ? t("Set Password", "पासवर्ड सेट करें") : t("Change Password", "पासवर्ड बदलें")}
             </Button>
           </DialogFooter>
         </DialogContent>
