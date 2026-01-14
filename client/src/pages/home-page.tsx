@@ -155,11 +155,50 @@ export default function HomePage() {
             <div className="flex-1 md:hidden" />
 
             {/* Right side controls */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Mobile Menu */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <LanguageToggle />
+              <ThemeToggle />
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-user-menu">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {user?.username ? getInitials(user.username) : "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium">{user?.name || user?.username}</p>
+                    {user?.merchantName && (
+                      <p className="text-xs text-muted-foreground">{user.merchantName}</p>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
+                  {user?.isSystemAdmin && (
+                    <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
+                      <Settings className="h-4 w-4 mr-2" />
+                      {t("Admin Panel", "एडमिन पैनल")}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    {t("Change Password", "पासवर्ड बदलें")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {t("Logout", "लॉगआउट")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Mobile Menu - at the very end */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden" data-testid="button-mobile-menu">
+                  <Button variant="ghost" size="icon" className="md:hidden h-8 w-8" data-testid="button-mobile-menu">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
@@ -217,45 +256,6 @@ export default function HomePage() {
                   </div>
                 </SheetContent>
               </Sheet>
-
-              <LanguageToggle />
-              <ThemeToggle />
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-user-menu">
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {user?.username ? getInitials(user.username) : "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">{user?.name || user?.username}</p>
-                    {user?.merchantName && (
-                      <p className="text-xs text-muted-foreground">{user.merchantName}</p>
-                    )}
-                  </div>
-                  <DropdownMenuSeparator />
-                  {user?.isSystemAdmin && (
-                    <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
-                      <Settings className="h-4 w-4 mr-2" />
-                      {t("Admin Panel", "एडमिन पैनल")}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
-                    <KeyRound className="h-4 w-4 mr-2" />
-                    {t("Change Password", "पासवर्ड बदलें")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    {t("Logout", "लॉगआउट")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
         </header>
