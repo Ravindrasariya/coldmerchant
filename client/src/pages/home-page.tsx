@@ -26,8 +26,10 @@ import {
   LogOut,
   Settings,
   KeyRound,
-  Loader2
+  Loader2,
+  Truck
 } from "lucide-react";
+import { TransactionsTab } from "@/components/transactions/transactions-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -154,7 +156,7 @@ export default function HomePage() {
 
       <main className="container max-w-7xl mx-auto px-4 md:px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mx-auto">
+          <TabsList className="grid w-full max-w-lg grid-cols-3 mx-auto">
             <TabsTrigger value="stock-entry" className="flex items-center gap-2" data-testid="tab-stock-entry">
               <PackagePlus className="h-4 w-4" />
               {t("Stock Entry", "स्टॉक एंट्री")}
@@ -162,6 +164,10 @@ export default function HomePage() {
             <TabsTrigger value="stock-register" className="flex items-center gap-2" data-testid="tab-stock-register">
               <ClipboardList className="h-4 w-4" />
               {t("Stock Register", "स्टॉक रजिस्टर")}
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="flex items-center gap-2" data-testid="tab-transactions">
+              <Truck className="h-4 w-4" />
+              {t("Transactions", "लेनदेन")}
             </TabsTrigger>
           </TabsList>
 
@@ -189,6 +195,10 @@ export default function HomePage() {
               </div>
             </div>
             <StockRegisterCard />
+          </TabsContent>
+
+          <TabsContent value="transactions" className="space-y-6">
+            <TransactionsTab />
           </TabsContent>
         </Tabs>
 
