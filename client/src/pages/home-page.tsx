@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
 import { StockRegisterTable } from "@/components/stock-register/stock-register-table";
 import { useAuth } from "@/hooks/use-auth";
@@ -105,6 +106,7 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <LanguageToggle />
             <ThemeToggle />
             
             <DropdownMenu>
