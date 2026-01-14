@@ -273,6 +273,31 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
               />
             </>
           )}
+
+          <FormField
+            control={form.control}
+            name={`lots.${lotIndex}.coldStoreChargesPerBag`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("Cold Store Charges/Bag", "कोल्ड स्टोर शुल्क/बोरी")}</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="" 
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9.]/g, '');
+                      field.onChange(val === "" ? undefined : parseFloat(val));
+                    }}
+                    data-testid={`input-coldstore-charge-${lotIndex}`}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         {cutType === "bilty_cut" && (

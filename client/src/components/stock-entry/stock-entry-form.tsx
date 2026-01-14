@@ -41,6 +41,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
           cutType: "gate_cut",
           size: "",
           pricePerKg: undefined,
+          coldStoreChargesPerBag: undefined,
           remarks: "",
           bagBreakdowns: [],
         },
@@ -86,6 +87,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
       cutType: "gate_cut",
       size: "",
       pricePerKg: undefined,
+      coldStoreChargesPerBag: undefined,
       remarks: "",
       bagBreakdowns: [],
     });
