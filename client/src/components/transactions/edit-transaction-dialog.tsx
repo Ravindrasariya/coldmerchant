@@ -80,12 +80,16 @@ function ProfitLossDisplay({
   otherCharges 
 }: { 
   totalCostOfGoods: number; 
-  revenue: number; 
-  transportationCharges: number; 
-  otherCharges: number;
+  revenue: number | undefined; 
+  transportationCharges: number | undefined; 
+  otherCharges: number | undefined;
 }) {
   const { t } = useLanguage();
-  const profitLoss = (revenue || 0) - totalCostOfGoods - (transportationCharges || 0) - (otherCharges || 0);
+  const safeRevenue = Number(revenue) || 0;
+  const safeTrans = Number(transportationCharges) || 0;
+  const safeOther = Number(otherCharges) || 0;
+  const safeCost = Number(totalCostOfGoods) || 0;
+  const profitLoss = safeRevenue - safeCost - safeTrans - safeOther;
   
   return (
     <div className="bg-muted/50 p-4 rounded-md">
@@ -96,7 +100,7 @@ function ProfitLossDisplay({
         </span>
       </div>
       <p className="text-xs text-muted-foreground mt-1">
-        {t("Revenue", "राजस्व")} (₹{(revenue || 0).toFixed(0)}) - {t("Cost", "लागत")} (₹{totalCostOfGoods.toFixed(0)}) - {t("Charges", "शुल्क")} (₹{((transportationCharges || 0) + (otherCharges || 0)).toFixed(0)})
+        {t("Revenue", "राजस्व")} (₹{safeRevenue.toFixed(0)}) - {t("Cost", "लागत")} (₹{safeCost.toFixed(0)}) - {t("Charges", "शुल्क")} (₹{(safeTrans + safeOther).toFixed(0)})
       </p>
     </div>
   );
