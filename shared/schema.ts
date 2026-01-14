@@ -76,6 +76,16 @@ export const bagBreakdowns = pgTable("bag_breakdowns", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Stock Entry Edit History - tracks all modifications after initial creation
+export const stockEntryEditHistory = pgTable("stock_entry_edit_history", {
+  id: serial("id").primaryKey(),
+  stockEntryId: integer("stock_entry_id").notNull().references(() => stockEntries.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  userId: integer("user_id").references(() => users.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changeSet: jsonb("change_set").notNull(), // Array of { scope, entityId, label, changes: [{ field, oldValue, newValue }] }
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -97,6 +107,22 @@ export const stockEntriesRelations = relations(stockEntries, ({ one, many }) => 
     references: [merchants.id],
   }),
   lots: many(lots),
+  editHistory: many(stockEntryEditHistory),
+}));
+
+export const stockEntryEditHistoryRelations = relations(stockEntryEditHistory, ({ one }) => ({
+  stockEntry: one(stockEntries, {
+    fields: [stockEntryEditHistory.stockEntryId],
+    references: [stockEntries.id],
+  }),
+  merchant: one(merchants, {
+    fields: [stockEntryEditHistory.merchantId],
+    references: [merchants.id],
+  }),
+  user: one(users, {
+    fields: [stockEntryEditHistory.userId],
+    references: [users.id],
+  }),
 }));
 
 export const lotsRelations = relations(lots, ({ one, many }) => ({
@@ -128,6 +154,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export const insertStockEntrySchema = createInsertSchema(stockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
 export const insertBagBreakdownSchema = createInsertSchema(bagBreakdowns).omit({ id: true, createdAt: true });
+export const insertStockEntryEditHistorySchema = createInsertSchema(stockEntryEditHistory).omit({ id: true, changedAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -144,6 +171,25 @@ export type InsertLot = z.infer<typeof insertLotSchema>;
 
 export type BagBreakdown = typeof bagBreakdowns.$inferSelect;
 export type InsertBagBreakdown = z.infer<typeof insertBagBreakdownSchema>;
+
+export type StockEntryEditHistory = typeof stockEntryEditHistory.$inferSelect;
+export type InsertStockEntryEditHistory = z.infer<typeof insertStockEntryEditHistorySchema>;
+
+// Change types for edit history
+export type FieldChange = {
+  field: string;
+  oldValue: string | number | null;
+  newValue: string | number | null;
+};
+
+export type ChangeItem = {
+  scope: 'entry' | 'lot' | 'breakdown';
+  entityId?: number;
+  label: string;
+  changes: FieldChange[];
+};
+
+export type ChangeSet = ChangeItem[];
 
 // Extended types for frontend use
 export const bagBreakdownFormSchema = z.object({
