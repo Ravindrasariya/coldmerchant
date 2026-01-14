@@ -496,22 +496,41 @@ export function StockRegisterCard() {
                               <span className="font-medium">{metrics.originalBags} {t("bags", "बोरी")}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">{t("Actual", "वास्तविक")}</span>{" "}
-                              <span className="font-semibold text-green-600 dark:text-green-400">{metrics.remainingToSell}</span>
-                              <span className="text-muted-foreground">/{metrics.actualSellableBags}</span>
+                              <span className="text-muted-foreground">{t("Actual:", "वास्तविक:")}</span>{" "}
+                              {(() => {
+                                const sellableBreakdowns = lot.bagBreakdowns?.filter((bd: any) => bd.size !== "Wastage") || [];
+                                if (sellableBreakdowns.length > 0) {
+                                  return sellableBreakdowns.map((bd: any, idx: number) => (
+                                    <span key={idx}>
+                                      {idx > 0 && ", "}
+                                      <span className="font-medium">{bd.size}</span>
+                                      <span className="text-muted-foreground"> - </span>
+                                      <span className="font-semibold text-green-600 dark:text-green-400">{bd.remainingBags ?? bd.numberOfBags}</span>
+                                      <span className="text-muted-foreground">/{bd.numberOfBags}</span>
+                                    </span>
+                                  ));
+                                } else {
+                                  return (
+                                    <>
+                                      <span className="font-semibold text-green-600 dark:text-green-400">{metrics.remainingToSell}</span>
+                                      <span className="text-muted-foreground">/{metrics.actualSellableBags}</span>
+                                    </>
+                                  );
+                                }
+                              })()}
                             </div>
-                            {lotColdTotal > 0 && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
-                                <span className="font-medium">Rs. {lotColdTotal.toFixed(0)}</span>
-                                <span className="text-muted-foreground mx-1">|</span>
-                                <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
-                                <span className={`font-medium ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                                  Rs. {lotColdDue > 0 ? lotColdDue.toFixed(0) : "0"}
-                                </span>
-                              </div>
-                            )}
                           </div>
+                          {lotColdTotal > 0 && (
+                            <div className="flex flex-wrap items-center gap-x-1 text-[13px] mt-1">
+                              <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
+                              <span className="font-medium">Rs. {lotColdTotal.toFixed(0)}</span>
+                              <span className="text-muted-foreground mx-1">|</span>
+                              <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
+                              <span className={`font-medium ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+                                Rs. {lotColdDue > 0 ? lotColdDue.toFixed(0) : "0"}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
