@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 
 // Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -147,25 +147,66 @@ export async function registerRoutes(
   app.patch("/api/stock-entries/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
       const id = parseInt(req.params.id);
       const { paymentStatus, remarks, lots } = req.body;
 
-      // Check if entry exists and belongs to merchant
+      // Check if entry exists and belongs to merchant - this is our snapshot
       const existingEntry = await storage.getStockEntryById(id, merchantId);
       if (!existingEntry) {
         return res.status(404).json({ message: "Stock entry not found" });
       }
 
+      // Track changes
+      const changes: ChangeSet = [];
+
+      // Helper to normalize values for comparison (handles decimals like "20.00" vs 20)
+      const normalizeValue = (val: any): string | null => {
+        if (val === null || val === undefined || val === '') return null;
+        const num = Number(val);
+        if (!isNaN(num)) return String(num); // Converts "20.00" to "20"
+        return String(val);
+      };
+
+      // Helper to compare values
+      const compareField = (field: string, oldVal: any, newVal: any, label: string, scope: 'entry' | 'lot' | 'breakdown', entityId?: number) => {
+        const oldStr = normalizeValue(oldVal);
+        const newStr = normalizeValue(newVal);
+        if (oldStr !== newStr) {
+          const existingItem = changes.find(c => c.scope === scope && c.entityId === entityId);
+          const change: FieldChange = { field, oldValue: oldStr, newValue: newStr };
+          if (existingItem) {
+            existingItem.changes.push(change);
+          } else {
+            changes.push({ scope, entityId, label, changes: [change] });
+          }
+        }
+      };
+
+      // Track entry-level changes
+      const newPaymentStatus = paymentStatus || existingEntry.paymentStatus;
+      const newRemarks = remarks !== undefined ? remarks : existingEntry.remarks;
+      compareField('paymentStatus', existingEntry.paymentStatus, newPaymentStatus, 'Stock Entry', 'entry', id);
+      compareField('remarks', existingEntry.remarks, newRemarks, 'Stock Entry', 'entry', id);
+
       // Update stock entry
       await storage.updateStockEntry(id, merchantId, {
-        paymentStatus: paymentStatus || existingEntry.paymentStatus,
-        remarks: remarks !== undefined ? remarks : existingEntry.remarks,
+        paymentStatus: newPaymentStatus,
+        remarks: newRemarks,
       });
 
       // Update lots and bag breakdowns if provided
       if (lots && Array.isArray(lots)) {
         for (const lotData of lots) {
           if (lotData.id) {
+            const existingLot = existingEntry.lots.find((l: any) => l.id === lotData.id);
+            const lotLabel = `Lot #${lotData.id} (${existingLot?.coldStoreName || 'Unknown'})`;
+
+            // Track lot-level changes
+            if (existingLot && lotData.remainingBags !== undefined) {
+              compareField('remainingBags', existingLot.remainingBags, lotData.remainingBags, lotLabel, 'lot', lotData.id);
+            }
+
             // Update existing lot
             await storage.updateLot(lotData.id, merchantId, {
               remainingBags: lotData.remainingBags,
@@ -173,9 +214,8 @@ export async function registerRoutes(
 
             // Handle bag breakdowns for bilty cut
             if (lotData.cutType === "bilty_cut" && lotData.bagBreakdowns) {
-              // Get existing breakdowns
-              const existingBreakdowns = await storage.getBagBreakdownsByLot(lotData.id, merchantId);
-              const existingIds = new Set(existingBreakdowns.map(b => b.id));
+              const existingBreakdowns = existingLot?.bagBreakdowns || [];
+              const existingIds = new Set<number>(existingBreakdowns.map((b: any) => b.id));
 
               for (const bdData of lotData.bagBreakdowns) {
                 const weight = bdData.weight || 0;
@@ -183,6 +223,19 @@ export async function registerRoutes(
                 const totalAmount = weight * pricePerKg;
 
                 if (bdData.id && bdData.id > 0) {
+                  const existingBd = existingBreakdowns.find((b: any) => b.id === bdData.id);
+                  const bdLabel = `Breakdown ${bdData.size} in ${existingLot?.coldStoreName || 'Unknown'}`;
+
+                  // Track breakdown changes
+                  if (existingBd) {
+                    compareField('size', existingBd.size, bdData.size, bdLabel, 'breakdown', bdData.id);
+                    compareField('numberOfBags', existingBd.numberOfBags, bdData.numberOfBags, bdLabel, 'breakdown', bdData.id);
+                    const newRemaining = bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags;
+                    compareField('remainingBags', existingBd.remainingBags, newRemaining, bdLabel, 'breakdown', bdData.id);
+                    compareField('weight', existingBd.weight, weight > 0 ? weight : null, bdLabel, 'breakdown', bdData.id);
+                    compareField('pricePerKg', existingBd.pricePerKg, pricePerKg > 0 ? pricePerKg : null, bdLabel, 'breakdown', bdData.id);
+                  }
+
                   // Update existing breakdown
                   await storage.updateBagBreakdown(bdData.id, merchantId, {
                     size: bdData.size,
@@ -194,7 +247,13 @@ export async function registerRoutes(
                   });
                   existingIds.delete(bdData.id);
                 } else {
-                  // Create new breakdown
+                  // Create new breakdown - record as addition
+                  changes.push({
+                    scope: 'breakdown',
+                    label: `Added breakdown ${bdData.size} (${bdData.numberOfBags} bags)`,
+                    changes: [],
+                  });
+
                   await storage.createBagBreakdown({
                     lotId: lotData.id,
                     merchantId,
@@ -208,14 +267,28 @@ export async function registerRoutes(
                 }
               }
 
-              // Delete removed breakdowns
+              // Delete removed breakdowns - record as deletion
               const idsToDelete = Array.from(existingIds);
               for (const oldId of idsToDelete) {
+                const deletedBd = existingBreakdowns.find((b: any) => b.id === oldId);
+                if (deletedBd) {
+                  changes.push({
+                    scope: 'breakdown',
+                    entityId: oldId,
+                    label: `Deleted breakdown ${deletedBd.size} (${deletedBd.numberOfBags} bags)`,
+                    changes: [],
+                  });
+                }
                 await storage.deleteBagBreakdown(oldId, merchantId);
               }
             }
           }
         }
+      }
+
+      // Save edit history if there were any changes
+      if (changes.length > 0) {
+        await storage.createEditHistory(id, merchantId, userId, changes);
       }
 
       // Fetch updated entry
@@ -224,6 +297,26 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating stock entry:", error);
       res.status(500).json({ message: "Failed to update stock entry" });
+    }
+  });
+
+  // GET /api/stock-entries/:id/history - Get edit history for a stock entry
+  app.get("/api/stock-entries/:id/history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+
+      // Verify entry exists and belongs to merchant
+      const entry = await storage.getStockEntryById(id, merchantId);
+      if (!entry) {
+        return res.status(404).json({ message: "Stock entry not found" });
+      }
+
+      const history = await storage.getEditHistory(id, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
     }
   });
 

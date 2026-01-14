@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Plus, Trash2, Package, ShoppingCart } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, Package, ShoppingCart, History, ChevronDown, ChevronRight } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SIZE_OPTIONS } from "@shared/schema";
@@ -94,6 +94,23 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const [sellQuantities, setSellQuantities] = useState<Record<string, number>>({});
   const [gateCutSellQty, setGateCutSellQty] = useState<Record<number, number>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+
+  // Fetch edit history
+  const { data: editHistory = [], isLoading: historyLoading } = useQuery<Array<{
+    id: number;
+    changedAt: string;
+    userName?: string;
+    changeSet: Array<{
+      scope: string;
+      entityId?: number;
+      label: string;
+      changes: Array<{ field: string; oldValue: string | null; newValue: string | null }>;
+    }>;
+  }>>({
+    queryKey: ['/api/stock-entries', entry.id, 'history'],
+    enabled: open,
+  });
 
   const updateMutation = useMutation({
     mutationFn: async (data: { paymentStatus: string; remarks: string; lots: typeof lots }) => {
@@ -106,6 +123,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         description: t("The stock entry has been updated successfully.", "स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/stock-entries', entry.id, 'history'] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -601,6 +619,70 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Edit History Section */}
+        {editHistory.length > 0 && (
+          <div className="border-t pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start p-2 h-auto"
+              onClick={() => setHistoryExpanded(!historyExpanded)}
+              data-testid="edit-history-toggle"
+            >
+              {historyExpanded ? (
+                <ChevronDown className="h-4 w-4 mr-2" />
+              ) : (
+                <ChevronRight className="h-4 w-4 mr-2" />
+              )}
+              <History className="h-4 w-4 mr-2" />
+              <span className="font-medium">{t("Edit History", "संपादन इतिहास")}</span>
+              <Badge variant="secondary" className="ml-2">{editHistory.length}</Badge>
+            </Button>
+            
+            {historyExpanded && (
+              <div className="mt-3 space-y-3 max-h-64 overflow-y-auto" data-testid="edit-history-list">
+                {editHistory.map((historyItem, idx) => (
+                  <div 
+                    key={historyItem.id} 
+                    className="bg-muted/30 rounded-md p-3 text-sm"
+                    data-testid={`history-item-${historyItem.id}`}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-muted-foreground text-xs">
+                        {new Date(historyItem.changedAt).toLocaleString()}
+                      </span>
+                      {historyItem.userName && (
+                        <Badge variant="outline" className="text-xs">{historyItem.userName}</Badge>
+                      )}
+                    </div>
+                    <ul className="space-y-1">
+                      {historyItem.changeSet.map((change, cIdx) => (
+                        <li key={cIdx} className="text-xs">
+                          <span className="font-medium">{change.label}:</span>
+                          {change.changes.length > 0 ? (
+                            <ul className="ml-4 mt-1 space-y-0.5">
+                              {change.changes.map((fc, fIdx) => (
+                                <li key={fIdx} className="text-muted-foreground">
+                                  {t(fc.field, fc.field)}: 
+                                  <span className="line-through text-destructive/70 mx-1">{fc.oldValue || '—'}</span>
+                                  →
+                                  <span className="text-primary ml-1">{fc.newValue || '—'}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-muted-foreground ml-1">({t("structural change", "संरचनात्मक परिवर्तन")})</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="edit-cancel">
