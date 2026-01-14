@@ -620,31 +620,22 @@ export function StockRegisterCard() {
                           )}
 
                           {metrics.coldStoreTotalCharges !== null && metrics.coldStoreTotalCharges > 0 && (
-                            <div className="mt-2 text-sm space-y-1">
-                              <div>
-                                <span className="text-muted-foreground">{t("Total Cold Charges:", "कुल कोल्ड शुल्क:")}</span>{" "}
-                                <span className="font-medium text-violet-600 dark:text-violet-400">
-                                  ₹{metrics.coldStoreTotalCharges.toFixed(0)}
-                                </span>
-                                <span className="text-xs text-muted-foreground ml-1">
-                                  ({metrics.originalBags} × ₹{metrics.coldStoreChargesPerBag})
-                                </span>
-                              </div>
+                            <div className="mt-2 text-sm">
+                              <span className="text-muted-foreground">{t("Cold:", "कोल्ड:")}</span>{" "}
+                              <span className="font-medium text-violet-600 dark:text-violet-400">
+                                ₹{metrics.coldStoreTotalCharges.toFixed(0)}
+                              </span>
+                              <span className="text-xs text-muted-foreground ml-1">
+                                ({metrics.originalBags} × ₹{metrics.coldStoreChargesPerBag})
+                              </span>
                               {metrics.coldStoreRemaining !== null && metrics.coldStoreRemaining > 0 && (
-                                <div>
-                                  <span className="text-muted-foreground">{t("Remaining Cold Due:", "शेष कोल्ड बाकी:")}</span>{" "}
+                                <>
+                                  <span className="text-muted-foreground ml-2">|</span>
+                                  <span className="text-muted-foreground ml-2">{t("Due:", "बाकी:")}</span>{" "}
                                   <span className="font-medium text-purple-600 dark:text-purple-400">
                                     ₹{metrics.coldStoreRemaining.toFixed(0)}
                                   </span>
-                                </div>
-                              )}
-                              {metrics.coldStorePaid > 0 && (
-                                <div>
-                                  <span className="text-muted-foreground">{t("Cold Paid:", "कोल्ड भुगतान:")}</span>{" "}
-                                  <span className="font-medium text-green-600 dark:text-green-400">
-                                    ₹{metrics.coldStorePaid.toFixed(0)}
-                                  </span>
-                                </div>
+                                </>
                               )}
                             </div>
                           )}
