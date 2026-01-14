@@ -99,9 +99,9 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center px-4 md:px-6 gap-4 md:gap-6">
+          <div className="flex h-16 items-center px-2 sm:px-4 md:px-6 gap-2 sm:gap-4 md:gap-6">
             {/* Brand */}
-            <div className="flex items-center gap-2 shrink-0 md:ml-4 lg:ml-12 xl:ml-16">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 md:ml-4 lg:ml-12 xl:ml-16">
               <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
                 <PackagePlus className="h-6 w-6 text-primary-foreground" />
               </div>
@@ -202,7 +202,7 @@ export default function HomePage() {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-64 p-0">
+                <SheetContent side="right" className="w-64 p-0">
                   <div className="flex flex-col h-full">
                     <div className="p-4 border-b">
                       <div className="flex items-center gap-2">
