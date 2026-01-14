@@ -42,6 +42,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState("stock-entry");
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -196,7 +197,7 @@ export default function HomePage() {
               </DropdownMenu>
 
               {/* Mobile Menu - at the very end */}
-              <Sheet>
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="md:hidden h-8 w-8" data-testid="button-mobile-menu">
                     <Menu className="h-5 w-5" />
@@ -223,6 +224,7 @@ export default function HomePage() {
                           value="stock-entry" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-stock-entry-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <PackagePlus className="h-4 w-4" />
                           {t("Stock Entry", "स्टॉक एंट्री")}
@@ -231,6 +233,7 @@ export default function HomePage() {
                           value="stock-register" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-stock-register-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <ClipboardList className="h-4 w-4" />
                           {t("Stock Register", "स्टॉक रजिस्टर")}
@@ -239,6 +242,7 @@ export default function HomePage() {
                           value="transactions" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-transactions-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Truck className="h-4 w-4" />
                           {t("Transactions", "लेनदेन")}
@@ -247,6 +251,7 @@ export default function HomePage() {
                           value="cash-management" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-cash-management-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Wallet className="h-4 w-4" />
                           {t("Cash", "नकद")}
