@@ -798,25 +798,32 @@ export async function registerRoutes(
       
       const { partyName, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue } = req.body;
       
+      // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
+      const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
+        const numA = parseFloat(String(a ?? "")) || 0;
+        const numB = parseFloat(String(b ?? "")) || 0;
+        return numA === numB;
+      };
+      
       // Track changes for edit history
       const changes: { field: string; oldValue: string | number | null; newValue: string | number | null }[] = [];
       
-      if (partyName !== undefined && partyName !== existingTxn.partyName) {
+      if (partyName !== undefined && (partyName || null) !== (existingTxn.partyName || null)) {
         changes.push({ field: "partyName", oldValue: existingTxn.partyName, newValue: partyName || null });
       }
-      if (vehicleNumber !== undefined && vehicleNumber !== existingTxn.vehicleNumber) {
+      if (vehicleNumber !== undefined && (vehicleNumber || null) !== (existingTxn.vehicleNumber || null)) {
         changes.push({ field: "vehicleNumber", oldValue: existingTxn.vehicleNumber, newValue: vehicleNumber || null });
       }
-      if (advancePayment !== undefined && advancePayment?.toString() !== existingTxn.advancePayment) {
+      if (advancePayment !== undefined && !decimalEqual(advancePayment, existingTxn.advancePayment)) {
         changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
       }
-      if (transportationCharges !== undefined && transportationCharges?.toString() !== existingTxn.transportationCharges) {
+      if (transportationCharges !== undefined && !decimalEqual(transportationCharges, existingTxn.transportationCharges)) {
         changes.push({ field: "transportationCharges", oldValue: existingTxn.transportationCharges, newValue: transportationCharges?.toString() || null });
       }
-      if (otherCharges !== undefined && otherCharges?.toString() !== existingTxn.otherCharges) {
+      if (otherCharges !== undefined && !decimalEqual(otherCharges, existingTxn.otherCharges)) {
         changes.push({ field: "otherCharges", oldValue: existingTxn.otherCharges, newValue: otherCharges?.toString() || null });
       }
-      if (revenue !== undefined && revenue?.toString() !== existingTxn.revenue) {
+      if (revenue !== undefined && !decimalEqual(revenue, existingTxn.revenue)) {
         changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: revenue?.toString() || null });
       }
       
@@ -827,7 +834,7 @@ export async function registerRoutes(
       const totalCostOfGoods = parseFloat(existingTxn.totalCostOfGoods || "0");
       const newProfitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
       
-      if (newProfitLoss.toString() !== existingTxn.profitLoss) {
+      if (!decimalEqual(newProfitLoss, existingTxn.profitLoss)) {
         changes.push({ field: "profitLoss", oldValue: existingTxn.profitLoss, newValue: newProfitLoss.toString() });
       }
       
