@@ -388,12 +388,12 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#52a7ff]/10">
                   <Receipt className="h-4 w-4 text-[#52a7ff]" />
                 </div>
-                <span className="font-bold text-lg leading-tight">
+                <span className="font-bold text-base leading-tight">
                   Tr No: {transaction.transactionNumber}
                 </span>
               </div>
               {transaction.partyName && (
-                <span className="font-semibold text-lg leading-tight">
+                <span className="font-semibold text-base leading-tight">
                   - {transaction.partyName}
                 </span>
               )}
