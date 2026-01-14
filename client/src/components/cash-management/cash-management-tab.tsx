@@ -411,6 +411,11 @@ export function CashManagementTab() {
                                     {farmer.village && (
                                       <span className="text-xs text-muted-foreground">({farmer.village})</span>
                                     )}
+                                    {farmer.totalDue > 0 && (
+                                      <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                        {t("Due", "बकाया")}: ₹{farmer.totalDue.toFixed(0)}
+                                      </Badge>
+                                    )}
                                   </div>
                                 </SelectItem>
                               ))}
