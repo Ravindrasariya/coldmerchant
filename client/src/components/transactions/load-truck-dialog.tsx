@@ -255,7 +255,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                 const key = getInventoryKey(inv);
                                 return (
                                   <SelectItem key={key} value={key}>
-                                    S#{inv.serialNumber} - {inv.coldStoreName} - {inv.size || "Mixed"} ({inv.remainingBags} {t("bags", "बोरी")})
+                                    S#{inv.serialNumber} - {inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"} ({inv.remainingBags} {t("bags", "बोरी")})
                                   </SelectItem>
                                 );
                               })}
