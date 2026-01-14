@@ -15,6 +15,8 @@ interface TransactionItem {
   id: number;
   serialNumber: number;
   coldStoreName: string;
+  potatoType: string | null;
+  size: string | null;
   bagsMoved: number;
   netWeight: string | null;
   pricePerKgSnapshot: string | null;
@@ -193,15 +195,13 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                   day: "numeric",
                   month: "short",
                   year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
                 })}
               </span>
               <span>|</span>
               {transaction.items.slice(0, 2).map((item, idx) => (
                 <span key={item.id}>
                   {idx > 0 && ", "}
-                  S#{item.serialNumber} ({item.bagsMoved})
+                  S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"}, {item.potatoType || "-"})
                 </span>
               ))}
               {transaction.items.length > 2 && (
