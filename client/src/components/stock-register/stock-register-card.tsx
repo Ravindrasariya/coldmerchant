@@ -43,6 +43,7 @@ interface StockEntryWithLots {
     size: string | null;
     pricePerKg: string | null;
     coldStoreChargesPerBag: string | null;
+    coldStorageChargesPaid: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
@@ -95,7 +96,9 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const wastageBreakdowns = lot.bagBreakdowns.filter(bd => bd.size === "Wastage");
   
   const coldStoreChargesPerBag = lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null;
-  const coldStoreDue = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : null;
+  const coldStoreTotalCharges = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : null;
+  const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
+  const coldStoreRemaining = coldStoreTotalCharges !== null ? coldStoreTotalCharges - coldStorePaid : null;
   
   return {
     originalBags: lot.originalBags,
@@ -107,7 +110,9 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     totalAmount,
     pricePerKg: lot.pricePerKg ? parseFloat(lot.pricePerKg) : null,
     coldStoreChargesPerBag,
-    coldStoreDue,
+    coldStoreTotalCharges,
+    coldStorePaid,
+    coldStoreRemaining,
     sellableBreakdowns,
     wastageBreakdowns,
   };
@@ -318,6 +323,8 @@ export function StockRegisterCard() {
             let totalActual = 0;
             let totalRemaining = 0;
             let entryTotalAmount = 0;
+            let entryColdStoreTotalCharges = 0;
+            let entryColdStorePaid = 0;
             
             lotsWithMetrics.forEach(({ metrics }) => {
               totalOriginal += metrics.originalBags;
@@ -327,10 +334,18 @@ export function StockRegisterCard() {
               if (metrics.totalAmount !== null) {
                 entryTotalAmount += metrics.totalAmount;
               }
+              if (metrics.coldStoreTotalCharges !== null) {
+                entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
+              }
+              entryColdStorePaid += metrics.coldStorePaid;
             });
             
-            const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-            const remainingDue = entryTotalAmount - amountPaid;
+            const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+            const farmerRemainingDue = entryTotalAmount - farmerAmountPaid;
+            const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
+            
+            const isFarmerPaid = farmerRemainingDue <= 0 && entryTotalAmount > 0;
+            const isColdStorePaid = coldStoreRemainingDue <= 0 && entryColdStoreTotalCharges > 0;
 
             return (
               <Card key={entry.id} className="border-border hover-elevate" data-testid={`card-entry-${entry.id}`}>
@@ -350,31 +365,41 @@ export function StockRegisterCard() {
                         </Badge>
                       ))}
                       
-                      <Badge 
-                        variant={entry.paymentStatus === "paid" ? "default" : "outline"}
-                        className={
-                          entry.paymentStatus === "paid" ? "bg-green-600" : 
-                          entry.paymentStatus === "partial" ? "border-blue-500 text-blue-600" : 
-                          "border-orange-500 text-orange-600"
-                        }
-                      >
-                        {entry.paymentStatus === "paid" ? t("Paid", "भुगतान हो गया") : 
-                         entry.paymentStatus === "partial" ? (
-                           <>
-                             {t("Partial", "आंशिक")}
-                             {remainingDue > 0 && (
-                               <span className="ml-1">- ₹{remainingDue.toFixed(0)} {t("Due", "बाकी")}</span>
-                             )}
-                           </>
-                         ) : (
-                           <>
-                             {t("Due", "बाकी")}
-                             {entryTotalAmount > 0 && (
-                               <span className="ml-1">- ₹{entryTotalAmount.toFixed(0)}</span>
-                             )}
-                           </>
-                         )}
-                      </Badge>
+                      {entryTotalAmount > 0 && (
+                        <Badge 
+                          variant={isFarmerPaid ? "default" : "outline"}
+                          className={
+                            isFarmerPaid ? "bg-green-600" : 
+                            farmerAmountPaid > 0 ? "border-blue-500 text-blue-600" : 
+                            "border-orange-500 text-orange-600"
+                          }
+                        >
+                          {isFarmerPaid ? t("Farmer Paid", "किसान भुगतान") : 
+                           farmerAmountPaid > 0 ? (
+                             <>{t("Farmer Due", "किसान बाकी")} - ₹{farmerRemainingDue.toFixed(0)}</>
+                           ) : (
+                             <>{t("Farmer Due", "किसान बाकी")} - ₹{entryTotalAmount.toFixed(0)}</>
+                           )}
+                        </Badge>
+                      )}
+                      
+                      {entryColdStoreTotalCharges > 0 && (
+                        <Badge 
+                          variant={isColdStorePaid ? "default" : "outline"}
+                          className={
+                            isColdStorePaid ? "bg-green-600" : 
+                            entryColdStorePaid > 0 ? "border-purple-500 text-purple-600" : 
+                            "border-violet-500 text-violet-600"
+                          }
+                        >
+                          {isColdStorePaid ? t("Cold Paid", "कोल्ड भुगतान") : 
+                           entryColdStorePaid > 0 ? (
+                             <>{t("Cold Due", "कोल्ड बाकी")} - ₹{coldStoreRemainingDue.toFixed(0)}</>
+                           ) : (
+                             <>{t("Cold Due", "कोल्ड बाकी")} - ₹{entryColdStoreTotalCharges.toFixed(0)}</>
+                           )}
+                        </Badge>
+                      )}
                       
                       <Badge 
                         variant="outline"
@@ -438,7 +463,7 @@ export function StockRegisterCard() {
                   </div>
                   
                   <div className="mt-2 text-sm">
-                    <span className="text-muted-foreground">{t("Total:", "कुल:")}</span>{" "}
+                    <span className="text-muted-foreground">{t("Total Bags:", "कुल बोरी:")}</span>{" "}
                     {totalWastage > 0 && (
                       <>
                         <span className="font-medium">{totalActual}/{totalOriginal}</span>
@@ -450,6 +475,52 @@ export function StockRegisterCard() {
                     )}
                     <span className="text-primary font-bold">{totalRemaining}</span>
                     <span className="text-muted-foreground">/{totalActual}</span>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t flex flex-wrap gap-4 text-sm">
+                    {entryTotalAmount > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        <div>
+                          <span className="text-muted-foreground">{t("Total Farmer Amount:", "किसान की कुल राशि:")}</span>{" "}
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">₹{entryTotalAmount.toFixed(0)}</span>
+                        </div>
+                        {farmerAmountPaid > 0 && (
+                          <div>
+                            <span className="text-muted-foreground">{t("Farmer Paid:", "किसान भुगतान:")}</span>{" "}
+                            <span className="font-medium text-green-600 dark:text-green-400">₹{farmerAmountPaid.toFixed(0)}</span>
+                            {farmerRemainingDue > 0 && (
+                              <>
+                                <span className="text-muted-foreground"> | </span>
+                                <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">₹{farmerRemainingDue.toFixed(0)}</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {entryColdStoreTotalCharges > 0 && (
+                      <div className="flex flex-col gap-0.5">
+                        <div>
+                          <span className="text-muted-foreground">{t("Total Cold Charges:", "कुल कोल्ड शुल्क:")}</span>{" "}
+                          <span className="font-semibold text-violet-600 dark:text-violet-400">₹{entryColdStoreTotalCharges.toFixed(0)}</span>
+                        </div>
+                        {entryColdStorePaid > 0 && (
+                          <div>
+                            <span className="text-muted-foreground">{t("Cold Paid:", "कोल्ड भुगतान:")}</span>{" "}
+                            <span className="font-medium text-green-600 dark:text-green-400">₹{entryColdStorePaid.toFixed(0)}</span>
+                            {coldStoreRemainingDue > 0 && (
+                              <>
+                                <span className="text-muted-foreground"> | </span>
+                                <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
+                                <span className="font-semibold text-purple-600 dark:text-purple-400">₹{coldStoreRemainingDue.toFixed(0)}</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 
@@ -580,15 +651,33 @@ export function StockRegisterCard() {
                             </div>
                           )}
 
-                          {metrics.coldStoreDue !== null && (
-                            <div className="mt-2 text-sm">
-                              <span className="text-muted-foreground">{t("Cold Store Due:", "कोल्ड स्टोर बकाया:")}</span>{" "}
-                              <span className="font-medium text-orange-600 dark:text-orange-400">
-                                ₹{metrics.coldStoreDue.toFixed(2)}
-                              </span>
-                              <span className="text-xs text-muted-foreground ml-1">
-                                ({metrics.originalBags} × ₹{metrics.coldStoreChargesPerBag})
-                              </span>
+                          {metrics.coldStoreTotalCharges !== null && metrics.coldStoreTotalCharges > 0 && (
+                            <div className="mt-2 text-sm space-y-1">
+                              <div>
+                                <span className="text-muted-foreground">{t("Total Cold Charges:", "कुल कोल्ड शुल्क:")}</span>{" "}
+                                <span className="font-medium text-violet-600 dark:text-violet-400">
+                                  ₹{metrics.coldStoreTotalCharges.toFixed(0)}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  ({metrics.originalBags} × ₹{metrics.coldStoreChargesPerBag})
+                                </span>
+                              </div>
+                              {metrics.coldStoreRemaining !== null && metrics.coldStoreRemaining > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground">{t("Remaining Cold Due:", "शेष कोल्ड बाकी:")}</span>{" "}
+                                  <span className="font-medium text-purple-600 dark:text-purple-400">
+                                    ₹{metrics.coldStoreRemaining.toFixed(0)}
+                                  </span>
+                                </div>
+                              )}
+                              {metrics.coldStorePaid > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground">{t("Cold Paid:", "कोल्ड भुगतान:")}</span>{" "}
+                                  <span className="font-medium text-green-600 dark:text-green-400">
+                                    ₹{metrics.coldStorePaid.toFixed(0)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                           
