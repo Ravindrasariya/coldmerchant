@@ -23,6 +23,7 @@ interface TransactionItem {
   netWeight: string | null;
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
+  revenue: string | null;
 }
 
 interface Transaction {
@@ -96,7 +97,10 @@ export function TransactionsTab() {
       
       // Filter by payment due
       if (filterPaymentDue !== "all") {
-        const revenue = parseFloat(txn.revenue || "0");
+        // Use transaction revenue if set, otherwise aggregate from items
+        const revenue = txn.revenue 
+          ? parseFloat(txn.revenue) 
+          : txn.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
         const amountReceived = parseFloat(txn.amountReceived || "0");
         const dueAmount = revenue - amountReceived;
         const hasDue = dueAmount > 0;
@@ -215,7 +219,12 @@ export function TransactionsTab() {
                 {t("Total Revenue", "कुल राजस्व")}
               </div>
               <p className="text-xl font-bold">
-                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, txn) => {
+                  const rev = txn.revenue 
+                    ? parseFloat(txn.revenue) 
+                    : txn.items.reduce((s, item) => s + parseFloat(item.revenue || "0"), 0);
+                  return sum + rev;
+                }, 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -232,18 +241,32 @@ export function TransactionsTab() {
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                {filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-green-600" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-red-600" />
-                )}
-                {t("Total P&L", "कुल लाभ/हानि")}
-              </div>
-              <p className={`text-xl font-bold ${filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "+" : ""}
-                ₹{Math.abs(filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0)).toLocaleString("en-IN")}
-              </p>
+              {(() => {
+                const totalPL = filteredTransactions.reduce((sum, txn) => {
+                  const rev = txn.revenue 
+                    ? parseFloat(txn.revenue) 
+                    : txn.items.reduce((s, item) => s + parseFloat(item.revenue || "0"), 0);
+                  const cost = parseFloat(txn.totalCostOfGoods || "0");
+                  const transport = parseFloat(txn.transportationCharges || "0");
+                  const other = parseFloat(txn.otherCharges || "0");
+                  return sum + (rev - cost - transport - other);
+                }, 0);
+                return (
+                  <>
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                      {totalPL >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-600" />
+                      )}
+                      {t("Total P&L", "कुल लाभ/हानि")}
+                    </div>
+                    <p className={`text-xl font-bold ${totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {totalPL >= 0 ? "+" : ""}₹{Math.abs(totalPL).toLocaleString("en-IN")}
+                    </p>
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
           <Card>
@@ -264,7 +287,13 @@ export function TransactionsTab() {
                 {t("Total Due", "कुल बकाया")}
               </div>
               <p className="text-xl font-bold text-orange-600">
-                ₹{Math.max(0, filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0") - parseFloat(t.amountReceived || "0")), 0)).toLocaleString("en-IN")}
+                ₹{Math.max(0, filteredTransactions.reduce((sum, txn) => {
+                  const rev = txn.revenue 
+                    ? parseFloat(txn.revenue) 
+                    : txn.items.reduce((s, item) => s + parseFloat(item.revenue || "0"), 0);
+                  const received = parseFloat(txn.amountReceived || "0");
+                  return sum + (rev - received);
+                }, 0)).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -335,10 +364,16 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   const { t } = useLanguage();
 
   const totalCost = parseFloat(transaction.totalCostOfGoods || "0");
-  const revenue = parseFloat(transaction.revenue || "0");
+  // Use transaction revenue if set, otherwise aggregate from items
+  const revenue = transaction.revenue 
+    ? parseFloat(transaction.revenue) 
+    : transaction.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
   const amountReceived = parseFloat(transaction.amountReceived || "0");
   const dueAmount = Math.max(0, revenue - amountReceived);
-  const profitLoss = parseFloat(transaction.profitLoss || "0");
+  // Recalculate P&L if transaction revenue is null but items have revenue
+  const profitLoss = transaction.revenue 
+    ? parseFloat(transaction.profitLoss || "0")
+    : revenue - totalCost - parseFloat(transaction.transportationCharges || "0") - parseFloat(transaction.otherCharges || "0");
   
   // Get unique potato types from transaction items (Wafer, Ration, Seed)
   const bagTypes = Array.from(new Set(transaction.items.map(item => item.potatoType).filter(Boolean))) as string[];

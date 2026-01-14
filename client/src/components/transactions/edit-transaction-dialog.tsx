@@ -174,10 +174,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       partyName: "",
       partyAddress: "",
       vehicleNumber: "",
-      advancePayment: undefined,
-      amountReceived: undefined,
-      transportationCharges: undefined,
-      otherCharges: undefined,
+      advancePayment: 0,
+      amountReceived: 0,
+      transportationCharges: 0,
+      otherCharges: 0,
     },
   });
 

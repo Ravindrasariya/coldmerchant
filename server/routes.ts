@@ -830,22 +830,19 @@ export async function registerRoutes(
       if (otherCharges !== undefined && !decimalEqual(otherCharges, existingTxn.otherCharges)) {
         changes.push({ field: "otherCharges", oldValue: existingTxn.otherCharges, newValue: otherCharges?.toString() || null });
       }
-      if (revenue !== undefined && !decimalEqual(revenue, existingTxn.revenue)) {
-        changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: revenue?.toString() || null });
-      }
-      
-      // Calculate new profit/loss
-      const revenueNum = parseFloat(revenue) || 0;
-      const transportNum = parseFloat(transportationCharges) || 0;
-      const otherNum = parseFloat(otherCharges) || 0;
+      // Revenue is now calculated from item-level revenues, so we don't update it directly
+      // Calculate new profit/loss using existing transaction revenue (aggregated from items)
+      const existingRevenueNum = parseFloat(existingTxn.revenue || "0");
+      const transportNum = parseFloat(transportationCharges !== undefined ? transportationCharges : existingTxn.transportationCharges) || 0;
+      const otherNum = parseFloat(otherCharges !== undefined ? otherCharges : existingTxn.otherCharges) || 0;
       const totalCostOfGoods = parseFloat(existingTxn.totalCostOfGoods || "0");
-      const newProfitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
+      const newProfitLoss = existingRevenueNum - totalCostOfGoods - transportNum - otherNum;
       
       if (!decimalEqual(newProfitLoss, existingTxn.profitLoss)) {
         changes.push({ field: "profitLoss", oldValue: existingTxn.profitLoss, newValue: newProfitLoss.toString() });
       }
       
-      // Update the transaction
+      // Update the transaction (do NOT update revenue - it's derived from items)
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: partyName || null,
         partyAddress: partyAddress || null,
@@ -854,7 +851,6 @@ export async function registerRoutes(
         amountReceived: amountReceived ? amountReceived.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,
         otherCharges: otherCharges ? otherCharges.toString() : null,
-        revenue: revenue ? revenue.toString() : null,
         profitLoss: newProfitLoss.toString(),
       });
       
