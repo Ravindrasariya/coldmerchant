@@ -342,16 +342,15 @@ export class DatabaseStorage implements IStorage {
           const newRemaining = Math.max(0, currentRemaining - item.bagsMoved);
           await this.updateBagBreakdown(item.breakdownId, item.merchantId, { remainingBags: newRemaining });
         }
-        // Also update lot total remaining (sum of all non-wastage breakdowns)
+        // Also update lot total remaining by recalculating from all breakdowns AFTER the update
         const lot = await this.getLotById(item.lotId, item.merchantId);
         if (lot) {
           const allBreakdowns = await db.select().from(bagBreakdowns)
-            .where(eq(bagBreakdowns.lotId, item.lotId));
+            .where(and(eq(bagBreakdowns.lotId, item.lotId), eq(bagBreakdowns.merchantId, item.merchantId)));
           const totalRemaining = allBreakdowns
             .filter(b => b.size !== "Wastage")
             .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
-          // Subtract current item's bags from total since we just updated breakdown
-          await this.updateLot(item.lotId, item.merchantId, { remainingBags: totalRemaining - item.bagsMoved });
+          await this.updateLot(item.lotId, item.merchantId, { remainingBags: totalRemaining });
         }
       } else {
         // Gate cut lot - decrement directly from lot

@@ -659,6 +659,10 @@ export async function registerRoutes(
           if (!breakdown) {
             return res.status(400).json({ message: `Breakdown ${breakdownId} not found` });
           }
+          // Validate breakdown belongs to the correct lot
+          if (breakdown.lotId !== lotId) {
+            return res.status(400).json({ message: `Breakdown ${breakdownId} does not belong to lot ${lotId}` });
+          }
           const available = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
           if (available < item.bagsMoved) {
             return res.status(400).json({ 
