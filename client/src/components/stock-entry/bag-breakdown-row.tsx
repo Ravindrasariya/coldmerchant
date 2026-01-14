@@ -66,9 +66,10 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
             <FormControl>
               <Input 
                 type="number" 
-                placeholder="0" 
+                placeholder="" 
                 {...field}
-                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                value={field.value ?? ""}
+                onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseInt(e.target.value))}
                 data-testid={`input-breakdown-bags-${lotIndex}-${breakdownIndex}`}
               />
             </FormControl>
@@ -87,10 +88,10 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
               <Input 
                 type="number"
                 step="0.01"
-                placeholder="0.00" 
+                placeholder="" 
                 {...field}
                 value={field.value ?? ""}
-                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                 data-testid={`input-breakdown-weight-${lotIndex}-${breakdownIndex}`}
               />
             </FormControl>
@@ -109,10 +110,10 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
               <Input 
                 type="number"
                 step="0.01"
-                placeholder="0.00" 
+                placeholder="" 
                 {...field}
                 value={field.value ?? ""}
-                onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                 data-testid={`input-breakdown-price-${lotIndex}-${breakdownIndex}`}
               />
             </FormControl>

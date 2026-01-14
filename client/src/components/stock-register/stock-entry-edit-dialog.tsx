@@ -122,7 +122,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     lotIndex: number,
     breakdownIndex: number,
     field: string,
-    value: string | number
+    value: string | number | undefined
   ) => {
     const newLots = [...lots];
     (newLots[lotIndex].bagBreakdowns[breakdownIndex] as any)[field] = value;
@@ -280,24 +280,27 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 <Input
                                   type="number"
                                   className="h-8"
-                                  value={bd.numberOfBags}
-                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "numberOfBags", parseInt(e.target.value) || 0)}
+                                  placeholder=""
+                                  value={bd.numberOfBags ?? ""}
+                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "numberOfBags", e.target.value === "" ? undefined : parseInt(e.target.value))}
                                   data-testid={`edit-breakdown-bags-${lotIndex}-${bdIndex}`}
                                 />
                                 <Input
                                   type="number"
                                   step="0.01"
                                   className="h-8"
-                                  value={bd.weight || ""}
-                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "weight", parseFloat(e.target.value) || 0)}
+                                  placeholder=""
+                                  value={bd.weight ?? ""}
+                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "weight", e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                   data-testid={`edit-breakdown-weight-${lotIndex}-${bdIndex}`}
                                 />
                                 <Input
                                   type="number"
                                   step="0.01"
                                   className="h-8"
-                                  value={bd.pricePerKg || ""}
-                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", parseFloat(e.target.value) || 0)}
+                                  placeholder=""
+                                  value={bd.pricePerKg ?? ""}
+                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                   data-testid={`edit-breakdown-price-${lotIndex}-${bdIndex}`}
                                 />
                                 <div className="font-mono text-sm">

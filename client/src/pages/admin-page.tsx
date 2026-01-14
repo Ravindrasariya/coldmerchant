@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
-  LogOut, Phone, MapPin 
+  LogOut, Phone, MapPin, ArrowLeft 
 } from "lucide-react";
 import type { Merchant, User } from "@shared/schema";
 
