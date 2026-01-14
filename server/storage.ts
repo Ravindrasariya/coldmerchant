@@ -367,6 +367,15 @@ export class DatabaseStorage implements IStorage {
       const breakdowns = await db.select().from(bagBreakdowns)
         .where(eq(bagBreakdowns.lotId, lot.id));
       
+      // Calculate available bags excluding wastage
+      let availableBags = lot.remainingBags;
+      if (breakdowns.length > 0) {
+        // For bilty_cut: sum remainingBags from non-wastage breakdowns
+        availableBags = breakdowns
+          .filter(b => b.size !== "Wastage")
+          .reduce((sum, b) => sum + (b.remainingBags || b.numberOfBags || 0), 0);
+      }
+      
       return {
         lotId: lot.id,
         serialNumber: entry?.serialNumber || 0,
@@ -377,13 +386,14 @@ export class DatabaseStorage implements IStorage {
         cutType: lot.cutType,
         size: lot.size,
         pricePerKg: lot.pricePerKg,
-        remainingBags: lot.remainingBags,
+        remainingBags: availableBags,
         originalBags: lot.originalBags,
         bagBreakdowns: breakdowns,
       };
     }));
     
-    return result.sort((a, b) => a.serialNumber - b.serialNumber);
+    // Filter out lots with no available (non-wastage) bags
+    return result.filter(r => r.remainingBags > 0).sort((a, b) => a.serialNumber - b.serialNumber);
   }
 }
 
