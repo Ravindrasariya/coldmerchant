@@ -125,6 +125,7 @@ export async function registerRoutes(
               merchantId,
               size: bdData.size,
               numberOfBags: bdData.numberOfBags,
+              remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
               weight: weight > 0 ? weight.toString() : null,
               pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
               totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
@@ -186,6 +187,7 @@ export async function registerRoutes(
                   await storage.updateBagBreakdown(bdData.id, merchantId, {
                     size: bdData.size,
                     numberOfBags: bdData.numberOfBags,
+                    remainingBags: bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags,
                     weight: weight > 0 ? weight.toString() : null,
                     pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
                     totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
@@ -198,6 +200,7 @@ export async function registerRoutes(
                     merchantId,
                     size: bdData.size,
                     numberOfBags: bdData.numberOfBags,
+                    remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
                     weight: weight > 0 ? weight.toString() : null,
                     pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
                     totalAmount: totalAmount > 0 ? totalAmount.toString() : null,

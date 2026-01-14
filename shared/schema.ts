@@ -69,6 +69,7 @@ export const bagBreakdowns = pgTable("bag_breakdowns", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   size: text("size").notNull(), // Large, Medium, Small, Wastage
   numberOfBags: integer("number_of_bags").notNull(),
+  remainingBags: integer("remaining_bags"), // tracks remaining per size, initially equals numberOfBags
   weight: decimal("weight", { precision: 10, scale: 2 }),
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
