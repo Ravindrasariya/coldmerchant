@@ -304,12 +304,15 @@ export default function HomePage() {
             <CashManagementTab />
           </TabsContent>
 
-          <footer className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
+          <footer className="mt-8 pt-4 border-t flex flex-col items-center text-center gap-2 text-sm text-muted-foreground">
             <div>
               {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
             </div>
             <div>
               {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+            </div>
+            <div>
+              {t("All Rights Reserved", "सर्वाधिकार सुरक्षित")}
             </div>
           </footer>
         </main>
