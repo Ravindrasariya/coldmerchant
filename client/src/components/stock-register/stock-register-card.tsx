@@ -29,6 +29,7 @@ interface StockEntryWithLots {
   district: string;
   state: string;
   paymentStatus: string;
+  amountPaid: string | null;
   remarks: string | null;
   lots: Array<{
     id: number;
@@ -316,13 +317,20 @@ export function StockRegisterCard() {
             let totalWastage = 0;
             let totalActual = 0;
             let totalRemaining = 0;
+            let entryTotalAmount = 0;
             
             lotsWithMetrics.forEach(({ metrics }) => {
               totalOriginal += metrics.originalBags;
               totalWastage += metrics.wastageBags;
               totalActual += metrics.actualSellableBags;
               totalRemaining += metrics.remainingToSell;
+              if (metrics.totalAmount !== null) {
+                entryTotalAmount += metrics.totalAmount;
+              }
             });
+            
+            const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+            const remainingDue = entryTotalAmount - amountPaid;
 
             return (
               <Card key={entry.id} className="border-border hover-elevate" data-testid={`card-entry-${entry.id}`}>
@@ -344,9 +352,28 @@ export function StockRegisterCard() {
                       
                       <Badge 
                         variant={entry.paymentStatus === "paid" ? "default" : "outline"}
-                        className={entry.paymentStatus === "paid" ? "bg-green-600" : "border-orange-500 text-orange-600"}
+                        className={
+                          entry.paymentStatus === "paid" ? "bg-green-600" : 
+                          entry.paymentStatus === "partial" ? "border-blue-500 text-blue-600" : 
+                          "border-orange-500 text-orange-600"
+                        }
                       >
-                        {entry.paymentStatus === "paid" ? t("Paid", "भुगतान हो गया") : t("Due", "बाकी")}
+                        {entry.paymentStatus === "paid" ? t("Paid", "भुगतान हो गया") : 
+                         entry.paymentStatus === "partial" ? (
+                           <>
+                             {t("Partial", "आंशिक")}
+                             {remainingDue > 0 && (
+                               <span className="ml-1">- ₹{remainingDue.toFixed(0)} {t("Due", "बाकी")}</span>
+                             )}
+                           </>
+                         ) : (
+                           <>
+                             {t("Due", "बाकी")}
+                             {entryTotalAmount > 0 && (
+                               <span className="ml-1">- ₹{entryTotalAmount.toFixed(0)}</span>
+                             )}
+                           </>
+                         )}
                       </Badge>
                       
                       <Badge 
