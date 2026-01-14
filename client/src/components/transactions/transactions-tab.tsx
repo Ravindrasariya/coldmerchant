@@ -384,16 +384,16 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 mr-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#52a7ff]/10">
-                  <Receipt className="h-4 w-4 text-[#52a7ff]" />
+              <div className="flex items-center gap-1 mr-1">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#52a7ff]/10">
+                  <Receipt className="h-3.5 w-3.5 text-[#52a7ff]" />
                 </div>
-                <span className="font-bold text-base leading-tight">
+                <span className="font-bold text-sm leading-tight whitespace-nowrap">
                   Tr No: {transaction.transactionNumber}
                 </span>
               </div>
               {transaction.partyName && (
-                <span className="font-semibold text-base leading-tight">
+                <span className="font-semibold text-sm leading-tight">
                   - {transaction.partyName}
                 </span>
               )}
