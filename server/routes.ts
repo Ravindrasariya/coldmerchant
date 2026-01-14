@@ -224,5 +224,189 @@ export async function registerRoutes(
     }
   });
 
+  // ============= ADMIN ROUTES =============
+  
+  // GET /api/admin/merchants - Get all merchants (admin only)
+  app.get("/api/admin/merchants", requireSystemAdmin, async (req, res) => {
+    try {
+      const allMerchants = await storage.getAllMerchants();
+      res.json(allMerchants);
+    } catch (error) {
+      console.error("Error fetching merchants:", error);
+      res.status(500).json({ message: "Failed to fetch merchants" });
+    }
+  });
+
+  // POST /api/admin/merchants - Create a new merchant (admin only)
+  app.post("/api/admin/merchants", requireSystemAdmin, async (req, res) => {
+    try {
+      const { name, contactNumber, address } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: "Merchant name is required" });
+      }
+
+      const merchant = await storage.createMerchant({
+        name,
+        contactNumber: contactNumber || null,
+        address: address || null,
+      });
+
+      res.status(201).json(merchant);
+    } catch (error) {
+      console.error("Error creating merchant:", error);
+      res.status(500).json({ message: "Failed to create merchant" });
+    }
+  });
+
+  // PUT /api/admin/merchants/:id - Update a merchant (admin only)
+  app.put("/api/admin/merchants/:id", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, contactNumber, address } = req.body;
+
+      const updated = await storage.updateMerchant(id, {
+        name,
+        contactNumber,
+        address,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating merchant:", error);
+      res.status(500).json({ message: "Failed to update merchant" });
+    }
+  });
+
+  // DELETE /api/admin/merchants/:id - Delete a merchant (admin only)
+  app.delete("/api/admin/merchants/:id", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteMerchant(id);
+      res.json({ message: "Merchant deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting merchant:", error);
+      res.status(500).json({ message: "Failed to delete merchant" });
+    }
+  });
+
+  // GET /api/admin/users - Get all users (admin only)
+  app.get("/api/admin/users", requireSystemAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Remove password from response
+      const usersWithoutPasswords = allUsers.map(({ password, ...user }) => user);
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // POST /api/admin/users - Create a new user (admin only)
+  app.post("/api/admin/users", requireSystemAdmin, async (req, res) => {
+    try {
+      const { username, name, mobileNumber, merchantId, canEdit } = req.body;
+
+      if (!username || !name || !merchantId) {
+        return res.status(400).json({ message: "Username, name, and merchant are required" });
+      }
+
+      // Check if username exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Default password is "password123"
+      const { hashPassword } = await import("./auth");
+      const hashedPassword = await hashPassword("password123");
+
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        name,
+        mobileNumber: mobileNumber || null,
+        merchantId,
+        isSystemAdmin: false,
+        canEdit: canEdit ?? true,
+        mustChangePassword: true,
+      });
+
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // PUT /api/admin/users/:id - Update a user (admin only)
+  app.put("/api/admin/users/:id", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, mobileNumber, canEdit } = req.body;
+
+      const updated = await storage.updateUser(id, {
+        name,
+        mobileNumber,
+        canEdit,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Remove password from response
+      const { password, ...userWithoutPassword } = updated;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // POST /api/admin/users/:id/reset-password - Reset user password to default (admin only)
+  app.post("/api/admin/users/:id/reset-password", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Reset to default password "password123"
+      const { hashPassword } = await import("./auth");
+      const hashedPassword = await hashPassword("password123");
+
+      await storage.updateUserPassword(id, hashedPassword);
+      await storage.updateUserMustChangePassword(id, true);
+
+      res.json({ message: "Password reset to default. User must change password on next login." });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // DELETE /api/admin/users/:id - Delete a user (admin only)
+  app.delete("/api/admin/users/:id", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Don't allow deleting yourself
+      if (req.user!.id === id) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   return httpServer;
 }

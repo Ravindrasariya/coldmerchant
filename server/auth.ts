@@ -70,50 +70,6 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/register", async (req, res, next) => {
-    try {
-      const { username, password, merchantName } = req.body;
-
-      if (!username || !password || !merchantName) {
-        return res.status(400).json({ message: "All fields are required" });
-      }
-
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      // Create merchant first
-      const merchant = await storage.createMerchant({
-        name: merchantName,
-      });
-
-      // Create user linked to merchant
-      const user = await storage.createUser({
-        username,
-        password: await hashPassword(password),
-        name: merchantName,
-        merchantId: merchant.id,
-        isSystemAdmin: false,
-        canEdit: true,
-        mustChangePassword: false,
-      });
-
-      req.login(user, (err) => {
-        if (err) return next(err);
-        
-        // Return user with merchant name
-        res.status(201).json({
-          ...user,
-          merchantName: merchant.name,
-        });
-      });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
-    }
-  });
-
   app.post("/api/login", (req, res, next) => {
     passport.authenticate("local", async (err: any, user: SelectUser | false, info: any) => {
       if (err) return next(err);
@@ -161,4 +117,59 @@ export function setupAuth(app: Express) {
       merchantName,
     });
   });
+
+  // Password change endpoint
+  app.post("/api/change-password", async (req, res) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    try {
+      const { currentPassword, newPassword, isFirstLogin } = req.body;
+
+      if (!newPassword) {
+        return res.status(400).json({ message: "New password is required" });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // If user must change password (first login) and isFirstLogin flag is set,
+      // we allow changing without verifying current password (they know it's the default)
+      // Otherwise, we require current password verification
+      if (user.mustChangePassword && isFirstLogin) {
+        // First login - just update the password
+      } else {
+        // Regular password change - verify current password
+        if (!currentPassword) {
+          return res.status(400).json({ message: "Current password is required" });
+        }
+        if (!(await comparePasswords(currentPassword, user.password))) {
+          return res.status(400).json({ message: "Current password is incorrect" });
+        }
+      }
+
+      // Update password
+      await storage.updateUserPassword(req.user.id, await hashPassword(newPassword));
+      
+      // Clear must change password flag if set
+      if (user.mustChangePassword) {
+        await storage.updateUserMustChangePassword(req.user.id, false);
+      }
+
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Password change error:", error);
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
 }
+
+// Export for use in admin routes
+export { hashPassword, comparePasswords };

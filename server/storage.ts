@@ -19,10 +19,19 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserPassword(id: number, hashedPassword: string): Promise<void>;
+  updateUserMustChangePassword(id: number, mustChange: boolean): Promise<void>;
+  getUsersByMerchant(merchantId: number): Promise<User[]>;
+  getAllUsers(): Promise<(User & { merchantName?: string })[]>;
+  updateUser(id: number, data: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<void>;
   
   // Merchant operations
   getMerchant(id: number): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
+  getAllMerchants(): Promise<Merchant[]>;
+  updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined>;
+  deleteMerchant(id: number): Promise<void>;
   
   // Stock Entry operations
   getStockEntriesByMerchant(merchantId: number): Promise<any[]>;
@@ -69,6 +78,40 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserPassword(id: number, hashedPassword: string): Promise<void> {
+    await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id));
+  }
+
+  async updateUserMustChangePassword(id: number, mustChange: boolean): Promise<void> {
+    await db.update(users).set({ mustChangePassword: mustChange }).where(eq(users.id, id));
+  }
+
+  async getUsersByMerchant(merchantId: number): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.merchantId, merchantId));
+  }
+
+  async getAllUsers(): Promise<(User & { merchantName?: string })[]> {
+    const allUsers = await db.select().from(users);
+    const result = await Promise.all(allUsers.map(async (user) => {
+      let merchantName: string | undefined;
+      if (user.merchantId) {
+        const merchant = await this.getMerchant(user.merchantId);
+        merchantName = merchant?.name;
+      }
+      return { ...user, merchantName };
+    }));
+    return result;
+  }
+
+  async updateUser(id: number, data: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
   // Merchant operations
   async getMerchant(id: number): Promise<Merchant | undefined> {
     const [merchant] = await db.select().from(merchants).where(eq(merchants.id, id));
@@ -78,6 +121,19 @@ export class DatabaseStorage implements IStorage {
   async createMerchant(merchant: InsertMerchant): Promise<Merchant> {
     const [created] = await db.insert(merchants).values(merchant).returning();
     return created;
+  }
+
+  async getAllMerchants(): Promise<Merchant[]> {
+    return await db.select().from(merchants);
+  }
+
+  async updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined> {
+    const [updated] = await db.update(merchants).set(data).where(eq(merchants.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteMerchant(id: number): Promise<void> {
+    await db.delete(merchants).where(eq(merchants.id, id));
   }
 
   // Stock Entry operations

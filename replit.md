@@ -36,17 +36,25 @@ Preferred communication style: Simple, everyday language.
 
 ### Multi-Tenant Data Model
 The system isolates data by merchant:
-- **Merchants**: Top-level tenant entity
-- **Users**: Linked to merchants with role-based access
+- **Merchants**: Top-level tenant entity with name, contact, address
+- **Users**: Linked to merchants with role-based access (isSystemAdmin, canEdit, mustChangePassword flags)
 - **Stock Entries**: Per-merchant with auto-incrementing serial numbers
 - **Lots**: Child of stock entries, tracks cold store inventory
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
 
+### Admin System
+- **System Admin**: Special user type (isSystemAdmin=true) with no merchantId, can access /admin panel
+- **Merchant Management**: Admin can create/edit/delete merchants via /api/admin/merchants
+- **User Management**: Admin can create/edit/delete users, reset passwords, set view/edit permissions
+- **Default Password**: New users created with password "password123" and mustChangePassword=true
+- **First Login**: Users with mustChangePassword flag are prompted to set a new password on first login
+
 ### Key Design Patterns
 - Shared schema in `/shared/schema.ts` used by both client and server
 - Form schemas defined with Zod and validated on both ends
-- Protected routes with authentication middleware
+- Protected routes with authentication middleware (requireAuth, requireMerchant, requireSystemAdmin)
 - Merchant ID scoping on all data operations for tenant isolation
+- No public registration - admin must onboard all merchants and users
 
 ## External Dependencies
 

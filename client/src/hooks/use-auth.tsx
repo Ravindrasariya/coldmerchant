@@ -4,7 +4,7 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { User as SelectUser, InsertUser } from "@shared/schema";
+import { User as SelectUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -14,7 +14,7 @@ type AuthContextType = {
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
+  changePasswordMutation: UseMutationResult<void, Error, ChangePasswordData>;
 };
 
 type LoginData = {
@@ -22,10 +22,10 @@ type LoginData = {
   password: string;
 };
 
-type RegisterData = {
-  username: string;
-  password: string;
-  merchantName: string;
+type ChangePasswordData = {
+  currentPassword?: string;
+  newPassword: string;
+  isFirstLogin?: boolean;
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -58,23 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterData) => {
-      const res = await apiRequest("POST", "/api/register", data);
-      return await res.json();
-    },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/logout");
@@ -91,6 +74,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: ChangePasswordData) => {
+      const res = await apiRequest("POST", "/api/change-password", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to change password");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      toast({
+        title: "Password changed",
+        description: "Your password has been updated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Password change failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <AuthContext.Provider
       value={{
@@ -99,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         loginMutation,
         logoutMutation,
-        registerMutation,
+        changePasswordMutation,
       }}
     >
       {children}

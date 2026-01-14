@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,16 +22,60 @@ import {
   ClipboardList, 
   ChevronDown, 
   LogOut,
-  User
+  Settings,
+  KeyRound,
+  Loader2
 } from "lucide-react";
 
 export default function HomePage() {
-  const { user, logoutMutation } = useAuth();
+  const [, setLocation] = useLocation();
+  const { user, logoutMutation, changePasswordMutation } = useAuth();
   const [activeTab, setActiveTab] = useState("stock-entry");
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const handleLogout = () => {
     logoutMutation.mutate();
   };
+
+  const handlePasswordChange = () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return;
+    }
+    changePasswordMutation.mutate({
+      currentPassword: isFirstLoginDialog ? undefined : passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword,
+      isFirstLogin: isFirstLoginDialog,
+    }, {
+      onSuccess: () => {
+        setShowPasswordDialog(false);
+        setIsFirstLoginDialog(false);
+        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (user?.isSystemAdmin && !user?.merchantId) {
+      setLocation("/admin");
+    }
+  }, [user, setLocation]);
+
+  useEffect(() => {
+    if (user?.mustChangePassword && !showPasswordDialog && !changePasswordMutation.isSuccess) {
+      setShowPasswordDialog(true);
+      setIsFirstLoginDialog(true);
+    }
+  }, [user?.mustChangePassword, showPasswordDialog, changePasswordMutation.isSuccess]);
+
+  if (user?.isSystemAdmin && !user?.merchantId) {
+    return <></>;
+  }
 
   const getInitials = (name: string) => {
     return name
@@ -73,11 +121,22 @@ export default function HomePage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user?.username}</p>
+                  <p className="text-sm font-medium">{user?.name || user?.username}</p>
                   {user?.merchantName && (
                     <p className="text-xs text-muted-foreground">{user.merchantName}</p>
                   )}
                 </div>
+                <DropdownMenuSeparator />
+                {user?.isSystemAdmin && (
+                  <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Admin Panel
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Change Password
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
                   <LogOut className="h-4 w-4 mr-2" />
@@ -129,6 +188,86 @@ export default function HomePage() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={showPasswordDialog} onOpenChange={(open) => {
+        if (!open && !isFirstLoginDialog) {
+          setShowPasswordDialog(false);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isFirstLoginDialog ? "Set New Password" : "Change Password"}</DialogTitle>
+          </DialogHeader>
+          {isFirstLoginDialog && (
+            <p className="text-sm text-muted-foreground">
+              Please set a new password to continue. This is required on first login.
+            </p>
+          )}
+          <div className="space-y-4 py-4">
+            {!isFirstLoginDialog && (
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  placeholder="Enter current password"
+                  data-testid="input-current-password"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                placeholder="Enter new password (min 6 characters)"
+                data-testid="input-new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                placeholder="Confirm new password"
+                data-testid="input-confirm-password"
+              />
+              {passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword && (
+                <p className="text-sm text-destructive">Passwords do not match</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            {!isFirstLoginDialog && (
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                Cancel
+              </Button>
+            )}
+            <Button
+              onClick={handlePasswordChange}
+              disabled={
+                (!isFirstLoginDialog && !passwordForm.currentPassword) ||
+                !passwordForm.newPassword ||
+                passwordForm.newPassword.length < 6 ||
+                passwordForm.newPassword !== passwordForm.confirmPassword ||
+                changePasswordMutation.isPending
+              }
+              data-testid="button-save-password"
+            >
+              {changePasswordMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {isFirstLoginDialog ? "Set Password" : "Change Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
