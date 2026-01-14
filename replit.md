@@ -41,6 +41,15 @@ The system isolates data by merchant:
 - **Stock Entries**: Per-merchant with auto-incrementing serial numbers
 - **Lots**: Child of stock entries, tracks cold store inventory
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
+- **Edit History**: Audit trail of all modifications to stock entries after initial creation
+
+### Edit History System
+- All modifications to stock entries after initial creation are automatically recorded
+- Tracks changes at entry, lot, and breakdown levels
+- Records: field name, old value, new value, timestamp, and user who made the change
+- Structural changes (adding/deleting breakdowns) are also tracked
+- History is displayed in a collapsible section at the bottom of the edit dialog
+- Session persistence set to 30 days for seamless user experience
 
 ### Admin System
 - **System Admin**: Special user type (isSystemAdmin=true) with no merchantId, can access /admin panel
