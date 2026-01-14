@@ -104,11 +104,15 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                 <FormLabel>Original # Bags *</FormLabel>
                 <FormControl>
                   <Input 
-                    type="number" 
+                    type="text"
+                    inputMode="numeric"
                     placeholder="" 
                     {...field}
                     value={field.value ?? ""}
-                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseInt(e.target.value))}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, '');
+                      field.onChange(val === "" ? undefined : parseInt(val));
+                    }}
                     data-testid={`input-original-bags-${lotIndex}`}
                   />
                 </FormControl>
@@ -249,12 +253,15 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                     <FormLabel>Price/kg</FormLabel>
                     <FormControl>
                       <Input 
-                        type="number" 
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="" 
                         {...field}
                         value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          field.onChange(val === "" ? undefined : parseFloat(val));
+                        }}
                         data-testid={`input-price-per-kg-${lotIndex}`}
                       />
                     </FormControl>
