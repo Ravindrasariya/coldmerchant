@@ -78,7 +78,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
       "Large": "Large / बड़ा",
       "Medium": "Medium / मध्यम",
       "Small": "Small / छोटा",
-      "Wastage": "Wastage / बर्बादी",
+      "Wastage": "Wastage / कचरा",
     };
     return sizeMap[size] || size;
   };
