@@ -234,7 +234,7 @@ export function CashManagementTab() {
           </TabsList>
         </Tabs>
 
-        <Card>
+        <Card className="relative z-10">
           <CardContent className="pt-6">
             {activeTab === "inward" ? (
               <Form {...inwardForm}>
