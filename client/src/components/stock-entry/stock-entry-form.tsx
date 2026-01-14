@@ -106,18 +106,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
         <FarmerInfoSection form={form} />
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">Lots</h3>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddLot}
-              data-testid="button-add-lot"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add More Lot
-            </Button>
-          </div>
+          <h3 className="text-lg font-medium">Lots</h3>
 
           {lotFields.map((field, index) => (
             <LotCard
@@ -128,6 +117,17 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
               canRemove={lotFields.length > 1}
             />
           ))}
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAddLot}
+            className="w-full"
+            data-testid="button-add-lot"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add More Lot
+          </Button>
         </div>
 
         <Card className="border-border">
