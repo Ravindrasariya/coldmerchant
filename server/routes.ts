@@ -116,8 +116,8 @@ export async function registerRoutes(
           remainingBags: lotData.originalBags,
         });
 
-        // Create bag breakdowns for bilty cut
-        if (lotData.cutType === "bilty_cut" && lotData.bagBreakdowns) {
+        // Create bag breakdowns for both cut types
+        if (lotData.bagBreakdowns) {
           for (const bdData of lotData.bagBreakdowns) {
             const weight = bdData.weight || 0;
             const pricePerKg = bdData.pricePerKg || 0;
@@ -221,8 +221,8 @@ export async function registerRoutes(
                 : undefined,
             });
 
-            // Handle bag breakdowns for bilty cut
-            if (lotData.cutType === "bilty_cut" && lotData.bagBreakdowns) {
+            // Handle bag breakdowns for both cut types
+            if (lotData.bagBreakdowns) {
               const existingBreakdowns = existingLot?.bagBreakdowns || [];
               const existingIds = new Set<number>(existingBreakdowns.map((b: any) => b.id));
 
