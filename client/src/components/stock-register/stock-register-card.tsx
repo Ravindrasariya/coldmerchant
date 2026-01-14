@@ -400,22 +400,22 @@ export function StockRegisterCard() {
                         {entryTotalAmount > 0 && (
                           <div className="flex items-center gap-1">
                             <span className="text-muted-foreground">{t("Farmer Total", "किसान कुल")}</span>{" "}
-                            <span className="font-medium">Rs. {entryTotalAmount.toFixed(0)}</span>
+                            <span className="font-medium">₹ {entryTotalAmount.toFixed(0)}</span>
                             <span className="text-muted-foreground mx-1">|</span>
                             <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
                             <span className={`font-medium ${farmerRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              Rs. {farmerRemainingDue > 0 ? farmerRemainingDue.toFixed(0) : "0"}
+                              ₹ {farmerRemainingDue > 0 ? farmerRemainingDue.toFixed(0) : "0"}
                             </span>
                           </div>
                         )}
                         {entryColdStoreTotalCharges > 0 && (
                           <div className="flex items-center gap-1">
                             <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
-                            <span className="font-medium">Rs. {entryColdStoreTotalCharges.toFixed(0)}</span>
+                            <span className="font-medium">₹ {entryColdStoreTotalCharges.toFixed(0)}</span>
                             <span className="text-muted-foreground mx-1">|</span>
                             <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
                             <span className={`font-medium ${coldStoreRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              Rs. {coldStoreRemainingDue > 0 ? coldStoreRemainingDue.toFixed(0) : "0"}
+                              ₹ {coldStoreRemainingDue > 0 ? coldStoreRemainingDue.toFixed(0) : "0"}
                             </span>
                           </div>
                         )}
@@ -523,11 +523,11 @@ export function StockRegisterCard() {
                           {lotColdTotal > 0 && (
                             <div className="flex flex-wrap items-center gap-x-1 text-[13px] mt-1">
                               <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
-                              <span className="font-medium">Rs. {lotColdTotal.toFixed(0)}</span>
+                              <span className="font-medium">₹ {lotColdTotal.toFixed(0)}</span>
                               <span className="text-muted-foreground mx-1">|</span>
                               <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
                               <span className={`font-medium ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                                Rs. {lotColdDue > 0 ? lotColdDue.toFixed(0) : "0"}
+                                ₹ {lotColdDue > 0 ? lotColdDue.toFixed(0) : "0"}
                               </span>
                             </div>
                           )}
