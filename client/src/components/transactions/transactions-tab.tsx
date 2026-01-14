@@ -336,6 +336,8 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
 
   const totalCost = parseFloat(transaction.totalCostOfGoods || "0");
   const revenue = parseFloat(transaction.revenue || "0");
+  const amountReceived = parseFloat(transaction.amountReceived || "0");
+  const dueAmount = Math.max(0, revenue - amountReceived);
   const profitLoss = parseFloat(transaction.profitLoss || "0");
   
   // Get unique potato types from transaction items (Wafer, Ration, Seed)
@@ -393,9 +395,13 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
                 <span className="font-medium ml-1">₹{revenue.toFixed(0)}</span>
               </span>
-              {revenue > 0 && (
+              {dueAmount > 0 ? (
                 <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                  {t("Due", "बकाया")}: ₹{revenue.toFixed(0)}
+                  {t("Due", "बकाया")}: ₹{dueAmount.toFixed(0)}
+                </Badge>
+              ) : revenue > 0 && (
+                <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-300 dark:border-green-600">
+                  {t("Paid", "भुगतान")}
                 </Badge>
               )}
             </div>
