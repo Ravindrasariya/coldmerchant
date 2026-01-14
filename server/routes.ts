@@ -796,7 +796,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue } = req.body;
+      const { partyName, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -816,6 +816,9 @@ export async function registerRoutes(
       }
       if (advancePayment !== undefined && !decimalEqual(advancePayment, existingTxn.advancePayment)) {
         changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
+      }
+      if (amountReceived !== undefined && !decimalEqual(amountReceived, existingTxn.amountReceived)) {
+        changes.push({ field: "amountReceived", oldValue: existingTxn.amountReceived, newValue: amountReceived?.toString() || null });
       }
       if (transportationCharges !== undefined && !decimalEqual(transportationCharges, existingTxn.transportationCharges)) {
         changes.push({ field: "transportationCharges", oldValue: existingTxn.transportationCharges, newValue: transportationCharges?.toString() || null });
@@ -843,6 +846,7 @@ export async function registerRoutes(
         partyName: partyName || null,
         vehicleNumber: vehicleNumber || null,
         advancePayment: advancePayment ? advancePayment.toString() : null,
+        amountReceived: amountReceived ? amountReceived.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,
         otherCharges: otherCharges ? otherCharges.toString() : null,
         revenue: revenue ? revenue.toString() : null,

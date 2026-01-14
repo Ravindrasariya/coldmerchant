@@ -32,6 +32,7 @@ interface Transaction {
   partyName: string | null;
   vehicleNumber: string | null;
   advancePayment: string | null;
+  amountReceived: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
   revenue: string | null;
@@ -95,7 +96,9 @@ export function TransactionsTab() {
       // Filter by payment due
       if (filterPaymentDue !== "all") {
         const revenue = parseFloat(txn.revenue || "0");
-        const hasDue = revenue > 0;
+        const amountReceived = parseFloat(txn.amountReceived || "0");
+        const dueAmount = revenue - amountReceived;
+        const hasDue = dueAmount > 0;
         if (filterPaymentDue === "due" && !hasDue) return false;
         if (filterPaymentDue === "paid" && hasDue) return false;
       }
@@ -248,8 +251,8 @@ export function TransactionsTab() {
                 <Wallet className="h-4 w-4" />
                 {t("Total Paid", "कुल भुगतान")}
               </div>
-              <p className="text-xl font-bold">
-                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.advancePayment || "0")), 0).toLocaleString("en-IN")}
+              <p className="text-xl font-bold text-green-600">
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.amountReceived || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -260,7 +263,7 @@ export function TransactionsTab() {
                 {t("Total Due", "कुल बकाया")}
               </div>
               <p className="text-xl font-bold text-orange-600">
-                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
+                ₹{Math.max(0, filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0") - parseFloat(t.amountReceived || "0")), 0)).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>

@@ -72,6 +72,7 @@ interface TransactionWithHistory {
   partyName: string | null;
   vehicleNumber: string | null;
   advancePayment: string | null;
+  amountReceived: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
   revenue: string | null;
@@ -88,6 +89,7 @@ const editTransactionSchema = z.object({
   partyName: z.string().optional(),
   vehicleNumber: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
+  amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
   revenue: z.coerce.number().optional(),
@@ -160,6 +162,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       partyName: "",
       vehicleNumber: "",
       advancePayment: undefined,
+      amountReceived: undefined,
       transportationCharges: undefined,
       otherCharges: undefined,
       revenue: undefined,
@@ -172,6 +175,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         partyName: transaction.partyName || "",
         vehicleNumber: transaction.vehicleNumber || "",
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
+        amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
         revenue: transaction.revenue ? parseFloat(transaction.revenue) : undefined,
@@ -509,9 +513,23 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     name="advancePayment"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("Advance Payment", "अग्रिम भुगतान")} (₹)</FormLabel>
+                        <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-advance-payment" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="amountReceived"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Amount Received", "प्राप्त राशि")} (₹)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-amount-received" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

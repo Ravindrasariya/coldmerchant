@@ -94,7 +94,8 @@ export const transactions = pgTable("transactions", {
   transactionNumber: integer("transaction_number").notNull(),
   partyName: text("party_name"),
   vehicleNumber: text("vehicle_number"), // optional truck/vehicle number
-  advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }),
+  advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }), // advance given to driver/transporter
+  amountReceived: decimal("amount_received", { precision: 12, scale: 2 }), // payment received from buyer
   transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
   otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),
   revenue: decimal("revenue", { precision: 12, scale: 2 }),
