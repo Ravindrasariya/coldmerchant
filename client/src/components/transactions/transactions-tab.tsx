@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
@@ -47,10 +49,69 @@ export function TransactionsTab() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
+  
+  // Filter states
+  const [filterTxnNumber, setFilterTxnNumber] = useState("");
+  const [filterSerialNumber, setFilterSerialNumber] = useState("");
+  const [filterParty, setFilterParty] = useState("all");
+  const [filterPaymentDue, setFilterPaymentDue] = useState("all");
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
   });
+
+  // Get unique party names for dropdown
+  const partyNames = useMemo(() => {
+    if (!transactions) return [];
+    const names = transactions
+      .map(t => t.partyName)
+      .filter((name): name is string => !!name);
+    return Array.from(new Set(names));
+  }, [transactions]);
+
+  // Filter transactions
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return [];
+    
+    return transactions.filter(txn => {
+      // Filter by transaction number
+      if (filterTxnNumber && !txn.transactionNumber.toString().includes(filterTxnNumber)) {
+        return false;
+      }
+      
+      // Filter by serial number (check items)
+      if (filterSerialNumber) {
+        const hasMatchingSerial = txn.items.some(
+          item => item.serialNumber.toString().includes(filterSerialNumber)
+        );
+        if (!hasMatchingSerial) return false;
+      }
+      
+      // Filter by party
+      if (filterParty !== "all" && txn.partyName !== filterParty) {
+        return false;
+      }
+      
+      // Filter by payment due
+      if (filterPaymentDue !== "all") {
+        const revenue = parseFloat(txn.revenue || "0");
+        const hasDue = revenue > 0;
+        if (filterPaymentDue === "due" && !hasDue) return false;
+        if (filterPaymentDue === "paid" && hasDue) return false;
+      }
+      
+      return true;
+    });
+  }, [transactions, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
+
+  const hasActiveFilters = filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
+
+  const clearFilters = () => {
+    setFilterTxnNumber("");
+    setFilterSerialNumber("");
+    setFilterParty("all");
+    setFilterPaymentDue("all");
+  };
 
   if (isLoading) {
     return (
@@ -80,8 +141,68 @@ export function TransactionsTab() {
         </Button>
       </div>
 
-      {/* Summary Cards */}
+      {/* Filters */}
       {transactions && transactions.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{t("Filters", "फ़िल्टर")}</span>
+              </div>
+              
+              <Input
+                placeholder={t("Transaction #", "लेनदेन #")}
+                value={filterTxnNumber}
+                onChange={(e) => setFilterTxnNumber(e.target.value)}
+                className="w-32 h-9"
+                data-testid="filter-txn-number"
+              />
+              
+              <Input
+                placeholder={t("Serial #", "सीरियल #")}
+                value={filterSerialNumber}
+                onChange={(e) => setFilterSerialNumber(e.target.value)}
+                className="w-28 h-9"
+                data-testid="filter-serial-number"
+              />
+              
+              <Select value={filterParty} onValueChange={setFilterParty}>
+                <SelectTrigger className="w-40 h-9" data-testid="filter-party">
+                  <SelectValue placeholder={t("Party", "पार्टी")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All Parties", "सभी पार्टी")}</SelectItem>
+                  {partyNames.map(name => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={filterPaymentDue} onValueChange={setFilterPaymentDue}>
+                <SelectTrigger className="w-36 h-9" data-testid="filter-payment-due">
+                  <SelectValue placeholder={t("Payment", "भुगतान")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All", "सभी")}</SelectItem>
+                  <SelectItem value="due">{t("Due", "बकाया")}</SelectItem>
+                  <SelectItem value="paid">{t("Paid", "भुगतान किया")}</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+                  <X className="h-4 w-4 mr-1" />
+                  {t("Clear", "साफ़ करें")}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary Cards */}
+      {filteredTransactions && filteredTransactions.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card>
             <CardContent className="p-4">
@@ -90,7 +211,7 @@ export function TransactionsTab() {
                 {t("Total Revenue", "कुल राजस्व")}
               </div>
               <p className="text-xl font-bold">
-                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -101,23 +222,23 @@ export function TransactionsTab() {
                 {t("Total Cost", "कुल लागत")}
               </div>
               <p className="text-xl font-bold">
-                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                {transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? (
+                {filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-green-600" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-red-600" />
                 )}
                 {t("Total P&L", "कुल लाभ/हानि")}
               </div>
-              <p className={`text-xl font-bold ${transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "+" : ""}
-                ₹{Math.abs(transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0)).toLocaleString("en-IN")}
+              <p className={`text-xl font-bold ${filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "+" : ""}
+                ₹{Math.abs(filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0)).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -128,7 +249,7 @@ export function TransactionsTab() {
                 {t("Total Paid", "कुल भुगतान")}
               </div>
               <p className="text-xl font-bold">
-                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.advancePayment || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.advancePayment || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -139,7 +260,7 @@ export function TransactionsTab() {
                 {t("Total Due", "कुल बकाया")}
               </div>
               <p className="text-xl font-bold text-orange-600">
-                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
           </Card>
@@ -156,9 +277,19 @@ export function TransactionsTab() {
             </p>
           </div>
         </Card>
+      ) : filteredTransactions.length === 0 ? (
+        <Card className="p-8">
+          <div className="text-center text-muted-foreground">
+            <Filter className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>{t("No matching transactions", "कोई मिलता जुलता लेनदेन नहीं")}</p>
+            <p className="text-sm mt-1">
+              {t("Try adjusting your filters", "फ़िल्टर बदलकर देखें")}
+            </p>
+          </div>
+        </Card>
       ) : (
         <div className="space-y-4">
-          {transactions?.slice().sort((a, b) => b.transactionNumber - a.transactionNumber).map((txn) => (
+          {filteredTransactions.slice().sort((a, b) => b.transactionNumber - a.transactionNumber).map((txn) => (
             <TransactionCard 
               key={txn.id} 
               transaction={txn} 
