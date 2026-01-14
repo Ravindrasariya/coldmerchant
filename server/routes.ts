@@ -280,6 +280,40 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/lots/:id/sell - Mark bags as sold for a gate_cut lot
+  app.post("/api/lots/:id/sell", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const lotId = parseInt(req.params.id);
+      const { quantity } = req.body;
+
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Invalid quantity. Must be a positive number." });
+      }
+
+      const lot = await storage.getLotById(lotId, merchantId);
+      if (!lot) {
+        return res.status(404).json({ message: "Lot not found" });
+      }
+
+      if (quantity > lot.remainingBags) {
+        return res.status(400).json({ 
+          message: `Cannot sell ${quantity} bags. Only ${lot.remainingBags} remaining.` 
+        });
+      }
+
+      const newRemaining = lot.remainingBags - quantity;
+      await storage.updateLot(lotId, merchantId, {
+        remainingBags: newRemaining,
+      });
+
+      res.json({ success: true, remainingBags: newRemaining });
+    } catch (error) {
+      console.error("Error marking lot bags as sold:", error);
+      res.status(500).json({ message: "Failed to mark bags as sold" });
+    }
+  });
+
   // ============= ADMIN ROUTES =============
   
   // GET /api/admin/merchants - Get all merchants (admin only)

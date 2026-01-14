@@ -6,6 +6,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,6 +92,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     }))
   })));
   const [sellQuantities, setSellQuantities] = useState<Record<string, number>>({});
+  const [gateCutSellQty, setGateCutSellQty] = useState<Record<number, number>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: async (data: { paymentStatus: string; remarks: string; lots: typeof lots }) => {
@@ -169,6 +181,66 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     }
     
     sellMutation.mutate({ breakdownId, quantity });
+  };
+
+  // For gate_cut lots - sell at lot level
+  const lotSellMutation = useMutation({
+    mutationFn: async ({ lotId, quantity }: { lotId: number; quantity: number }) => {
+      const res = await apiRequest("POST", `/api/lots/${lotId}/sell`, { quantity });
+      return await res.json();
+    },
+    onSuccess: (data, variables) => {
+      toast({
+        title: t("Sale Recorded", "बिक्री दर्ज हो गई"),
+        description: t(`${variables.quantity} bags marked as sold.`, `${variables.quantity} बोरी बेची गई।`),
+      });
+      setLots(prevLots => prevLots.map(lot => 
+        lot.id === variables.lotId 
+          ? { ...lot, remainingBags: data.remainingBags }
+          : lot
+      ));
+      setGateCutSellQty(prev => ({ ...prev, [variables.lotId]: 0 }));
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLotSell = (lotId: number, lotIndex: number) => {
+    const quantity = gateCutSellQty[lotId] || 0;
+    const lot = lots[lotIndex];
+    
+    if (quantity <= 0) {
+      toast({
+        title: t("Invalid Quantity", "अमान्य मात्रा"),
+        description: t("Please enter a valid quantity to sell.", "कृपया बेचने के लिए मान्य मात्रा दर्ज करें।"),
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (quantity > lot.remainingBags) {
+      toast({
+        title: t("Insufficient Stock", "अपर्याप्त स्टॉक"),
+        description: t(`Only ${lot.remainingBags} bags remaining.`, `केवल ${lot.remainingBags} बोरी शेष है।`),
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    lotSellMutation.mutate({ lotId, quantity });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirm) {
+      handleRemoveBreakdown(deleteConfirm.lotIndex, deleteConfirm.bdIndex);
+      setDeleteConfirm(null);
+    }
   };
 
   const handleAddBreakdown = (lotIndex: number) => {
@@ -433,7 +505,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-destructive"
-                                  onClick={() => handleRemoveBreakdown(lotIndex, bdIndex)}
+                                  onClick={() => setDeleteConfirm({ lotIndex, bdIndex })}
                                   data-testid={`edit-remove-breakdown-${lotIndex}-${bdIndex}`}
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -452,10 +524,83 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     </div>
                   </CardContent>
                 )}
+                {lot.cutType === "gate_cut" && (
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">{t("Gate Cut Details", "गेट कट विवरण")}</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-md">
+                        <div>
+                          <Label className="text-xs">{t("Size", "आकार")}</Label>
+                          <p className="font-medium">{lot.size || "—"}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("Price/kg", "मूल्य/किलो")}</Label>
+                          <p className="font-medium">{lot.pricePerKg ? `₹${lot.pricePerKg}` : "—"}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("Remaining", "शेष")}</Label>
+                          <p className="font-mono font-medium">
+                            <span className="text-primary">{lot.remainingBags}</span>
+                            <span className="text-muted-foreground">/{lot.originalBags}</span>
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs">{t("Mark Sold", "बेचें")}</Label>
+                          {lot.id > 0 ? (
+                            <div className="flex gap-1 mt-1">
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                className="h-8 w-20"
+                                placeholder="#"
+                                value={gateCutSellQty[lot.id] || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9]/g, '');
+                                  setGateCutSellQty(prev => ({ ...prev, [lot.id]: val === "" ? 0 : parseInt(val) }));
+                                }}
+                                data-testid={`edit-gatecut-sell-qty-${lotIndex}`}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleLotSell(lot.id, lotIndex)}
+                                disabled={lotSellMutation.isPending || !gateCutSellQty[lot.id] || gateCutSellQty[lot.id] <= 0}
+                                data-testid={`edit-gatecut-sell-btn-${lotIndex}`}
+                              >
+                                <ShoppingCart className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">{t("Save first", "पहले सहेजें")}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             ))}
           </div>
         </div>
+
+        <AlertDialog open={deleteConfirm !== null} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("Delete Breakdown Row?", "विवरण पंक्ति हटाएं?")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("Are you sure you want to delete this breakdown row? This action cannot be undone.", "क्या आप वाकई इस विवरण पंक्ति को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("Cancel", "रद्द करें")}</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {t("Delete", "हटाएं")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="edit-cancel">
