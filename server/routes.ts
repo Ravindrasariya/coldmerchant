@@ -1096,5 +1096,103 @@ export async function registerRoutes(
     }
   });
 
+  // ============== CASH MANAGEMENT ENDPOINTS ==============
+
+  // GET /api/cash/entries - Get all cash entries for merchant
+  app.get("/api/cash/entries", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const entries = await storage.getCashEntriesByMerchant(merchantId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching cash entries:", error);
+      res.status(500).json({ message: "Failed to fetch cash entries" });
+    }
+  });
+
+  // GET /api/cash/parties - Get parties with outstanding dues
+  app.get("/api/cash/parties", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const parties = await storage.getPartiesWithDue(merchantId);
+      res.json(parties);
+    } catch (error) {
+      console.error("Error fetching parties:", error);
+      res.status(500).json({ message: "Failed to fetch parties" });
+    }
+  });
+
+  // GET /api/cash/farmers - Get farmers with outstanding dues
+  app.get("/api/cash/farmers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const farmers = await storage.getFarmersWithDue(merchantId);
+      res.json(farmers);
+    } catch (error) {
+      console.error("Error fetching farmers:", error);
+      res.status(500).json({ message: "Failed to fetch farmers" });
+    }
+  });
+
+  // POST /api/cash/entries - Create a cash entry (inward or outflow)
+  app.post("/api/cash/entries", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { direction, receiptType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, amount, entryDate, remarks } = req.body;
+
+      // Validate required fields
+      if (!direction || !["inward", "outflow"].includes(direction)) {
+        return res.status(400).json({ message: "Valid direction (inward/outflow) is required" });
+      }
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Valid positive amount is required" });
+      }
+      if (!entryDate) {
+        return res.status(400).json({ message: "Entry date is required" });
+      }
+      
+      // Validate direction-specific fields
+      if (direction === "inward") {
+        if (!receiptType || !["cash_received", "account_received"].includes(receiptType)) {
+          return res.status(400).json({ message: "Valid receipt type is required for inward entries" });
+        }
+        if (!partyName) {
+          return res.status(400).json({ message: "Party name is required for inward entries" });
+        }
+      } else if (direction === "outflow") {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer"].includes(expenseType)) {
+          return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
+        }
+        if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
+          return res.status(400).json({ message: "Valid payment mode is required for outflow entries" });
+        }
+        if (expenseType === "farmer" && !farmerName) {
+          return res.status(400).json({ message: "Farmer name is required when expense type is farmer" });
+        }
+      }
+
+      // Create the cash entry with FIFO allocation in a single transaction
+      const createdEntry = await storage.createCashEntryWithFIFO({
+        merchantId,
+        direction,
+        receiptType: receiptType || null,
+        expenseType: expenseType || null,
+        paymentMode: paymentMode || null,
+        partyName: partyName || null,
+        partyVillage: partyVillage || null,
+        farmerName: farmerName || null,
+        farmerVillage: farmerVillage || null,
+        amount: amount.toString(),
+        entryDate,
+        remarks: remarks || null,
+      }, direction === "inward" && !!partyName);
+      
+      res.status(201).json(createdEntry);
+    } catch (error) {
+      console.error("Error creating cash entry:", error);
+      res.status(500).json({ message: "Failed to create cash entry" });
+    }
+  });
+
   return httpServer;
 }

@@ -1,16 +1,19 @@
 import { 
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
+  cashEntries, cashEntryAllocations,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
   type StockEntryEditHistory, type InsertStockEntryEditHistory, type ChangeSet,
   type Transaction, type InsertTransaction,
   type TransactionItem, type InsertTransactionItem,
-  type TransactionEditHistory, type InsertTransactionEditHistory
+  type TransactionEditHistory, type InsertTransactionEditHistory,
+  type CashEntry, type InsertCashEntry,
+  type CashEntryAllocation, type InsertCashEntryAllocation
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gt, ne } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -67,6 +70,14 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction & { transactionNumber: number }, items: Omit<InsertTransactionItem, 'transactionId'>[]): Promise<Transaction & { items: TransactionItem[] }>;
   getNextTransactionNumber(merchantId: number): Promise<number>;
   getUnsoldInventory(merchantId: number): Promise<any[]>;
+  
+  // Cash Entry operations
+  getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]>;
+  createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
+  createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
+  getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
+  getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]>;
+  getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -543,6 +554,197 @@ export class DatabaseStorage implements IStorage {
         await this.updateLot(lotId, merchantId, { remainingBags: newRemaining });
       }
     }
+  }
+
+  // Cash Entry operations
+  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]> {
+    const entries = await db.select().from(cashEntries)
+      .where(eq(cashEntries.merchantId, merchantId))
+      .orderBy(desc(cashEntries.createdAt));
+    
+    const result = await Promise.all(entries.map(async (entry) => {
+      const allocations = await db.select().from(cashEntryAllocations)
+        .where(eq(cashEntryAllocations.cashEntryId, entry.id));
+      return { ...entry, allocations };
+    }));
+    
+    return result;
+  }
+
+  async createCashEntry(entry: InsertCashEntry): Promise<CashEntry> {
+    const [created] = await db.insert(cashEntries).values(entry).returning();
+    return created;
+  }
+
+  async createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation> {
+    const [created] = await db.insert(cashEntryAllocations).values(allocation).returning();
+    return created;
+  }
+
+  async getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]> {
+    // Get all transactions with party name and calculate due (revenue - amountReceived)
+    const txns = await db.select().from(transactions)
+      .where(eq(transactions.merchantId, merchantId));
+    
+    // Group by partyName and calculate dues
+    const partyMap = new Map<string, { partyAddress: string | null; totalDue: number; transactionCount: number }>();
+    
+    for (const txn of txns) {
+      if (!txn.partyName) continue;
+      
+      const revenue = parseFloat(txn.revenue || "0");
+      const received = parseFloat(txn.amountReceived || "0");
+      const due = Math.max(0, revenue - received);
+      
+      if (due <= 0) continue; // Only include parties with pending dues
+      
+      const existing = partyMap.get(txn.partyName);
+      if (existing) {
+        existing.totalDue += due;
+        existing.transactionCount += 1;
+      } else {
+        partyMap.set(txn.partyName, {
+          partyAddress: txn.partyAddress,
+          totalDue: due,
+          transactionCount: 1,
+        });
+      }
+    }
+    
+    return Array.from(partyMap.entries()).map(([partyName, data]) => ({
+      partyName,
+      ...data,
+    }));
+  }
+
+  async getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]> {
+    // Get stock entries with payment status "due" and calculate total cost from lots
+    const entries = await db.select().from(stockEntries)
+      .where(and(eq(stockEntries.merchantId, merchantId), eq(stockEntries.paymentStatus, "due")));
+    
+    // Group by farmerName and calculate total due from lots
+    const farmerMap = new Map<string, { village: string | null; totalDue: number; entryCount: number }>();
+    
+    for (const entry of entries) {
+      // Get all lots for this entry and calculate total cost
+      const entryLots = await db.select().from(lots)
+        .where(eq(lots.stockEntryId, entry.id));
+      
+      let entryTotalDue = 0;
+      for (const lot of entryLots) {
+        // Get breakdowns to calculate total weight and cost
+        const breakdownList = await db.select().from(bagBreakdowns)
+          .where(eq(bagBreakdowns.lotId, lot.id));
+        
+        if (breakdownList.length > 0) {
+          // Sum up total amount from breakdowns
+          entryTotalDue += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+        } else if (lot.pricePerKg) {
+          // Estimate from lot's pricePerKg and bags (approx 50kg per bag)
+          entryTotalDue += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+        }
+      }
+      
+      const existing = farmerMap.get(entry.farmerName);
+      if (existing) {
+        existing.totalDue += entryTotalDue;
+        existing.entryCount += 1;
+      } else {
+        farmerMap.set(entry.farmerName, {
+          village: entry.village,
+          totalDue: entryTotalDue,
+          entryCount: 1,
+        });
+      }
+    }
+    
+    return Array.from(farmerMap.entries()).map(([farmerName, data]) => ({
+      farmerName,
+      ...data,
+    }));
+  }
+
+  async getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]> {
+    // Get transactions for this party that still have due amount, ordered by creation date (FIFO)
+    const txns = await db.select().from(transactions)
+      .where(and(
+        eq(transactions.merchantId, merchantId),
+        eq(transactions.partyName, partyName)
+      ))
+      .orderBy(asc(transactions.createdAt));
+    
+    // Filter to only those with remaining due
+    return txns.filter(txn => {
+      const revenue = parseFloat(txn.revenue || "0");
+      const received = parseFloat(txn.amountReceived || "0");
+      return revenue > received;
+    });
+  }
+
+  async createCashEntryWithFIFO(
+    entry: InsertCashEntry,
+    applyFIFO: boolean
+  ): Promise<CashEntry & { allocations: CashEntryAllocation[] }> {
+    // Use a transaction to ensure atomicity of FIFO allocation
+    return await db.transaction(async (tx) => {
+      // Create the cash entry
+      const [createdEntry] = await tx.insert(cashEntries).values(entry).returning();
+      
+      const allocations: CashEntryAllocation[] = [];
+      
+      // If this is an inward payment and has a partyName, apply FIFO to transactions
+      if (applyFIFO && entry.direction === "inward" && entry.partyName) {
+        let remainingAmount = parseFloat(entry.amount);
+        
+        // Get transactions with due for this party (FIFO order)
+        const txns = await tx.select().from(transactions)
+          .where(and(
+            eq(transactions.merchantId, entry.merchantId),
+            eq(transactions.partyName, entry.partyName)
+          ))
+          .orderBy(asc(transactions.createdAt));
+        
+        // Filter to only those with remaining due
+        const transactionsWithDue = txns.filter(txn => {
+          const revenue = parseFloat(txn.revenue || "0");
+          const received = parseFloat(txn.amountReceived || "0");
+          return revenue > received;
+        });
+        
+        for (const txn of transactionsWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          const revenue = parseFloat(txn.revenue || "0");
+          const currentReceived = parseFloat(txn.amountReceived || "0");
+          const due = revenue - currentReceived;
+          
+          if (due <= 0) continue;
+          
+          // Calculate how much to apply to this transaction
+          const toApply = Math.min(remainingAmount, due);
+          
+          // Create allocation record within transaction
+          const [allocation] = await tx.insert(cashEntryAllocations).values({
+            cashEntryId: createdEntry.id,
+            transactionId: txn.id,
+            merchantId: entry.merchantId,
+            appliedAmount: toApply.toString(),
+          }).returning();
+          
+          allocations.push(allocation);
+          
+          // Update transaction's amountReceived within transaction
+          const newReceived = currentReceived + toApply;
+          await tx.update(transactions)
+            .set({ amountReceived: newReceived.toString() })
+            .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, entry.merchantId)));
+          
+          remainingAmount -= toApply;
+        }
+      }
+      
+      return { ...createdEntry, allocations };
+    });
   }
 }
 

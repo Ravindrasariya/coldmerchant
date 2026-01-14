@@ -27,9 +27,11 @@ import {
   Settings,
   KeyRound,
   Loader2,
-  Truck
+  Truck,
+  Wallet
 } from "lucide-react";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
+import { CashManagementTab } from "@/components/cash-management/cash-management-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -156,7 +158,7 @@ export default function HomePage() {
 
       <main className="container max-w-7xl mx-auto px-4 md:px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-3 mx-auto">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4 mx-auto">
             <TabsTrigger value="stock-entry" className="flex items-center gap-2" data-testid="tab-stock-entry">
               <PackagePlus className="h-4 w-4" />
               {t("Stock Entry", "स्टॉक एंट्री")}
@@ -168,6 +170,10 @@ export default function HomePage() {
             <TabsTrigger value="transactions" className="flex items-center gap-2" data-testid="tab-transactions">
               <Truck className="h-4 w-4" />
               {t("Transactions", "लेनदेन")}
+            </TabsTrigger>
+            <TabsTrigger value="cash-management" className="flex items-center gap-2" data-testid="tab-cash-management">
+              <Wallet className="h-4 w-4" />
+              {t("Cash", "नकद")}
             </TabsTrigger>
           </TabsList>
 
@@ -199,6 +205,18 @@ export default function HomePage() {
 
           <TabsContent value="transactions" className="space-y-6">
             <TransactionsTab />
+          </TabsContent>
+
+          <TabsContent value="cash-management" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold">{t("Cash Management", "नकद प्रबंधन")}</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t("Track payments received and expenses", "प्राप्त भुगतान और खर्चों को ट्रैक करें")}
+                </p>
+              </div>
+            </div>
+            <CashManagementTab />
           </TabsContent>
         </Tabs>
 

@@ -135,6 +135,34 @@ export const transactionEditHistory = pgTable("transaction_edit_history", {
   changeSet: jsonb("change_set").notNull(), // Array of { field, oldValue, newValue }
 });
 
+// Cash Entries - for Cash Management (inward and outflow)
+export const cashEntries = pgTable("cash_entries", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  direction: text("direction").notNull(), // "inward" or "outflow"
+  receiptType: text("receipt_type"), // For inward: "cash_received", "account_received"
+  expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer"
+  paymentMode: text("payment_mode"), // For outflow: "cash", "account_transfer"
+  partyName: text("party_name"), // For inward: buyer name from transactions
+  partyVillage: text("party_village"), // For inward: buyer location
+  farmerName: text("farmer_name"), // For farmer outflow
+  farmerVillage: text("farmer_village"), // For farmer outflow
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  entryDate: date("entry_date").notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Cash Entry Allocations - tracks which transactions a cash inward was applied to (FIFO)
+export const cashEntryAllocations = pgTable("cash_entry_allocations", {
+  id: serial("id").primaryKey(),
+  cashEntryId: integer("cash_entry_id").notNull().references(() => cashEntries.id, { onDelete: "cascade" }),
+  transactionId: integer("transaction_id").notNull().references(() => transactions.id),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -143,6 +171,8 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   bagBreakdowns: many(bagBreakdowns),
   transactions: many(transactions),
   transactionItems: many(transactionItems),
+  cashEntries: many(cashEntries),
+  cashEntryAllocations: many(cashEntryAllocations),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -238,6 +268,29 @@ export const transactionEditHistoryRelations = relations(transactionEditHistory,
   }),
 }));
 
+export const cashEntriesRelations = relations(cashEntries, ({ one, many }) => ({
+  merchant: one(merchants, {
+    fields: [cashEntries.merchantId],
+    references: [merchants.id],
+  }),
+  allocations: many(cashEntryAllocations),
+}));
+
+export const cashEntryAllocationsRelations = relations(cashEntryAllocations, ({ one }) => ({
+  cashEntry: one(cashEntries, {
+    fields: [cashEntryAllocations.cashEntryId],
+    references: [cashEntries.id],
+  }),
+  transaction: one(transactions, {
+    fields: [cashEntryAllocations.transactionId],
+    references: [transactions.id],
+  }),
+  merchant: one(merchants, {
+    fields: [cashEntryAllocations.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertMerchantSchema = createInsertSchema(merchants).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -248,6 +301,8 @@ export const insertStockEntryEditHistorySchema = createInsertSchema(stockEntryEd
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, transactionNumber: true });
 export const insertTransactionItemSchema = createInsertSchema(transactionItems).omit({ id: true, createdAt: true });
 export const insertTransactionEditHistorySchema = createInsertSchema(transactionEditHistory).omit({ id: true, changedAt: true });
+export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, createdAt: true });
+export const insertCashEntryAllocationSchema = createInsertSchema(cashEntryAllocations).omit({ id: true, createdAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -276,6 +331,12 @@ export type InsertTransactionItem = z.infer<typeof insertTransactionItemSchema>;
 
 export type TransactionEditHistory = typeof transactionEditHistory.$inferSelect;
 export type InsertTransactionEditHistory = z.infer<typeof insertTransactionEditHistorySchema>;
+
+export type CashEntry = typeof cashEntries.$inferSelect;
+export type InsertCashEntry = z.infer<typeof insertCashEntrySchema>;
+
+export type CashEntryAllocation = typeof cashEntryAllocations.$inferSelect;
+export type InsertCashEntryAllocation = z.infer<typeof insertCashEntryAllocationSchema>;
 
 // Change types for edit history
 export type FieldChange = {
@@ -359,3 +420,9 @@ export const QUALITY_OPTIONS = ["Poor", "Medium", "Good"] as const;
 export const CUT_TYPES = ["gate_cut", "bilty_cut"] as const;
 export const SIZE_OPTIONS = ["Large", "Medium", "Small", "Wastage"] as const;
 export const PAYMENT_STATUS = ["due", "paid"] as const;
+
+// Cash Management Options
+export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
+export const EXPENSE_TYPES = ["salary", "general_expense", "grading", "hammali", "farmer"] as const;
+export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
+export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
