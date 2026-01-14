@@ -385,7 +385,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
           <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="bg-[#52a7ff]/20 text-[#52a7ff] border-[#52a7ff]/40">
-                #{transaction.transactionNumber}
+                Tr: #{transaction.transactionNumber}
               </Badge>
               {transaction.partyName && (
                 <span className="font-semibold">{transaction.partyName}</span>
