@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, History, Save, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Save, Plus, Trash2, X } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -197,6 +197,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      setShowAddItem(false);
+      setSelectedInventory("");
+      setNewItemBags(0);
       toast({
         title: t("Transaction Updated", "लेनदेन अपडेट किया गया"),
         description: t("Changes saved successfully", "परिवर्तन सफलतापूर्वक सहेजे गए"),
@@ -226,6 +229,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      setShowAddItem(false);
+      setSelectedInventory("");
+      setNewItemBags(0);
       toast({
         title: t("Items Updated", "आइटम अपडेट किए गए"),
         description: t("Transaction items saved successfully", "लेनदेन आइटम सफलतापूर्वक सहेजे गए"),
@@ -355,7 +361,23 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
               {showAddItem && (
                 <div className="border rounded-md p-3 space-y-2 bg-background">
-                  <Label className="text-xs">{t("Select from Inventory", "इन्वेंट्री से चुनें")}</Label>
+                  <div className="flex justify-between items-center">
+                    <Label className="text-xs">{t("Select from Inventory", "इन्वेंट्री से चुनें")}</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        setShowAddItem(false);
+                        setSelectedInventory("");
+                        setNewItemBags(0);
+                      }}
+                      data-testid="button-close-add-lot"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Select value={selectedInventory} onValueChange={setSelectedInventory}>
                     <SelectTrigger data-testid="select-inventory">
                       <SelectValue placeholder={t("Choose lot", "लॉट चुनें")} />
