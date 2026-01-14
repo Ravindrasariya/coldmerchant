@@ -350,14 +350,14 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
               <Badge variant="outline" className="bg-[#52a7ff]/20 text-[#52a7ff] border-[#52a7ff]/40">
                 #{transaction.transactionNumber}
               </Badge>
+              {transaction.partyName && (
+                <span className="font-semibold">{transaction.partyName}</span>
+              )}
               {bagTypes.map((type) => (
                 <Badge key={type} variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600">
                   {type}
                 </Badge>
               ))}
-              {transaction.partyName && (
-                <span className="font-semibold">{transaction.partyName}</span>
-              )}
               {transaction.vehicleNumber && (
                 <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
                   <Truck className="h-3 w-3 mr-1" />
