@@ -2,6 +2,7 @@ import { useFieldArray, UseFormReturn } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -329,6 +330,29 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             )}
           </div>
         )}
+
+        <div className="pt-4 border-t">
+          <FormField
+            control={form.control}
+            name={`lots.${lotIndex}.remarks`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Remarks</FormLabel>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Enter any remarks for this lot..." 
+                    className="resize-none"
+                    rows={2}
+                    {...field} 
+                    value={field.value || ""}
+                    data-testid={`textarea-remarks-${lotIndex}`}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
       </CardContent>
     </Card>
   );

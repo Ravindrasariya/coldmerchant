@@ -3,16 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Plus, Save, X, FileText, Loader2 } from "lucide-react";
+import { Plus, Save, X, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { StockEntryForm as StockEntryFormType, stockEntryFormSchema } from "@shared/schema";
@@ -48,6 +39,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
           cutType: "gate_cut",
           size: "",
           pricePerKg: undefined,
+          remarks: "",
           bagBreakdowns: [],
         },
       ],
@@ -92,6 +84,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
       cutType: "gate_cut",
       size: "",
       pricePerKg: undefined,
+      remarks: "",
       bagBreakdowns: [],
     });
   };
@@ -129,39 +122,6 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
             Add More Lot
           </Button>
         </div>
-
-        <Card className="border-border">
-          <CardHeader className="pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                <FileText className="h-4 w-4 text-primary" />
-              </div>
-              <CardTitle className="text-lg font-medium">Additional Information</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <FormField
-              control={form.control}
-              name="remarks"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Remarks</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      placeholder="Enter any additional remarks..." 
-                      className="resize-none"
-                      rows={3}
-                      {...field} 
-                      value={field.value || ""}
-                      data-testid="textarea-remarks"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </Card>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button

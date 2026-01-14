@@ -58,6 +58,7 @@ export const lots = pgTable("lots", {
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),
+  remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -160,6 +161,7 @@ export const lotFormSchema = z.object({
   cutType: z.enum(["gate_cut", "bilty_cut"]),
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
+  remarks: z.string().optional(),
   bagBreakdowns: z.array(bagBreakdownFormSchema).optional(),
 });
 
