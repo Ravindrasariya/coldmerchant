@@ -103,21 +103,24 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     watchedItems.forEach((item) => {
       const lot = inventory.find((inv) => inv.lotId === item.lotId);
       const pricePerKg = lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-      const netWeight = item.netWeight || 0;
+      const netWeight = Number(item.netWeight) || 0;
       const costOfGoods = netWeight * pricePerKg;
 
-      totalBags += item.bagsMoved || 0;
+      totalBags += Number(item.bagsMoved) || 0;
       totalNetWeight += netWeight;
       totalCostOfGoods += costOfGoods;
     });
 
-    const profitLoss = watchedRevenue - totalCostOfGoods - watchedTransport - watchedOther;
+    const revenue = Number(watchedRevenue) || 0;
+    const transport = Number(watchedTransport) || 0;
+    const other = Number(watchedOther) || 0;
+    const profitLoss = revenue - totalCostOfGoods - transport - other;
 
     return {
-      totalBags,
-      totalNetWeight,
-      totalCostOfGoods,
-      profitLoss,
+      totalBags: isNaN(totalBags) ? 0 : totalBags,
+      totalNetWeight: isNaN(totalNetWeight) ? 0 : totalNetWeight,
+      totalCostOfGoods: isNaN(totalCostOfGoods) ? 0 : totalCostOfGoods,
+      profitLoss: isNaN(profitLoss) ? 0 : profitLoss,
     };
   }, [watchedItems, inventory, watchedRevenue, watchedTransport, watchedOther]);
 
@@ -156,8 +159,9 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
   const getItemCost = (item: typeof watchedItems[0]) => {
     const lot = inventory.find((inv) => inv.lotId === item.lotId);
     const pricePerKg = lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-    const netWeight = item.netWeight || 0;
-    return netWeight * pricePerKg;
+    const netWeight = Number(item.netWeight) || 0;
+    const cost = netWeight * pricePerKg;
+    return isNaN(cost) ? 0 : cost;
   };
 
   useEffect(() => {
