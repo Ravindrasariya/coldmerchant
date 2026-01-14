@@ -303,7 +303,6 @@ export function StockRegisterCard() {
             }));
             
             const entryStatus = computeEntryStatus(entry.lots);
-            const qualities = Array.from(new Set(entry.lots.map(lot => lot.quality)));
             const potatoTypes = Array.from(new Set(entry.lots.map(lot => lot.potatoType)));
             
             let totalOriginal = 0;
@@ -333,20 +332,6 @@ export function StockRegisterCard() {
                       {potatoTypes.map((type, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
                           {type}
-                        </Badge>
-                      ))}
-                      
-                      {qualities.map((q, i) => (
-                        <Badge 
-                          key={i} 
-                          variant="secondary"
-                          className={
-                            q === "Good" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
-                            q === "Medium" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                            "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                          }
-                        >
-                          {q}
                         </Badge>
                       ))}
                       
@@ -418,27 +403,17 @@ export function StockRegisterCard() {
                     )}
                   </div>
                   
-                  {totalWastage > 0 && (
-                    <div className="mt-2 text-sm">
-                      <span className="text-muted-foreground">{t("Total:", "कुल:")}</span>{" "}
-                      <span className="font-medium">{t("Original", "मूल")} {totalOriginal}</span>,{" "}
-                      <span className="font-medium">{t("Actual", "वास्तविक")} {totalActual}</span>
-                      <span className="text-muted-foreground">/</span>
-                      <span className="text-primary font-medium">{totalRemaining}</span>
+                  <div className="mt-2 text-sm">
+                    <span className="text-muted-foreground">{t("Total:", "कुल:")}</span>{" "}
+                    <span className="text-primary font-bold">{totalRemaining}</span>
+                    <span className="text-muted-foreground">/</span>
+                    <span className="font-medium">{totalActual}</span>
+                    {totalWastage > 0 && (
                       <span className="text-muted-foreground ml-1">
                         ({totalWastage} {t("Wastage", "कचरा")})
                       </span>
-                    </div>
-                  )}
-                  {totalWastage === 0 && (
-                    <div className="mt-2 text-sm">
-                      <span className="text-muted-foreground">{t("Total Bags:", "कुल बोरी:")}</span>{" "}
-                      <span className="font-medium">{totalOriginal}</span>
-                      <span className="text-muted-foreground"> | </span>
-                      <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
-                      <span className="text-primary font-medium">{totalRemaining}</span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </CardHeader>
                 
                 <CardContent className="pt-0">
@@ -455,7 +430,20 @@ export function StockRegisterCard() {
                               <Badge variant="outline" className="font-mono">
                                 {t("Lot", "लॉट")} {lotIndex + 1}
                               </Badge>
-                              <span className="font-medium">{lot.coldStoreName}</span>
+                              <span className="text-sm text-muted-foreground">{lot.coldStoreName}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {lot.potatoType}
+                              </Badge>
+                              <Badge 
+                                variant="secondary"
+                                className={
+                                  lot.quality === "Good" ? "text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
+                                  lot.quality === "Medium" ? "text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                  "text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                                }
+                              >
+                                {lot.quality}
+                              </Badge>
                               <Badge variant="secondary" className="text-xs">
                                 {lot.bagType}
                               </Badge>
@@ -470,89 +458,72 @@ export function StockRegisterCard() {
                             </div>
                             
                             <div className="text-sm">
-                              {metrics.wastageBags > 0 ? (
-                                <span>
-                                  <span className="text-muted-foreground">{t("Original", "मूल")}</span>{" "}
-                                  <span className="font-medium">{metrics.originalBags}</span>,{" "}
-                                  <span className="text-muted-foreground">{t("Actual", "वास्तविक")}</span>{" "}
-                                  <span className="font-medium">{metrics.actualSellableBags}</span>
-                                  <span className="text-muted-foreground">/</span>
-                                  <span className="text-primary font-bold">{metrics.remainingToSell}</span>
-                                  <span className="text-xs text-muted-foreground ml-1">
-                                    ({metrics.wastageBags} {t("Wastage", "कचरा")})
-                                  </span>
-                                </span>
-                              ) : (
-                                <span>
-                                  <span className="font-mono font-bold text-primary">{metrics.remainingToSell}</span>
-                                  <span className="text-muted-foreground">/{metrics.originalBags} {t("bags", "बोरी")}</span>
+                              <span className="font-mono font-bold text-primary">{metrics.remainingToSell}</span>
+                              <span className="text-muted-foreground">/{metrics.actualSellableBags}</span>
+                              {metrics.wastageBags > 0 && (
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  ({metrics.wastageBags} {t("Wastage", "कचरा")})
                                 </span>
                               )}
                             </div>
                           </div>
                           
                           {lot.cutType === "bilty_cut" && (metrics.sellableBreakdowns.length > 0 || metrics.wastageBreakdowns.length > 0) && (
-                            <div className="mt-2 pt-2 border-t border-border/30 space-y-2">
-                              {metrics.sellableBreakdowns.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {metrics.sellableBreakdowns.map((bd, bdIndex) => {
-                                    const bdPrice = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                                    const bdWeight = bd.weight ? parseFloat(bd.weight) : 0;
-                                    const bdTotal = bd.totalAmount 
-                                      ? parseFloat(bd.totalAmount) 
-                                      : (bdPrice > 0 && bdWeight > 0 ? bdPrice * bdWeight : null);
-                                    
-                                    return (
-                                      <div 
-                                        key={bd.id || bdIndex}
-                                        className="text-xs px-2 py-1 rounded border bg-background border-border"
-                                      >
-                                        <span className="font-medium">{bd.size}</span>
-                                        <span className="text-muted-foreground mx-1">×</span>
-                                        <span>{bd.numberOfBags}</span>
-                                        {bdWeight > 0 && (
-                                          <>
-                                            <span className="text-muted-foreground mx-1">|</span>
-                                            <span>{bdWeight}kg</span>
-                                          </>
-                                        )}
-                                        {bdPrice > 0 && (
-                                          <>
-                                            <span className="text-muted-foreground mx-1">@</span>
-                                            <span>₹{bdPrice}/kg</span>
-                                          </>
-                                        )}
-                                        {bdTotal !== null && (
-                                          <>
-                                            <span className="text-muted-foreground mx-1">=</span>
-                                            <span className="font-medium text-green-600 dark:text-green-400">₹{bdTotal.toFixed(0)}</span>
-                                          </>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                              {metrics.wastageBreakdowns.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {metrics.wastageBreakdowns.map((bd, bdIndex) => (
+                            <div className="mt-2 pt-2 border-t border-border/30">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {metrics.sellableBreakdowns.map((bd, bdIndex) => {
+                                  const bdPrice = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+                                  const bdWeight = bd.weight ? parseFloat(bd.weight) : 0;
+                                  const bdTotal = bd.totalAmount 
+                                    ? parseFloat(bd.totalAmount) 
+                                    : (bdPrice > 0 && bdWeight > 0 ? bdPrice * bdWeight : null);
+                                  
+                                  return (
                                     <div 
-                                      key={bd.id || `wastage-${bdIndex}`}
-                                      className="text-xs px-2 py-1 rounded border bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                                      key={bd.id || bdIndex}
+                                      className="text-xs px-2 py-1 rounded border bg-background border-border"
                                     >
-                                      <span className="font-medium">{t("Wastage", "कचरा")}</span>
-                                      <span className="mx-1">×</span>
-                                      <span>{bd.numberOfBags} {t("bags", "बोरी")}</span>
+                                      <span className="font-medium">{bd.size}</span>
+                                      <span className="text-muted-foreground mx-1">×</span>
+                                      <span>{bd.numberOfBags}</span>
+                                      {bdWeight > 0 && (
+                                        <>
+                                          <span className="text-muted-foreground mx-1">|</span>
+                                          <span>{bdWeight}kg</span>
+                                        </>
+                                      )}
+                                      {bdPrice > 0 && (
+                                        <>
+                                          <span className="text-muted-foreground mx-1">@</span>
+                                          <span>₹{bdPrice}/kg</span>
+                                        </>
+                                      )}
+                                      {bdTotal !== null && (
+                                        <>
+                                          <span className="text-muted-foreground mx-1">=</span>
+                                          <span className="font-medium text-green-600 dark:text-green-400">₹{bdTotal.toFixed(0)}</span>
+                                        </>
+                                      )}
                                     </div>
-                                  ))}
-                                </div>
-                              )}
-                              {metrics.totalAmount !== null && (
-                                <div className="text-sm pt-1">
-                                  <span className="text-muted-foreground">{t("Total Amount:", "कुल राशि:")}</span>{" "}
-                                  <span className="font-medium text-green-600 dark:text-green-400">₹{metrics.totalAmount.toFixed(0)}</span>
-                                </div>
-                              )}
+                                  );
+                                })}
+                                {metrics.wastageBreakdowns.map((bd, bdIndex) => (
+                                  <div 
+                                    key={bd.id || `wastage-${bdIndex}`}
+                                    className="text-xs px-2 py-1 rounded border bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                                  >
+                                    <span className="font-medium">{t("Wastage", "कचरा")}</span>
+                                    <span className="mx-1">×</span>
+                                    <span>{bd.numberOfBags}</span>
+                                  </div>
+                                ))}
+                                {metrics.totalAmount !== null && (
+                                  <div className="text-xs px-2 py-1 rounded border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
+                                    <span className="text-muted-foreground">{t("Total:", "कुल:")}</span>{" "}
+                                    <span className="font-medium text-green-600 dark:text-green-400">₹{metrics.totalAmount.toFixed(0)}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                           
