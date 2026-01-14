@@ -238,8 +238,8 @@ export function CashManagementTab() {
   };
 
   return (
-    <div className="flex gap-6 p-4 h-full" data-testid="cash-management-tab">
-      <div className="w-1/2 space-y-4">
+    <div className="flex flex-col md:flex-row gap-6 p-4 h-full" data-testid="cash-management-tab">
+      <div className="w-full md:w-1/2 space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow")}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="inward" className="flex items-center gap-2" data-testid="tab-inward">
@@ -575,7 +575,7 @@ export function CashManagementTab() {
         </Card>
       </div>
 
-      <div className="w-1/2 space-y-4">
+      <div className="w-full md:w-1/2 space-y-4">
         <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
         
         <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
