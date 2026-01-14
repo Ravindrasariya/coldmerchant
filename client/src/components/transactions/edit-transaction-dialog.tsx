@@ -49,6 +49,8 @@ interface EditableItem {
   size: string | null;
   bagsMoved: number;
   originalBags: number;
+  netWeight: number;
+  originalNetWeight: number;
   inventoryKey?: string;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
@@ -146,6 +148,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [showAddItem, setShowAddItem] = useState(false);
   const [selectedInventory, setSelectedInventory] = useState<string>("");
   const [newItemBags, setNewItemBags] = useState<number>(0);
+  const [newItemWeight, setNewItemWeight] = useState<number>(0);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
 
   const { data: transaction, isLoading } = useQuery<TransactionWithHistory>({
@@ -194,6 +197,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         size: item.size,
         bagsMoved: item.bagsMoved,
         originalBags: item.bagsMoved,
+        netWeight: parseFloat(item.netWeight || "0"),
+        originalNetWeight: parseFloat(item.netWeight || "0"),
         action: 'keep' as const
       })));
     }
@@ -231,6 +236,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         id: item.id,
         inventoryKey: item.inventoryKey,
         bagsMoved: item.bagsMoved,
+        netWeight: item.netWeight,
         action: item.action
       }));
       return apiRequest("PUT", `/api/transactions/${transactionId}/items`, { items: itemsToSend });
@@ -259,10 +265,23 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const handleBagCountChange = (index: number, newBags: number) => {
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
+      const hasChanges = newBags !== item.originalBags || item.netWeight !== item.originalNetWeight;
       return {
         ...item,
         bagsMoved: newBags,
-        action: item.id ? (newBags !== item.originalBags ? 'update' : 'keep') : 'add'
+        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+      };
+    }));
+  };
+
+  const handleNetWeightChange = (index: number, newWeight: number) => {
+    setEditableItems(items => items.map((item, i) => {
+      if (i !== index) return item;
+      const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
+      return {
+        ...item,
+        netWeight: newWeight,
+        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
       };
     }));
   };
@@ -310,12 +329,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       size: inv.size,
       bagsMoved: newItemBags,
       originalBags: 0,
+      netWeight: newItemWeight,
+      originalNetWeight: 0,
       inventoryKey: selectedInventory,
       action: 'add' as const
     }]);
     
     setSelectedInventory("");
     setNewItemBags(0);
+    setNewItemWeight(0);
     setShowAddItem(false);
   };
 
@@ -391,6 +413,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         setShowAddItem(false);
                         setSelectedInventory("");
                         setNewItemBags(0);
+                        setNewItemWeight(0);
                       }}
                       data-testid="button-close-add-lot"
                     >
@@ -412,7 +435,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Input
                       type="number"
                       min="1"
@@ -421,6 +444,16 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       onChange={(e) => setNewItemBags(parseInt(e.target.value) || 0)}
                       className="w-24"
                       data-testid="input-new-item-bags"
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder={t("Weight (Kg)", "वजन (किग्रा)")}
+                      value={newItemWeight || ""}
+                      onChange={(e) => setNewItemWeight(parseFloat(e.target.value) || 0)}
+                      className="w-28"
+                      data-testid="input-new-item-weight"
                     />
                     <Button type="button" size="sm" onClick={handleAddItem} data-testid="button-confirm-add">
                       {t("Add", "जोड़ें")}
@@ -431,19 +464,34 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
               {editableItems.map((item, index) => 
                 item.action === 'remove' ? null : (
-                  <div key={item.id || `new-${index}`} className="flex items-center gap-2 text-sm">
-                    <span className="flex-1">
+                  <div key={item.id || `new-${index}`} className="flex items-center gap-2 text-sm flex-wrap">
+                    <span className="flex-1 min-w-[150px]">
                       S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
                     </span>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.bagsMoved}
-                      onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
-                      className="w-20 h-8"
-                      data-testid={`input-item-bags-${index}`}
-                    />
-                    <span className="text-muted-foreground text-xs">{t("bags", "बोरी")}</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.bagsMoved}
+                        onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
+                        className="w-16 h-8"
+                        data-testid={`input-item-bags-${index}`}
+                      />
+                      <span className="text-muted-foreground text-xs">{t("bags", "बोरी")}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={item.netWeight === 0 ? "" : item.netWeight}
+                        onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
+                        className="w-20 h-8"
+                        placeholder="0"
+                        data-testid={`input-item-weight-${index}`}
+                      />
+                      <span className="text-muted-foreground text-xs">{t("Kg", "किग्रा")}</span>
+                    </div>
                     <Button 
                       type="button" 
                       variant="ghost" 
@@ -458,10 +506,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 )
               )}
 
-              <div className="border-t pt-2 mt-2 flex justify-between font-medium">
+              <div className="border-t pt-2 mt-2 flex justify-between font-medium text-sm">
                 <span>{t("Total", "कुल")}</span>
-                <span>
-                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)} {t("bags", "बोरी")}
+                <span className="flex gap-3">
+                  <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)} {t("bags", "बोरी")}</span>
+                  <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)} {t("Kg", "किग्रा")}</span>
                 </span>
               </div>
 

@@ -914,9 +914,15 @@ export async function registerRoutes(
             });
           }
         } else if (itemChange.action === 'update' && itemChange.id) {
-          // Update bag count
+          // Update bag count and/or weight
           const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
-          if (existingItem && itemChange.bagsMoved !== existingItem.bagsMoved) {
+          const existingNetWeight = parseFloat(existingItem?.netWeight || "0");
+          const hasChanges = existingItem && (
+            itemChange.bagsMoved !== existingItem.bagsMoved || 
+            (typeof itemChange.netWeight === 'number' && itemChange.netWeight !== existingNetWeight)
+          );
+          
+          if (existingItem && hasChanges) {
             const bagsDelta = existingItem.bagsMoved - itemChange.bagsMoved; // positive = returning bags
             
             // Validate: can't take more than available + current allocation
@@ -935,15 +941,18 @@ export async function registerRoutes(
               }
             }
             
-            // Adjust inventory
-            await storage.adjustInventory(existingItem.lotId, existingItem.breakdownId, merchantId, bagsDelta);
+            // Adjust inventory only if bags changed
+            if (bagsDelta !== 0) {
+              await storage.adjustInventory(existingItem.lotId, existingItem.breakdownId, merchantId, bagsDelta);
+            }
             
-            // Calculate new values
+            // Use provided netWeight if given, otherwise calculate
             const pricePerKg = parseFloat(existingItem.pricePerKgSnapshot || "0");
-            const avgBagWeight = existingItem.bagsMoved > 0 
-              ? parseFloat(existingItem.netWeight || "0") / existingItem.bagsMoved 
-              : 50;
-            const newNetWeight = itemChange.bagsMoved * avgBagWeight;
+            const newNetWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
+              ? itemChange.netWeight
+              : (existingItem.bagsMoved > 0 
+                  ? parseFloat(existingItem.netWeight || "0") / existingItem.bagsMoved * itemChange.bagsMoved
+                  : itemChange.bagsMoved * 50);
             const newCostOfGoods = newNetWeight * pricePerKg;
             
             await storage.updateTransactionItem(itemChange.id, merchantId, {
@@ -952,10 +961,18 @@ export async function registerRoutes(
               costOfGoods: newCostOfGoods.toString()
             });
             
+            const changeDetails: string[] = [];
+            if (itemChange.bagsMoved !== existingItem.bagsMoved) {
+              changeDetails.push(`${existingItem.bagsMoved} → ${itemChange.bagsMoved} bags`);
+            }
+            if (newNetWeight !== existingNetWeight) {
+              changeDetails.push(`${existingNetWeight.toFixed(1)} → ${newNetWeight.toFixed(1)} Kg`);
+            }
+            
             changes.push({
               field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}`,
-              oldValue: `${existingItem.bagsMoved} bags`,
-              newValue: `${itemChange.bagsMoved} bags`
+              oldValue: `${existingItem.bagsMoved} bags, ${existingNetWeight.toFixed(1)} Kg`,
+              newValue: `${itemChange.bagsMoved} bags, ${newNetWeight.toFixed(1)} Kg`
             });
             
             newTotalBags += itemChange.bagsMoved;
@@ -1003,9 +1020,10 @@ export async function registerRoutes(
           // Deduct from inventory (negative delta = take bags)
           await storage.adjustInventory(lotId, breakdownId, merchantId, -itemChange.bagsMoved);
           
-          // Calculate values
-          const avgBagWeight = 50; // Default assumption
-          const netWeight = itemChange.bagsMoved * avgBagWeight;
+          // Use provided netWeight if given, otherwise calculate with default
+          const netWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
+            ? itemChange.netWeight
+            : itemChange.bagsMoved * 50; // Default 50kg per bag
           const costOfGoods = netWeight * pricePerKg;
           
           // Create the transaction item
