@@ -101,13 +101,13 @@ export default function HomePage() {
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-16 items-center px-4 md:px-6 gap-4 md:gap-6">
             {/* Brand */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 md:ml-2 lg:ml-6">
               <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
                 <PackagePlus className="h-6 w-6 text-primary-foreground" />
               </div>
-              <div className="flex flex-col h-12 justify-center">
+              <div className="flex flex-col h-12">
                 <span className="font-bold text-xl leading-tight text-primary">Vyapar Vriddhi</span>
-                <span className="text-[10px] leading-none mt-1">
+                <span className="text-[10px] leading-none mt-2">
                   by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
                 </span>
               </div>
