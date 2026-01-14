@@ -93,6 +93,7 @@ export const transactions = pgTable("transactions", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
   partyName: text("party_name"),
+  vehicleNumber: text("vehicle_number"), // optional truck/vehicle number
   advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }),
   transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
   otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),

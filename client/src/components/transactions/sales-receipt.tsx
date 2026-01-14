@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Printer } from "lucide-react";
@@ -21,6 +21,7 @@ interface Transaction {
   transactionNumber: number;
   merchantId: number;
   partyName: string | null;
+  vehicleNumber: string | null;
   advancePayment: string | null;
   totalBags: number;
   totalNetWeight: string | null;
@@ -43,7 +44,7 @@ interface SalesReceiptDialogProps {
 }
 
 export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChange }: SalesReceiptDialogProps) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const printRef = useRef<HTMLDivElement>(null);
 
   const { data: transaction, isLoading: txnLoading } = useQuery<Transaction>({
@@ -69,7 +70,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Sales Receipt #${transaction?.transactionNumber}</title>
+          <title>Sales Receipt / बिक्री रसीद #${transaction?.transactionNumber}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -134,6 +135,14 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               font-size: 0.9em;
               color: #666;
             }
+            .disclaimer {
+              margin-top: 30px;
+              padding: 10px;
+              border: 1px dashed #999;
+              text-align: center;
+              font-size: 12px;
+              color: #666;
+            }
             @media print {
               body { padding: 0; }
               button { display: none; }
@@ -149,24 +158,6 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     printWindow.print();
   };
 
-  const groupItemsByPotatoType = (items: TransactionItem[]) => {
-    const grouped: Record<string, { bags: number; weight: number; sizes: Record<string, number> }> = {};
-    
-    items.forEach((item) => {
-      const type = item.potatoType || "Unknown";
-      if (!grouped[type]) {
-        grouped[type] = { bags: 0, weight: 0, sizes: {} };
-      }
-      grouped[type].bags += item.bagsMoved;
-      grouped[type].weight += parseFloat(item.netWeight || "0");
-      
-      const size = item.size || "Mixed";
-      grouped[type].sizes[size] = (grouped[type].sizes[size] || 0) + item.bagsMoved;
-    });
-    
-    return grouped;
-  };
-
   if (!open) return null;
 
   return (
@@ -180,6 +171,9 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               {t("Print", "प्रिंट")}
             </Button>
           </DialogTitle>
+          <DialogDescription>
+            {t("Preview and print the sales receipt", "बिक्री रसीद का पूर्वावलोकन और प्रिंट करें")}
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -193,29 +187,34 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
             <div className="header text-center border-b-2 border-black pb-4">
               <h1 className="text-2xl font-bold">{merchant.name}</h1>
               {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
-              {merchant.contactNumber && <p className="text-sm text-gray-600">{t("Phone", "फोन")}: {merchant.contactNumber}</p>}
+              {merchant.contactNumber && (
+                <p className="text-sm text-gray-600">
+                  Phone / फोन: {merchant.contactNumber}
+                </p>
+              )}
             </div>
 
             <div className="text-center">
               <h2 className="text-xl font-semibold">
-                <span className="bilingual">
-                  Sales Receipt / बिक्री रसीद
-                </span>
+                Sales Receipt / बिक्री रसीद
               </h2>
             </div>
 
             <div className="receipt-info flex justify-between text-sm">
               <div>
-                <p><strong>{t("Receipt No", "रसीद नं")}:</strong> #{transaction.transactionNumber}</p>
-                <p><strong>{t("Date", "तारीख")}:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
+                <p><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</p>
+                <p><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
                 })}</p>
+                {transaction.vehicleNumber && (
+                  <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
+                )}
               </div>
               <div className="text-right">
                 {transaction.partyName && (
-                  <p><strong>{t("Party", "पार्टी")}:</strong> {transaction.partyName}</p>
+                  <p><strong>Sent to / भेजा गया:</strong> {transaction.partyName}</p>
                 )}
               </div>
             </div>
@@ -223,12 +222,12 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border p-2 text-left">{t("S.No", "क्र.सं.")}</th>
-                  <th className="border p-2 text-left">{t("Lot Details", "लॉट विवरण")}</th>
-                  <th className="border p-2 text-left">{t("Potato Type", "आलू का प्रकार")}</th>
-                  <th className="border p-2 text-left">{t("Size", "आकार")}</th>
-                  <th className="border p-2 text-right">{t("Bags", "बोरी")}</th>
-                  <th className="border p-2 text-right">{t("Weight (Kg)", "वजन (किग्रा)")}</th>
+                  <th className="border p-2 text-left">S.No / क्र.सं.</th>
+                  <th className="border p-2 text-left">Lot Details / लॉट विवरण</th>
+                  <th className="border p-2 text-left">Potato Type / आलू का प्रकार</th>
+                  <th className="border p-2 text-left">Size / आकार</th>
+                  <th className="border p-2 text-right">Bags / बोरी</th>
+                  <th className="border p-2 text-right">Weight (Kg) / वजन (किग्रा)</th>
                 </tr>
               </thead>
               <tbody>
@@ -237,7 +236,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                     <td className="border p-2">{idx + 1}</td>
                     <td className="border p-2">S#{item.serialNumber} - {item.coldStoreName}</td>
                     <td className="border p-2">{item.potatoType || "-"}</td>
-                    <td className="border p-2">{item.size || t("Mixed", "मिश्रित")}</td>
+                    <td className="border p-2">{item.size || "Mixed / मिश्रित"}</td>
                     <td className="border p-2 text-right">{item.bagsMoved}</td>
                     <td className="border p-2 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
                   </tr>
@@ -245,39 +244,28 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="border p-2" colSpan={4}>{t("Total", "कुल")}</td>
+                  <td className="border p-2" colSpan={4}>Total / कुल</td>
                   <td className="border p-2 text-right">{transaction.totalBags}</td>
                   <td className="border p-2 text-right">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
                 </tr>
               </tfoot>
             </table>
 
-            <div className="border-t pt-4">
-              <h3 className="font-semibold mb-2">{t("Summary by Potato Type", "आलू प्रकार के अनुसार सारांश")}</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                {Object.entries(groupItemsByPotatoType(transaction.items)).map(([type, data]) => (
-                  <div key={type} className="bg-gray-50 p-3 rounded">
-                    <p className="font-medium">{type}</p>
-                    <p>{t("Bags", "बोरी")}: {data.bags}</p>
-                    <p>{t("Weight", "वजन")}: {data.weight.toFixed(1)} kg</p>
-                    <p className="text-xs text-gray-600">
-                      {Object.entries(data.sizes).map(([size, count]) => `${size}: ${count}`).join(", ")}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {parseFloat(transaction.advancePayment || "0") > 0 && (
               <div className="border-t pt-4">
                 <p className="text-right">
-                  <strong>{t("Advance Paid", "अग्रिम भुगतान")}:</strong> ₹{parseFloat(transaction.advancePayment || "0").toFixed(2)}
+                  <strong>Advance Paid / अग्रिम भुगतान:</strong> ₹{parseFloat(transaction.advancePayment || "0").toFixed(2)}
                 </p>
               </div>
             )}
 
             <div className="border-t pt-4 text-center text-sm text-gray-500">
-              <p>{t("Thank you for your business!", "आपके व्यापार के लिए धन्यवाद!")}</p>
+              <p>Thank you for your business! / आपके व्यापार के लिए धन्यवाद!</p>
+            </div>
+
+            <div className="disclaimer border border-dashed border-gray-400 p-3 text-center text-sm text-gray-600 mt-6">
+              <p>No need to sign/stamp the online generated receipt</p>
+              <p className="hindi">ऑनलाइन जनरेट रसीद पर हस्ताक्षर/मुहर की आवश्यकता नहीं है</p>
             </div>
           </div>
         ) : (

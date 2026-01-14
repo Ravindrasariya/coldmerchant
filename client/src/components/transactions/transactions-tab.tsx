@@ -26,6 +26,7 @@ interface Transaction {
   merchantId: number;
   transactionNumber: number;
   partyName: string | null;
+  vehicleNumber: string | null;
   advancePayment: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
@@ -88,8 +89,8 @@ export function TransactionsTab() {
           </div>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {transactions?.map((txn) => (
+        <div className="space-y-4">
+          {transactions?.slice().sort((a, b) => b.transactionNumber - a.transactionNumber).map((txn) => (
             <TransactionCard 
               key={txn.id} 
               transaction={txn} 
@@ -132,18 +133,25 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
 
   const totalCost = parseFloat(transaction.totalCostOfGoods || "0");
   const advancePayment = parseFloat(transaction.advancePayment || "0");
+  const revenue = parseFloat(transaction.revenue || "0");
   const profitLoss = parseFloat(transaction.profitLoss || "0");
   
-  const dueFromMerchant = totalCost - advancePayment;
+  const duePayment = Math.max(0, revenue - advancePayment);
 
   return (
-    <Card className="hover-elevate flex flex-col" data-testid={`card-transaction-${transaction.id}`}>
+    <Card className="hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
             <Badge variant="outline">#{transaction.transactionNumber}</Badge>
             {transaction.partyName && (
               <span className="text-base font-medium">{transaction.partyName}</span>
+            )}
+            {transaction.vehicleNumber && (
+              <Badge variant="secondary" className="text-xs">
+                <Truck className="h-3 w-3 mr-1" />
+                {transaction.vehicleNumber}
+              </Badge>
             )}
           </CardTitle>
           {profitLoss !== 0 && (
@@ -167,8 +175,8 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
           })}
         </p>
       </CardHeader>
-      <CardContent className="space-y-3 flex-1">
-        <div className="grid grid-cols-3 gap-2 text-sm">
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-4 gap-2 text-sm">
           <div className="text-center p-2 bg-muted/50 rounded-md">
             <Package className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
             <p className="font-semibold">{transaction.totalBags}</p>
@@ -182,6 +190,10 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
             <IndianRupee className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
             <p className="font-semibold">₹{totalCost.toFixed(0)}</p>
             <p className="text-xs text-muted-foreground">{t("Cost", "लागत")}</p>
+          </div>
+          <div className="text-center p-2 bg-muted/50 rounded-md">
+            <p className="font-semibold">₹{revenue.toFixed(0)}</p>
+            <p className="text-xs text-muted-foreground">{t("Revenue", "राजस्व")}</p>
           </div>
         </div>
 
@@ -199,17 +211,17 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
           )}
         </div>
 
-        {dueFromMerchant > 0 && (
+        {duePayment > 0 && (
           <div className="border-t pt-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">{t("Due Payment:", "बकाया भुगतान:")}</span>
               <span className="font-semibold text-orange-600 dark:text-orange-400">
-                ₹{dueFromMerchant.toFixed(2)}
+                ₹{duePayment.toFixed(2)}
               </span>
             </div>
             {advancePayment > 0 && (
               <p className="text-xs text-muted-foreground text-right">
-                ({t("After advance of", "अग्रिम के बाद")} ₹{advancePayment.toFixed(0)})
+                ({t("Revenue", "राजस्व")} ₹{revenue.toFixed(0)} - {t("Advance", "अग्रिम")} ₹{advancePayment.toFixed(0)})
               </p>
             )}
           </div>

@@ -629,7 +629,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { partyName, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
+      const { partyName, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -745,6 +745,7 @@ export async function registerRoutes(
           merchantId,
           transactionNumber,
           partyName: partyName || null,
+          vehicleNumber: vehicleNumber || null,
           advancePayment: advancePayment ? advancePayment.toString() : null,
           transportationCharges: transportationCharges ? transportationCharges.toString() : null,
           otherCharges: otherCharges ? otherCharges.toString() : null,
@@ -795,13 +796,16 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, advancePayment, transportationCharges, otherCharges, revenue } = req.body;
+      const { partyName, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue } = req.body;
       
       // Track changes for edit history
       const changes: { field: string; oldValue: string | number | null; newValue: string | number | null }[] = [];
       
       if (partyName !== undefined && partyName !== existingTxn.partyName) {
         changes.push({ field: "partyName", oldValue: existingTxn.partyName, newValue: partyName || null });
+      }
+      if (vehicleNumber !== undefined && vehicleNumber !== existingTxn.vehicleNumber) {
+        changes.push({ field: "vehicleNumber", oldValue: existingTxn.vehicleNumber, newValue: vehicleNumber || null });
       }
       if (advancePayment !== undefined && advancePayment?.toString() !== existingTxn.advancePayment) {
         changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
@@ -830,6 +834,7 @@ export async function registerRoutes(
       // Update the transaction
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: partyName || null,
+        vehicleNumber: vehicleNumber || null,
         advancePayment: advancePayment ? advancePayment.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,
         otherCharges: otherCharges ? otherCharges.toString() : null,

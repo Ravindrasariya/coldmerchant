@@ -50,6 +50,7 @@ const transactionItemSchema = z.object({
 
 const transactionFormSchema = z.object({
   partyName: z.string().optional(),
+  vehicleNumber: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
@@ -77,6 +78,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
       partyName: "",
+      vehicleNumber: "",
       advancePayment: undefined,
       transportationCharges: undefined,
       otherCharges: undefined,
@@ -195,14 +197,25 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <Label htmlFor="partyName">{t("Party Name (Optional)", "पार्टी का नाम (वैकल्पिक)")}</Label>
-            <Input
-              id="partyName"
-              {...form.register("partyName")}
-              placeholder={t("Enter buyer/party name", "खरीदार/पार्टी का नाम दर्ज करें")}
-              data-testid="input-party-name"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="partyName">{t("Party Name (Optional)", "पार्टी का नाम (वैकल्पिक)")}</Label>
+              <Input
+                id="partyName"
+                {...form.register("partyName")}
+                placeholder={t("Enter buyer/party name", "खरीदार/पार्टी का नाम दर्ज करें")}
+                data-testid="input-party-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="vehicleNumber">{t("Vehicle # (Optional)", "वाहन नं (वैकल्पिक)")}</Label>
+              <Input
+                id="vehicleNumber"
+                {...form.register("vehicleNumber")}
+                placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
+                data-testid="input-vehicle-number"
+              />
+            </div>
           </div>
 
           <div className="space-y-4">

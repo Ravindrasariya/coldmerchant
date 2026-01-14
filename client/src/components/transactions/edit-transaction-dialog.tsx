@@ -42,6 +42,7 @@ interface TransactionWithHistory {
   id: number;
   transactionNumber: number;
   partyName: string | null;
+  vehicleNumber: string | null;
   advancePayment: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
@@ -57,6 +58,7 @@ interface TransactionWithHistory {
 
 const editTransactionSchema = z.object({
   partyName: z.string().optional(),
+  vehicleNumber: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
@@ -69,6 +71,35 @@ interface EditTransactionDialogProps {
   transactionId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function ProfitLossDisplay({ 
+  totalCostOfGoods, 
+  revenue, 
+  transportationCharges, 
+  otherCharges 
+}: { 
+  totalCostOfGoods: number; 
+  revenue: number; 
+  transportationCharges: number; 
+  otherCharges: number;
+}) {
+  const { t } = useLanguage();
+  const profitLoss = (revenue || 0) - totalCostOfGoods - (transportationCharges || 0) - (otherCharges || 0);
+  
+  return (
+    <div className="bg-muted/50 p-4 rounded-md">
+      <div className="flex justify-between items-center">
+        <span className="font-medium">{t("Profit/Loss", "लाभ/हानि")} ({t("read-only", "केवल पठन")})</span>
+        <span className={`text-xl font-bold ${profitLoss >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+          {profitLoss >= 0 ? "+" : ""}₹{profitLoss.toFixed(2)}
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        {t("Revenue", "राजस्व")} (₹{(revenue || 0).toFixed(0)}) - {t("Cost", "लागत")} (₹{totalCostOfGoods.toFixed(0)}) - {t("Charges", "शुल्क")} (₹{((transportationCharges || 0) + (otherCharges || 0)).toFixed(0)})
+      </p>
+    </div>
+  );
 }
 
 export function EditTransactionDialog({ transactionId, open, onOpenChange }: EditTransactionDialogProps) {
@@ -85,6 +116,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     resolver: zodResolver(editTransactionSchema),
     defaultValues: {
       partyName: "",
+      vehicleNumber: "",
       advancePayment: undefined,
       transportationCharges: undefined,
       otherCharges: undefined,
@@ -96,6 +128,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (transaction) {
       form.reset({
         partyName: transaction.partyName || "",
+        vehicleNumber: transaction.vehicleNumber || "",
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
         transportationCharges: transaction.transportationCharges ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
@@ -133,6 +166,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const getFieldLabel = (field: string): string => {
     const labels: Record<string, string> = {
       partyName: t("Party Name", "पार्टी का नाम"),
+      vehicleNumber: t("Vehicle #", "वाहन नं"),
       advancePayment: t("Advance Payment", "अग्रिम भुगतान"),
       transportationCharges: t("Transportation", "परिवहन"),
       otherCharges: t("Other Charges", "अन्य शुल्क"),
@@ -183,19 +217,35 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="partyName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("Party Name", "पार्टी का नाम")}</FormLabel>
-                      <FormControl>
-                        <Input placeholder={t("Enter party name", "पार्टी का नाम दर्ज करें")} {...field} data-testid="input-party-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="partyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Party Name", "पार्टी का नाम")}</FormLabel>
+                        <FormControl>
+                          <Input placeholder={t("Enter party name", "पार्टी का नाम दर्ज करें")} {...field} data-testid="input-party-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="vehicleNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
+                        <FormControl>
+                          <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} data-testid="input-vehicle-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -256,6 +306,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     )}
                   />
                 </div>
+
+                <ProfitLossDisplay 
+                  totalCostOfGoods={parseFloat(transaction.totalCostOfGoods || "0")}
+                  revenue={form.watch("revenue") || 0}
+                  transportationCharges={form.watch("transportationCharges") || 0}
+                  otherCharges={form.watch("otherCharges") || 0}
+                />
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
