@@ -347,17 +347,19 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline">#{transaction.transactionNumber}</Badge>
-              {bagTypes.map((size) => (
-                <Badge key={size} variant="secondary" className="text-xs">
-                  {size}
+              <Badge variant="outline" className="bg-[#52a7ff]/20 text-[#52a7ff] border-[#52a7ff]/40">
+                #{transaction.transactionNumber}
+              </Badge>
+              {bagTypes.map((type) => (
+                <Badge key={type} variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600">
+                  {type}
                 </Badge>
               ))}
               {transaction.partyName && (
                 <span className="font-semibold">{transaction.partyName}</span>
               )}
               {transaction.vehicleNumber && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
                   <Truck className="h-3 w-3 mr-1" />
                   {transaction.vehicleNumber}
                 </Badge>
@@ -407,11 +409,14 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 })}
               </span>
               <span>|</span>
-              {transaction.items.slice(0, 2).map((item, idx) => (
-                <span key={item.id}>
-                  {idx > 0 && ", "}
-                  S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"}, {item.potatoType || "-"})
-                </span>
+              {transaction.items.slice(0, 2).map((item) => (
+                <Badge 
+                  key={item.id} 
+                  variant="outline" 
+                  className="text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600"
+                >
+                  S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"}, {item.coldStoreName || "-"})
+                </Badge>
               ))}
               {transaction.items.length > 2 && (
                 <span>+{transaction.items.length - 2} {t("more", "और")}</span>
