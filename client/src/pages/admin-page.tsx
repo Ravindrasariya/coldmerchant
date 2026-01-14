@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
-  ArrowLeft, Phone, MapPin 
+  LogOut, Phone, MapPin 
 } from "lucide-react";
 import type { Merchant, User } from "@shared/schema";
 
@@ -25,7 +25,7 @@ type UserWithMerchant = Omit<User, 'password'> & { merchantName?: string };
 
 export default function AdminPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("merchants");
   
@@ -37,9 +37,14 @@ export default function AdminPage() {
   const [editingUser, setEditingUser] = useState<UserWithMerchant | null>(null);
   const [userForm, setUserForm] = useState({ username: "", name: "", mobileNumber: "", merchantId: "", canEdit: true });
 
+  useEffect(() => {
+    if (!user?.isSystemAdmin) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
   if (!user?.isSystemAdmin) {
-    setLocation("/");
-    return <></>;
+    return null;
   }
 
   const { data: merchants = [], isLoading: merchantsLoading } = useQuery<MerchantWithUsers[]>({
@@ -214,14 +219,24 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-6xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => setLocation("/")} data-testid="button-back">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Admin Panel</h1>
           <p className="text-muted-foreground">Manage merchants and users</p>
         </div>
+        <Button 
+          variant="outline" 
+          onClick={() => logoutMutation.mutate()}
+          disabled={logoutMutation.isPending}
+          data-testid="button-logout"
+        >
+          {logoutMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <LogOut className="h-4 w-4 mr-2" />
+          )}
+          Logout
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
