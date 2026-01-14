@@ -58,6 +58,12 @@ interface FarmerWithDue {
   entryCount: number;
 }
 
+interface ColdStoreWithDue {
+  coldStoreName: string;
+  totalDue: number;
+  lotCount: number;
+}
+
 const inwardFormSchema = z.object({
   receiptType: z.string().min(1, "Receipt type is required"),
   partyName: z.string().min(1, "Party name is required"),
@@ -70,6 +76,7 @@ const outflowFormSchema = z.object({
   expenseType: z.string().min(1, "Expense type is required"),
   paymentMode: z.string().min(1, "Payment mode is required"),
   farmerName: z.string().optional(),
+  coldStoreName: z.string().optional(),
   amount: z.coerce.number().min(1, "Amount must be greater than 0"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -95,6 +102,10 @@ export function CashManagementTab() {
     queryKey: ["/api/cash/farmers"],
   });
 
+  const { data: coldStores = [] } = useQuery<ColdStoreWithDue[]>({
+    queryKey: ["/api/cash/cold-stores"],
+  });
+
   const inwardForm = useForm<InwardFormValues>({
     resolver: zodResolver(inwardFormSchema),
     defaultValues: {
@@ -112,6 +123,7 @@ export function CashManagementTab() {
       expenseType: "",
       paymentMode: "cash",
       farmerName: "",
+      coldStoreName: "",
       amount: 0,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -126,6 +138,8 @@ export function CashManagementTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
         title: t("Success", "सफलता"),
@@ -144,6 +158,7 @@ export function CashManagementTab() {
           expenseType: "",
           paymentMode: "cash",
           farmerName: "",
+          coldStoreName: "",
           amount: 0,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -183,6 +198,7 @@ export function CashManagementTab() {
       paymentMode: values.paymentMode,
       farmerName: values.expenseType === "farmer" ? values.farmerName : null,
       farmerVillage: selectedFarmer?.village || null,
+      coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
       amount: values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
@@ -206,6 +222,7 @@ export function CashManagementTab() {
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
       case "farmer": return t("Farmer", "किसान");
+      case "cold_store_charge": return t("Cold Store Charge", "शीत भंडार शुल्क");
       default: return type;
     }
   };
@@ -416,6 +433,41 @@ export function CashManagementTab() {
                                         {t("Due", "बकाया")}: ₹{farmer.totalDue.toFixed(0)}
                                       </Badge>
                                     )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {expenseType === "cold_store_charge" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="coldStoreName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Cold Store Name", "शीत भंडार का नाम")} *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-cold-store-name">
+                                <SelectValue placeholder={t("Select Cold Store", "शीत भंडार चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {coldStores.map((store) => (
+                                <SelectItem key={store.coldStoreName} value={store.coldStoreName}>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span>{store.coldStoreName}</span>
+                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                      {t("Due", "बकाया")}: ₹{store.totalDue.toFixed(0)}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({store.lotCount} {t("lots", "लॉट")})
+                                    </span>
                                   </div>
                                 </SelectItem>
                               ))}

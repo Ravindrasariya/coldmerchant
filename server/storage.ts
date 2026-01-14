@@ -1,7 +1,7 @@
 import { 
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
-  cashEntries, cashEntryAllocations,
+  cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -10,7 +10,8 @@ import {
   type TransactionItem, type InsertTransactionItem,
   type TransactionEditHistory, type InsertTransactionEditHistory,
   type CashEntry, type InsertCashEntry,
-  type CashEntryAllocation, type InsertCashEntryAllocation
+  type CashEntryAllocation, type InsertCashEntryAllocation,
+  type ColdStoreChargeAllocation, type InsertColdStoreChargeAllocation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, gt, ne } from "drizzle-orm";
@@ -78,6 +79,8 @@ export interface IStorage {
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
   getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
+  getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
+  createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -664,6 +667,43 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]> {
+    // Get all lots with cold store charges that have not been fully paid
+    const allLots = await db.select().from(lots)
+      .where(eq(lots.merchantId, merchantId));
+    
+    // Group by coldStoreName and calculate dues
+    const coldStoreMap = new Map<string, { totalDue: number; lotCount: number }>();
+    
+    for (const lot of allLots) {
+      const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+      if (chargesPerBag <= 0) continue;
+      
+      // Calculate total cold store charges for this lot
+      const totalCharges = chargesPerBag * lot.originalBags;
+      const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+      const due = totalCharges - paidAmount;
+      
+      if (due <= 0) continue; // Skip fully paid lots
+      
+      const existing = coldStoreMap.get(lot.coldStoreName);
+      if (existing) {
+        existing.totalDue += due;
+        existing.lotCount += 1;
+      } else {
+        coldStoreMap.set(lot.coldStoreName, {
+          totalDue: due,
+          lotCount: 1,
+        });
+      }
+    }
+    
+    return Array.from(coldStoreMap.entries()).map(([coldStoreName, data]) => ({
+      coldStoreName,
+      ...data,
+    }));
+  }
+
   async getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]> {
     // Get transactions for this party that still have due amount, ordered by creation date (FIFO)
     const txns = await db.select().from(transactions)
@@ -684,13 +724,14 @@ export class DatabaseStorage implements IStorage {
   async createCashEntryWithFIFO(
     entry: InsertCashEntry,
     applyFIFO: boolean
-  ): Promise<CashEntry & { allocations: CashEntryAllocation[] }> {
+  ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     // Use a transaction to ensure atomicity of FIFO allocation
     return await db.transaction(async (tx) => {
       // Create the cash entry
       const [createdEntry] = await tx.insert(cashEntries).values(entry).returning();
       
       const allocations: CashEntryAllocation[] = [];
+      const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
       
       // If this is an inward payment and has a partyName, apply FIFO to transactions
       if (applyFIFO && entry.direction === "inward" && entry.partyName) {
@@ -743,7 +784,61 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      return { ...createdEntry, allocations };
+      // If this is a cold store charge payment, apply FIFO to lots
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && entry.coldStoreName) {
+        let remainingAmount = parseFloat(entry.amount);
+        
+        // Get lots for this cold store with due charges (FIFO order by createdAt)
+        const allLots = await tx.select().from(lots)
+          .where(and(
+            eq(lots.merchantId, entry.merchantId),
+            eq(lots.coldStoreName, entry.coldStoreName)
+          ))
+          .orderBy(asc(lots.createdAt));
+        
+        // Filter to only those with remaining due
+        const lotsWithDue = allLots.filter(lot => {
+          const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+          if (chargesPerBag <= 0) return false;
+          const totalCharges = chargesPerBag * lot.originalBags;
+          const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+          return totalCharges > paidAmount;
+        });
+        
+        for (const lot of lotsWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+          const totalCharges = chargesPerBag * lot.originalBags;
+          const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+          const due = totalCharges - currentPaid;
+          
+          if (due <= 0) continue;
+          
+          // Calculate how much to apply to this lot
+          const toApply = Math.min(remainingAmount, due);
+          
+          // Create allocation record within transaction
+          const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
+            cashEntryId: createdEntry.id,
+            lotId: lot.id,
+            merchantId: entry.merchantId,
+            appliedAmount: toApply.toString(),
+          }).returning();
+          
+          coldStoreAllocations.push(allocation);
+          
+          // Update lot's coldStorageChargesPaid within transaction
+          const newPaid = currentPaid + toApply;
+          await tx.update(lots)
+            .set({ coldStorageChargesPaid: newPaid.toString() })
+            .where(and(eq(lots.id, lot.id), eq(lots.merchantId, entry.merchantId)));
+          
+          remainingAmount -= toApply;
+        }
+      }
+      
+      return { ...createdEntry, allocations, coldStoreAllocations };
     });
   }
 }

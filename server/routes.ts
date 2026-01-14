@@ -1134,11 +1134,23 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/cold-stores - Get cold stores with outstanding dues
+  app.get("/api/cash/cold-stores", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const coldStores = await storage.getColdStoresWithDue(merchantId);
+      res.json(coldStores);
+    } catch (error) {
+      console.error("Error fetching cold stores:", error);
+      res.status(500).json({ message: "Failed to fetch cold stores" });
+    }
+  });
+
   // POST /api/cash/entries - Create a cash entry (inward or outflow)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { direction, receiptType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, amount, entryDate, remarks } = req.body;
+      const { direction, receiptType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, amount, entryDate, remarks } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow"].includes(direction)) {
@@ -1160,7 +1172,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
         }
         if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
@@ -1169,7 +1181,14 @@ export async function registerRoutes(
         if (expenseType === "farmer" && !farmerName) {
           return res.status(400).json({ message: "Farmer name is required when expense type is farmer" });
         }
+        if (expenseType === "cold_store_charge" && !coldStoreName) {
+          return res.status(400).json({ message: "Cold store name is required when expense type is cold store charge" });
+        }
       }
+
+      // Determine if FIFO should be applied
+      const applyFIFO = (direction === "inward" && !!partyName) || 
+                        (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 
       // Create the cash entry with FIFO allocation in a single transaction
       const createdEntry = await storage.createCashEntryWithFIFO({
@@ -1182,10 +1201,11 @@ export async function registerRoutes(
         partyVillage: partyVillage || null,
         farmerName: farmerName || null,
         farmerVillage: farmerVillage || null,
+        coldStoreName: coldStoreName || null,
         amount: amount.toString(),
         entryDate,
         remarks: remarks || null,
-      }, direction === "inward" && !!partyName);
+      }, applyFIFO);
       
       res.status(201).json(createdEntry);
     } catch (error) {
