@@ -124,6 +124,7 @@ export const transactionItems = pgTable("transaction_items", {
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   pricePerKgSnapshot: decimal("price_per_kg_snapshot", { precision: 10, scale: 2 }),
   costOfGoods: decimal("cost_of_goods", { precision: 12, scale: 2 }),
+  revenue: decimal("revenue", { precision: 12, scale: 2 }), // per-item revenue for P&L calculation
   createdAt: timestamp("created_at").defaultNow(),
 });
 
