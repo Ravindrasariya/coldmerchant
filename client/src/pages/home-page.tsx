@@ -28,8 +28,10 @@ import {
   KeyRound,
   Loader2,
   Truck,
-  Wallet
+  Wallet,
+  Menu
 } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
 import { CashManagementTab } from "@/components/cash-management/cash-management-tab";
 
@@ -97,20 +99,22 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-14 items-center px-4 md:px-6 gap-6">
+          <div className="flex h-16 items-center px-4 md:px-6 gap-4 md:gap-6">
             {/* Brand */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                <PackagePlus className="h-4 w-4 text-primary-foreground" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
+                <PackagePlus className="h-5 w-5 text-primary-foreground" />
               </div>
-              <div className="hidden sm:flex flex-col">
-                <span className="font-semibold text-sm leading-tight text-primary">Vyapar Vriddhi</span>
-                <span className="text-[10px] text-muted-foreground leading-tight">by KrashuVed</span>
+              <div className="flex flex-col justify-between h-10">
+                <span className="font-bold text-lg leading-tight text-primary">Vyapar Vriddhi</span>
+                <span className="text-[10px] leading-tight">
+                  by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+                </span>
               </div>
             </div>
 
-            {/* Navigation Tabs - inline in header */}
-            <nav className="flex-1 overflow-x-auto">
+            {/* Navigation Tabs - Desktop (hidden on mobile) */}
+            <nav className="hidden md:flex flex-1 overflow-x-auto">
               <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
                 <TabsTrigger 
                   value="stock-entry" 
@@ -118,7 +122,7 @@ export default function HomePage() {
                   data-testid="tab-stock-entry"
                 >
                   <PackagePlus className="h-4 w-4" />
-                  <span className="hidden md:inline">{t("Stock Entry", "स्टॉक एंट्री")}</span>
+                  {t("Stock Entry", "स्टॉक एंट्री")}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="stock-register" 
@@ -126,7 +130,7 @@ export default function HomePage() {
                   data-testid="tab-stock-register"
                 >
                   <ClipboardList className="h-4 w-4" />
-                  <span className="hidden md:inline">{t("Stock Register", "स्टॉक रजिस्टर")}</span>
+                  {t("Stock Register", "स्टॉक रजिस्टर")}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="transactions" 
@@ -134,7 +138,7 @@ export default function HomePage() {
                   data-testid="tab-transactions"
                 >
                   <Truck className="h-4 w-4" />
-                  <span className="hidden md:inline">{t("Transactions", "लेनदेन")}</span>
+                  {t("Transactions", "लेनदेन")}
                 </TabsTrigger>
                 <TabsTrigger 
                   value="cash-management" 
@@ -142,13 +146,78 @@ export default function HomePage() {
                   data-testid="tab-cash-management"
                 >
                   <Wallet className="h-4 w-4" />
-                  <span className="hidden md:inline">{t("Cash", "नकद")}</span>
+                  {t("Cash", "नकद")}
                 </TabsTrigger>
               </TabsList>
             </nav>
 
+            {/* Spacer for mobile */}
+            <div className="flex-1 md:hidden" />
+
             {/* Right side controls */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Mobile Menu */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden" data-testid="button-mobile-menu">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0">
+                  <div className="flex flex-col h-full">
+                    <div className="p-4 border-b">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
+                          <PackagePlus className="h-5 w-5 text-primary-foreground" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-lg leading-tight text-primary">Vyapar Vriddhi</span>
+                          <span className="text-[10px] leading-tight">
+                            by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <nav className="flex-1 p-2">
+                      <TabsList className="flex flex-col w-full h-auto gap-1 bg-transparent p-0">
+                        <TabsTrigger 
+                          value="stock-entry" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-stock-entry-mobile"
+                        >
+                          <PackagePlus className="h-4 w-4" />
+                          {t("Stock Entry", "स्टॉक एंट्री")}
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="stock-register" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-stock-register-mobile"
+                        >
+                          <ClipboardList className="h-4 w-4" />
+                          {t("Stock Register", "स्टॉक रजिस्टर")}
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="transactions" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-transactions-mobile"
+                        >
+                          <Truck className="h-4 w-4" />
+                          {t("Transactions", "लेनदेन")}
+                        </TabsTrigger>
+                        <TabsTrigger 
+                          value="cash-management" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-cash-management-mobile"
+                        >
+                          <Wallet className="h-4 w-4" />
+                          {t("Cash", "नकद")}
+                        </TabsTrigger>
+                      </TabsList>
+                    </nav>
+                  </div>
+                </SheetContent>
+              </Sheet>
+
               <LanguageToggle />
               <ThemeToggle />
               
