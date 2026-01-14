@@ -46,6 +46,7 @@ interface StockEntryWithLots {
       id: number;
       size: string;
       numberOfBags: number;
+      remainingBags: number | null;
       weight: string | null;
       pricePerKg: string | null;
       totalAmount: string | null;
@@ -484,6 +485,7 @@ export function StockRegisterCard() {
                                 {metrics.sellableBreakdowns.map((bd, bdIndex) => {
                                   const bdPrice = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
                                   const bdWeight = bd.weight ? parseFloat(bd.weight) : 0;
+                                  const bdRemaining = bd.remainingBags ?? bd.numberOfBags;
                                   const bdTotal = bd.totalAmount 
                                     ? parseFloat(bd.totalAmount) 
                                     : (bdPrice > 0 && bdWeight > 0 ? bdPrice * bdWeight : null);
@@ -495,7 +497,8 @@ export function StockRegisterCard() {
                                     >
                                       <span className="font-medium">{bd.size}</span>
                                       <span className="text-muted-foreground mx-1">×</span>
-                                      <span>{bd.numberOfBags}</span>
+                                      <span className="font-bold text-primary">{bdRemaining}</span>
+                                      <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                                       {bdWeight > 0 && (
                                         <>
                                           <span className="text-muted-foreground mx-1">|</span>
