@@ -360,7 +360,7 @@ export function StockRegisterCard() {
                         {potatoTypes.map((type, i) => (
                           <Badge 
                             key={i} 
-                            className="text-[11px] px-2 py-0.5 font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0"
+                            className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0"
                           >
                             {type}
                           </Badge>
