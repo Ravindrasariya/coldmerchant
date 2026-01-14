@@ -29,6 +29,7 @@ interface CashEntry {
   partyVillage: string | null;
   farmerName: string | null;
   farmerVillage: string | null;
+  coldStoreName: string | null;
   amount: string;
   entryDate: string;
   remarks: string | null;
@@ -576,7 +577,7 @@ export function CashManagementTab() {
       <div className="w-1/2 space-y-4">
         <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
         
-        <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
+        <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
           {entriesLoading ? (
             <div className="text-center py-8 text-muted-foreground">
               {t("Loading...", "लोड हो रहा है...")}
@@ -626,60 +627,53 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
       className={`hover-elevate ${isInward ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500'}`}
       data-testid={`card-cash-entry-${entry.id}`}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {isInward ? (
-              <ArrowDownLeft className="h-4 w-4 text-green-600" />
+              <ArrowDownLeft className="h-4 w-4 text-green-600 shrink-0" />
             ) : (
-              <ArrowUpRight className="h-4 w-4 text-amber-600" />
+              <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
             )}
-            <span className="font-semibold">
-              {isInward ? entry.partyName : (entry.farmerName || getExpenseTypeLabel(entry.expenseType))}
+            <span className="font-semibold truncate">
+              {isInward ? entry.partyName : (entry.farmerName || entry.coldStoreName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 
-              className={isInward 
+              className={`shrink-0 ${isInward 
                 ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600" 
                 : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
-              }
+              }`}
             >
               {isInward ? t("Inflow", "आवक") : t("Outflow", "बहिर्वाह")}
             </Badge>
-            <RefreshCw className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground" />
           </div>
-          <span className={`font-bold ${isInward ? 'text-green-600' : 'text-amber-600'}`}>
+          <span className={`font-bold shrink-0 ${isInward ? 'text-green-600' : 'text-amber-600'}`}>
             {isInward ? '+' : '-'}₹{amount.toLocaleString()}
           </span>
         </div>
 
-        <div className="mt-2 text-sm text-muted-foreground">
-          {format(new Date(entry.entryDate), "dd/MM/yyyy")}
-        </div>
-
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+          <span>{format(new Date(entry.entryDate), "dd/MM/yyyy")}</span>
           {isInward && entry.receiptType && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs py-0">
               {getReceiptTypeLabel(entry.receiptType)}
             </Badge>
           )}
           {!isInward && entry.paymentMode && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs py-0">
               {entry.paymentMode === "cash" ? t("Cash", "नकद") : t("Account", "खाता")}
             </Badge>
           )}
           {isInward && totalApplied > 0 && (
-            <span className="text-xs text-green-600">
+            <span className="text-green-600">
               {t("Applied", "लागू")}: ₹{totalApplied.toLocaleString()}
             </span>
           )}
+          {entry.remarks && (
+            <span className="italic truncate max-w-[200px]">{entry.remarks}</span>
+          )}
         </div>
-
-        {entry.remarks && (
-          <div className="mt-2 text-xs text-muted-foreground italic">
-            {entry.remarks}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
