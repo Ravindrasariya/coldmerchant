@@ -725,6 +725,7 @@ export async function registerRoutes(
           breakdownId: item.breakdownId,
           serialNumber: entry?.serialNumber || 0,
           coldStoreName: lot?.coldStoreName || "",
+          potatoType: lot?.potatoType || "",
           size,
           bagsMoved: item.bagsMoved,
           netWeight: netWeight.toString(),
@@ -760,6 +761,115 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating transaction:", error);
       res.status(500).json({ message: "Failed to create transaction" });
+    }
+  });
+
+  // GET /api/transactions/:id - Get a single transaction with edit history
+  app.get("/api/transactions/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const transactionId = parseInt(req.params.id);
+      
+      const transaction = await storage.getTransactionById(transactionId, merchantId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const editHistory = await storage.getTransactionEditHistory(transactionId, merchantId);
+      res.json({ ...transaction, editHistory });
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
+      res.status(500).json({ message: "Failed to fetch transaction" });
+    }
+  });
+
+  // PATCH /api/transactions/:id - Update a transaction (only partyName, advancePayment, transportationCharges, otherCharges, revenue)
+  app.patch("/api/transactions/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const transactionId = parseInt(req.params.id);
+      
+      const existingTxn = await storage.getTransactionById(transactionId, merchantId);
+      if (!existingTxn) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      const { partyName, advancePayment, transportationCharges, otherCharges, revenue } = req.body;
+      
+      // Track changes for edit history
+      const changes: { field: string; oldValue: string | number | null; newValue: string | number | null }[] = [];
+      
+      if (partyName !== undefined && partyName !== existingTxn.partyName) {
+        changes.push({ field: "partyName", oldValue: existingTxn.partyName, newValue: partyName || null });
+      }
+      if (advancePayment !== undefined && advancePayment?.toString() !== existingTxn.advancePayment) {
+        changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
+      }
+      if (transportationCharges !== undefined && transportationCharges?.toString() !== existingTxn.transportationCharges) {
+        changes.push({ field: "transportationCharges", oldValue: existingTxn.transportationCharges, newValue: transportationCharges?.toString() || null });
+      }
+      if (otherCharges !== undefined && otherCharges?.toString() !== existingTxn.otherCharges) {
+        changes.push({ field: "otherCharges", oldValue: existingTxn.otherCharges, newValue: otherCharges?.toString() || null });
+      }
+      if (revenue !== undefined && revenue?.toString() !== existingTxn.revenue) {
+        changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: revenue?.toString() || null });
+      }
+      
+      // Calculate new profit/loss
+      const revenueNum = parseFloat(revenue) || 0;
+      const transportNum = parseFloat(transportationCharges) || 0;
+      const otherNum = parseFloat(otherCharges) || 0;
+      const totalCostOfGoods = parseFloat(existingTxn.totalCostOfGoods || "0");
+      const newProfitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
+      
+      if (newProfitLoss.toString() !== existingTxn.profitLoss) {
+        changes.push({ field: "profitLoss", oldValue: existingTxn.profitLoss, newValue: newProfitLoss.toString() });
+      }
+      
+      // Update the transaction
+      const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
+        partyName: partyName || null,
+        advancePayment: advancePayment ? advancePayment.toString() : null,
+        transportationCharges: transportationCharges ? transportationCharges.toString() : null,
+        otherCharges: otherCharges ? otherCharges.toString() : null,
+        revenue: revenue ? revenue.toString() : null,
+        profitLoss: newProfitLoss.toString(),
+      });
+      
+      // Record edit history if there are changes
+      if (changes.length > 0) {
+        await storage.createTransactionEditHistory({
+          transactionId,
+          merchantId,
+          userId,
+          changeSet: changes,
+        });
+      }
+      
+      res.json(updatedTxn);
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+      res.status(500).json({ message: "Failed to update transaction" });
+    }
+  });
+
+  // GET /api/merchants/:id - Get merchant details (for print receipt)
+  app.get("/api/merchants/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = parseInt(req.params.id);
+      // Only allow access to own merchant data
+      if (merchantId !== req.user!.merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const merchant = await storage.getMerchantById(merchantId);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      res.json(merchant);
+    } catch (error) {
+      console.error("Error fetching merchant:", error);
+      res.status(500).json({ message: "Failed to fetch merchant" });
     }
   });
 

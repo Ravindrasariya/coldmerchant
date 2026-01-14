@@ -113,12 +113,23 @@ export const transactionItems = pgTable("transaction_items", {
   breakdownId: integer("breakdown_id").references(() => bagBreakdowns.id), // null for gate_cut lots
   serialNumber: integer("serial_number").notNull(), // cached from stock entry
   coldStoreName: text("cold_store_name").notNull(), // cached
+  potatoType: text("potato_type"), // cached potato type for display
   size: text("size"), // cached size for display
   bagsMoved: integer("bags_moved").notNull(),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   pricePerKgSnapshot: decimal("price_per_kg_snapshot", { precision: 10, scale: 2 }),
   costOfGoods: decimal("cost_of_goods", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Transaction Edit History - tracks modifications to transactions
+export const transactionEditHistory = pgTable("transaction_edit_history", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull().references(() => transactions.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  userId: integer("user_id").references(() => users.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changeSet: jsonb("change_set").notNull(), // Array of { field, oldValue, newValue }
 });
 
 // Relations
@@ -191,6 +202,7 @@ export const transactionsRelations = relations(transactions, ({ one, many }) => 
     references: [merchants.id],
   }),
   items: many(transactionItems),
+  editHistory: many(transactionEditHistory),
 }));
 
 export const transactionItemsRelations = relations(transactionItems, ({ one }) => ({
@@ -208,6 +220,21 @@ export const transactionItemsRelations = relations(transactionItems, ({ one }) =
   }),
 }));
 
+export const transactionEditHistoryRelations = relations(transactionEditHistory, ({ one }) => ({
+  transaction: one(transactions, {
+    fields: [transactionEditHistory.transactionId],
+    references: [transactions.id],
+  }),
+  merchant: one(merchants, {
+    fields: [transactionEditHistory.merchantId],
+    references: [merchants.id],
+  }),
+  user: one(users, {
+    fields: [transactionEditHistory.userId],
+    references: [users.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertMerchantSchema = createInsertSchema(merchants).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -217,6 +244,7 @@ export const insertBagBreakdownSchema = createInsertSchema(bagBreakdowns).omit({
 export const insertStockEntryEditHistorySchema = createInsertSchema(stockEntryEditHistory).omit({ id: true, changedAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true, transactionNumber: true });
 export const insertTransactionItemSchema = createInsertSchema(transactionItems).omit({ id: true, createdAt: true });
+export const insertTransactionEditHistorySchema = createInsertSchema(transactionEditHistory).omit({ id: true, changedAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -242,6 +270,9 @@ export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 
 export type TransactionItem = typeof transactionItems.$inferSelect;
 export type InsertTransactionItem = z.infer<typeof insertTransactionItemSchema>;
+
+export type TransactionEditHistory = typeof transactionEditHistory.$inferSelect;
+export type InsertTransactionEditHistory = z.infer<typeof insertTransactionEditHistorySchema>;
 
 // Change types for edit history
 export type FieldChange = {

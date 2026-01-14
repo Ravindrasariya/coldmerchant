@@ -1,12 +1,13 @@
 import { 
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
-  transactions, transactionItems,
+  transactions, transactionItems, transactionEditHistory,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
   type StockEntryEditHistory, type InsertStockEntryEditHistory, type ChangeSet,
   type Transaction, type InsertTransaction,
-  type TransactionItem, type InsertTransactionItem
+  type TransactionItem, type InsertTransactionItem,
+  type TransactionEditHistory, type InsertTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -435,6 +436,61 @@ export class DatabaseStorage implements IStorage {
     }
     
     return results.sort((a, b) => a.serialNumber - b.serialNumber);
+  }
+
+  // Get single transaction by ID
+  async getTransactionById(id: number, merchantId: number): Promise<(Transaction & { items: TransactionItem[] }) | undefined> {
+    const [txn] = await db.select().from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)));
+    
+    if (!txn) return undefined;
+    
+    const items = await db.select().from(transactionItems)
+      .where(eq(transactionItems.transactionId, txn.id));
+    
+    return { ...txn, items };
+  }
+
+  // Update transaction
+  async updateTransaction(id: number, merchantId: number, data: Partial<Transaction>): Promise<Transaction | undefined> {
+    const [updated] = await db.update(transactions)
+      .set(data)
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)))
+      .returning();
+    return updated;
+  }
+
+  // Transaction Edit History operations
+  async createTransactionEditHistory(data: { transactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<TransactionEditHistory> {
+    const [created] = await db.insert(transactionEditHistory).values(data).returning();
+    return created;
+  }
+
+  async getTransactionEditHistory(transactionId: number, merchantId: number): Promise<(TransactionEditHistory & { userName?: string })[]> {
+    const history = await db.select().from(transactionEditHistory)
+      .where(and(
+        eq(transactionEditHistory.transactionId, transactionId),
+        eq(transactionEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(transactionEditHistory.changedAt));
+    
+    const result = await Promise.all(history.map(async (h) => {
+      let userName: string | undefined;
+      if (h.userId) {
+        const user = await this.getUser(h.userId);
+        userName = user?.name;
+      }
+      return { ...h, userName };
+    }));
+    
+    return result;
+  }
+
+  // Get merchant by ID
+  async getMerchantById(id: number): Promise<Merchant | undefined> {
+    const [merchant] = await db.select().from(merchants)
+      .where(eq(merchants.id, id));
+    return merchant;
   }
 }
 
