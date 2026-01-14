@@ -94,7 +94,7 @@ function ProfitLossDisplay({
   return (
     <div className="bg-muted/50 p-4 rounded-md">
       <div className="flex justify-between items-center">
-        <span className="font-medium">{t("Profit/Loss", "लाभ/हानि")} ({t("read-only", "केवल पठन")})</span>
+        <span className="font-medium">{t("Profit/Loss", "लाभ/हानि")}</span>
         <span className={`text-xl font-bold ${profitLoss >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
           {profitLoss >= 0 ? "+" : ""}₹{profitLoss.toFixed(2)}
         </span>
@@ -357,7 +357,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         </span>
                       </div>
                       <ul className="space-y-1">
-                        {entry.changeSet.map((change, idx) => (
+                        {entry.changeSet
+                          .filter((change) => {
+                            const oldVal = formatValue(change.oldValue);
+                            const newVal = formatValue(change.newValue);
+                            return oldVal !== newVal;
+                          })
+                          .map((change, idx) => (
                           <li key={idx} className="text-muted-foreground">
                             <span className="font-medium">{getFieldLabel(change.field)}</span>: {formatValue(change.oldValue)} → {formatValue(change.newValue)}
                           </li>
