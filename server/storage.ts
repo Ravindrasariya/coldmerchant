@@ -1,8 +1,9 @@
 import { 
-  users, merchants, stockEntries, lots, bagBreakdowns,
+  users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
-  type BagBreakdown, type InsertBagBreakdown
+  type BagBreakdown, type InsertBagBreakdown,
+  type StockEntryEditHistory, type InsertStockEntryEditHistory, type ChangeSet
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -52,6 +53,10 @@ export interface IStorage {
   deleteBagBreakdown(id: number, merchantId: number): Promise<void>;
   getBagBreakdownsByLot(lotId: number, merchantId: number): Promise<BagBreakdown[]>;
   getBagBreakdownById(id: number, merchantId: number): Promise<BagBreakdown | undefined>;
+  
+  // Edit History operations
+  createEditHistory(stockEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<StockEntryEditHistory>;
+  getEditHistory(stockEntryId: number, merchantId: number): Promise<(StockEntryEditHistory & { userName?: string })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -258,6 +263,37 @@ export class DatabaseStorage implements IStorage {
     const [breakdown] = await db.select().from(bagBreakdowns)
       .where(and(eq(bagBreakdowns.id, id), eq(bagBreakdowns.merchantId, merchantId)));
     return breakdown || undefined;
+  }
+
+  // Edit History operations
+  async createEditHistory(stockEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<StockEntryEditHistory> {
+    const [created] = await db.insert(stockEntryEditHistory).values({
+      stockEntryId,
+      merchantId,
+      userId,
+      changeSet,
+    }).returning();
+    return created;
+  }
+
+  async getEditHistory(stockEntryId: number, merchantId: number): Promise<(StockEntryEditHistory & { userName?: string })[]> {
+    const history = await db.select().from(stockEntryEditHistory)
+      .where(and(
+        eq(stockEntryEditHistory.stockEntryId, stockEntryId),
+        eq(stockEntryEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(stockEntryEditHistory.changedAt));
+    
+    const result = await Promise.all(history.map(async (h) => {
+      let userName: string | undefined;
+      if (h.userId) {
+        const user = await this.getUser(h.userId);
+        userName = user?.name;
+      }
+      return { ...h, userName };
+    }));
+    
+    return result;
   }
 }
 
