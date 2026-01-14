@@ -29,7 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Plus, Trash2, Package, ShoppingCart, History, ChevronDown, ChevronRight } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, Package, History, ChevronDown, ChevronRight } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SIZE_OPTIONS } from "@shared/schema";
@@ -93,8 +93,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       pricePerKg: bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0,
     }))
   })));
-  const [sellQuantities, setSellQuantities] = useState<Record<string, number>>({});
-  const [gateCutSellQty, setGateCutSellQty] = useState<Record<number, number>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
 
@@ -136,125 +134,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       });
     },
   });
-
-  const sellMutation = useMutation({
-    mutationFn: async ({ breakdownId, quantity }: { breakdownId: number; quantity: number }) => {
-      const res = await apiRequest("POST", `/api/bag-breakdowns/${breakdownId}/sell`, { quantity });
-      return await res.json();
-    },
-    onSuccess: (data, variables) => {
-      toast({
-        title: t("Sale Recorded", "बिक्री दर्ज हो गई"),
-        description: t(`${variables.quantity} bags marked as sold.`, `${variables.quantity} बोरी बेची गई।`),
-      });
-      // Update local state including lot remainingBags
-      setLots(prevLots => prevLots.map(lot => {
-        const updatedBreakdowns = lot.bagBreakdowns.map(bd => 
-          bd.id === variables.breakdownId 
-            ? { ...bd, remainingBags: data.remainingBags }
-            : bd
-        );
-        // Recalculate lot's remaining from updated breakdowns
-        const lotRemaining = updatedBreakdowns.reduce((sum, bd) => {
-          if (bd.size === "Wastage") return sum;
-          return sum + (bd.remainingBags ?? bd.numberOfBags);
-        }, 0);
-        return {
-          ...lot,
-          remainingBags: lotRemaining,
-          bagBreakdowns: updatedBreakdowns
-        };
-      }));
-      setSellQuantities(prev => ({ ...prev, [variables.breakdownId]: 0 }));
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSell = (breakdownId: number, lotIndex: number, bdIndex: number) => {
-    const quantity = sellQuantities[breakdownId] || 0;
-    const bd = lots[lotIndex].bagBreakdowns[bdIndex];
-    const remaining = bd.remainingBags ?? bd.numberOfBags;
-    
-    if (quantity <= 0) {
-      toast({
-        title: t("Invalid Quantity", "अमान्य मात्रा"),
-        description: t("Please enter a valid quantity to sell.", "कृपया बेचने के लिए मान्य मात्रा दर्ज करें।"),
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (quantity > remaining) {
-      toast({
-        title: t("Insufficient Stock", "अपर्याप्त स्टॉक"),
-        description: t(`Only ${remaining} bags remaining.`, `केवल ${remaining} बोरी शेष है।`),
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    sellMutation.mutate({ breakdownId, quantity });
-  };
-
-  // For gate_cut lots - sell at lot level
-  const lotSellMutation = useMutation({
-    mutationFn: async ({ lotId, quantity }: { lotId: number; quantity: number }) => {
-      const res = await apiRequest("POST", `/api/lots/${lotId}/sell`, { quantity });
-      return await res.json();
-    },
-    onSuccess: (data, variables) => {
-      toast({
-        title: t("Sale Recorded", "बिक्री दर्ज हो गई"),
-        description: t(`${variables.quantity} bags marked as sold.`, `${variables.quantity} बोरी बेची गई।`),
-      });
-      setLots(prevLots => prevLots.map(lot => 
-        lot.id === variables.lotId 
-          ? { ...lot, remainingBags: data.remainingBags }
-          : lot
-      ));
-      setGateCutSellQty(prev => ({ ...prev, [variables.lotId]: 0 }));
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleLotSell = (lotId: number, lotIndex: number) => {
-    const quantity = gateCutSellQty[lotId] || 0;
-    const lot = lots[lotIndex];
-    
-    if (quantity <= 0) {
-      toast({
-        title: t("Invalid Quantity", "अमान्य मात्रा"),
-        description: t("Please enter a valid quantity to sell.", "कृपया बेचने के लिए मान्य मात्रा दर्ज करें।"),
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (quantity > lot.remainingBags) {
-      toast({
-        title: t("Insufficient Stock", "अपर्याप्त स्टॉक"),
-        description: t(`Only ${lot.remainingBags} bags remaining.`, `केवल ${lot.remainingBags} बोरी शेष है।`),
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    lotSellMutation.mutate({ lotId, quantity });
-  };
 
   const confirmDelete = () => {
     if (deleteConfirm) {
@@ -427,22 +306,20 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
                       {lot.bagBreakdowns.length > 0 && (
                         <div className="space-y-2">
-                          <div className="hidden md:grid md:grid-cols-8 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                          <div className="hidden md:grid md:grid-cols-7 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                             <div>{t("Size", "आकार")}</div>
                             <div>{t("# Bags", "बोरी")}</div>
                             <div>{t("Remaining", "शेष")}</div>
                             <div>{t("Weight", "वजन")}</div>
                             <div>{t("Price/kg", "मूल्य/किलो")}</div>
                             <div>{t("Total", "कुल")}</div>
-                            <div>{t("Mark Sold", "बेचें")}</div>
                             <div></div>
                           </div>
                           {lot.bagBreakdowns.map((bd, bdIndex) => {
                             const total = (bd.weight || 0) * (bd.pricePerKg || 0);
                             const remaining = bd.remainingBags ?? bd.numberOfBags;
-                            const isWastage = bd.size === "Wastage";
                             return (
-                              <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-8 gap-2 p-2 bg-muted/30 rounded-md items-center">
+                              <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-7 gap-2 p-2 bg-muted/30 rounded-md items-center">
                                 <Select
                                   value={bd.size}
                                   onValueChange={(v) => handleBreakdownChange(lotIndex, bdIndex, "size", v)}
@@ -499,37 +376,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 <div className="font-mono text-sm">
                                   {total > 0 ? `₹${total.toFixed(2)}` : "—"}
                                 </div>
-                                {!isWastage && bd.id > 0 ? (
-                                  <div className="flex gap-1">
-                                    <Input
-                                      type="text"
-                                      inputMode="numeric"
-                                      className="h-8 w-16"
-                                      placeholder="#"
-                                      value={sellQuantities[bd.id] || ""}
-                                      onChange={(e) => {
-                                        const val = e.target.value.replace(/[^0-9]/g, '');
-                                        setSellQuantities(prev => ({ ...prev, [bd.id]: val === "" ? 0 : parseInt(val) }));
-                                      }}
-                                      data-testid={`edit-sell-qty-${lotIndex}-${bdIndex}`}
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => handleSell(bd.id, lotIndex, bdIndex)}
-                                      disabled={sellMutation.isPending || !sellQuantities[bd.id] || sellQuantities[bd.id] <= 0}
-                                      data-testid={`edit-sell-btn-${lotIndex}-${bdIndex}`}
-                                    >
-                                      <ShoppingCart className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-muted-foreground">
-                                    {isWastage ? "—" : t("Save first", "पहले सहेजें")}
-                                  </div>
-                                )}
                                 <Button
                                   type="button"
                                   variant="ghost"
@@ -557,56 +403,113 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 {lot.cutType === "gate_cut" && (
                   <CardContent className="pt-0">
                     <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground">{t("Gate Cut Details", "गेट कट विवरण")}</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-md">
-                        <div>
-                          <Label className="text-xs">{t("Size", "आकार")}</Label>
-                          <p className="font-medium">{lot.size || "—"}</p>
-                        </div>
-                        <div>
-                          <Label className="text-xs">{t("Price/kg", "मूल्य/किलो")}</Label>
-                          <p className="font-medium">{lot.pricePerKg ? `₹${lot.pricePerKg}` : "—"}</p>
-                        </div>
-                        <div>
-                          <Label className="text-xs">{t("Remaining", "शेष")}</Label>
-                          <p className="font-mono font-medium">
-                            <span className="text-primary">{lot.remainingBags}</span>
-                            <span className="text-muted-foreground">/{lot.originalBags}</span>
-                          </p>
-                        </div>
-                        <div>
-                          <Label className="text-xs">{t("Mark Sold", "बेचें")}</Label>
-                          {lot.id > 0 ? (
-                            <div className="flex gap-1 mt-1">
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                className="h-8 w-20"
-                                placeholder="#"
-                                value={gateCutSellQty[lot.id] || ""}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(/[^0-9]/g, '');
-                                  setGateCutSellQty(prev => ({ ...prev, [lot.id]: val === "" ? 0 : parseInt(val) }));
-                                }}
-                                data-testid={`edit-gatecut-sell-qty-${lotIndex}`}
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleLotSell(lot.id, lotIndex)}
-                                disabled={lotSellMutation.isPending || !gateCutSellQty[lot.id] || gateCutSellQty[lot.id] <= 0}
-                                data-testid={`edit-gatecut-sell-btn-${lotIndex}`}
-                              >
-                                <ShoppingCart className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground mt-1">{t("Save first", "पहले सहेजें")}</p>
-                          )}
-                        </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">{t("Bag Breakdown", "बोरी विवरण")}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddBreakdown(lotIndex)}
+                          data-testid={`edit-add-breakdown-gatecut-${lotIndex}`}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          {t("Add Row", "पंक्ति जोड़ें")}
+                        </Button>
                       </div>
+
+                      {lot.bagBreakdowns.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="hidden md:grid md:grid-cols-7 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                            <div>{t("Size", "आकार")}</div>
+                            <div>{t("# Bags", "बोरी")}</div>
+                            <div>{t("Remaining", "शेष")}</div>
+                            <div>{t("Weight", "वजन")}</div>
+                            <div>{t("Price/kg", "मूल्य/किलो")}</div>
+                            <div>{t("Total", "कुल")}</div>
+                            <div></div>
+                          </div>
+                          {lot.bagBreakdowns.map((bd, bdIndex) => {
+                            const total = (bd.weight || 0) * (bd.pricePerKg || 0);
+                            const remaining = bd.remainingBags ?? bd.numberOfBags;
+                            return (
+                              <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-7 gap-2 p-2 bg-muted/30 rounded-md items-center">
+                                <Select
+                                  value={bd.size}
+                                  onValueChange={(v) => handleBreakdownChange(lotIndex, bdIndex, "size", v)}
+                                >
+                                  <SelectTrigger className="h-8" data-testid={`edit-gatecut-breakdown-size-${lotIndex}-${bdIndex}`}>
+                                    <SelectValue placeholder={t("Size", "आकार")} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {SIZE_OPTIONS.map((size) => (
+                                      <SelectItem key={size} value={size}>{size}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  className="h-8"
+                                  placeholder=""
+                                  value={bd.numberOfBags ?? ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    handleBreakdownChange(lotIndex, bdIndex, "numberOfBags", val === "" ? undefined : parseInt(val));
+                                  }}
+                                  data-testid={`edit-gatecut-breakdown-bags-${lotIndex}-${bdIndex}`}
+                                />
+                                <div className="font-mono text-sm font-medium">
+                                  <span className="text-primary">{remaining}</span>
+                                  <span className="text-muted-foreground">/{bd.numberOfBags}</span>
+                                </div>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  className="h-8"
+                                  placeholder=""
+                                  value={bd.weight ?? ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                                    handleBreakdownChange(lotIndex, bdIndex, "weight", val === "" ? undefined : parseFloat(val));
+                                  }}
+                                  data-testid={`edit-gatecut-breakdown-weight-${lotIndex}-${bdIndex}`}
+                                />
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  className="h-8"
+                                  placeholder=""
+                                  value={bd.pricePerKg ?? ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                                    handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", val === "" ? undefined : parseFloat(val));
+                                  }}
+                                  data-testid={`edit-gatecut-breakdown-price-${lotIndex}-${bdIndex}`}
+                                />
+                                <div className="font-mono text-sm">
+                                  {total > 0 ? `₹${total.toFixed(2)}` : "—"}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => setDeleteConfirm({ lotIndex, bdIndex })}
+                                  data-testid={`edit-gatecut-remove-breakdown-${lotIndex}-${bdIndex}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {lot.bagBreakdowns.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          {t("No breakdown rows. Click \"Add Row\" to add breakdown details.", "कोई विवरण पंक्ति नहीं। विवरण जोड़ने के लिए \"पंक्ति जोड़ें\" पर क्लिक करें।")}
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 )}
