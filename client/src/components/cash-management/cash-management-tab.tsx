@@ -236,7 +236,7 @@ export function CashManagementTab() {
 
         <Card className="relative z-10">
           <CardContent className="pt-6">
-            {activeTab === "inward" ? (
+            <div className={activeTab === "inward" ? "block" : "hidden"}>
               <Form {...inwardForm}>
                 <form onSubmit={inwardForm.handleSubmit(onInwardSubmit)} className="space-y-4">
                   <FormField
@@ -361,7 +361,8 @@ export function CashManagementTab() {
                   </Button>
                 </form>
               </Form>
-            ) : (
+            </div>
+            <div className={activeTab === "outflow" ? "block" : "hidden"}>
               <Form {...outflowForm}>
                 <form onSubmit={outflowForm.handleSubmit(onOutflowSubmit)} className="space-y-4">
                   <FormField
@@ -510,7 +511,7 @@ export function CashManagementTab() {
                   </Button>
                 </form>
               </Form>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>
