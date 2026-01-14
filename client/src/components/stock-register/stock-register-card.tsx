@@ -459,30 +459,36 @@ export function StockRegisterCard() {
                           className="py-2 px-3 bg-muted/20 rounded-md border border-border/30"
                           data-testid={`lot-card-${entry.id}-${lotIndex}`}
                         >
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-                            <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1},</span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px]">
+                            <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1}</span>
                             <div className="flex items-center gap-1.5">
                               <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
                               <span className="font-medium">{lot.coldStoreName}</span>
                             </div>
-                            <div>
-                              <span className="text-muted-foreground">{t("Type:", "प्रकार:")}</span>{" "}
-                              <span className="font-medium">{lot.potatoType}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">{t("Quality:", "गुणवत्ता:")}</span>{" "}
-                              <span className="font-medium">{lot.quality}</span>
-                            </div>
+                            <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
+                              {lot.potatoType}
+                            </Badge>
+                            <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
+                              lot.quality === "Good" 
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                : lot.quality === "Medium"
+                                  ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
+                                  : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                            }`}>
+                              {lot.quality}
+                            </Badge>
                             {lot.size && (
-                              <div>
-                                <span className="text-muted-foreground">{t("Size:", "आकार:")}</span>{" "}
-                                <span className="font-medium">{lot.size}</span>
-                              </div>
+                              <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0">
+                                {lot.size}
+                              </Badge>
                             )}
-                            <div>
-                              <span className="text-muted-foreground">{t("Buy Type:", "खरीद प्रकार:")}</span>{" "}
-                              <span className="font-medium">{lot.cutType === "bilty_cut" ? t("Bilty Cut", "बिल्टी कट") : t("Gate Cut", "गेट कट")}</span>
-                            </div>
+                            <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
+                              lot.cutType === "bilty_cut"
+                                ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"
+                                : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+                            }`}>
+                              {lot.cutType === "bilty_cut" ? t("Bilty Cut", "बिल्टी कट") : t("Gate Cut", "गेट कट")}
+                            </Badge>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-1">
                             <div>
