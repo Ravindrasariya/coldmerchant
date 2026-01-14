@@ -381,8 +381,8 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   return (
     <Card className="hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="outline" className="bg-[#52a7ff]/20 text-[#52a7ff] border-[#52a7ff]/40">
                 #{transaction.transactionNumber}
@@ -409,79 +409,84 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
               )}
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap text-sm">
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-2 sm:gap-3 text-sm">
               <span className="flex items-center gap-1">
                 <Package className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="font-medium">{transaction.totalBags}</span>
                 <span className="text-muted-foreground">{t("Bags", "बोरी")}</span>
               </span>
-              <span className="text-muted-foreground">|</span>
-              <span>
+              <span className="flex items-center gap-1">
                 <span className="font-medium">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</span>
                 <span className="text-muted-foreground ml-1">{t("Kg", "किग्रा")}</span>
               </span>
-              <span className="text-muted-foreground">|</span>
-              <span>
+              <span className="col-span-1">
                 <span className="text-muted-foreground">{t("Cost", "लागत")}:</span>
                 <span className="font-medium ml-1">₹{totalCost.toFixed(0)}</span>
               </span>
-              <span className="text-muted-foreground">|</span>
-              <span>
+              <span className="col-span-1">
                 <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
                 <span className="font-medium ml-1">₹{revenue.toFixed(0)}</span>
               </span>
               {dueAmount > 0 ? (
-                <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                  {t("Due", "बकाया")}: ₹{dueAmount.toFixed(0)}
-                </Badge>
+                <div className="col-span-2 sm:col-span-1">
+                  <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
+                    {t("Due", "बकाया")}: ₹{dueAmount.toFixed(0)}
+                  </Badge>
+                </div>
               ) : revenue > 0 && (
-                <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-300 dark:border-green-600">
-                  {t("Paid", "भुगतान")}
-                </Badge>
+                <div className="col-span-2 sm:col-span-1">
+                  <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-300 dark:border-green-600">
+                    {t("Paid", "भुगतान")}
+                  </Badge>
+                </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-              <span>
+            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground pt-1 border-t sm:border-0 mt-2 sm:mt-0">
+              <span className="font-medium text-muted-foreground/80">
                 {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "short",
                   year: "numeric",
                 })}
               </span>
-              <span>|</span>
-              {transaction.items.slice(0, 2).map((item) => (
-                <Badge 
-                  key={item.id} 
-                  variant="outline" 
-                  className="text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600"
-                >
-                  S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"}, {item.coldStoreName || "-"})
-                </Badge>
-              ))}
-              {transaction.items.length > 2 && (
-                <span>+{transaction.items.length - 2} {t("more", "और")}</span>
-              )}
+              <span className="hidden sm:inline">|</span>
+              <div className="flex flex-wrap gap-1.5 mt-1 sm:mt-0">
+                {transaction.items.slice(0, 3).map((item) => (
+                  <Badge 
+                    key={item.id} 
+                    variant="outline" 
+                    className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
+                  >
+                    S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"})
+                  </Badge>
+                ))}
+                {transaction.items.length > 3 && (
+                  <span className="text-[10px]">{t("and more", "और अधिक")}</span>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-1 flex-shrink-0">
+          <div className="flex sm:flex-col gap-2 flex-shrink-0 border-t sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0 justify-end">
             <Button 
               variant="outline" 
               size="sm"
               onClick={onEdit}
+              className="flex-1 sm:flex-none h-8 sm:h-9"
               data-testid={`button-edit-transaction-${transaction.id}`}
             >
-              <Edit className="h-4 w-4 mr-1" />
+              <Edit className="h-3.5 w-3.5 mr-1.5" />
               {t("Edit", "संपादित")}
             </Button>
             <Button 
               variant="outline" 
               size="sm"
               onClick={onPrint}
+              className="flex-1 sm:flex-none h-8 sm:h-9"
               data-testid={`button-print-receipt-${transaction.id}`}
             >
-              <Printer className="h-4 w-4 mr-1" />
+              <Printer className="h-3.5 w-3.5 mr-1.5" />
               {t("Receipt", "रसीद")}
             </Button>
           </div>
