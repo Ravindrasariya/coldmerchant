@@ -95,87 +95,103 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-14 items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex h-14 items-center px-4 md:px-6 gap-6">
+            {/* Brand */}
+            <div className="flex items-center gap-2 shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
                 <PackagePlus className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-lg hidden sm:block">Vyapar Vriddhi</span>
+              <div className="hidden sm:flex flex-col">
+                <span className="font-semibold text-sm leading-tight text-primary">Vyapar Vriddhi</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">by KrashuVed</span>
+              </div>
             </div>
-            {user?.merchantName && (
-              <span className="text-sm text-muted-foreground hidden md:block">
-                {user.merchantName}
-              </span>
-            )}
-          </div>
 
-          <div className="flex items-center gap-2">
-            <LanguageToggle />
-            <ThemeToggle />
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2" data-testid="button-user-menu">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {user?.username ? getInitials(user.username) : "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:block text-sm">{user?.username}</span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user?.name || user?.username}</p>
-                  {user?.merchantName && (
-                    <p className="text-xs text-muted-foreground">{user.merchantName}</p>
+            {/* Navigation Tabs - inline in header */}
+            <nav className="flex-1 overflow-x-auto">
+              <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
+                <TabsTrigger 
+                  value="stock-entry" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-stock-entry"
+                >
+                  <PackagePlus className="h-4 w-4" />
+                  <span className="hidden md:inline">{t("Stock Entry", "स्टॉक एंट्री")}</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="stock-register" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-stock-register"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  <span className="hidden md:inline">{t("Stock Register", "स्टॉक रजिस्टर")}</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="transactions" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-transactions"
+                >
+                  <Truck className="h-4 w-4" />
+                  <span className="hidden md:inline">{t("Transactions", "लेनदेन")}</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="cash-management" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-[#1a7fd4] data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-cash-management"
+                >
+                  <Wallet className="h-4 w-4" />
+                  <span className="hidden md:inline">{t("Cash", "नकद")}</span>
+                </TabsTrigger>
+              </TabsList>
+            </nav>
+
+            {/* Right side controls */}
+            <div className="flex items-center gap-2 shrink-0">
+              <LanguageToggle />
+              <ThemeToggle />
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-user-menu">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {user?.username ? getInitials(user.username) : "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium">{user?.name || user?.username}</p>
+                    {user?.merchantName && (
+                      <p className="text-xs text-muted-foreground">{user.merchantName}</p>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
+                  {user?.isSystemAdmin && (
+                    <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
+                      <Settings className="h-4 w-4 mr-2" />
+                      {t("Admin Panel", "एडमिन पैनल")}
+                    </DropdownMenuItem>
                   )}
-                </div>
-                <DropdownMenuSeparator />
-                {user?.isSystemAdmin && (
-                  <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
-                    <Settings className="h-4 w-4 mr-2" />
-                    {t("Admin Panel", "एडमिन पैनल")}
+                  <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    {t("Change Password", "पासवर्ड बदलें")}
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
-                  <KeyRound className="h-4 w-4 mr-2" />
-                  {t("Change Password", "पासवर्ड बदलें")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  {t("Logout", "लॉगआउट")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {t("Logout", "लॉगआउट")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="container max-w-7xl mx-auto px-4 md:px-6 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4 mx-auto">
-            <TabsTrigger value="stock-entry" className="flex items-center gap-2" data-testid="tab-stock-entry">
-              <PackagePlus className="h-4 w-4" />
-              {t("Stock Entry", "स्टॉक एंट्री")}
-            </TabsTrigger>
-            <TabsTrigger value="stock-register" className="flex items-center gap-2" data-testid="tab-stock-register">
-              <ClipboardList className="h-4 w-4" />
-              {t("Stock Register", "स्टॉक रजिस्टर")}
-            </TabsTrigger>
-            <TabsTrigger value="transactions" className="flex items-center gap-2" data-testid="tab-transactions">
-              <Truck className="h-4 w-4" />
-              {t("Transactions", "लेनदेन")}
-            </TabsTrigger>
-            <TabsTrigger value="cash-management" className="flex items-center gap-2" data-testid="tab-cash-management">
-              <Wallet className="h-4 w-4" />
-              {t("Cash", "नकद")}
-            </TabsTrigger>
-          </TabsList>
+        <main className="container max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
 
           <TabsContent value="stock-entry" className="space-y-6">
             <div className="flex items-center justify-between">
@@ -218,17 +234,17 @@ export default function HomePage() {
             </div>
             <CashManagementTab />
           </TabsContent>
-        </Tabs>
 
-        <footer className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
-          <div>
-            {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
-          </div>
-          <div>
-            {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
-          </div>
-        </footer>
-      </main>
+          <footer className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
+            <div>
+              {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
+            </div>
+            <div>
+              {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+            </div>
+          </footer>
+        </main>
+      </Tabs>
 
       <Dialog open={showPasswordDialog} onOpenChange={(open) => {
         if (!open && !isFirstLoginDialog) {
