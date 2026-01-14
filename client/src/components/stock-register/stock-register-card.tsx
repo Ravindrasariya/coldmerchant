@@ -105,9 +105,9 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   };
 }
 
-function computeEntryStatus(lots: StockEntryWithLots['lots']): 'unsold' | 'partial' | 'sold' {
-  const allSold = lots.every(lot => lot.remainingBags === 0);
-  const allUnsold = lots.every(lot => lot.remainingBags > 0);
+function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnType<typeof computeLotMetrics> }>): 'unsold' | 'partial' | 'sold' {
+  const allSold = lotsWithMetrics.every(({ metrics }) => metrics.remainingToSell === 0);
+  const allUnsold = lotsWithMetrics.every(({ metrics }) => metrics.remainingToSell > 0);
   
   if (allSold) return 'sold';
   if (allUnsold) return 'unsold';
@@ -302,7 +302,7 @@ export function StockRegisterCard() {
               metrics: computeLotMetrics(lot),
             }));
             
-            const entryStatus = computeEntryStatus(entry.lots);
+            const entryStatus = computeEntryStatusFromMetrics(lotsWithMetrics);
             const potatoTypes = Array.from(new Set(entry.lots.map(lot => lot.potatoType)));
             
             let totalOriginal = 0;
