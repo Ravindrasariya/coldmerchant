@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -141,6 +142,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [showAddItem, setShowAddItem] = useState(false);
   const [selectedInventory, setSelectedInventory] = useState<string>("");
   const [newItemBags, setNewItemBags] = useState<number>(0);
+  const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
 
   const { data: transaction, isLoading } = useQuery<TransactionWithHistory>({
     queryKey: ["/api/transactions", transactionId],
@@ -258,6 +260,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   };
 
   const handleRemoveItem = (index: number) => {
+    setDeleteConfirmIndex(index);
+  };
+
+  const confirmRemoveItem = () => {
+    if (deleteConfirmIndex === null) return;
+    const index = deleteConfirmIndex;
+    
     setEditableItems(items => {
       const item = items[index];
       if (!item) return items;
@@ -272,6 +281,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         i === index ? { ...it, action: 'remove' as const } : it
       );
     });
+    
+    setDeleteConfirmIndex(null);
   };
 
   const handleAddItem = () => {
@@ -622,6 +633,29 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           </div>
         )}
       </DialogContent>
+
+      <AlertDialog open={deleteConfirmIndex !== null} onOpenChange={(open) => !open && setDeleteConfirmIndex(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Remove Item?", "आइटम हटाएं?")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmIndex !== null && editableItems[deleteConfirmIndex] && (
+                <>
+                  {t("Are you sure you want to remove", "क्या आप इसे हटाना चाहते हैं")}{" "}
+                  <strong>S#{editableItems[deleteConfirmIndex].serialNumber} - {editableItems[deleteConfirmIndex].coldStoreName} - {editableItems[deleteConfirmIndex].size || "Mixed"}</strong>
+                  {" "}({editableItems[deleteConfirmIndex].bagsMoved} {t("bags", "बोरी")})?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">{t("Cancel", "रद्द करें")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" data-testid="button-confirm-delete">
+              {t("Remove", "हटाएं")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
