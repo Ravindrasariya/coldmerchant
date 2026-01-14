@@ -384,29 +384,38 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="bg-[#52a7ff]/20 text-[#52a7ff] border-[#52a7ff]/40">
-                Tr: #{transaction.transactionNumber}
-              </Badge>
+              <div className="flex items-center gap-2 mr-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#52a7ff]/10">
+                  <Receipt className="h-4 w-4 text-[#52a7ff]" />
+                </div>
+                <span className="font-bold text-lg leading-tight">
+                  Tr No: {transaction.transactionNumber}
+                </span>
+              </div>
               {transaction.partyName && (
-                <span className="font-semibold">{transaction.partyName}</span>
+                <span className="font-semibold text-lg leading-tight">
+                  - {transaction.partyName}
+                </span>
               )}
-              {bagTypes.map((type) => (
-                <Badge key={type} variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600">
-                  {type}
-                </Badge>
-              ))}
-              {transaction.vehicleNumber && (
-                <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
-                  <Truck className="h-3 w-3 mr-1" />
-                  {transaction.vehicleNumber}
-                </Badge>
-              )}
-              {profitLoss !== 0 && (
-                <Badge variant={profitLoss >= 0 ? "default" : "destructive"} className="flex items-center gap-1">
-                  {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  ₹{Math.abs(profitLoss).toFixed(0)}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2 ml-auto">
+                {bagTypes.map((type) => (
+                  <Badge key={type} variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600">
+                    {type}
+                  </Badge>
+                ))}
+                {transaction.vehicleNumber && (
+                  <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
+                    <Truck className="h-3 w-3 mr-1" />
+                    {transaction.vehicleNumber}
+                  </Badge>
+                )}
+                {profitLoss !== 0 && (
+                  <Badge variant={profitLoss >= 0 ? "default" : "destructive"} className="flex items-center gap-1">
+                    {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    ₹{Math.abs(profitLoss).toFixed(0)}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-2 sm:gap-3 text-sm">
