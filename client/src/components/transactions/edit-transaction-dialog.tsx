@@ -70,6 +70,7 @@ interface TransactionWithHistory {
   id: number;
   transactionNumber: number;
   partyName: string | null;
+  partyAddress: string | null;
   vehicleNumber: string | null;
   advancePayment: string | null;
   amountReceived: string | null;
@@ -87,6 +88,7 @@ interface TransactionWithHistory {
 
 const editTransactionSchema = z.object({
   partyName: z.string().optional(),
+  partyAddress: z.string().optional(),
   vehicleNumber: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
   amountReceived: z.coerce.number().optional(),
@@ -160,6 +162,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     resolver: zodResolver(editTransactionSchema),
     defaultValues: {
       partyName: "",
+      partyAddress: "",
       vehicleNumber: "",
       advancePayment: undefined,
       amountReceived: undefined,
@@ -173,6 +176,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (transaction) {
       form.reset({
         partyName: transaction.partyName || "",
+        partyAddress: transaction.partyAddress || "",
         vehicleNumber: transaction.vehicleNumber || "",
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
@@ -492,6 +496,22 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="partyAddress"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Party Address", "पार्टी का पता")}</FormLabel>
+                        <FormControl>
+                          <Input placeholder={t("Enter party address", "पार्टी का पता दर्ज करें")} {...field} data-testid="input-party-address" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div>
                   <FormField
                     control={form.control}
                     name="vehicleNumber"

@@ -30,6 +30,7 @@ interface Transaction {
   merchantId: number;
   transactionNumber: number;
   partyName: string | null;
+  partyAddress: string | null;
   vehicleNumber: string | null;
   advancePayment: string | null;
   amountReceived: string | null;

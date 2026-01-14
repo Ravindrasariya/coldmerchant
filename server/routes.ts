@@ -629,7 +629,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { partyName, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
+      const { partyName, partyAddress, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -745,6 +745,7 @@ export async function registerRoutes(
           merchantId,
           transactionNumber,
           partyName: partyName || null,
+          partyAddress: partyAddress || null,
           vehicleNumber: vehicleNumber || null,
           advancePayment: advancePayment ? advancePayment.toString() : null,
           transportationCharges: transportationCharges ? transportationCharges.toString() : null,
@@ -796,7 +797,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue } = req.body;
+      const { partyName, partyAddress, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -810,6 +811,9 @@ export async function registerRoutes(
       
       if (partyName !== undefined && (partyName || null) !== (existingTxn.partyName || null)) {
         changes.push({ field: "partyName", oldValue: existingTxn.partyName, newValue: partyName || null });
+      }
+      if (partyAddress !== undefined && (partyAddress || null) !== (existingTxn.partyAddress || null)) {
+        changes.push({ field: "partyAddress", oldValue: existingTxn.partyAddress, newValue: partyAddress || null });
       }
       if (vehicleNumber !== undefined && (vehicleNumber || null) !== (existingTxn.vehicleNumber || null)) {
         changes.push({ field: "vehicleNumber", oldValue: existingTxn.vehicleNumber, newValue: vehicleNumber || null });
@@ -844,6 +848,7 @@ export async function registerRoutes(
       // Update the transaction
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: partyName || null,
+        partyAddress: partyAddress || null,
         vehicleNumber: vehicleNumber || null,
         advancePayment: advancePayment ? advancePayment.toString() : null,
         amountReceived: amountReceived ? amountReceived.toString() : null,

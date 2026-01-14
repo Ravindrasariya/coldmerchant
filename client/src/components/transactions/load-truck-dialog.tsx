@@ -50,6 +50,7 @@ const transactionItemSchema = z.object({
 
 const transactionFormSchema = z.object({
   partyName: z.string().optional(),
+  partyAddress: z.string().optional(),
   vehicleNumber: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
@@ -208,14 +209,24 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
               />
             </div>
             <div>
-              <Label htmlFor="vehicleNumber">{t("Vehicle # (Optional)", "वाहन नं (वैकल्पिक)")}</Label>
+              <Label htmlFor="partyAddress">{t("Party Address (Optional)", "पार्टी का पता (वैकल्पिक)")}</Label>
               <Input
-                id="vehicleNumber"
-                {...form.register("vehicleNumber")}
-                placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
-                data-testid="input-vehicle-number"
+                id="partyAddress"
+                {...form.register("partyAddress")}
+                placeholder={t("Enter party address", "पार्टी का पता दर्ज करें")}
+                data-testid="input-party-address"
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="vehicleNumber">{t("Vehicle # (Optional)", "वाहन नं (वैकल्पिक)")}</Label>
+            <Input
+              id="vehicleNumber"
+              {...form.register("vehicleNumber")}
+              placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
+              data-testid="input-vehicle-number"
+            />
           </div>
 
           <div className="space-y-4">
