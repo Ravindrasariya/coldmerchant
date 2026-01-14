@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
@@ -79,6 +79,72 @@ export function TransactionsTab() {
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
       </div>
+
+      {/* Summary Cards */}
+      {transactions && transactions.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                <IndianRupee className="h-4 w-4" />
+                {t("Total Revenue", "कुल राजस्व")}
+              </div>
+              <p className="text-xl font-bold">
+                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                <Receipt className="h-4 w-4" />
+                {t("Total Cost", "कुल लागत")}
+              </div>
+              <p className="text-xl font-bold">
+                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN")}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                {transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                )}
+                {t("Total P&L", "कुल लाभ/हानि")}
+              </div>
+              <p className={`text-xl font-bold ${transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0) >= 0 ? "+" : ""}
+                ₹{Math.abs(transactions.reduce((sum, t) => sum + (parseFloat(t.profitLoss || "0")), 0)).toLocaleString("en-IN")}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                <Wallet className="h-4 w-4" />
+                {t("Total Paid", "कुल भुगतान")}
+              </div>
+              <p className="text-xl font-bold">
+                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.advancePayment || "0")), 0).toLocaleString("en-IN")}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
+                <CreditCard className="h-4 w-4" />
+                {t("Total Due", "कुल बकाया")}
+              </div>
+              <p className="text-xl font-bold text-orange-600">
+                ₹{transactions.reduce((sum, t) => sum + (parseFloat(t.revenue || "0")), 0).toLocaleString("en-IN")}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {transactions && transactions.length === 0 ? (
         <Card className="p-8">
