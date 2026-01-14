@@ -1,0 +1,195 @@
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import { Form } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Plus, Save, X, FileText, Loader2 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { StockEntryForm as StockEntryFormType, stockEntryFormSchema } from "@shared/schema";
+import { FarmerInfoSection } from "./farmer-info-section";
+import { LotCard } from "./lot-card";
+
+interface StockEntryFormProps {
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
+
+export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
+  const { toast } = useToast();
+  
+  const form = useForm<StockEntryFormType>({
+    resolver: zodResolver(stockEntryFormSchema),
+    defaultValues: {
+      purchaseDate: new Date().toISOString().split("T")[0],
+      farmerName: "",
+      farmerContact: "",
+      village: "",
+      tehsil: "",
+      district: "",
+      state: "",
+      remarks: "",
+      lots: [
+        {
+          coldStoreName: "",
+          originalBags: 0,
+          potatoType: "",
+          bagType: "",
+          quality: "",
+          cutType: "gate_cut",
+          size: "",
+          pricePerKg: undefined,
+          bagBreakdowns: [],
+        },
+      ],
+    },
+  });
+
+  const { fields: lotFields, append: appendLot, remove: removeLot } = useFieldArray({
+    control: form.control,
+    name: "lots",
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: StockEntryFormType) => {
+      const res = await apiRequest("POST", "/api/stock-entries", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Stock Entry Created",
+        description: "The stock entry has been saved successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      form.reset();
+      onSuccess?.();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddLot = () => {
+    appendLot({
+      coldStoreName: "",
+      originalBags: 0,
+      potatoType: "",
+      bagType: "",
+      quality: "",
+      cutType: "gate_cut",
+      size: "",
+      pricePerKg: undefined,
+      bagBreakdowns: [],
+    });
+  };
+
+  const onSubmit = (data: StockEntryFormType) => {
+    createMutation.mutate(data);
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FarmerInfoSection form={form} />
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Lots</h3>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddLot}
+              data-testid="button-add-lot"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add More Lot
+            </Button>
+          </div>
+
+          {lotFields.map((field, index) => (
+            <LotCard
+              key={field.id}
+              form={form}
+              lotIndex={index}
+              onRemove={() => removeLot(index)}
+              canRemove={lotFields.length > 1}
+            />
+          ))}
+        </div>
+
+        <Card className="border-border">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                <FileText className="h-4 w-4 text-primary" />
+              </div>
+              <CardTitle className="text-lg font-medium">Additional Information</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <FormField
+              control={form.control}
+              name="remarks"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Remarks</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Enter any additional remarks..." 
+                      className="resize-none"
+                      rows={3}
+                      {...field} 
+                      value={field.value || ""}
+                      data-testid="textarea-remarks"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              form.reset();
+              onCancel?.();
+            }}
+            data-testid="button-cancel"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={createMutation.isPending}
+            data-testid="button-save"
+          >
+            {createMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Entry
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
