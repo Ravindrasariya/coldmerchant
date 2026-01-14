@@ -17,8 +17,12 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  role: text("role").default("user"), // admin, user
+  name: text("name").notNull(),
+  mobileNumber: text("mobile_number"),
+  merchantId: integer("merchant_id").references(() => merchants.id),
+  isSystemAdmin: boolean("is_system_admin").default(false),
+  canEdit: boolean("can_edit").default(true),
+  mustChangePassword: boolean("must_change_password").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

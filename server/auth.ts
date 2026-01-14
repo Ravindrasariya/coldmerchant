@@ -92,8 +92,11 @@ export function setupAuth(app: Express) {
       const user = await storage.createUser({
         username,
         password: await hashPassword(password),
+        name: merchantName,
         merchantId: merchant.id,
-        role: "admin",
+        isSystemAdmin: false,
+        canEdit: true,
+        mustChangePassword: false,
       });
 
       req.login(user, (err) => {
@@ -121,11 +124,15 @@ export function setupAuth(app: Express) {
       req.login(user, async (err) => {
         if (err) return next(err);
         
-        // Get merchant name
-        const merchant = await storage.getMerchant(user.merchantId);
+        // Get merchant name if user has a merchant
+        let merchantName: string | undefined;
+        if (user.merchantId) {
+          const merchant = await storage.getMerchant(user.merchantId);
+          merchantName = merchant?.name;
+        }
         res.status(200).json({
           ...user,
-          merchantName: merchant?.name,
+          merchantName,
         });
       });
     })(req, res, next);
@@ -143,11 +150,15 @@ export function setupAuth(app: Express) {
       return res.sendStatus(401);
     }
     
-    // Get merchant name
-    const merchant = await storage.getMerchant(req.user.merchantId);
+    // Get merchant name if user has a merchant
+    let merchantName: string | undefined;
+    if (req.user.merchantId) {
+      const merchant = await storage.getMerchant(req.user.merchantId);
+      merchantName = merchant?.name;
+    }
     res.json({
       ...req.user,
-      merchantName: merchant?.name,
+      merchantName,
     });
   });
 }

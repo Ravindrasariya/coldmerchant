@@ -4,10 +4,26 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema } from "@shared/schema";
 
-// Middleware to ensure user is authenticated and get merchant ID
+// Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ message: "Unauthorized" });
+  }
+  next();
+}
+
+// Middleware to ensure user has a merchant (not a system admin without merchant)
+function requireMerchant(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated() || !req.user || !req.user.merchantId) {
+    return res.status(403).json({ message: "This action requires a merchant account" });
+  }
+  next();
+}
+
+// Middleware to ensure user is a system admin
+function requireSystemAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated() || !req.user || !req.user.isSystemAdmin) {
+    return res.status(403).json({ message: "Admin access required" });
   }
   next();
 }
@@ -21,9 +37,9 @@ export async function registerRoutes(
 
   // Stock Entries Routes
   // GET /api/stock-entries - Get all stock entries for the authenticated merchant
-  app.get("/api/stock-entries", requireAuth, async (req, res) => {
+  app.get("/api/stock-entries", requireMerchant, async (req, res) => {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.merchantId!;
       const entries = await storage.getStockEntriesByMerchant(merchantId);
       res.json(entries);
     } catch (error) {
@@ -33,9 +49,9 @@ export async function registerRoutes(
   });
 
   // GET /api/stock-entries/:id - Get a specific stock entry
-  app.get("/api/stock-entries/:id", requireAuth, async (req, res) => {
+  app.get("/api/stock-entries/:id", requireMerchant, async (req, res) => {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
       
       const entry = await storage.getStockEntryById(id, merchantId);
@@ -51,9 +67,9 @@ export async function registerRoutes(
   });
 
   // POST /api/stock-entries - Create a new stock entry
-  app.post("/api/stock-entries", requireAuth, async (req, res) => {
+  app.post("/api/stock-entries", requireMerchant, async (req, res) => {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.merchantId!;
       const validationResult = stockEntryFormSchema.safeParse(req.body);
       
       if (!validationResult.success) {
@@ -127,9 +143,9 @@ export async function registerRoutes(
   });
 
   // PATCH /api/stock-entries/:id - Update a stock entry
-  app.patch("/api/stock-entries/:id", requireAuth, async (req, res) => {
+  app.patch("/api/stock-entries/:id", requireMerchant, async (req, res) => {
     try {
-      const merchantId = req.user!.merchantId;
+      const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
       const { paymentStatus, remarks, lots } = req.body;
 
