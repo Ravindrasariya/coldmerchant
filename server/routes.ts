@@ -896,6 +896,7 @@ export async function registerRoutes(
       let newTotalBags = 0;
       let newTotalNetWeight = 0;
       let newTotalCostOfGoods = 0;
+      let newTotalRevenue = 0;
       
       // Process item changes
       for (const itemChange of items) {
@@ -917,9 +918,11 @@ export async function registerRoutes(
           // Update bag count and/or weight
           const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
           const existingNetWeight = parseFloat(existingItem?.netWeight || "0");
+          const existingRevenue = parseFloat(existingItem?.revenue || "0");
           const hasChanges = existingItem && (
             itemChange.bagsMoved !== existingItem.bagsMoved || 
-            (typeof itemChange.netWeight === 'number' && itemChange.netWeight !== existingNetWeight)
+            (typeof itemChange.netWeight === 'number' && itemChange.netWeight !== existingNetWeight) ||
+            (typeof itemChange.revenue === 'number' && itemChange.revenue !== existingRevenue)
           );
           
           if (existingItem && hasChanges) {
@@ -955,10 +958,13 @@ export async function registerRoutes(
                   : itemChange.bagsMoved * 50);
             const newCostOfGoods = newNetWeight * pricePerKg;
             
+            const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
+            
             await storage.updateTransactionItem(itemChange.id, merchantId, {
               bagsMoved: itemChange.bagsMoved,
               netWeight: newNetWeight.toString(),
-              costOfGoods: newCostOfGoods.toString()
+              costOfGoods: newCostOfGoods.toString(),
+              revenue: itemRevenue.toString()
             });
             
             const changeDetails: string[] = [];
@@ -978,11 +984,13 @@ export async function registerRoutes(
             newTotalBags += itemChange.bagsMoved;
             newTotalNetWeight += newNetWeight;
             newTotalCostOfGoods += newCostOfGoods;
+            newTotalRevenue += itemRevenue;
           } else if (existingItem) {
             // No change, keep existing values
             newTotalBags += existingItem.bagsMoved;
             newTotalNetWeight += parseFloat(existingItem.netWeight || "0");
             newTotalCostOfGoods += parseFloat(existingItem.costOfGoods || "0");
+            newTotalRevenue += parseFloat(existingItem.revenue || "0");
           }
         } else if (itemChange.action === 'add' && itemChange.inventoryKey) {
           // Add new item from inventory
@@ -1026,6 +1034,9 @@ export async function registerRoutes(
             : itemChange.bagsMoved * 50; // Default 50kg per bag
           const costOfGoods = netWeight * pricePerKg;
           
+          // Use provided revenue if given, default to 0
+          const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : 0;
+          
           // Create the transaction item
           const newItem = await storage.addTransactionItem({
             transactionId,
@@ -1039,7 +1050,8 @@ export async function registerRoutes(
             bagsMoved: itemChange.bagsMoved,
             netWeight: netWeight.toString(),
             pricePerKgSnapshot: pricePerKg.toString(),
-            costOfGoods: costOfGoods.toString()
+            costOfGoods: costOfGoods.toString(),
+            revenue: itemRevenue.toString()
           });
           
           changes.push({
@@ -1051,28 +1063,45 @@ export async function registerRoutes(
           newTotalBags += itemChange.bagsMoved;
           newTotalNetWeight += netWeight;
           newTotalCostOfGoods += costOfGoods;
+          newTotalRevenue += itemRevenue;
         } else if (itemChange.action === 'keep' && itemChange.id) {
-          // Keep existing item unchanged
+          // Keep existing item - but check if revenue was updated
           const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
           if (existingItem) {
+            const existingRevenue = parseFloat(existingItem.revenue || "0");
+            const newItemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
+            
+            // Update revenue if changed
+            if (typeof itemChange.revenue === 'number' && itemChange.revenue !== existingRevenue) {
+              await storage.updateTransactionItem(itemChange.id, merchantId, {
+                revenue: newItemRevenue.toString()
+              });
+              changes.push({
+                field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_revenue`,
+                oldValue: `₹${existingRevenue.toFixed(0)}`,
+                newValue: `₹${newItemRevenue.toFixed(0)}`
+              });
+            }
+            
             newTotalBags += existingItem.bagsMoved;
             newTotalNetWeight += parseFloat(existingItem.netWeight || "0");
             newTotalCostOfGoods += parseFloat(existingItem.costOfGoods || "0");
+            newTotalRevenue += newItemRevenue;
           }
         }
       }
       
-      // Recalculate profit/loss
-      const revenue = parseFloat(existingTxn.revenue || "0");
+      // Recalculate profit/loss using aggregated item revenues
       const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
       const otherCharges = parseFloat(existingTxn.otherCharges || "0");
-      const newProfitLoss = revenue - newTotalCostOfGoods - transportationCharges - otherCharges;
+      const newProfitLoss = newTotalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges;
       
-      // Update transaction totals
+      // Update transaction totals with aggregated revenue
       await storage.updateTransaction(transactionId, merchantId, {
         totalBags: newTotalBags,
         totalNetWeight: newTotalNetWeight.toString(),
         totalCostOfGoods: newTotalCostOfGoods.toString(),
+        revenue: newTotalRevenue.toString(),
         profitLoss: newProfitLoss.toString()
       });
       
