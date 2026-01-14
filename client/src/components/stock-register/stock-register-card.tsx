@@ -469,25 +469,15 @@ export function StockRegisterCard() {
                   
                   {entryTotalAmount > 0 && (
                     <div className="mt-3 pt-3 border-t text-sm">
-                      <div className="flex flex-col gap-0.5">
-                        <div>
-                          <span className="text-muted-foreground">{t("Total Farmer Amount:", "किसान की कुल राशि:")}</span>{" "}
-                          <span className="font-semibold text-orange-600 dark:text-orange-400">₹{entryTotalAmount.toFixed(0)}</span>
-                        </div>
-                        {farmerAmountPaid > 0 && (
-                          <div>
-                            <span className="text-muted-foreground">{t("Farmer Paid:", "किसान भुगतान:")}</span>{" "}
-                            <span className="font-medium text-green-600 dark:text-green-400">₹{farmerAmountPaid.toFixed(0)}</span>
-                            {farmerRemainingDue > 0 && (
-                              <>
-                                <span className="text-muted-foreground"> | </span>
-                                <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
-                                <span className="font-semibold text-orange-600 dark:text-orange-400">₹{farmerRemainingDue.toFixed(0)}</span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <span className="text-muted-foreground">{t("Total Farmer Amount:", "किसान की कुल राशि:")}</span>{" "}
+                      <span className="font-semibold text-orange-600 dark:text-orange-400">₹{entryTotalAmount.toFixed(0)}</span>
+                      {farmerRemainingDue > 0 && (
+                        <>
+                          <span className="text-muted-foreground ml-2">|</span>
+                          <span className="text-muted-foreground ml-2">{t("Remaining Due:", "शेष बाकी:")}</span>{" "}
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">₹{farmerRemainingDue.toFixed(0)}</span>
+                        </>
+                      )}
                     </div>
                   )}
                 </CardHeader>
