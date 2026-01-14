@@ -338,8 +338,8 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   const revenue = parseFloat(transaction.revenue || "0");
   const profitLoss = parseFloat(transaction.profitLoss || "0");
   
-  // Get unique bag sizes from transaction items
-  const bagTypes = Array.from(new Set(transaction.items.map(item => item.size).filter(Boolean))) as string[];
+  // Get unique potato types from transaction items (Wafer, Ration, Seed)
+  const bagTypes = Array.from(new Set(transaction.items.map(item => item.potatoType).filter(Boolean))) as string[];
 
   return (
     <Card className="hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
