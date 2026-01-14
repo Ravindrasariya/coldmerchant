@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Trash2 } from "lucide-react";
 import { StockEntryForm, SIZE_OPTIONS } from "@shared/schema";
+import { useLanguage } from "@/hooks/use-language";
 
 interface BagBreakdownRowProps {
   form: UseFormReturn<StockEntryForm>;
@@ -26,6 +27,7 @@ interface BagBreakdownRowProps {
 }
 
 export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: BagBreakdownRowProps) {
+  const { t } = useLanguage();
   const weight = form.watch(`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.weight`) || 0;
   const pricePerKg = form.watch(`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.pricePerKg`) || 0;
   const totalAmount = weight * pricePerKg;
@@ -37,11 +39,11 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
         name={`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.size`}
         render={({ field }) => (
           <FormItem className="col-span-1">
-            <FormLabel className="md:hidden text-xs">Size</FormLabel>
+            <FormLabel className="md:hidden text-xs">{t("Size", "आकार")}</FormLabel>
             <Select onValueChange={field.onChange} value={field.value}>
               <FormControl>
                 <SelectTrigger data-testid={`select-breakdown-size-${lotIndex}-${breakdownIndex}`}>
-                  <SelectValue placeholder="Size" />
+                  <SelectValue placeholder={t("Size", "आकार")} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -62,7 +64,7 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
         name={`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.numberOfBags`}
         render={({ field }) => (
           <FormItem className="col-span-1">
-            <FormLabel className="md:hidden text-xs"># Bags</FormLabel>
+            <FormLabel className="md:hidden text-xs">{t("# Bags", "बोरी")}</FormLabel>
             <FormControl>
               <Input 
                 type="text"
@@ -87,7 +89,7 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
         name={`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.weight`}
         render={({ field }) => (
           <FormItem className="col-span-1">
-            <FormLabel className="md:hidden text-xs">Weight</FormLabel>
+            <FormLabel className="md:hidden text-xs">{t("Weight", "वजन")}</FormLabel>
             <FormControl>
               <Input 
                 type="text"
@@ -112,7 +114,7 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
         name={`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.pricePerKg`}
         render={({ field }) => (
           <FormItem className="col-span-1">
-            <FormLabel className="md:hidden text-xs">Price/kg</FormLabel>
+            <FormLabel className="md:hidden text-xs">{t("Price/kg", "मूल्य/किलो")}</FormLabel>
             <FormControl>
               <Input 
                 type="text"
@@ -134,7 +136,7 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
 
       <div className="col-span-1 flex items-center">
         <div className="flex-1">
-          <p className="md:hidden text-xs text-muted-foreground mb-1">Total</p>
+          <p className="md:hidden text-xs text-muted-foreground mb-1">{t("Total", "कुल")}</p>
           <p className="font-mono text-sm font-medium" data-testid={`text-breakdown-total-${lotIndex}-${breakdownIndex}`}>
             {totalAmount > 0 ? `₹${totalAmount.toFixed(2)}` : "—"}
           </p>

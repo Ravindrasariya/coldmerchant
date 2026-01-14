@@ -18,12 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Filter, Edit, Printer, Package, X } from "lucide-react";
-import { QUALITY_OPTIONS, PAYMENT_STATUS } from "@shared/schema";
+import { QUALITY_OPTIONS } from "@shared/schema";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
+import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryWithLots {
   id: number;
@@ -48,6 +49,7 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
       size: string;
@@ -60,6 +62,7 @@ interface StockEntryWithLots {
 }
 
 export function StockRegisterTable() {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
@@ -133,7 +136,7 @@ export function StockRegisterTable() {
     return (
       <Card>
         <CardContent className="py-10 text-center">
-          <p className="text-destructive">Error loading stock entries</p>
+          <p className="text-destructive">{t("Error loading stock entries", "स्टॉक एंट्री लोड करने में त्रुटि")}</p>
         </CardContent>
       </Card>
     );
@@ -147,7 +150,7 @@ export function StockRegisterTable() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by farmer name, serial # or cold store..."
+                placeholder={t("Search by farmer name, serial # or cold store...", "किसान का नाम, क्रमांक या कोल्ड स्टोर द्वारा खोजें...")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -156,7 +159,7 @@ export function StockRegisterTable() {
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Filters:</span>
+              <span className="text-sm text-muted-foreground">{t("Filters:", "फ़िल्टर:")}</span>
             </div>
           </div>
         </CardHeader>
@@ -164,17 +167,17 @@ export function StockRegisterTable() {
           <div className="flex flex-wrap gap-3">
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
               <SelectTrigger className="w-[140px]" data-testid="filter-payment-status">
-                <SelectValue placeholder="Payment" />
+                <SelectValue placeholder={t("Payment", "भुगतान")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="due">Due</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="due">{t("Due", "बाकी")}</SelectItem>
+                <SelectItem value="paid">{t("Paid", "भुगतान हो गया")}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select value={filterQuality} onValueChange={setFilterQuality}>
               <SelectTrigger className="w-[130px]" data-testid="filter-quality">
-                <SelectValue placeholder="Quality" />
+                <SelectValue placeholder={t("Quality", "गुणवत्ता")} />
               </SelectTrigger>
               <SelectContent>
                 {QUALITY_OPTIONS.map((quality) => (
@@ -187,7 +190,7 @@ export function StockRegisterTable() {
 
             <Select value={filterColdStore} onValueChange={setFilterColdStore}>
               <SelectTrigger className="w-[160px]" data-testid="filter-cold-store">
-                <SelectValue placeholder="Cold Store" />
+                <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
               </SelectTrigger>
               <SelectContent>
                 {coldStores.map((store) => (
@@ -204,7 +207,7 @@ export function StockRegisterTable() {
               onClick={() => setFilterUnsold(!filterUnsold)}
               data-testid="filter-unsold"
             >
-              Unsold Only
+              {t("Unsold Only", "केवल बिना बिके")}
             </Button>
 
             {hasActiveFilters && (
@@ -215,7 +218,7 @@ export function StockRegisterTable() {
                 data-testid="button-clear-filters"
               >
                 <X className="h-4 w-4 mr-1" />
-                Clear
+                {t("Clear", "साफ़ करें")}
               </Button>
             )}
           </div>
@@ -233,9 +236,9 @@ export function StockRegisterTable() {
           ) : filteredEntries.length === 0 ? (
             <div className="py-16 text-center">
               <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <p className="text-lg font-medium text-muted-foreground">No stock entries found</p>
+              <p className="text-lg font-medium text-muted-foreground">{t("No stock entries found", "कोई स्टॉक एंट्री नहीं मिली")}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {hasActiveFilters ? "Try adjusting your filters" : "Create your first stock entry to get started"}
+                {hasActiveFilters ? t("Try adjusting your filters", "अपने फ़िल्टर समायोजित करने का प्रयास करें") : t("Create your first stock entry to get started", "शुरू करने के लिए अपनी पहली स्टॉक एंट्री बनाएं")}
               </p>
             </div>
           ) : (
@@ -243,14 +246,14 @@ export function StockRegisterTable() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
-                    <TableHead className="w-[80px] text-xs uppercase font-semibold tracking-wide">Serial #</TableHead>
-                    <TableHead className="text-xs uppercase font-semibold tracking-wide">Date</TableHead>
-                    <TableHead className="text-xs uppercase font-semibold tracking-wide">Farmer</TableHead>
-                    <TableHead className="text-xs uppercase font-semibold tracking-wide">Cold Store</TableHead>
-                    <TableHead className="text-xs uppercase font-semibold tracking-wide text-right">Bags</TableHead>
-                    <TableHead className="text-xs uppercase font-semibold tracking-wide">Quality</TableHead>
-                    <TableHead className="text-xs uppercase font-semibold tracking-wide">Payment</TableHead>
-                    <TableHead className="w-[100px] text-xs uppercase font-semibold tracking-wide text-right">Actions</TableHead>
+                    <TableHead className="w-[80px] text-xs uppercase font-semibold tracking-wide">{t("Serial #", "क्रमांक")}</TableHead>
+                    <TableHead className="text-xs uppercase font-semibold tracking-wide">{t("Date", "तिथि")}</TableHead>
+                    <TableHead className="text-xs uppercase font-semibold tracking-wide">{t("Farmer", "किसान")}</TableHead>
+                    <TableHead className="text-xs uppercase font-semibold tracking-wide">{t("Cold Store", "कोल्ड स्टोर")}</TableHead>
+                    <TableHead className="text-xs uppercase font-semibold tracking-wide text-right">{t("Bags", "बोरी")}</TableHead>
+                    <TableHead className="text-xs uppercase font-semibold tracking-wide">{t("Quality", "गुणवत्ता")}</TableHead>
+                    <TableHead className="text-xs uppercase font-semibold tracking-wide">{t("Payment", "भुगतान")}</TableHead>
+                    <TableHead className="w-[100px] text-xs uppercase font-semibold tracking-wide text-right">{t("Actions", "कार्रवाई")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -258,7 +261,7 @@ export function StockRegisterTable() {
                     const totalOriginalBags = entry.lots.reduce((sum, lot) => sum + lot.originalBags, 0);
                     const totalRemainingBags = entry.lots.reduce((sum, lot) => sum + lot.remainingBags, 0);
                     const qualities = Array.from(new Set(entry.lots.map(lot => lot.quality)));
-                    const coldStores = Array.from(new Set(entry.lots.map(lot => lot.coldStoreName)));
+                    const coldStoresList = Array.from(new Set(entry.lots.map(lot => lot.coldStoreName)));
 
                     return (
                       <TableRow key={entry.id} className="hover-elevate" data-testid={`row-entry-${entry.id}`}>
@@ -282,7 +285,7 @@ export function StockRegisterTable() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {coldStores.map((store, i) => (
+                            {coldStoresList.map((store, i) => (
                               <Badge key={i} variant="outline" className="text-xs">
                                 {store}
                               </Badge>
@@ -315,7 +318,7 @@ export function StockRegisterTable() {
                             variant={entry.paymentStatus === "paid" ? "default" : "outline"}
                             className={entry.paymentStatus === "paid" ? "bg-green-600" : "border-orange-500 text-orange-600"}
                           >
-                            {entry.paymentStatus === "paid" ? "Paid" : "Due"}
+                            {entry.paymentStatus === "paid" ? t("Paid", "भुगतान हो गया") : t("Due", "बाकी")}
                           </Badge>
                         </TableCell>
                         <TableCell>

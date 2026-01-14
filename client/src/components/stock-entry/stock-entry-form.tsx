@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { StockEntryForm as StockEntryFormType, stockEntryFormSchema } from "@shared/schema";
 import { FarmerInfoSection } from "./farmer-info-section";
 import { LotCard } from "./lot-card";
+import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryFormProps {
   onSuccess?: () => void;
@@ -17,6 +18,7 @@ interface StockEntryFormProps {
 
 export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   
   const form = useForm<StockEntryFormType>({
     resolver: zodResolver(stockEntryFormSchema),
@@ -58,8 +60,8 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
     },
     onSuccess: () => {
       toast({
-        title: "Stock Entry Created",
-        description: "The stock entry has been saved successfully.",
+        title: t("Stock Entry Created", "स्टॉक एंट्री बनाई गई"),
+        description: t("The stock entry has been saved successfully.", "स्टॉक एंट्री सफलतापूर्वक सहेजी गई।"),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       form.reset();
@@ -67,7 +69,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("Error", "त्रुटि"),
         description: error.message,
         variant: "destructive",
       });
@@ -99,7 +101,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
         <FarmerInfoSection form={form} />
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">Lots</h3>
+          <h3 className="text-lg font-medium">{t("Lots", "लॉट")}</h3>
 
           {lotFields.map((field, index) => (
             <LotCard
@@ -119,7 +121,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
             data-testid="button-add-lot"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add More Lot
+            {t("Add More Lot", "और लॉट जोड़ें")}
           </Button>
         </div>
 
@@ -134,7 +136,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
             data-testid="button-cancel"
           >
             <X className="h-4 w-4 mr-2" />
-            Cancel
+            {t("Cancel", "रद्द करें")}
           </Button>
           <Button
             type="submit"
@@ -146,7 +148,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
-            Save Entry
+            {t("Save Entry", "एंट्री सहेजें")}
           </Button>
         </div>
       </form>

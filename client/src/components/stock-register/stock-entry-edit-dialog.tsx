@@ -22,7 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Save, Loader2, Plus, Trash2, Package } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { SIZE_OPTIONS, PAYMENT_STATUS } from "@shared/schema";
+import { SIZE_OPTIONS } from "@shared/schema";
+import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryWithLots {
   id: number;
@@ -47,6 +48,7 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
       size: string;
@@ -66,6 +68,7 @@ interface StockEntryEditDialogProps {
 
 export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEditDialogProps) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus);
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [lots, setLots] = useState(entry.lots.map(lot => ({
@@ -84,15 +87,15 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     },
     onSuccess: () => {
       toast({
-        title: "Entry Updated",
-        description: "The stock entry has been updated successfully.",
+        title: t("Entry Updated", "एंट्री अपडेट हो गई"),
+        description: t("The stock entry has been updated successfully.", "स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
+        title: t("Error", "त्रुटि"),
         description: error.message,
         variant: "destructive",
       });
@@ -139,27 +142,27 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="font-mono text-primary">#{entry.serialNumber}</span>
-            <span>Edit Stock Entry</span>
+            <span>{t("Edit Stock Entry", "स्टॉक एंट्री संपादित करें")}</span>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Farmer Details</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("Farmer Details", "किसान विवरण")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground text-xs">Name</p>
+                  <p className="text-muted-foreground text-xs">{t("Name", "नाम")}</p>
                   <p className="font-medium">{entry.farmerName}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Contact</p>
+                  <p className="text-muted-foreground text-xs">{t("Contact", "संपर्क")}</p>
                   <p className="font-medium">{entry.farmerContact || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Date</p>
+                  <p className="text-muted-foreground text-xs">{t("Date", "तिथि")}</p>
                   <p className="font-medium">
                     {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
                       day: "2-digit",
@@ -169,15 +172,15 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Village</p>
+                  <p className="text-muted-foreground text-xs">{t("Village", "गाँव")}</p>
                   <p className="font-medium">{entry.village || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">District</p>
+                  <p className="text-muted-foreground text-xs">{t("District", "जिला")}</p>
                   <p className="font-medium">{entry.district}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">State</p>
+                  <p className="text-muted-foreground text-xs">{t("State", "राज्य")}</p>
                   <p className="font-medium">{entry.state}</p>
                 </div>
               </div>
@@ -186,24 +189,24 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Payment Status</Label>
+              <Label>{t("Payment Status", "भुगतान स्थिति")}</Label>
               <Select value={paymentStatus} onValueChange={setPaymentStatus}>
                 <SelectTrigger data-testid="edit-payment-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="due">Due</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="due">{t("Due", "बाकी")}</SelectItem>
+                  <SelectItem value="paid">{t("Paid", "भुगतान हो गया")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Remarks</Label>
+              <Label>{t("Remarks", "टिप्पणी")}</Label>
               <Textarea
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Enter remarks..."
+                placeholder={t("Enter remarks...", "टिप्पणी दर्ज करें...")}
                 className="resize-none"
                 rows={2}
                 data-testid="edit-remarks"
@@ -212,7 +215,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           </div>
 
           <div className="space-y-4">
-            <h4 className="font-medium">Lots</h4>
+            <h4 className="font-medium">{t("Lots", "लॉट")}</h4>
             {lots.map((lot, lotIndex) => (
               <Card key={lot.id || lotIndex} className="border-border">
                 <CardHeader className="pb-3">
@@ -228,7 +231,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <span className="font-mono font-medium">{lot.remainingBags}</span>
-                      <span>/{lot.originalBags} bags</span>
+                      <span>/{lot.originalBags} {t("bags", "बोरी")}</span>
                     </div>
                   </div>
                 </CardHeader>
@@ -237,7 +240,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   <CardContent className="pt-0">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">Bag Breakdown</p>
+                        <p className="text-sm text-muted-foreground">{t("Bag Breakdown", "बोरी विवरण")}</p>
                         <Button
                           type="button"
                           variant="outline"
@@ -246,18 +249,18 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           data-testid={`edit-add-breakdown-${lotIndex}`}
                         >
                           <Plus className="h-3 w-3 mr-1" />
-                          Add Row
+                          {t("Add Row", "पंक्ति जोड़ें")}
                         </Button>
                       </div>
 
                       {lot.bagBreakdowns.length > 0 && (
                         <div className="space-y-2">
                           <div className="hidden md:grid md:grid-cols-6 gap-3 px-2 text-xs font-semibold text-muted-foreground uppercase">
-                            <div>Size</div>
-                            <div># Bags</div>
-                            <div>Weight</div>
-                            <div>Price/kg</div>
-                            <div>Total</div>
+                            <div>{t("Size", "आकार")}</div>
+                            <div>{t("# Bags", "बोरी")}</div>
+                            <div>{t("Weight", "वजन")}</div>
+                            <div>{t("Price/kg", "मूल्य/किलो")}</div>
+                            <div>{t("Total", "कुल")}</div>
                             <div></div>
                           </div>
                           {lot.bagBreakdowns.map((bd, bdIndex) => {
@@ -269,7 +272,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   onValueChange={(v) => handleBreakdownChange(lotIndex, bdIndex, "size", v)}
                                 >
                                   <SelectTrigger className="h-8" data-testid={`edit-breakdown-size-${lotIndex}-${bdIndex}`}>
-                                    <SelectValue placeholder="Size" />
+                                    <SelectValue placeholder={t("Size", "आकार")} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {SIZE_OPTIONS.map((size) => (
@@ -334,7 +337,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
                       {lot.bagBreakdowns.length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                          No breakdown rows. Click "Add Row" to add breakdown details.
+                          {t("No breakdown rows. Click \"Add Row\" to add breakdown details.", "कोई विवरण पंक्ति नहीं। विवरण जोड़ने के लिए \"पंक्ति जोड़ें\" पर क्लिक करें।")}
                         </p>
                       )}
                     </div>
@@ -347,7 +350,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="edit-cancel">
-            Cancel
+            {t("Cancel", "रद्द करें")}
           </Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="edit-save">
             {updateMutation.isPending ? (
@@ -355,7 +358,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
-            Save Changes
+            {t("Save Changes", "बदलाव सहेजें")}
           </Button>
         </div>
       </DialogContent>

@@ -17,12 +17,15 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User } from "lucide-react";
 import { StockEntryForm, DISTRICTS, STATES } from "@shared/schema";
+import { useLanguage } from "@/hooks/use-language";
 
 interface FarmerInfoSectionProps {
   form: UseFormReturn<StockEntryForm>;
 }
 
 export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
+  const { t } = useLanguage();
+
   return (
     <Card className="border-border">
       <CardHeader className="pb-4">
@@ -30,7 +33,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
             <User className="h-4 w-4 text-primary" />
           </div>
-          <CardTitle className="text-lg font-medium">Farmer Information</CardTitle>
+          <CardTitle className="text-lg font-medium">{t("Farmer Information", "किसान जानकारी")}</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -40,7 +43,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="purchaseDate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Purchase Date *</FormLabel>
+                <FormLabel>{t("Purchase Date", "खरीद तिथि")} *</FormLabel>
                 <FormControl>
                   <Input 
                     type="date" 
@@ -58,10 +61,10 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="farmerName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Farmer Name *</FormLabel>
+                <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
                 <FormControl>
                   <Input 
-                    placeholder="Enter farmer name" 
+                    placeholder={t("Enter farmer name", "किसान का नाम दर्ज करें")} 
                     {...field} 
                     data-testid="input-farmer-name"
                   />
@@ -76,10 +79,10 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="farmerContact"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Contact Number</FormLabel>
+                <FormLabel>{t("Contact Number", "संपर्क नंबर")}</FormLabel>
                 <FormControl>
                   <Input 
-                    placeholder="Enter contact number" 
+                    placeholder={t("Enter contact number", "संपर्क नंबर दर्ज करें")} 
                     {...field} 
                     value={field.value || ""}
                     data-testid="input-farmer-contact"
@@ -95,10 +98,10 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="village"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Village</FormLabel>
+                <FormLabel>{t("Village", "गाँव")}</FormLabel>
                 <FormControl>
                   <Input 
-                    placeholder="Enter village" 
+                    placeholder={t("Enter village", "गाँव दर्ज करें")} 
                     {...field} 
                     value={field.value || ""}
                     data-testid="input-village"
@@ -114,10 +117,10 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="tehsil"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Tehsil</FormLabel>
+                <FormLabel>{t("Tehsil", "तहसील")}</FormLabel>
                 <FormControl>
                   <Input 
-                    placeholder="Enter tehsil" 
+                    placeholder={t("Enter tehsil", "तहसील दर्ज करें")} 
                     {...field} 
                     value={field.value || ""}
                     data-testid="input-tehsil"
@@ -133,11 +136,11 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="district"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>District *</FormLabel>
+                <FormLabel>{t("District", "जिला")} *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger data-testid="select-district">
-                      <SelectValue placeholder="Select district" />
+                      <SelectValue placeholder={t("Select district", "जिला चुनें")} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -158,11 +161,11 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="state"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>State *</FormLabel>
+                <FormLabel>{t("State", "राज्य")} *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger data-testid="select-state">
-                      <SelectValue placeholder="Select state" />
+                      <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
