@@ -139,6 +139,7 @@ export function CashManagementTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });

@@ -14,7 +14,7 @@ import {
   type ColdStoreChargeAllocation, type InsertColdStoreChargeAllocation
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, gt, ne } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -621,9 +621,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]> {
-    // Get stock entries with payment status "due" and calculate total cost from lots
+    // Get stock entries with payment status "due" or "partial" 
     const entries = await db.select().from(stockEntries)
-      .where(and(eq(stockEntries.merchantId, merchantId), eq(stockEntries.paymentStatus, "due")));
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
+      ));
     
     // Group by farmerName and calculate total due from lots
     const farmerMap = new Map<string, { village: string | null; totalDue: number; entryCount: number }>();
@@ -633,7 +636,7 @@ export class DatabaseStorage implements IStorage {
       const entryLots = await db.select().from(lots)
         .where(eq(lots.stockEntryId, entry.id));
       
-      let entryTotalDue = 0;
+      let entryTotalCost = 0;
       for (const lot of entryLots) {
         // Get breakdowns to calculate total weight and cost
         const breakdownList = await db.select().from(bagBreakdowns)
@@ -641,21 +644,27 @@ export class DatabaseStorage implements IStorage {
         
         if (breakdownList.length > 0) {
           // Sum up total amount from breakdowns
-          entryTotalDue += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+          entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
         } else if (lot.pricePerKg) {
           // Estimate from lot's pricePerKg and bags (approx 50kg per bag)
-          entryTotalDue += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+          entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
         }
       }
       
+      // Calculate due by subtracting amount already paid
+      const amountPaid = parseFloat(entry.amountPaid || "0");
+      const entryDue = Math.max(0, entryTotalCost - amountPaid);
+      
+      if (entryDue <= 0) continue; // Skip fully paid entries
+      
       const existing = farmerMap.get(entry.farmerName);
       if (existing) {
-        existing.totalDue += entryTotalDue;
+        existing.totalDue += entryDue;
         existing.entryCount += 1;
       } else {
         farmerMap.set(entry.farmerName, {
           village: entry.village,
-          totalDue: entryTotalDue,
+          totalDue: entryDue,
           entryCount: 1,
         });
       }
@@ -779,6 +788,62 @@ export class DatabaseStorage implements IStorage {
           await tx.update(transactions)
             .set({ amountReceived: newReceived.toString() })
             .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, entry.merchantId)));
+          
+          remainingAmount -= toApply;
+        }
+      }
+      
+      // If this is a farmer payment, apply FIFO to stock entries
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
+        let remainingAmount = parseFloat(entry.amount);
+        
+        // Get stock entries for this farmer with due amount (FIFO order by createdAt)
+        const farmerEntries = await tx.select().from(stockEntries)
+          .where(and(
+            eq(stockEntries.merchantId, entry.merchantId),
+            eq(stockEntries.farmerName, entry.farmerName),
+            or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
+          ))
+          .orderBy(asc(stockEntries.createdAt));
+        
+        for (const stockEntry of farmerEntries) {
+          if (remainingAmount <= 0) break;
+          
+          // Calculate total cost for this entry from lots and breakdowns
+          const entryLots = await tx.select().from(lots)
+            .where(eq(lots.stockEntryId, stockEntry.id));
+          
+          let entryTotalCost = 0;
+          for (const lot of entryLots) {
+            const breakdownList = await tx.select().from(bagBreakdowns)
+              .where(eq(bagBreakdowns.lotId, lot.id));
+            
+            if (breakdownList.length > 0) {
+              entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+            } else if (lot.pricePerKg) {
+              entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+            }
+          }
+          
+          const currentPaid = parseFloat(stockEntry.amountPaid || "0");
+          const due = entryTotalCost - currentPaid;
+          
+          if (due <= 0) continue;
+          
+          // Calculate how much to apply to this stock entry
+          const toApply = Math.min(remainingAmount, due);
+          
+          // Update stock entry's amountPaid and paymentStatus
+          const newPaid = currentPaid + toApply;
+          const newDue = entryTotalCost - newPaid;
+          const newStatus = newDue <= 0 ? "paid" : "partial";
+          
+          await tx.update(stockEntries)
+            .set({ 
+              amountPaid: newPaid.toString(),
+              paymentStatus: newStatus
+            })
+            .where(and(eq(stockEntries.id, stockEntry.id), eq(stockEntries.merchantId, entry.merchantId)));
           
           remainingAmount -= toApply;
         }
