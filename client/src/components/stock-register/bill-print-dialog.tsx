@@ -135,7 +135,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
             <div>
               <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0;">${lot.coldStoreName}</p>
               <p style="font-size: 11px; color: #666; margin: 0;">
-                ${lot.potatoType} • ${lot.bagType} • ${lot.quality} Quality / गुणवत्ता • ${lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
+                ${lot.potatoType} • ${lot.bagType} • ${lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
               </p>
             </div>
             <div style="text-align: right;">
@@ -297,7 +297,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                     <div>
                       <p className="font-semibold">{lot.coldStoreName}</p>
                       <p className="text-xs text-gray-600">
-                        {lot.potatoType} • {lot.bagType} • {lot.quality} Quality / गुणवत्ता • {lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
+                        {lot.potatoType} • {lot.bagType} • {lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
                       </p>
                     </div>
                     <div className="text-right text-sm">
