@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar } from "lucide-react";
+import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake } from "lucide-react";
 import { QUALITY_OPTIONS } from "@shared/schema";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
@@ -348,304 +348,242 @@ export function StockRegisterCard() {
             const isColdStorePaid = coldStoreRemainingDue <= 0 && entryColdStoreTotalCharges > 0;
 
             return (
-              <Card key={entry.id} className="border-border hover-elevate" data-testid={`card-entry-${entry.id}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-lg font-bold text-primary" data-testid={`text-serial-${entry.id}`}>
-                        #{entry.serialNumber}
-                      </span>
-                      <span className="font-semibold text-lg" data-testid={`text-farmer-${entry.id}`}>
-                        {entry.farmerName}
-                      </span>
+              <Card key={entry.id} className="border-border/60 shadow-sm hover-elevate" data-testid={`card-entry-${entry.id}`}>
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                        <span className="font-semibold text-base" data-testid={`text-farmer-${entry.id}`}>
+                          {entry.farmerName}
+                        </span>
+                        
+                        {potatoTypes.map((type, i) => (
+                          <Badge 
+                            key={i} 
+                            className="text-[11px] px-2 py-0.5 font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0"
+                          >
+                            {type}
+                          </Badge>
+                        ))}
+                        
+                        {entry.lots.map((lot, i) => (
+                          lot.size && lot.cutType === "gate_cut" && (
+                            <Badge 
+                              key={`size-${i}`}
+                              className="text-[11px] px-2 py-0.5 font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300 border-0"
+                            >
+                              {lot.size}
+                            </Badge>
+                          )
+                        ))}
+                        
+                        {(farmerRemainingDue > 0 || coldStoreRemainingDue > 0) && (
+                          <Badge 
+                            variant="outline"
+                            className="text-[11px] px-2 py-0.5 font-medium border-orange-400 text-orange-600 dark:border-orange-500 dark:text-orange-400 gap-1"
+                          >
+                            <Clock className="h-3 w-3" />
+                            {t("Due", "बाकी")}
+                          </Badge>
+                        )}
+                      </div>
                       
-                      {potatoTypes.map((type, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs">
-                          {type}
-                        </Badge>
-                      ))}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+                        <div className="flex items-center gap-1" data-testid={`text-serial-${entry.id}`}>
+                          <Package className="h-3.5 w-3.5" />
+                          <span>{t("Lot No:", "लॉट नंबर:")} <span className="font-medium text-foreground">{entry.serialNumber}</span></span>
+                        </div>
+                        {entry.farmerContact && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3.5 w-3.5" />
+                            <span>{entry.farmerContact}</span>
+                          </div>
+                        )}
+                        {entry.village && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            <span>{entry.village}, {entry.tehsil ? `${entry.tehsil}, ` : ""}{entry.district}</span>
+                          </div>
+                        )}
+                      </div>
                       
-                      {entryTotalAmount > 0 && (
-                        <Badge 
-                          variant={isFarmerPaid ? "default" : "outline"}
-                          className={
-                            isFarmerPaid ? "bg-green-600" : 
-                            farmerAmountPaid > 0 ? "border-blue-500 text-blue-600" : 
-                            "border-orange-500 text-orange-600"
-                          }
-                        >
-                          {isFarmerPaid ? t("Farmer Paid", "किसान भुगतान") : t("Farmer Due", "किसान बाकी")}
-                        </Badge>
-                      )}
-                      
-                      {entryColdStoreTotalCharges > 0 && (
-                        <Badge 
-                          variant={isColdStorePaid ? "default" : "outline"}
-                          className={
-                            isColdStorePaid ? "bg-green-600" : 
-                            entryColdStorePaid > 0 ? "border-purple-500 text-purple-600" : 
-                            "border-violet-500 text-violet-600"
-                          }
-                        >
-                          {isColdStorePaid ? t("Cold Paid", "कोल्ड भुगतान") : t("Cold Due", "कोल्ड बाकी")}
-                        </Badge>
-                      )}
-                      
-                      <Badge 
-                        variant="outline"
-                        className={
-                          entryStatus === 'sold' ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-900/20" :
-                          entryStatus === 'partial' ? "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-900/20" :
-                          "border-amber-500 text-amber-600 bg-amber-50 dark:bg-amber-900/20"
-                        }
-                      >
-                        {entryStatus === 'sold' ? t("Sold", "बिक गया") :
-                         entryStatus === 'partial' ? t("Partial Sold", "आंशिक बिका") :
-                         t("Unsold", "बिना बिका")}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
+                        <div>
+                          <span className="text-muted-foreground">{t("Original Size:", "मूल आकार:")}</span>{" "}
+                          <span className="font-medium">{totalOriginal} {t("bags", "बोरी")}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
+                          <span className="font-semibold text-green-600 dark:text-green-400">{totalRemaining} {t("bags", "बोरी")}</span>
+                        </div>
+                        {entryTotalAmount > 0 && (
+                          <>
+                            {farmerAmountPaid > 0 && (
+                              <div>
+                                <span className="text-muted-foreground">{t("Farmer Paid:", "किसान भुगतान:")}</span>{" "}
+                                <span className="font-medium text-green-600 dark:text-green-400">Rs. {farmerAmountPaid.toFixed(0)}</span>
+                              </div>
+                            )}
+                            {farmerRemainingDue > 0 && (
+                              <div>
+                                <span className="text-muted-foreground">{t("Farmer Due:", "किसान बाकी:")}</span>{" "}
+                                <span className="font-medium text-orange-600 dark:text-orange-400">Rs. {farmerRemainingDue.toFixed(0)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {entryColdStoreTotalCharges > 0 && (
+                          <>
+                            {entryColdStorePaid > 0 && (
+                              <div>
+                                <span className="text-muted-foreground">{t("Cold Charges Paid:", "कोल्ड शुल्क भुगतान:")}</span>{" "}
+                                <span className="font-medium text-green-600 dark:text-green-400">Rs. {entryColdStorePaid.toFixed(0)}</span>
+                              </div>
+                            )}
+                            {coldStoreRemainingDue > 0 && (
+                              <div>
+                                <span className="text-muted-foreground">{t("Cold Charges Due:", "कोल्ड शुल्क बाकी:")}</span>{" "}
+                                <span className="font-medium text-orange-600 dark:text-orange-400">Rs. {coldStoreRemainingDue.toFixed(0)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="flex gap-1">
+                    <div className="flex flex-col gap-1.5 shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="text-xs h-8 gap-1.5 justify-start"
                         onClick={() => setEditEntry(entry)}
                         data-testid={`button-edit-${entry.id}`}
                       >
-                        <Edit className="h-4 w-4 mr-1" />
-                        {t("Edit", "संपादित करें")}
+                        <Edit className="h-3.5 w-3.5" />
+                        {t("Edit", "संपादित")}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
+                        className="text-xs h-8 gap-1.5 justify-start"
                         onClick={() => setPrintEntry(entry)}
                         data-testid={`button-print-${entry.id}`}
                       >
-                        <Printer className="h-4 w-4 mr-1" />
+                        <Printer className="h-3.5 w-3.5" />
                         {t("Print", "प्रिंट")}
                       </Button>
                     </div>
                   </div>
-                  
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-2">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>
-                        {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                    </div>
-                    {entry.farmerContact && (
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-3.5 w-3.5" />
-                        <span>{entry.farmerContact}</span>
-                      </div>
-                    )}
-                    {entry.village && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        <span>{entry.village}, {entry.tehsil ? `${entry.tehsil}, ` : ""}{entry.district}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="mt-2 text-sm">
-                    <span className="text-muted-foreground">{t("Total Bags:", "कुल बोरी:")}</span>{" "}
-                    {totalWastage > 0 && (
-                      <>
-                        <span className="font-medium">{totalActual}/{totalOriginal}</span>
-                        <span className="text-muted-foreground ml-1">
-                          ({totalWastage} {t("Wastage", "कचरा")})
-                        </span>
-                        <span className="text-muted-foreground">, </span>
-                      </>
-                    )}
-                    <span className="text-primary font-bold">{totalRemaining}</span>
-                    <span className="text-muted-foreground">/{totalActual}</span>
-                  </div>
-                  
-                  {entryTotalAmount > 0 && (
-                    <div className="mt-3 pt-3 border-t text-sm">
-                      <span className="text-muted-foreground">{t("Total Farmer Amount:", "किसान की कुल राशि:")}</span>{" "}
-                      <span className="font-semibold text-orange-600 dark:text-orange-400">₹{entryTotalAmount.toFixed(0)}</span>
-                      {farmerRemainingDue > 0 && (
-                        <>
-                          <span className="text-muted-foreground ml-2">|</span>
-                          <span className="text-muted-foreground ml-2">{t("Remaining Due:", "शेष बाकी:")}</span>{" "}
-                          <span className="font-semibold text-orange-600 dark:text-orange-400">₹{farmerRemainingDue.toFixed(0)}</span>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </CardHeader>
                 
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
+                {lotsWithMetrics.length > 1 && (
+                <CardContent className="pt-0 pb-3 px-4">
+                  <div className="space-y-2">
                     {lotsWithMetrics.map(({ lot, metrics }, lotIndex) => {
                       return (
                         <div 
                           key={lot.id} 
-                          className="p-3 bg-muted/30 rounded-lg border border-border/50"
+                          className="py-2 px-3 bg-muted/20 rounded-md border border-border/30"
                           data-testid={`lot-card-${entry.id}-${lotIndex}`}
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="font-mono">
-                                {t("Lot", "लॉट")} {lotIndex + 1}
-                              </Badge>
-                              <span className="text-sm text-muted-foreground">{lot.coldStoreName}</span>
-                              <Badge variant="secondary" className="text-xs">
-                                {lot.potatoType}
-                              </Badge>
-                              <Badge 
-                                variant="secondary"
-                                className={
-                                  lot.quality === "Good" ? "text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
-                                  lot.quality === "Medium" ? "text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                                  "text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                                }
-                              >
-                                {lot.quality}
-                              </Badge>
-                              <Badge variant="secondary" className="text-xs">
-                                {lot.bagType}
-                              </Badge>
-                              <Badge variant="secondary" className="text-xs">
-                                {lot.cutType === "gate_cut" ? t("Gate Cut", "गेट कट") : t("Bilty Cut", "बिल्टी कट")}
-                              </Badge>
-                              {lot.size && lot.cutType === "gate_cut" && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {lot.size}
-                                </Badge>
-                              )}
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+                            <div className="flex items-center gap-1.5">
+                              <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-muted-foreground">{lot.coldStoreName}</span>
                             </div>
-                            
-                            <div className="text-sm">
-                              {metrics.wastageBags > 0 && (
-                                <>
-                                  <span className="text-muted-foreground">{t("Original", "मूल")} #</span>
-                                  <span className="font-medium">{metrics.originalBags}</span>
-                                  <span className="text-muted-foreground">, {t("Actual", "वास्तविक")} </span>
-                                </>
-                              )}
-                              <span className="font-mono font-bold text-primary">{metrics.remainingToSell}</span>
-                              <span className="text-muted-foreground">/{metrics.actualSellableBags}</span>
-                              {metrics.wastageBags > 0 && (
-                                <span className="text-xs text-muted-foreground ml-1">
-                                  ({metrics.wastageBags} {t("Wastage", "कचरा")})
-                                </span>
-                              )}
+                            <div>
+                              <span className="text-muted-foreground">{t("Type:", "प्रकार:")}</span>{" "}
+                              <span className="font-medium">{lot.potatoType}</span>
                             </div>
-                          </div>
-                          
-                          {lot.cutType === "bilty_cut" && (metrics.sellableBreakdowns.length > 0 || metrics.wastageBreakdowns.length > 0) && (
-                            <div className="mt-2 pt-2 border-t border-border/30">
-                              <div className="flex flex-wrap items-center gap-2">
-                                {metrics.sellableBreakdowns.map((bd, bdIndex) => {
-                                  const bdPrice = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                                  const bdWeight = bd.weight ? parseFloat(bd.weight) : 0;
-                                  const bdRemaining = bd.remainingBags ?? bd.numberOfBags;
-                                  const bdTotal = bd.totalAmount 
-                                    ? parseFloat(bd.totalAmount) 
-                                    : (bdPrice > 0 && bdWeight > 0 ? bdPrice * bdWeight : null);
-                                  
-                                  return (
-                                    <div 
-                                      key={bd.id || bdIndex}
-                                      className="text-xs px-2 py-1 rounded border bg-background border-border"
-                                    >
-                                      <span className="font-medium">{bd.size}</span>
-                                      <span className="text-muted-foreground mx-1">×</span>
-                                      <span className="font-bold text-primary">{bdRemaining}</span>
-                                      <span className="text-muted-foreground">/{bd.numberOfBags}</span>
-                                      {bdWeight > 0 && (
-                                        <>
-                                          <span className="text-muted-foreground mx-1">|</span>
-                                          <span>{bdWeight}kg</span>
-                                        </>
-                                      )}
-                                      {bdPrice > 0 && (
-                                        <>
-                                          <span className="text-muted-foreground mx-1">@</span>
-                                          <span>₹{bdPrice}/kg</span>
-                                        </>
-                                      )}
-                                      {bdTotal !== null && (
-                                        <>
-                                          <span className="text-muted-foreground mx-1">=</span>
-                                          <span className="font-medium text-green-600 dark:text-green-400">₹{bdTotal.toFixed(0)}</span>
-                                        </>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                                {metrics.wastageBreakdowns.map((bd, bdIndex) => (
-                                  <div 
-                                    key={bd.id || `wastage-${bdIndex}`}
-                                    className="text-xs px-2 py-1 rounded border bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
-                                  >
-                                    <span className="font-medium">{t("Wastage", "कचरा")}</span>
-                                    <span className="mx-1">×</span>
-                                    <span>{bd.numberOfBags}</span>
-                                  </div>
-                                ))}
-                                {metrics.totalAmount !== null && (
-                                  <div className="text-xs px-2 py-1 rounded border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
-                                    <span className="text-muted-foreground">{t("Total:", "कुल:")}</span>{" "}
-                                    <span className="font-medium text-green-600 dark:text-green-400">₹{metrics.totalAmount.toFixed(0)}</span>
+                            <div>
+                              <span className="text-muted-foreground">{t("Original:", "मूल:")}</span>{" "}
+                              <span className="font-medium">{metrics.originalBags} {t("bags", "बोरी")}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">{t("Remaining:", "शेष:")}</span>{" "}
+                              <span className="font-semibold text-green-600 dark:text-green-400">{metrics.remainingToSell} {t("bags", "बोरी")}</span>
+                            </div>
+                            {metrics.coldStoreTotalCharges !== null && metrics.coldStoreTotalCharges > 0 && (
+                              <>
+                                {metrics.coldStorePaid > 0 && (
+                                  <div>
+                                    <span className="text-muted-foreground">{t("Cold Paid:", "कोल्ड भुगतान:")}</span>{" "}
+                                    <span className="font-medium text-green-600 dark:text-green-400">Rs. {metrics.coldStorePaid.toFixed(0)}</span>
                                   </div>
                                 )}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {lot.cutType === "gate_cut" && metrics.pricePerKg && (
-                            <div className="mt-2 text-sm text-muted-foreground">
-                              <span>{t("Price:", "मूल्य:")}</span>{" "}
-                              <span className="font-medium text-foreground">₹{metrics.pricePerKg}/kg</span>
-                            </div>
-                          )}
-
-                          {metrics.coldStoreTotalCharges !== null && metrics.coldStoreTotalCharges > 0 && (
-                            <div className="mt-2 text-sm">
-                              <span className="text-muted-foreground">{t("Cold:", "कोल्ड:")}</span>{" "}
-                              <span className="font-medium text-violet-600 dark:text-violet-400">
-                                ₹{metrics.coldStoreTotalCharges.toFixed(0)}
-                              </span>
-                              <span className="text-xs text-muted-foreground ml-1">
-                                ({metrics.originalBags} × ₹{metrics.coldStoreChargesPerBag})
-                              </span>
-                              {metrics.coldStoreRemaining !== null && metrics.coldStoreRemaining > 0 && (
-                                <>
-                                  <span className="text-muted-foreground ml-2">|</span>
-                                  <span className="text-muted-foreground ml-2">{t("Due:", "बाकी:")}</span>{" "}
-                                  <span className="font-medium text-purple-600 dark:text-purple-400">
-                                    ₹{metrics.coldStoreRemaining.toFixed(0)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                          
-                          {lot.remarks && (
-                            <div className="mt-2 text-xs text-muted-foreground italic">
-                              {t("Remarks:", "टिप्पणी:")} {lot.remarks}
-                            </div>
-                          )}
+                                {metrics.coldStoreRemaining !== null && metrics.coldStoreRemaining > 0 && (
+                                  <div>
+                                    <span className="text-muted-foreground">{t("Cold Due:", "कोल्ड बाकी:")}</span>{" "}
+                                    <span className="font-medium text-orange-600 dark:text-orange-400">Rs. {metrics.coldStoreRemaining.toFixed(0)}</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                  
-                  {entry.remarks && (
-                    <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
-                      <span className="font-medium">{t("Remarks:", "टिप्पणी:")}</span> {entry.remarks}
-                    </div>
-                  )}
                 </CardContent>
+                )}
+                
+                {lotsWithMetrics.length === 1 && lotsWithMetrics[0].lot.cutType === "bilty_cut" && (lotsWithMetrics[0].metrics.sellableBreakdowns.length > 0 || lotsWithMetrics[0].metrics.wastageBreakdowns.length > 0) && (
+                <CardContent className="pt-0 pb-3 px-4">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] py-2 px-3 bg-muted/20 rounded-md border border-border/30">
+                    <div className="flex items-center gap-1.5">
+                      <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground">{lotsWithMetrics[0].lot.coldStoreName}</span>
+                    </div>
+                    {lotsWithMetrics[0].metrics.sellableBreakdowns.map((bd, bdIndex) => {
+                      const bdRemaining = bd.remainingBags ?? bd.numberOfBags;
+                      return (
+                        <div key={bd.id || bdIndex}>
+                          <span className="text-muted-foreground">{bd.size}:</span>{" "}
+                          <span className="font-semibold text-green-600 dark:text-green-400">{bdRemaining}</span>
+                          <span className="text-muted-foreground">/{bd.numberOfBags}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+                )}
+                
+                {lotsWithMetrics.length === 1 && lotsWithMetrics[0].lot.cutType === "gate_cut" && (
+                <CardContent className="pt-0 pb-3 px-4">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] py-2 px-3 bg-muted/20 rounded-md border border-border/30">
+                    <div className="flex items-center gap-1.5">
+                      <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground">{lotsWithMetrics[0].lot.coldStoreName}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{t("Quality:", "गुणवत्ता:")}</span>{" "}
+                      <span className="font-medium">{lotsWithMetrics[0].lot.quality}</span>
+                    </div>
+                    {lotsWithMetrics[0].metrics.pricePerKg && (
+                      <div>
+                        <span className="text-muted-foreground">{t("Price:", "मूल्य:")}</span>{" "}
+                        <span className="font-medium">Rs. {lotsWithMetrics[0].metrics.pricePerKg}/kg</span>
+                      </div>
+                    )}
+                    {lotsWithMetrics[0].metrics.coldStoreTotalCharges !== null && lotsWithMetrics[0].metrics.coldStoreTotalCharges > 0 && (
+                      <>
+                        {lotsWithMetrics[0].metrics.coldStorePaid > 0 && (
+                          <div>
+                            <span className="text-muted-foreground">{t("Cold Paid:", "कोल्ड भुगतान:")}</span>{" "}
+                            <span className="font-medium text-green-600 dark:text-green-400">Rs. {lotsWithMetrics[0].metrics.coldStorePaid.toFixed(0)}</span>
+                          </div>
+                        )}
+                        {lotsWithMetrics[0].metrics.coldStoreRemaining !== null && lotsWithMetrics[0].metrics.coldStoreRemaining > 0 && (
+                          <div>
+                            <span className="text-muted-foreground">{t("Cold Due:", "कोल्ड बाकी:")}</span>{" "}
+                            <span className="font-medium text-orange-600 dark:text-orange-400">Rs. {lotsWithMetrics[0].metrics.coldStoreRemaining.toFixed(0)}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+                )}
               </Card>
             );
           })}
