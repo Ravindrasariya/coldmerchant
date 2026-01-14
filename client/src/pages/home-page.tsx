@@ -16,7 +16,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
-import { StockRegisterTable } from "@/components/stock-register/stock-register-table";
+import { StockRegisterCard } from "@/components/stock-register/stock-register-card";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { 
@@ -188,7 +188,7 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            <StockRegisterTable />
+            <StockRegisterCard />
           </TabsContent>
         </Tabs>
 
