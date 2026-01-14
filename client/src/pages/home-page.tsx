@@ -187,6 +187,15 @@ export default function HomePage() {
             <StockRegisterTable />
           </TabsContent>
         </Tabs>
+
+        <footer className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-muted-foreground">
+          <div>
+            Need help? Please reach out to <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
+          </div>
+          <div>
+            Powered by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+          </div>
+        </footer>
       </main>
 
       <Dialog open={showPasswordDialog} onOpenChange={(open) => {
