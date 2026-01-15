@@ -66,6 +66,7 @@ export function TransactionsTab() {
   const [downloadEndDate, setDownloadEndDate] = useState("");
   
   // Filter states
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterParty, setFilterParty] = useState("all");
@@ -75,6 +76,14 @@ export function TransactionsTab() {
     queryKey: ["/api/transactions"],
     enabled: transactionMode === "raw",
   });
+
+  // Get unique years for dropdown
+  const availableYears = useMemo(() => {
+    if (!transactions) return [new Date().getFullYear().toString()];
+    const years = transactions.map(t => new Date(t.createdAt).getFullYear().toString());
+    const uniqueYears = Array.from(new Set(years)).sort((a, b) => parseInt(b) - parseInt(a));
+    return uniqueYears.length > 0 ? uniqueYears : [new Date().getFullYear().toString()];
+  }, [transactions]);
 
   // Get unique party names for dropdown
   const partyNames = useMemo(() => {
@@ -90,6 +99,11 @@ export function TransactionsTab() {
     if (!transactions) return [];
     
     return transactions.filter(txn => {
+      // Filter by year
+      if (filterYear && new Date(txn.createdAt).getFullYear().toString() !== filterYear) {
+        return false;
+      }
+      
       // Filter by transaction number
       if (filterTxnNumber && !txn.transactionNumber.toString().includes(filterTxnNumber)) {
         return false;
@@ -123,11 +137,13 @@ export function TransactionsTab() {
       
       return true;
     });
-  }, [transactions, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
+  }, [transactions, filterYear, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
 
-  const hasActiveFilters = filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
+  const currentYear = new Date().getFullYear().toString();
+  const hasActiveFilters = filterYear !== currentYear || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
 
   const clearFilters = () => {
+    setFilterYear(new Date().getFullYear().toString());
     setFilterTxnNumber("");
     setFilterSerialNumber("");
     setFilterParty("all");
@@ -349,6 +365,17 @@ export function TransactionsTab() {
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
               </div>
+              
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="w-24 h-9" data-testid="filter-year">
+                  <SelectValue placeholder={t("Year", "वर्ष")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               
               <Input
                 placeholder={t("Transaction #", "लेनदेन #")}
