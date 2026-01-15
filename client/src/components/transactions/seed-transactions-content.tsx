@@ -453,8 +453,8 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                           )}
                           {/* Due badge */}
                           {dueAmount > 0 && (
-                            <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                              ₹{dueAmount.toLocaleString("en-IN")}
+                            <Badge variant="destructive" className="text-xs">
+                              {t("Due", "बकाया")}
                             </Badge>
                           )}
                           {/* P&L badge - green/up for profit, red/down for loss */}
