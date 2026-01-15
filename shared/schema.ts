@@ -59,7 +59,11 @@ export const lots = pgTable("lots", {
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // charges per bag from cold store
+  hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // hammali and grading charges
   coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges
+  adjustedAmount: decimal("adjusted_amount", { precision: 12, scale: 2 }), // adjustment amount for farmer due
+  adjustedAmountType: text("adjusted_amount_type"), // "debit" or "credit"
+  adjustedAmountRemark: text("adjusted_amount_remark"), // reason for adjustment
   remainingBags: integer("remaining_bags").notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
