@@ -413,6 +413,12 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
             const revenue = parseFloat(txn.totalRevenue || "0");
             const cost = parseFloat(txn.totalCost || "0");
             const dueAmount = parseFloat(txn.totalDueToFarmer || "0");
+            const transportCharges = parseFloat(txn.transportCharges || "0");
+            const otherCharges = parseFloat(txn.otherCharges || "0");
+            const extraCharges = transportCharges + otherCharges;
+            
+            // Get unique potato types from transaction items
+            const potatoTypes = Array.from(new Set(txn.items.map(item => item.potatoType).filter(Boolean))) as string[];
             
             return (
               <Card key={txn.id} className="hover-elevate" data-testid={`seed-txn-card-${txn.id}`}>
@@ -433,22 +439,35 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                           - {txn.farmerName}{txn.village ? `, ${txn.village}` : ""}
                         </span>
                         <div className="flex items-center gap-2 ml-auto">
+                          {/* Potato type badges */}
+                          {potatoTypes.map((type) => (
+                            <Badge key={type} variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600">
+                              {type}
+                            </Badge>
+                          ))}
                           {txn.vehicleNumber && (
                             <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
                               <Truck className="h-3 w-3 mr-1" />
                               {txn.vehicleNumber}
                             </Badge>
                           )}
+                          {/* Due badge */}
                           {dueAmount > 0 && (
                             <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                              <TrendingDown className="h-3 w-3 mr-1" />
                               ₹{dueAmount.toLocaleString("en-IN")}
+                            </Badge>
+                          )}
+                          {/* P&L badge - green/up for profit, red/down for loss */}
+                          {profitLoss !== 0 && (
+                            <Badge variant={profitLoss >= 0 ? "default" : "destructive"} className="flex items-center gap-1">
+                              {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                              ₹{Math.abs(profitLoss).toLocaleString("en-IN")}
                             </Badge>
                           )}
                         </div>
                       </div>
 
-                      {/* Row 2: Bags, Cost, Revenue, Due */}
+                      {/* Row 2: Bags, Cost, Revenue, Extra Charges, Due */}
                       <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-2 sm:gap-3 text-sm">
                         <span className="flex items-center gap-1">
                           <Package className="h-3.5 w-3.5 text-muted-foreground" />
@@ -463,11 +482,17 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                           <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
                           <span className="font-medium ml-1">₹{revenue.toLocaleString("en-IN")}</span>
                         </span>
+                        {extraCharges > 0 && (
+                          <span className="col-span-1">
+                            <span className="text-muted-foreground">{t("Charges", "शुल्क")}:</span>
+                            <span className="font-medium ml-1">₹{extraCharges.toLocaleString("en-IN")}</span>
+                          </span>
+                        )}
                         {dueAmount > 0 ? (
                           <div className="col-span-2 sm:col-span-1">
-                            <span className="text-orange-600 dark:text-orange-400 font-medium">
+                            <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
                               {t("Due", "बकाया")}: ₹{dueAmount.toLocaleString("en-IN")}
-                            </span>
+                            </Badge>
                           </div>
                         ) : revenue > 0 && (
                           <div className="col-span-2 sm:col-span-1">
