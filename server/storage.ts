@@ -859,24 +859,7 @@ export class DatabaseStorage implements IStorage {
         eq(farmerSettlements.settlementDirection, "raw_to_seed")
       ));
     
-    // Calculate total paid per farmer (from cash entries and settlements)
-    const paidByFarmer = new Map<string, number>();
-    
-    for (const entry of seedCashEntries) {
-      if (entry.farmerName) {
-        // Match using composite key (name + village) for consistency
-        const key = normalizeName(entry.farmerName) + "|" + normalizeName(entry.farmerVillage || "");
-        paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(entry.amount || "0"));
-      }
-    }
-    
-    for (const settlement of rawToSeedSettlements) {
-      // Match using composite key (name + village) for consistency with cross-settlement eligibility
-      const key = normalizeName(settlement.farmerName) + "|" + normalizeName(settlement.farmerVillage || "");
-      paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(settlement.settledAmount || "0"));
-    }
-    
-    // Group by normalized farmer name + village (case-insensitive, trimmed) and calculate total due
+    // Build farmer map FIRST from seed transactions
     const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
@@ -899,6 +882,40 @@ export class DatabaseStorage implements IStorage {
           totalDue: dueToFarmer,
           transactionCount: 1,
         });
+      }
+    }
+    
+    // Calculate total paid per farmer (from cash entries and settlements)
+    const paidByFarmer = new Map<string, number>();
+    
+    for (const entry of seedCashEntries) {
+      if (entry.farmerName) {
+        // Match using composite key (name + village) for consistency
+        const key = normalizeName(entry.farmerName) + "|" + normalizeName(entry.farmerVillage || "");
+        paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(entry.amount || "0"));
+      }
+    }
+    
+    // For cross-settlements, match by name only since raw potato village may differ from seed village
+    // Create a name-to-keys map to find all farmer keys that match by name
+    const nameToKeys = new Map<string, string[]>();
+    Array.from(farmerMap.keys()).forEach(key => {
+      const namePart = key.split("|")[0];
+      if (!nameToKeys.has(namePart)) {
+        nameToKeys.set(namePart, []);
+      }
+      nameToKeys.get(namePart)!.push(key);
+    });
+    
+    for (const settlement of rawToSeedSettlements) {
+      // Match settlements by name only (cross-settlement can have different villages)
+      const normalizedSettlementName = normalizeName(settlement.farmerName);
+      const matchingKeys = nameToKeys.get(normalizedSettlementName) || [];
+      
+      if (matchingKeys.length > 0) {
+        // Apply settlement to first matching key (most common case is single farmer)
+        const key = matchingKeys[0];
+        paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(settlement.settledAmount || "0"));
       }
     }
     
