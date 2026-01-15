@@ -419,7 +419,13 @@ export function CashManagementTab() {
       <CashSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       
       {/* Header with Settings Button */}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{t("Cash Management", "नकद प्रबंधन")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t("Track payments received and expenses", "प्राप्त भुगतान और खर्चों को ट्रैक करें")}
+          </p>
+        </div>
         <Button
           variant="ghost"
           size="icon"

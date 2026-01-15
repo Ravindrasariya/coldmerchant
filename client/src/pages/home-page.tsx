@@ -301,17 +301,7 @@ export default function HomePage() {
           </div>
 
           <div className={activeTab === "cash-management" ? "block" : "hidden"}>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold">{t("Cash Management", "नकद प्रबंधन")}</h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t("Track payments received and expenses", "प्राप्त भुगतान और खर्चों को ट्रैक करें")}
-                  </p>
-                </div>
-              </div>
-              <CashManagementTab />
-            </div>
+            <CashManagementTab />
           </div>
 
           <footer className="mt-8 pt-4 border-t flex flex-col items-center text-center gap-2 text-sm text-muted-foreground">
