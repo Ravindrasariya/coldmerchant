@@ -341,67 +341,69 @@ export function TransactionsTab() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
+      {/* Filters Row */}
+      <div className="flex items-center gap-3">
+        <Card className="flex-1">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+              </div>
+              
+              <Input
+                placeholder={t("Transaction #", "लेनदेन #")}
+                value={filterTxnNumber}
+                onChange={(e) => setFilterTxnNumber(e.target.value)}
+                className="w-32 h-9"
+                data-testid="filter-txn-number"
+              />
+              
+              <Input
+                placeholder={t("Serial #", "सीरियल #")}
+                value={filterSerialNumber}
+                onChange={(e) => setFilterSerialNumber(e.target.value)}
+                className="w-28 h-9"
+                data-testid="filter-serial-number"
+              />
+              
+              <Select value={filterParty} onValueChange={setFilterParty}>
+                <SelectTrigger className="w-40 h-9" data-testid="filter-party">
+                  <SelectValue placeholder={t("Party", "पार्टी")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All Parties", "सभी पार्टी")}</SelectItem>
+                  {partyNames.map(name => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={filterPaymentDue} onValueChange={setFilterPaymentDue}>
+                <SelectTrigger className="w-36 h-9" data-testid="filter-payment-due">
+                  <SelectValue placeholder={t("Payment", "भुगतान")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All", "सभी")}</SelectItem>
+                  <SelectItem value="due">{t("Due", "बकाया")}</SelectItem>
+                  <SelectItem value="paid">{t("Paid", "भुगतान किया")}</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+                  <X className="h-4 w-4 mr-1" />
+                  {t("Clear", "साफ़ करें")}
+                </Button>
+              )}
             </div>
-            
-            <Input
-              placeholder={t("Transaction #", "लेनदेन #")}
-              value={filterTxnNumber}
-              onChange={(e) => setFilterTxnNumber(e.target.value)}
-              className="w-32 h-9"
-              data-testid="filter-txn-number"
-            />
-            
-            <Input
-              placeholder={t("Serial #", "सीरियल #")}
-              value={filterSerialNumber}
-              onChange={(e) => setFilterSerialNumber(e.target.value)}
-              className="w-28 h-9"
-              data-testid="filter-serial-number"
-            />
-            
-            <Select value={filterParty} onValueChange={setFilterParty}>
-              <SelectTrigger className="w-40 h-9" data-testid="filter-party">
-                <SelectValue placeholder={t("Party", "पार्टी")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("All Parties", "सभी पार्टी")}</SelectItem>
-                {partyNames.map(name => (
-                  <SelectItem key={name} value={name}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={filterPaymentDue} onValueChange={setFilterPaymentDue}>
-              <SelectTrigger className="w-36 h-9" data-testid="filter-payment-due">
-                <SelectValue placeholder={t("Payment", "भुगतान")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("All", "सभी")}</SelectItem>
-                <SelectItem value="due">{t("Due", "बकाया")}</SelectItem>
-                <SelectItem value="paid">{t("Paid", "भुगतान किया")}</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
-                <X className="h-4 w-4 mr-1" />
-                {t("Clear", "साफ़ करें")}
-              </Button>
-            )}
+          </CardContent>
+        </Card>
 
-            <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-truck">
-              <Truck className="h-4 w-4 mr-2" />
-              {t("Load A Truck", "ट्रक लोड करें")}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-truck">
+          <Truck className="h-4 w-4 mr-2" />
+          {t("Load A Truck", "ट्रक लोड करें")}
+        </Button>
+      </div>
 
       {/* Summary Cards */}
       {filteredTransactions && filteredTransactions.length > 0 && (
