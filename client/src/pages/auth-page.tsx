@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, PackagePlus, TrendingUp, Users, ClipboardList } from "lucide-react";
+import { Loader2, PackagePlus, TrendingUp, Users, ClipboardList, Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -28,6 +28,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function AuthPage() {
   const [, setLocation] = useLocation();
   const { user, loginMutation } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -65,10 +66,14 @@ export default function AuthPage() {
                 <PackagePlus className="h-6 w-6 text-primary-foreground" />
               </div>
             </div>
-            <CardTitle className="text-2xl">Vyapar Vriddhi</CardTitle>
-            <CardDescription>
-              Potato Trading Management System
+            <CardTitle className="text-2xl text-primary">Vyapar Vriddhi</CardTitle>
+            <div className="text-sm">
+              by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+            </div>
+            <CardDescription className="mt-4">
+              Welcome
             </CardDescription>
+            <p className="text-sm text-muted-foreground">Please Enter Your Login Details</p>
           </CardHeader>
           <CardContent>
             <Form {...loginForm}>
@@ -78,10 +83,10 @@ export default function AuthPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>Mobile Number</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter your username" 
+                          placeholder="Enter 10-digit mobile number" 
                           {...field} 
                           data-testid="input-login-username"
                         />
@@ -99,12 +104,20 @@ export default function AuthPage() {
                       <FormLabel>Password</FormLabel>
                       <FormControl>
                         <Input 
-                          type="password" 
-                          placeholder="Enter your password" 
+                          type={showPassword ? "text" : "password"} 
+                          placeholder="Enter password" 
                           {...field} 
                           data-testid="input-login-password"
                         />
                       </FormControl>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="mt-1 text-muted-foreground hover:text-foreground"
+                        data-testid="button-toggle-password"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -119,10 +132,29 @@ export default function AuthPage() {
                   {loginMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : null}
-                  Sign In
+                  Login
                 </Button>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    className="text-primary hover:underline text-sm"
+                    onClick={() => {
+                      // Note: Change password requires being logged in first
+                      alert("Please login first, then change your password from the menu.");
+                    }}
+                    data-testid="link-change-password"
+                  >
+                    Change Password
+                  </button>
+                </div>
               </form>
             </Form>
+
+            <div className="mt-6 pt-4 border-t text-center text-sm text-muted-foreground">
+              Need Help? Please reach out to <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>{" "}
+              <span className="font-medium">8882589392</span>
+            </div>
           </CardContent>
         </Card>
       </div>
