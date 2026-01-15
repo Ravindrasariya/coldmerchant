@@ -359,11 +359,11 @@ export function StockRegisterCard() {
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-farmer-total">₹{Math.round(summaryTotals.farmerTotal).toLocaleString()}</p>
+                <p className="text-lg font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-farmer-due">₹{Math.round(summaryTotals.farmerDue).toLocaleString()}</p>
+                <p className="text-lg font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </CardContent>
@@ -378,11 +378,11 @@ export function StockRegisterCard() {
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-cold-total">₹{Math.round(summaryTotals.coldStoreTotal).toLocaleString()}</p>
+                <p className="text-lg font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-cold-due">₹{Math.round(summaryTotals.coldStoreDue).toLocaleString()}</p>
+                <p className="text-lg font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </CardContent>
