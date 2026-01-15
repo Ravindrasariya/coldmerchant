@@ -45,6 +45,7 @@ export default function HomePage() {
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
+    mobileNumber: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -59,6 +60,7 @@ export default function HomePage() {
       return;
     }
     changePasswordMutation.mutate({
+      mobileNumber: isFirstLoginDialog ? undefined : passwordForm.mobileNumber,
       currentPassword: isFirstLoginDialog ? undefined : passwordForm.currentPassword,
       newPassword: passwordForm.newPassword,
       isFirstLogin: isFirstLoginDialog,
@@ -66,7 +68,7 @@ export default function HomePage() {
       onSuccess: () => {
         setShowPasswordDialog(false);
         setIsFirstLoginDialog(false);
-        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        setPasswordForm({ mobileNumber: "", currentPassword: "", newPassword: "", confirmPassword: "" });
       },
     });
   };
@@ -330,17 +332,30 @@ export default function HomePage() {
           )}
           <div className="space-y-4 py-4">
             {!isFirstLoginDialog && (
-              <div className="space-y-2">
-                <Label htmlFor="current-password">{t("Current Password", "वर्तमान पासवर्ड")}</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  placeholder={t("Enter current password", "वर्तमान पासवर्ड दर्ज करें")}
-                  data-testid="input-current-password"
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="mobile-number">{t("Registered Mobile Number", "पंजीकृत मोबाइल नंबर")}</Label>
+                  <Input
+                    id="mobile-number"
+                    type="text"
+                    value={passwordForm.mobileNumber}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, mobileNumber: e.target.value })}
+                    placeholder={t("Enter registered mobile number", "पंजीकृत मोबाइल नंबर दर्ज करें")}
+                    data-testid="input-mobile-number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">{t("Current Password", "वर्तमान पासवर्ड")}</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    placeholder={t("Enter current password", "वर्तमान पासवर्ड दर्ज करें")}
+                    data-testid="input-current-password"
+                  />
+                </div>
+              </>
             )}
             <div className="space-y-2">
               <Label htmlFor="new-password">{t("New Password", "नया पासवर्ड")}</Label>
@@ -377,7 +392,7 @@ export default function HomePage() {
             <Button
               onClick={handlePasswordChange}
               disabled={
-                (!isFirstLoginDialog && !passwordForm.currentPassword) ||
+                (!isFirstLoginDialog && (!passwordForm.currentPassword || !passwordForm.mobileNumber)) ||
                 !passwordForm.newPassword ||
                 passwordForm.newPassword.length < 6 ||
                 passwordForm.newPassword !== passwordForm.confirmPassword ||

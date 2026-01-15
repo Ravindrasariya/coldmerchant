@@ -83,10 +83,10 @@ export default function AuthPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Mobile Number</FormLabel>
+                      <FormLabel>User Name</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter 10-digit mobile number" 
+                          placeholder="Enter your username" 
                           {...field} 
                           data-testid="input-login-username"
                         />

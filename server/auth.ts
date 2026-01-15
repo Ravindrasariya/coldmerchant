@@ -130,7 +130,7 @@ export function setupAuth(app: Express) {
     }
 
     try {
-      const { currentPassword, newPassword, isFirstLogin } = req.body;
+      const { mobileNumber, currentPassword, newPassword, isFirstLogin } = req.body;
 
       if (!newPassword) {
         return res.status(400).json({ message: "New password is required" });
@@ -147,11 +147,17 @@ export function setupAuth(app: Express) {
 
       // If user must change password (first login) and isFirstLogin flag is set,
       // we allow changing without verifying current password (they know it's the default)
-      // Otherwise, we require current password verification
+      // Otherwise, we require current password verification AND mobile number validation
       if (user.mustChangePassword && isFirstLogin) {
         // First login - just update the password
       } else {
-        // Regular password change - verify current password
+        // Regular password change - verify mobile number and current password
+        if (!mobileNumber) {
+          return res.status(400).json({ message: "Registered mobile number is required" });
+        }
+        if (user.mobileNumber !== mobileNumber) {
+          return res.status(400).json({ message: "Mobile number does not match registered number" });
+        }
         if (!currentPassword) {
           return res.status(400).json({ message: "Current password is required" });
         }

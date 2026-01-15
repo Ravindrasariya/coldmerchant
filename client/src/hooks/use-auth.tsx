@@ -23,6 +23,7 @@ type LoginData = {
 };
 
 type ChangePasswordData = {
+  mobileNumber?: string;
   currentPassword?: string;
   newPassword: string;
   isFirstLogin?: boolean;
