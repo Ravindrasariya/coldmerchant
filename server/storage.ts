@@ -896,28 +896,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // For cross-settlements, match by name only since raw potato village may differ from seed village
-    // Create a name-to-keys map to find all farmer keys that match by name
-    const nameToKeys = new Map<string, string[]>();
-    Array.from(farmerMap.keys()).forEach(key => {
-      const namePart = key.split("|")[0];
-      if (!nameToKeys.has(namePart)) {
-        nameToKeys.set(namePart, []);
-      }
-      nameToKeys.get(namePart)!.push(key);
-    });
-    
-    for (const settlement of rawToSeedSettlements) {
-      // Match settlements by name only (cross-settlement can have different villages)
-      const normalizedSettlementName = normalizeName(settlement.farmerName);
-      const matchingKeys = nameToKeys.get(normalizedSettlementName) || [];
-      
-      if (matchingKeys.length > 0) {
-        // Apply settlement to first matching key (most common case is single farmer)
-        const key = matchingKeys[0];
-        paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(settlement.settledAmount || "0"));
-      }
-    }
+    // Cross-settlements are now directly applied to seed transactions (totalDueToFarmer updated)
+    // So we don't need to track them separately here - the dues are already reduced in the seed transactions
     
     // Subtract payments and settlements from dues
     Array.from(paidByFarmer.entries()).forEach(([key, paidAmount]) => {
@@ -1727,9 +1707,10 @@ export class DatabaseStorage implements IStorage {
         if (crossSettlement.direction === 'raw_to_seed') {
           // Paying farmer for raw potatoes via cross-settlement (offsetting seed dues)
           // 1. Update stock register amountPaid by settlement amount (farmer is effectively paid)
-          // 2. Seed dues are reduced via farmerSettlements record (no direct update needed)
+          // 2. Update seed transactions totalDueToFarmer directly (reduce seed dues)
           let remainingSettlement = crossSettlement.settledAmount;
           
+          // Step 1: Update raw potato stock entries (farmer is paid)
           for (const entryId of crossSettlement.rawPotatoEntryIds) {
             if (remainingSettlement <= 0) break;
             
@@ -1772,6 +1753,32 @@ export class DatabaseStorage implements IStorage {
               .where(eq(stockEntries.id, stockEntry.id));
             
             remainingSettlement -= toApply;
+          }
+          
+          // Step 2: Update seed transactions (reduce seed dues by full settlement amount)
+          let remainingSeedSettlement = crossSettlement.settledAmount;
+          
+          for (const txnId of crossSettlement.seedTransactionIds) {
+            if (remainingSeedSettlement <= 0) break;
+            
+            const [seedTxn] = await tx.select().from(seedTransactions)
+              .where(eq(seedTransactions.id, txnId));
+            
+            if (!seedTxn) continue;
+            
+            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+            if (currentDue <= 0) continue;
+            
+            const toApply = Math.min(remainingSeedSettlement, currentDue);
+            const newDue = Math.max(0, currentDue - toApply);
+            
+            await tx.update(seedTransactions)
+              .set({ 
+                totalDueToFarmer: newDue.toString()
+              })
+              .where(eq(seedTransactions.id, txnId));
+            
+            remainingSeedSettlement -= toApply;
           }
         } else if (crossSettlement.direction === 'seed_to_raw') {
           // Receiving seed payment, offset against raw potato dues
