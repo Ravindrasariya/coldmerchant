@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf } from "lucide-react";
+import { Search, X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -39,7 +39,12 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   };
 }
 
-export function SeedStockRegisterCard() {
+interface SeedStockRegisterCardProps {
+  downloadDialogOpen?: boolean;
+  onDownloadDialogClose?: () => void;
+}
+
+export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen, onDownloadDialogClose }: SeedStockRegisterCardProps = {}) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,9 +52,17 @@ export function SeedStockRegisterCard() {
   const [filterColdStore, setFilterColdStore] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
   
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
   const [downloadStartDate, setDownloadStartDate] = useState("");
   const [downloadEndDate, setDownloadEndDate] = useState("");
+  
+  const downloadDialogOpen = externalDownloadOpen ?? internalDownloadOpen;
+  const setDownloadDialogOpen = (open: boolean) => {
+    if (!open && onDownloadDialogClose) {
+      onDownloadDialogClose();
+    }
+    setInternalDownloadOpen(open);
+  };
 
   const { data: entries, isLoading, error } = useQuery<SeedStockEntryWithLots[]>({
     queryKey: ["/api/seed-stock-entries"],
@@ -280,76 +293,26 @@ export function SeedStockRegisterCard() {
         </DialogContent>
       </Dialog>
 
-      <Card>
+      <Card className="border-border">
         <CardHeader className="pb-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-green-500/10">
-                <Leaf className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold">{t("Seed Stock Register", "बीज स्टॉक रजिस्टर")}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {filteredEntries.length} {t("entries", "प्रविष्टियाँ")}
-                </p>
-              </div>
-            </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDownloadDialogOpen(true)}
-              data-testid="button-download-seed-csv"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {t("Download CSV", "CSV डाउनलोड")}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2 mb-1">
-                <Boxes className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{t("Total Bags", "कुल बोरी")}</span>
-              </div>
-              <p className="text-lg font-semibold">{summaryTotals.bagsTotal.toLocaleString()}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2 mb-1">
-                <Boxes className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{t("Remaining", "बाकी")}</span>
-              </div>
-              <p className="text-lg font-semibold">{summaryTotals.bagsRemaining.toLocaleString()}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{t("Total Value", "कुल मूल्य")}</span>
-              </div>
-              <p className="text-lg font-semibold">₹{summaryTotals.totalValue.toLocaleString()}</p>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2 mb-1">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">{t("Cold Store Total", "कोल्ड स्टोर कुल")}</span>
-              </div>
-              <p className="text-lg font-semibold">₹{summaryTotals.coldStoreTotal.toLocaleString()}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t("Search by supplier, serial #, cold store...", "आपूर्तिकर्ता, क्रमांक, कोल्ड स्टोर से खोजें...")}
+                placeholder={t("Search by supplier, serial # or cold store...", "आपूर्तिकर्ता, क्रमांक या कोल्ड स्टोर द्वारा खोजें...")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
                 data-testid="input-seed-search"
               />
             </div>
-            
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{t("Filters:", "फ़िल्टर:")}</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap gap-3">
             <Select value={filterPotatoType} onValueChange={setFilterPotatoType}>
               <SelectTrigger className="w-[140px]" data-testid="select-seed-potato-type-filter">
                 <SelectValue placeholder={t("Potato Type", "आलू प्रकार")} />
@@ -391,8 +354,60 @@ export function SeedStockRegisterCard() {
         </CardContent>
       </Card>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card data-testid="card-seed-bags-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Boxes className="h-5 w-5 text-blue-600" />
+              <span className="font-medium">{t("Bags", "बोरी")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
+                <p className="text-lg font-bold" data-testid="text-seed-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">{t("Remaining (Unsold)", "बचे (अनबिके)")}</span>
+                <p className="text-lg font-bold text-amber-600" data-testid="text-seed-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-seed-supplier-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-5 w-5 text-green-600" />
+              <span className="font-medium">{t("Supplier", "आपूर्तिकर्ता")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
+                <p className="text-lg font-bold" data-testid="text-seed-supplier-total">₹{summaryTotals.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-seed-cold-store-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="h-5 w-5 text-purple-600" />
+              <span className="font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
+                <p className="text-lg font-bold" data-testid="text-seed-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <Card key={i}>
               <CardContent className="p-4">
@@ -413,84 +428,136 @@ export function SeedStockRegisterCard() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {filteredEntries.map((entry) => (
-            <Card key={entry.id} className="overflow-hidden" data-testid={`seed-entry-card-${entry.id}`}>
-              <CardContent className="p-4">
-                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                  <div className="flex-1 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="font-mono">
-                        #{entry.serialNumber}
-                      </Badge>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {format(new Date(entry.purchaseDate), "dd MMM yyyy")}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h3 className="font-medium text-lg">{entry.supplierName}</h3>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
-                        {entry.supplierContact && (
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3.5 w-3.5" />
-                            {entry.supplierContact}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {entry.district}, {entry.state}
+        <div className="space-y-4">
+          {filteredEntries.map((entry) => {
+            const potatoTypes = Array.from(new Set(entry.seedLots.map(lot => lot.potatoType)));
+            let entryTotalAmount = 0;
+            let entryColdStoreTotal = 0;
+            
+            entry.seedLots.forEach(lot => {
+              const metrics = computeSeedLotMetrics(lot);
+              entryTotalAmount += metrics.totalAmount;
+              entryColdStoreTotal += metrics.coldStoreTotal;
+            });
+            
+            return (
+              <Card key={entry.id} className="border-border/60 shadow-sm hover-elevate" data-testid={`seed-entry-card-${entry.id}`}>
+                <CardHeader className="py-3 px-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                        <div className="flex items-center gap-1" data-testid={`text-seed-serial-${entry.id}`}>
+                          <Package className="h-4 w-4" style={{ color: '#52a7ff' }} />
+                          <span className="font-semibold text-base">{t("Sr No:", "क्र.:")} {entry.serialNumber} -</span>
+                        </div>
+                        <span className="font-semibold text-base" data-testid={`text-supplier-${entry.id}`}>
+                          {entry.supplierName}
                         </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {entry.seedLots.map((lot, lotIndex) => {
-                        const metrics = computeSeedLotMetrics(lot);
-                        return (
-                          <div
-                            key={lot.id}
-                            className="p-3 rounded-lg bg-muted/30 border border-border/50"
+                        
+                        {potatoTypes.map((type, i) => (
+                          <Badge 
+                            key={i} 
+                            className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0"
                           >
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <Badge variant="secondary" className="text-xs">
-                                {t("Lot", "लॉट")} {lotIndex + 1}
-                              </Badge>
-                              <span className="flex items-center gap-1 text-sm">
-                                <Snowflake className="h-3.5 w-3.5 text-blue-500" />
-                                {lot.coldStoreName}
-                              </span>
-                              <Badge variant="outline">{lot.potatoType}</Badge>
-                              <Badge variant="outline">{lot.size}</Badge>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">{t("Original", "मूल")}:</span>
-                                <span className="ml-1 font-medium">{metrics.originalBags} {t("bags", "बोरी")}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">{t("Remaining", "बाकी")}:</span>
-                                <span className="ml-1 font-medium">{metrics.remainingBags} {t("bags", "बोरी")}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">{t("Price/Bag", "मूल्य/बोरी")}:</span>
-                                <span className="ml-1 font-medium">₹{metrics.pricePerBag}</span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">{t("Total", "कुल")}:</span>
-                                <span className="ml-1 font-medium">₹{metrics.totalAmount.toLocaleString()}</span>
-                              </div>
-                            </div>
+                            {type}
+                          </Badge>
+                        ))}
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>{format(new Date(entry.purchaseDate), "dd MMM yyyy")}</span>
+                        </div>
+                        {entry.supplierContact && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3.5 w-3.5" />
+                            <span>{entry.supplierContact}</span>
                           </div>
-                        );
-                      })}
+                        )}
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" />
+                          <span>{entry.address ? `${entry.address}, ` : ""}{entry.district}, {entry.state}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
+                        {entryTotalAmount > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">{t("Supplier Total", "आपूर्तिकर्ता कुल")}</span>{" "}
+                            <span className="font-medium">₹ {entryTotalAmount.toFixed(0)}</span>
+                          </div>
+                        )}
+                        {entryColdStoreTotal > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
+                            <span className="font-medium">₹ {entryColdStoreTotal.toFixed(0)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardHeader>
+                
+                <CardContent className="pt-0 pb-3 px-4">
+                  <div className="space-y-2">
+                    {entry.seedLots.map((lot, lotIndex) => {
+                      const metrics = computeSeedLotMetrics(lot);
+                      
+                      return (
+                        <div 
+                          key={lot.id} 
+                          className="py-2 px-3 bg-muted/20 rounded-md border border-border/30"
+                          data-testid={`seed-lot-card-${entry.id}-${lotIndex}`}
+                        >
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px]">
+                            <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1}</span>
+                            <div className="flex items-center gap-1.5">
+                              <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="font-medium">{lot.coldStoreName}</span>
+                            </div>
+                            <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
+                              {lot.potatoType}
+                            </Badge>
+                            <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0">
+                              {lot.size}
+                            </Badge>
+                            <Badge className="text-[11px] px-2 py-0.5 font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">
+                              {lot.bagType}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">{t("Bags", "बोरी")}:</span>
+                              <span className="font-medium">{metrics.originalBags}</span>
+                              {metrics.remainingBags < metrics.originalBags && (
+                                <span className="text-amber-600 dark:text-amber-400">({metrics.remainingBags} {t("left", "बचे")})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">{t("Price/Bag", "मूल्य/बोरी")}:</span>
+                              <span className="font-medium">₹{metrics.pricePerBag}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">{t("Total", "कुल")}:</span>
+                              <span className="font-medium">₹{metrics.totalAmount.toLocaleString()}</span>
+                            </div>
+                            {metrics.coldStoreChargesPerBag > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">{t("Cold Charges", "कोल्ड शुल्क")}:</span>
+                                <span className="font-medium">₹{metrics.coldStoreTotal.toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

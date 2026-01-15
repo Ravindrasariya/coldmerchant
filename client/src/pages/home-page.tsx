@@ -45,6 +45,7 @@ export default function HomePage() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("stock-entry");
   const [stockMode, setStockMode] = useState<"raw" | "seed">("raw");
+  const [seedDownloadDialogOpen, setSeedDownloadDialogOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -334,30 +335,50 @@ export default function HomePage() {
                       : t("View and manage your seed stock", "अपने बीज स्टॉक को देखें और प्रबंधित करें")}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-                  <Button
-                    variant={stockMode === "raw" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStockMode("raw")}
-                    className="gap-1.5"
-                    data-testid="button-register-mode-raw"
-                  >
-                    <PackagePlus className="h-4 w-4" />
-                    {t("Raw Potato", "कच्चा आलू")}
-                  </Button>
-                  <Button
-                    variant={stockMode === "seed" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStockMode("seed")}
-                    className="gap-1.5"
-                    data-testid="button-register-mode-seed"
-                  >
-                    <Leaf className="h-4 w-4" />
-                    {t("Seed", "बीज")}
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                    <Button
+                      variant={stockMode === "raw" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setStockMode("raw")}
+                      className="gap-1.5"
+                      data-testid="button-register-mode-raw"
+                    >
+                      <PackagePlus className="h-4 w-4" />
+                      {t("Raw Potato", "कच्चा आलू")}
+                    </Button>
+                    <Button
+                      variant={stockMode === "seed" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setStockMode("seed")}
+                      className="gap-1.5"
+                      data-testid="button-register-mode-seed"
+                    >
+                      <Leaf className="h-4 w-4" />
+                      {t("Seed", "बीज")}
+                    </Button>
+                  </div>
+                  {stockMode === "seed" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSeedDownloadDialogOpen(true)}
+                      title={t("Download CSV", "CSV डाउनलोड")}
+                      data-testid="button-seed-download-header"
+                    >
+                      <Download className="h-5 w-5" />
+                    </Button>
+                  )}
                 </div>
               </div>
-              {stockMode === "raw" ? <StockRegisterCard /> : <SeedStockRegisterCard />}
+              {stockMode === "raw" ? (
+                <StockRegisterCard />
+              ) : (
+                <SeedStockRegisterCard 
+                  downloadDialogOpen={seedDownloadDialogOpen}
+                  onDownloadDialogClose={() => setSeedDownloadDialogOpen(false)}
+                />
+              )}
             </div>
           </div>
 
