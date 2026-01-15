@@ -475,7 +475,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <IndianRupee className="h-3.5 w-3.5" />
-              {t("Revenue", "राजस्व")}
+              {t("Total Revenue", "कुल राजस्व")}
             </div>
             <div className="text-lg font-semibold text-green-600">₹{summary.totalRevenue.toLocaleString("en-IN")}</div>
           </CardContent>
@@ -484,7 +484,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Receipt className="h-3.5 w-3.5" />
-              {t("Cost", "लागत")}
+              {t("Total Cost", "कुल लागत")}
             </div>
             <div className="text-lg font-semibold">₹{summary.totalCost.toLocaleString("en-IN")}</div>
           </CardContent>
@@ -493,7 +493,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               {summary.totalProfitLoss >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-              {t("P&L", "लाभ/हानि")}
+              {t("Total P&L", "कुल लाभ/हानि")}
             </div>
             <div className={`text-lg font-semibold ${summary.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
               ₹{Math.abs(summary.totalProfitLoss).toLocaleString("en-IN")}
