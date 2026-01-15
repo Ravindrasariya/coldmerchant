@@ -645,7 +645,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]> {
-    // Get all transactions with party name and calculate due (revenue - amountReceived)
+    // Get all transactions with party name
     const txns = await db.select().from(transactions)
       .where(eq(transactions.merchantId, merchantId));
     
@@ -655,7 +655,13 @@ export class DatabaseStorage implements IStorage {
     for (const txn of txns) {
       if (!txn.partyName) continue;
       
-      const revenue = parseFloat(txn.revenue || "0");
+      // Calculate revenue from transaction items (more accurate than header)
+      const items = await db.select().from(transactionItems)
+        .where(eq(transactionItems.transactionId, txn.id));
+      
+      const itemsRevenue = items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
+      // Use items revenue if available, otherwise fall back to header revenue
+      const revenue = itemsRevenue > 0 ? itemsRevenue : parseFloat(txn.revenue || "0");
       const received = parseFloat(txn.amountReceived || "0");
       const due = Math.max(0, revenue - received);
       
