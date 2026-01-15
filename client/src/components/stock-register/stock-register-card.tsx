@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -157,6 +160,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [filterQuality, setFilterQuality] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
   const [filterColdStore, setFilterColdStore] = useState<string>("");
+  const [farmerPopoverOpen, setFarmerPopoverOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<StockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
   
@@ -506,16 +510,50 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               </SelectContent>
             </Select>
 
-            <Select value={filterFarmer} onValueChange={setFilterFarmer}>
-              <SelectTrigger className="w-[140px]" data-testid="filter-farmer">
-                <SelectValue placeholder={t("Farmer", "किसान")} />
-              </SelectTrigger>
-              <SelectContent>
-                {farmerNames.map((name) => (
-                  <SelectItem key={name} value={name}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={farmerPopoverOpen} onOpenChange={setFarmerPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={farmerPopoverOpen}
+                  className={cn(
+                    "w-[160px] justify-between h-9 font-normal",
+                    !filterFarmer && "text-muted-foreground"
+                  )}
+                  data-testid="filter-farmer"
+                >
+                  <span className="truncate">
+                    {filterFarmer || t("Farmer", "किसान")}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0">
+                <Command>
+                  <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
+                  <CommandList>
+                    <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
+                    <CommandGroup>
+                      {farmerNames.map((name) => (
+                        <CommandItem
+                          key={name}
+                          value={name}
+                          onSelect={(currentValue) => {
+                            setFilterFarmer(currentValue === filterFarmer ? "" : currentValue);
+                            setFarmerPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${filterFarmer === name ? "opacity-100" : "opacity-0"}`}
+                          />
+                          {name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
               <SelectTrigger className="w-[120px]" data-testid="filter-payment-status">
