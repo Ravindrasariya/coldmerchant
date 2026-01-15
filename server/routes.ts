@@ -1237,11 +1237,36 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/cross-settlement-check - Check cross-settlement eligibility for a farmer
+  app.get("/api/cash/cross-settlement-check", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { farmerName, farmerVillage, farmerContact } = req.query;
+      
+      if (!farmerName || typeof farmerName !== 'string') {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+
+      const eligibility = await storage.checkCrossSettlementEligibility(
+        merchantId,
+        farmerName,
+        typeof farmerVillage === 'string' ? farmerVillage : null,
+        typeof farmerContact === 'string' ? farmerContact : null
+      );
+      
+      res.json(eligibility);
+    } catch (error) {
+      console.error("Error checking cross-settlement eligibility:", error);
+      res.status(500).json({ message: "Failed to check cross-settlement eligibility" });
+    }
+  });
+
   // POST /api/cash/entries - Create a cash entry (inward or outflow)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, supplierName, amount, entryDate, remarks } = req.body;
+      const userId = req.user!.id;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow"].includes(direction)) {
@@ -1292,13 +1317,37 @@ export async function registerRoutes(
         }
       }
 
+      // Validate cross-settlement if provided
+      let validatedCrossSettlement: {
+        settledAmount: number;
+        direction: 'raw_to_seed' | 'seed_to_raw';
+        seedTransactionIds: number[];
+        rawPotatoEntryIds: number[];
+      } | undefined;
+      
+      if (crossSettlement) {
+        const { settledAmount, direction: settlementDirection, seedTransactionIds, rawPotatoEntryIds } = crossSettlement;
+        if (typeof settledAmount !== 'number' || settledAmount <= 0) {
+          return res.status(400).json({ message: "Cross-settlement amount must be a positive number" });
+        }
+        if (!['raw_to_seed', 'seed_to_raw'].includes(settlementDirection)) {
+          return res.status(400).json({ message: "Invalid cross-settlement direction" });
+        }
+        validatedCrossSettlement = {
+          settledAmount,
+          direction: settlementDirection,
+          seedTransactionIds: seedTransactionIds || [],
+          rawPotatoEntryIds: rawPotatoEntryIds || [],
+        };
+      }
+
       // Determine if FIFO should be applied
       const applyFIFO = (direction === "inward" && !!partyName) || 
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 
-      // Create the cash entry with FIFO allocation in a single transaction
-      const createdEntry = await storage.createCashEntryWithFIFO({
+      // Create the cash entry with FIFO allocation and optional cross-settlement
+      const createdEntry = await storage.createCashEntryWithCrossSettlement({
         merchantId,
         direction,
         receiptType: receiptType || null,
@@ -1314,7 +1363,7 @@ export async function registerRoutes(
         amount: amount.toString(),
         entryDate,
         remarks: remarks || null,
-      }, applyFIFO);
+      }, applyFIFO, validatedCrossSettlement, userId);
       
       res.status(201).json(createdEntry);
     } catch (error) {
