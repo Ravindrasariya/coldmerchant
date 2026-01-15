@@ -844,7 +844,39 @@ export class DatabaseStorage implements IStorage {
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
     
-    // Group by normalized farmer name (case-insensitive, trimmed) and calculate total due
+    // Get seed sale cash entries (payments received from farmers for seeds)
+    const seedCashEntries = await db.select().from(cashEntries)
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        eq(cashEntries.direction, "inward"),
+        eq(cashEntries.revenueType, "seed_sale")
+      ));
+    
+    // Get cross-settlements (raw_to_seed) that offset seed dues
+    const rawToSeedSettlements = await db.select().from(farmerSettlements)
+      .where(and(
+        eq(farmerSettlements.merchantId, merchantId),
+        eq(farmerSettlements.settlementDirection, "raw_to_seed")
+      ));
+    
+    // Calculate total paid per farmer (from cash entries and settlements)
+    const paidByFarmer = new Map<string, number>();
+    
+    for (const entry of seedCashEntries) {
+      if (entry.farmerName) {
+        // Match using composite key (name + village) for consistency
+        const key = normalizeName(entry.farmerName) + "|" + normalizeName(entry.farmerVillage || "");
+        paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(entry.amount || "0"));
+      }
+    }
+    
+    for (const settlement of rawToSeedSettlements) {
+      // Match using composite key (name + village) for consistency with cross-settlement eligibility
+      const key = normalizeName(settlement.farmerName) + "|" + normalizeName(settlement.farmerVillage || "");
+      paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(settlement.settledAmount || "0"));
+    }
+    
+    // Group by normalized farmer name + village (case-insensitive, trimmed) and calculate total due
     const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
@@ -852,8 +884,9 @@ export class DatabaseStorage implements IStorage {
       
       if (dueToFarmer <= 0) continue; // Skip fully paid
       
-      const key = normalizeName(txn.farmerName);
-      if (!key) continue;
+      // Use composite key (name + village) for consistency
+      const key = normalizeName(txn.farmerName) + "|" + normalizeName(txn.village || "");
+      if (!normalizeName(txn.farmerName)) continue;
       
       const existing = farmerMap.get(key);
       if (existing) {
@@ -869,12 +902,23 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(farmerMap.entries()).map(([_, data]) => ({
-      farmerName: data.displayName,
-      village: data.village,
-      totalDue: data.totalDue,
-      transactionCount: data.transactionCount,
-    })).sort((a, b) => b.totalDue - a.totalDue);
+    // Subtract payments and settlements from dues
+    Array.from(paidByFarmer.entries()).forEach(([key, paidAmount]) => {
+      const farmer = farmerMap.get(key);
+      if (farmer) {
+        farmer.totalDue = Math.max(0, farmer.totalDue - paidAmount);
+      }
+    });
+    
+    // Filter out farmers with no remaining due
+    return Array.from(farmerMap.entries())
+      .filter(([_, data]) => data.totalDue > 0)
+      .map(([_, data]) => ({
+        farmerName: data.displayName,
+        village: data.village,
+        totalDue: data.totalDue,
+        transactionCount: data.transactionCount,
+      })).sort((a, b) => b.totalDue - a.totalDue);
   }
 
   async getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]> {
@@ -1553,6 +1597,19 @@ export class DatabaseStorage implements IStorage {
     // Subtract what's already been paid
     const paidTowardsSeed = seedPaidByFarmer.get(normalizedName) || 0;
     seedDueAmount = Math.max(0, seedDueAmount - paidTowardsSeed);
+    
+    // Also subtract cross-settlements (raw_to_seed) that offset seed dues
+    const rawToSeedSettlements = await db.select().from(farmerSettlements)
+      .where(and(
+        eq(farmerSettlements.merchantId, merchantId),
+        eq(farmerSettlements.settlementDirection, "raw_to_seed")
+      ));
+    
+    for (const settlement of rawToSeedSettlements) {
+      if (normalizeName(settlement.farmerName) === normalizedName) {
+        seedDueAmount = Math.max(0, seedDueAmount - parseFloat(settlement.settledAmount || "0"));
+      }
+    }
 
     // Check for raw potato dues (merchant owes money to farmer)
     const allStockEntries = await db.select().from(stockEntries)
@@ -1652,8 +1709,10 @@ export class DatabaseStorage implements IStorage {
         // Apply the cross-settlement based on direction
         if (crossSettlement.direction === 'raw_to_seed') {
           // Paying farmer for raw potatoes, offset against seed dues
-          // The settled amount reduces what farmer owes for seeds (virtual payment toward seed dues)
-          // No actual cash entry needed for the offset - it's recorded as settlement
+          // The settled amount is recorded in farmerSettlements table
+          // getSeedFarmersWithDues and checkCrossSettlementEligibility will account for this
+          // by subtracting farmerSettlements with direction 'raw_to_seed' from seed dues
+          // No direct update needed - the settlement record handles the offset
         } else if (crossSettlement.direction === 'seed_to_raw') {
           // Receiving seed payment, offset against raw potato dues
           // The settled amount reduces what we owe farmer for raw potatoes
