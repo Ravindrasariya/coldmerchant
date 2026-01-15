@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer } from "lucide-react";
+import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -334,6 +334,8 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
       <Card className="border-border">
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-3">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+
             <Select value={filterSerial} onValueChange={setFilterSerial}>
               <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter">
                 <SelectValue placeholder={t("Serial #", "क्रमांक")} />
@@ -385,6 +387,16 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
               data-testid="button-seed-unsold-filter"
             >
               {t("Unsold Only", "केवल अनबिके")}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDownloadDialogOpen(true)}
+              title={t("Download", "डाउनलोड")}
+              data-testid="button-seed-download"
+            >
+              <Download className="h-4 w-4" />
             </Button>
 
             {hasActiveFilters && (

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -146,7 +146,8 @@ function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnT
 export function StockRegisterCard() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [filterSerial, setFilterSerial] = useState<string>("");
+  const [filterFarmer, setFilterFarmer] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
@@ -174,17 +175,28 @@ export function StockRegisterCard() {
     return Array.from(stores);
   }, [entries]);
 
+  const serialNumbers = useMemo(() => {
+    if (!entries) return [];
+    return entries.map(e => e.serialNumber).sort((a, b) => a - b);
+  }, [entries]);
+
+  const farmerNames = useMemo(() => {
+    if (!entries) return [];
+    const names = new Set<string>();
+    entries.forEach(entry => names.add(entry.farmerName));
+    return Array.from(names).sort();
+  }, [entries]);
+
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     
     return entries.filter((entry) => {
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const matchesSearch = 
-          entry.farmerName.toLowerCase().includes(search) ||
-          entry.serialNumber.toString().includes(search) ||
-          entry.lots.some(lot => lot.coldStoreName.toLowerCase().includes(search));
-        if (!matchesSearch) return false;
+      if (filterSerial && entry.serialNumber.toString() !== filterSerial) {
+        return false;
+      }
+
+      if (filterFarmer && entry.farmerName !== filterFarmer) {
+        return false;
       }
 
       if (filterPaymentStatus && entry.paymentStatus !== filterPaymentStatus) {
@@ -208,17 +220,18 @@ export function StockRegisterCard() {
 
       return true;
     });
-  }, [entries, searchTerm, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, filterSerial, filterFarmer, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const clearFilters = () => {
-    setSearchTerm("");
+    setFilterSerial("");
+    setFilterFarmer("");
     setFilterPaymentStatus("");
     setFilterQuality("");
     setFilterUnsold(false);
     setFilterColdStore("");
   };
 
-  const hasActiveFilters = searchTerm || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
+  const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
 
   // Compute summary totals from filtered entries
   const summaryTotals = useMemo(() => {
@@ -470,16 +483,29 @@ export function StockRegisterCard() {
       <Card className="border-border">
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t("Search farmer, serial #...", "किसान, क्रमांक खोजें...")}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-9"
-                data-testid="input-search"
-              />
-            </div>
+            <Filter className="h-4 w-4 text-muted-foreground" />
+
+            <Select value={filterSerial} onValueChange={setFilterSerial}>
+              <SelectTrigger className="w-[100px]" data-testid="filter-serial">
+                <SelectValue placeholder={t("Serial #", "क्रमांक")} />
+              </SelectTrigger>
+              <SelectContent>
+                {serialNumbers.map((num) => (
+                  <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterFarmer} onValueChange={setFilterFarmer}>
+              <SelectTrigger className="w-[140px]" data-testid="filter-farmer">
+                <SelectValue placeholder={t("Farmer", "किसान")} />
+              </SelectTrigger>
+              <SelectContent>
+                {farmerNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
               <SelectTrigger className="w-[120px]" data-testid="filter-payment-status">
