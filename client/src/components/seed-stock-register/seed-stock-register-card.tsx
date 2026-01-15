@@ -26,14 +26,14 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
   const coldStoreChargesPerBag = lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0;
   const coldStoreChargesPaid = lot.coldStoreChargesPaid ? parseFloat(lot.coldStoreChargesPaid) : 0;
-  const hammaliPerBag = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
-  const gradingPerBag = lot.gradingPerBag ? parseFloat(lot.gradingPerBag) : 0;
+  const hammaliCharges = lot.hammaliCharges ? parseFloat(lot.hammaliCharges) : 0;
+  const gradingCharges = lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0;
+  const transportCharges = lot.transportCharges ? parseFloat(lot.transportCharges) : 0;
   
   const totalAmount = lot.originalBags * pricePerBag;
   const coldStoreTotal = lot.originalBags * coldStoreChargesPerBag;
   const coldStoreDue = Math.max(coldStoreTotal - coldStoreChargesPaid, 0);
-  const hammaliTotal = lot.originalBags * hammaliPerBag;
-  const gradingTotal = lot.originalBags * gradingPerBag;
+  const totalExtraCost = hammaliCharges + gradingCharges + transportCharges;
   const soldBags = lot.originalBags - lot.remainingBags;
   
   return {
@@ -46,10 +46,10 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
     coldStoreTotal,
     coldStoreChargesPaid,
     coldStoreDue,
-    hammaliPerBag,
-    hammaliTotal,
-    gradingPerBag,
-    gradingTotal,
+    hammaliCharges,
+    gradingCharges,
+    transportCharges,
+    totalExtraCost,
   };
 }
 
@@ -594,6 +594,12 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                                 <span className={`font-medium ${metrics.coldStoreDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
                                   ₹{metrics.coldStoreDue.toLocaleString()}
                                 </span>
+                              </div>
+                            )}
+                            {metrics.totalExtraCost > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">{t("Extra Cost", "अतिरिक्त लागत")}:</span>
+                                <span className="font-medium text-purple-600 dark:text-purple-400">₹{metrics.totalExtraCost.toLocaleString()}</span>
                               </div>
                             )}
                           </div>

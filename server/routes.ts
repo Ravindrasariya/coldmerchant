@@ -1587,8 +1587,9 @@ export async function registerRoutes(
               pricePerBag: lotData.pricePerBag?.toString(),
               coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
               coldStoreChargesPaid: lotData.coldStoreChargesPaid?.toString() || "0",
-              hammaliPerBag: lotData.hammaliPerBag?.toString() || null,
-              gradingPerBag: lotData.gradingPerBag?.toString() || null,
+              hammaliCharges: lotData.hammaliCharges?.toString() || null,
+              gradingCharges: lotData.gradingCharges?.toString() || null,
+              transportCharges: lotData.transportCharges?.toString() || null,
               remainingBags: lotData.remainingBags ?? lotData.originalBags,
               remarks: lotData.remarks || null,
             });
@@ -1605,8 +1606,9 @@ export async function registerRoutes(
               pricePerBag: lotData.pricePerBag.toString(),
               coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
               coldStoreChargesPaid: lotData.coldStoreChargesPaid?.toString() || "0",
-              hammaliPerBag: lotData.hammaliPerBag?.toString() || null,
-              gradingPerBag: lotData.gradingPerBag?.toString() || null,
+              hammaliCharges: lotData.hammaliCharges?.toString() || null,
+              gradingCharges: lotData.gradingCharges?.toString() || null,
+              transportCharges: lotData.transportCharges?.toString() || null,
               remainingBags: lotData.originalBags,
               remarks: lotData.remarks || null,
             });

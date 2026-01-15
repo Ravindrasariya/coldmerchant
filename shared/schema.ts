@@ -249,8 +249,9 @@ export const seedLots = pgTable("seed_lots", {
   pricePerBag: decimal("price_per_bag", { precision: 10, scale: 2 }).notNull(),
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }),
   coldStoreChargesPaid: decimal("cold_store_charges_paid", { precision: 12, scale: 2 }).default("0"),
-  hammaliPerBag: decimal("hammali_per_bag", { precision: 10, scale: 2 }),
-  gradingPerBag: decimal("grading_per_bag", { precision: 10, scale: 2 }),
+  hammaliCharges: decimal("hammali_charges", { precision: 12, scale: 2 }),
+  gradingCharges: decimal("grading_charges", { precision: 12, scale: 2 }),
+  transportCharges: decimal("transport_charges", { precision: 12, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -654,8 +655,9 @@ export const seedLotUpdateSchema = z.object({
   pricePerBag: z.coerce.number().min(0).optional(),
   coldStoreChargesPerBag: z.coerce.number().optional(),
   coldStoreChargesPaid: z.coerce.number().optional(),
-  hammaliPerBag: z.coerce.number().optional(),
-  gradingPerBag: z.coerce.number().optional(),
+  hammaliCharges: z.coerce.number().optional(),
+  gradingCharges: z.coerce.number().optional(),
+  transportCharges: z.coerce.number().optional(),
   remarks: z.string().optional(),
 });
 

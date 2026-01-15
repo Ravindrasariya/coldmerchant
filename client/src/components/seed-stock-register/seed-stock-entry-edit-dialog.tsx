@@ -42,8 +42,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     pricePerBag: lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0,
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0,
     coldStoreChargesPaid: lot.coldStoreChargesPaid ? parseFloat(lot.coldStoreChargesPaid) : 0,
-    hammaliPerBag: lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0,
-    gradingPerBag: lot.gradingPerBag ? parseFloat(lot.gradingPerBag) : 0,
+    hammaliCharges: lot.hammaliCharges ? parseFloat(lot.hammaliCharges) : 0,
+    gradingCharges: lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0,
+    transportCharges: lot.transportCharges ? parseFloat(lot.transportCharges) : 0,
   })));
 
   interface SeedLotUpdate {
@@ -57,8 +58,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     pricePerBag: number;
     coldStoreChargesPerBag: number;
     coldStoreChargesPaid: number;
-    hammaliPerBag: number;
-    gradingPerBag: number;
+    hammaliCharges: number;
+    gradingCharges: number;
+    transportCharges: number;
     remarks?: string;
   }
 
@@ -110,8 +112,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
         pricePerBag: lot.pricePerBag,
         coldStoreChargesPerBag: lot.coldStoreChargesPerBag,
         coldStoreChargesPaid: lot.coldStoreChargesPaid,
-        hammaliPerBag: lot.hammaliPerBag,
-        gradingPerBag: lot.gradingPerBag,
+        hammaliCharges: lot.hammaliCharges,
+        gradingCharges: lot.gradingCharges,
+        transportCharges: lot.transportCharges,
         remarks: lot.remarks || undefined,
       })),
     });
@@ -227,8 +230,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
                       <Input
                         type="number"
-                        value={lot.originalBags}
+                        value={lot.originalBags || ""}
                         onChange={(e) => handleLotChange(lotIndex, "originalBags", parseInt(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-original-bags`}
                       />
                     </div>
@@ -236,8 +240,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Remaining Bags", "बचे बोरी")}</Label>
                       <Input
                         type="number"
-                        value={lot.remainingBags}
+                        value={lot.remainingBags || ""}
                         onChange={(e) => handleLotChange(lotIndex, "remainingBags", parseInt(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-remaining-bags`}
                       />
                     </div>
@@ -245,8 +250,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Price/Bag", "मूल्य/बोरी")}</Label>
                       <Input
                         type="number"
-                        value={lot.pricePerBag}
+                        value={lot.pricePerBag || ""}
                         onChange={(e) => handleLotChange(lotIndex, "pricePerBag", parseFloat(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-price`}
                       />
                     </div>
@@ -254,8 +260,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Cold Charges/Bag", "कोल्ड शुल्क/बोरी")}</Label>
                       <Input
                         type="number"
-                        value={lot.coldStoreChargesPerBag}
+                        value={lot.coldStoreChargesPerBag || ""}
                         onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPerBag", parseFloat(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-cold-charges`}
                       />
                     </div>
@@ -263,27 +270,40 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Cold Charges Paid", "कोल्ड शुल्क भुगतान")}</Label>
                       <Input
                         type="number"
-                        value={lot.coldStoreChargesPaid}
+                        value={lot.coldStoreChargesPaid || ""}
                         onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPaid", parseFloat(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-cold-paid`}
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">{t("Hammali/Bag", "हम्माली/बोरी")}</Label>
+                      <Label className="text-xs">{t("Total Hammali", "कुल हम्माली")}</Label>
                       <Input
                         type="number"
-                        value={lot.hammaliPerBag}
-                        onChange={(e) => handleLotChange(lotIndex, "hammaliPerBag", parseFloat(e.target.value) || 0)}
+                        value={lot.hammaliCharges || ""}
+                        onChange={(e) => handleLotChange(lotIndex, "hammaliCharges", parseFloat(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-hammali`}
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">{t("Grading/Bag", "ग्रेडिंग/बोरी")}</Label>
+                      <Label className="text-xs">{t("Total Grading", "कुल ग्रेडिंग")}</Label>
                       <Input
                         type="number"
-                        value={lot.gradingPerBag}
-                        onChange={(e) => handleLotChange(lotIndex, "gradingPerBag", parseFloat(e.target.value) || 0)}
+                        value={lot.gradingCharges || ""}
+                        onChange={(e) => handleLotChange(lotIndex, "gradingCharges", parseFloat(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-grading`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Total Transport", "कुल ट्रांसपोर्ट")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.transportCharges || ""}
+                        onChange={(e) => handleLotChange(lotIndex, "transportCharges", parseFloat(e.target.value) || 0)}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        data-testid={`input-seed-lot-${lotIndex}-transport`}
                       />
                     </div>
                   </div>
