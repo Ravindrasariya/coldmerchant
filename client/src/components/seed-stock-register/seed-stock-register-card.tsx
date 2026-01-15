@@ -230,6 +230,9 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
       t("Price/Bag", "मूल्य/बोरी"),
       t("Total Value ₹", "कुल मूल्य ₹"),
       t("Cold Store Charges/Bag", "कोल्ड स्टोर शुल्क/बोरी"),
+      t("Hammali ₹", "हम्माली ₹"),
+      t("Grading ₹", "ग्रेडिंग ₹"),
+      t("Transport ₹", "परिवहन ₹"),
     ];
 
     const rows: string[][] = [];
@@ -254,6 +257,9 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           metrics.pricePerBag.toFixed(2),
           metrics.totalAmount.toFixed(0),
           metrics.coldStoreChargesPerBag.toFixed(2),
+          metrics.hammaliCharges.toFixed(2),
+          metrics.gradingCharges.toFixed(2),
+          metrics.transportCharges.toFixed(2),
         ]);
       });
     });
