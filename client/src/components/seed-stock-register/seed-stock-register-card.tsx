@@ -402,17 +402,17 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         <Card data-testid="card-seed-bags-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Boxes className="h-5 w-5 text-blue-600" />
-              <span className="font-medium">{t("Bags", "बोरी")}</span>
+              <Boxes className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium">{t("Bags", "बोरी")}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-seed-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
+                <p className="text-base font-bold" data-testid="text-seed-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Remaining", "बचे")}</span>
-                <p className="text-lg font-bold text-amber-600" data-testid="text-seed-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+                <p className="text-base font-bold text-amber-600" data-testid="text-seed-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -421,17 +421,17 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         <Card data-testid="card-seed-supplier-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Users className="h-5 w-5 text-green-600" />
-              <span className="font-medium">{t("Supplier", "आपूर्तिकर्ता")}</span>
+              <Users className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium">{t("Supplier", "आपूर्तिकर्ता")}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-seed-supplier-total">₹{summaryTotals.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-base font-bold" data-testid="text-seed-supplier-total">₹{summaryTotals.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बकाया")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-seed-supplier-due">₹{summaryTotals.totalSupplierDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-base font-bold text-red-600" data-testid="text-seed-supplier-due">₹{summaryTotals.totalSupplierDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </CardContent>
@@ -440,17 +440,17 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         <Card data-testid="card-seed-cold-store-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Building2 className="h-5 w-5 text-purple-600" />
-              <span className="font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
+              <Building2 className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
             </div>
             <div className="flex justify-between items-baseline gap-2">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-seed-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-base font-bold" data-testid="text-seed-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बकाया")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-seed-cold-due">₹{summaryTotals.totalColdStoreDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-base font-bold text-red-600" data-testid="text-seed-cold-due">₹{summaryTotals.totalColdStoreDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </CardContent>
@@ -459,12 +459,12 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         <Card data-testid="card-seed-extra-cost-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-5 w-5 text-orange-600" />
-              <span className="font-medium">{t("Extra Cost", "अतिरिक्त लागत")}</span>
+              <Clock className="h-4 w-4 text-orange-600" />
+              <span className="text-sm font-medium">{t("Extra Cost", "अतिरिक्त लागत")}</span>
             </div>
             <div>
               <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-              <p className="text-lg font-bold" data-testid="text-seed-extra-cost-total">₹{summaryTotals.totalExtraCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              <p className="text-base font-bold" data-testid="text-seed-extra-cost-total">₹{summaryTotals.totalExtraCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
             </div>
           </CardContent>
         </Card>
