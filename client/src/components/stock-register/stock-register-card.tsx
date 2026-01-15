@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake } from "lucide-react";
+import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2 } from "lucide-react";
 import { QUALITY_OPTIONS } from "@shared/schema";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
@@ -198,6 +198,44 @@ export function StockRegisterCard() {
 
   const hasActiveFilters = searchTerm || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
 
+  // Compute summary totals from filtered entries
+  const summaryTotals = useMemo(() => {
+    let bagsTotal = 0;
+    let bagsRemaining = 0;
+    let farmerTotal = 0;
+    let farmerDue = 0;
+    let coldStoreTotal = 0;
+    let coldStoreDue = 0;
+
+    filteredEntries.forEach(entry => {
+      let entryTotalAmount = 0;
+      let entryColdStoreTotalCharges = 0;
+      let entryColdStorePaid = 0;
+
+      entry.lots.forEach(lot => {
+        const metrics = computeLotMetrics(lot);
+        bagsTotal += metrics.actualSellableBags;
+        bagsRemaining += metrics.remainingToSell;
+        if (metrics.totalAmount !== null) {
+          entryTotalAmount += metrics.totalAmount;
+        }
+        if (metrics.coldStoreTotalCharges !== null) {
+          entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
+        }
+        entryColdStorePaid += metrics.coldStorePaid;
+      });
+
+      farmerTotal += entryTotalAmount;
+      const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+      farmerDue += Math.max(entryTotalAmount - amountPaid, 0);
+      
+      coldStoreTotal += entryColdStoreTotalCharges;
+      coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
+    });
+
+    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue };
+  }, [filteredEntries]);
+
   if (error) {
     return (
       <Card>
@@ -290,6 +328,66 @@ export function StockRegisterCard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card data-testid="card-bags-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Boxes className="h-5 w-5 text-blue-600" />
+              <span className="font-medium">{t("Bags", "बैग")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
+                <p className="text-lg font-bold" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">{t("Remaining (Unsold)", "बचे (अनबिके)")}</span>
+                <p className="text-lg font-bold text-amber-600" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-farmer-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-5 w-5 text-green-600" />
+              <span className="font-medium">{t("Farmer", "किसान")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
+                <p className="text-lg font-bold" data-testid="text-farmer-total">₹{Math.round(summaryTotals.farmerTotal).toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
+                <p className="text-lg font-bold text-red-600" data-testid="text-farmer-due">₹{Math.round(summaryTotals.farmerDue).toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-cold-store-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="h-5 w-5 text-purple-600" />
+              <span className="font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
+                <p className="text-lg font-bold" data-testid="text-cold-total">₹{Math.round(summaryTotals.coldStoreTotal).toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
+                <p className="text-lg font-bold text-red-600" data-testid="text-cold-due">₹{Math.round(summaryTotals.coldStoreDue).toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {isLoading ? (
         <div className="space-y-4">
