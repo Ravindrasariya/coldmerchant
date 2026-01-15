@@ -70,19 +70,10 @@ export function TransactionsTab() {
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterParty, setFilterParty] = useState("all");
   const [filterPaymentDue, setFilterPaymentDue] = useState("all");
-  
-  // If in seed mode, render seed transactions component
-  if (transactionMode === "seed") {
-    return (
-      <SeedTransactionsContent
-        transactionMode={transactionMode}
-        setTransactionMode={setTransactionMode}
-      />
-    );
-  }
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
+    enabled: transactionMode === "raw",
   });
 
   // Get unique party names for dropdown
@@ -241,6 +232,16 @@ export function TransactionsTab() {
       description: t("CSV downloaded successfully", "CSV सफलतापूर्वक डाउनलोड हुई"),
     });
   };
+
+  // If in seed mode, render seed transactions component
+  if (transactionMode === "seed") {
+    return (
+      <SeedTransactionsContent
+        transactionMode={transactionMode}
+        setTransactionMode={setTransactionMode}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
