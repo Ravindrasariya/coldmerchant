@@ -7,12 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2, Package, IndianRupee } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, IndianRupee, History, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { SEED_DISTRICTS, STATES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { format } from "date-fns";
 
 interface SeedLotOption {
   id: number;
@@ -72,6 +74,16 @@ interface SeedTransaction {
   items: SeedTransactionItem[];
 }
 
+interface EditHistoryEntry {
+  id: number;
+  seedTransactionId: number;
+  merchantId: number;
+  userId: number | null;
+  changedAt: string;
+  changeSet: Array<{ field: string; oldValue: any; newValue: any }>;
+  userName?: string;
+}
+
 interface EditSeedTransactionDialogProps {
   transactionId: number | null;
   open: boolean;
@@ -95,8 +107,15 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([]);
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const { data: transaction, isLoading: isLoadingTransaction } = useQuery<SeedTransaction>({
     queryKey: ["/api/seed-transactions", transactionId],
+    enabled: open && transactionId !== null,
+  });
+
+  const { data: editHistory } = useQuery<EditHistoryEntry[]>({
+    queryKey: ["/api/seed-transactions", transactionId, "edit-history"],
     enabled: open && transactionId !== null,
   });
 
@@ -577,6 +596,55 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
               </div>
             </CardContent>
           </Card>
+
+          {/* Edit History Section */}
+          {editHistory && editHistory.length > 0 && (
+            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between" data-testid="button-toggle-seed-history">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4" />
+                    <span>{t("Edit History", "संपादन इतिहास")} ({editHistory.length})</span>
+                  </div>
+                  {historyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-3 mt-3 max-h-60 overflow-y-auto">
+                  {editHistory.map((entry) => (
+                    <Card key={entry.id} className="bg-muted/30">
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(entry.changedAt), "dd MMM yyyy, hh:mm a")}
+                          </span>
+                          {entry.userName && (
+                            <Badge variant="secondary" className="text-xs">
+                              {entry.userName}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          {(entry.changeSet as Array<{ field: string; oldValue: any; newValue: any }>).map((change, idx) => (
+                            <div key={idx} className="text-sm flex flex-wrap gap-1 items-center">
+                              <span className="font-medium">{change.field}:</span>
+                              <span className="text-red-600 line-through">
+                                {change.oldValue !== null ? String(change.oldValue) : '-'}
+                              </span>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="text-green-600">
+                                {change.newValue !== null ? String(change.newValue) : '-'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </div>
 
         <DialogFooter>

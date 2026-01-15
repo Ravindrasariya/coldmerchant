@@ -310,6 +310,16 @@ export const seedTransactionItems = pgTable("seed_transaction_items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Seed Transaction Edit History - tracks modifications to seed transactions
+export const seedTransactionEditHistory = pgTable("seed_transaction_edit_history", {
+  id: serial("id").primaryKey(),
+  seedTransactionId: integer("seed_transaction_id").notNull().references(() => seedTransactions.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  userId: integer("user_id").references(() => users.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changeSet: jsonb("change_set").notNull(), // Array of { field, oldValue, newValue }
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -376,6 +386,23 @@ export const seedTransactionsRelations = relations(seedTransactions, ({ one, man
     references: [merchants.id],
   }),
   items: many(seedTransactionItems),
+  editHistory: many(seedTransactionEditHistory),
+}));
+
+// Seed Transaction Edit History Relations
+export const seedTransactionEditHistoryRelations = relations(seedTransactionEditHistory, ({ one }) => ({
+  seedTransaction: one(seedTransactions, {
+    fields: [seedTransactionEditHistory.seedTransactionId],
+    references: [seedTransactions.id],
+  }),
+  merchant: one(merchants, {
+    fields: [seedTransactionEditHistory.merchantId],
+    references: [merchants.id],
+  }),
+  user: one(users, {
+    fields: [seedTransactionEditHistory.userId],
+    references: [users.id],
+  }),
 }));
 
 // Seed Transaction Items Relations
@@ -569,6 +596,7 @@ export const insertSeedLotSchema = createInsertSchema(seedLots).omit({ id: true,
 export const insertSeedStockEntryEditHistorySchema = createInsertSchema(seedStockEntryEditHistory).omit({ id: true, changedAt: true });
 export const insertSeedTransactionSchema = createInsertSchema(seedTransactions).omit({ id: true, createdAt: true, transactionNumber: true });
 export const insertSeedTransactionItemSchema = createInsertSchema(seedTransactionItems).omit({ id: true, createdAt: true });
+export const insertSeedTransactionEditHistorySchema = createInsertSchema(seedTransactionEditHistory).omit({ id: true, changedAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -630,6 +658,9 @@ export type InsertSeedTransaction = z.infer<typeof insertSeedTransactionSchema>;
 
 export type SeedTransactionItem = typeof seedTransactionItems.$inferSelect;
 export type InsertSeedTransactionItem = z.infer<typeof insertSeedTransactionItemSchema>;
+
+export type SeedTransactionEditHistory = typeof seedTransactionEditHistory.$inferSelect;
+export type InsertSeedTransactionEditHistory = z.infer<typeof insertSeedTransactionEditHistorySchema>;
 
 // Change types for edit history
 export type FieldChange = {

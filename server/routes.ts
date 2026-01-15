@@ -1790,15 +1790,35 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/seed-transactions/:id/edit-history - Get edit history for a seed transaction
+  app.get("/api/seed-transactions/:id/edit-history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const history = await storage.getSeedTransactionEditHistory(id, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching seed transaction edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
+    }
+  });
+
   // PATCH /api/seed-transactions/:id - Update a seed transaction
   app.patch("/api/seed-transactions/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
       const id = parseInt(req.params.id);
       const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, items } = req.body;
 
       if (!farmerName || !district || !state || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Get existing transaction for change tracking
+      const existingTxn = await storage.getSeedTransactionById(id, merchantId);
+      if (!existingTxn) {
+        return res.status(404).json({ message: "Seed transaction not found" });
       }
 
       // Calculate totals
@@ -1875,6 +1895,103 @@ export async function registerRoutes(
 
       if (!transaction) {
         return res.status(404).json({ message: "Seed transaction not found" });
+      }
+
+      // Track changes for edit history
+      const changes: Array<{ field: string; oldValue: any; newValue: any }> = [];
+      
+      // Helper to normalize values for comparison (handles decimal string vs number)
+      const normalizeValue = (val: any): string => {
+        if (val === null || val === undefined || val === '') return '';
+        const num = parseFloat(String(val));
+        return isNaN(num) ? String(val).trim() : num.toString();
+      };
+      
+      // Compare text fields
+      const textFieldsToTrack = [
+        { key: 'farmerName', label: 'Farmer Name' },
+        { key: 'farmerContact', label: 'Farmer Contact' },
+        { key: 'village', label: 'Village' },
+        { key: 'tehsil', label: 'Tehsil' },
+        { key: 'district', label: 'District' },
+        { key: 'state', label: 'State' },
+        { key: 'vehicleNumber', label: 'Vehicle Number' },
+        { key: 'otherChargesRemarks', label: 'Other Charges Remarks' },
+      ];
+
+      for (const { key, label } of textFieldsToTrack) {
+        const oldVal = existingTxn[key as keyof typeof existingTxn];
+        const newVal = transaction[key as keyof typeof transaction];
+        if (String(oldVal || '').trim() !== String(newVal || '').trim()) {
+          changes.push({ field: label, oldValue: oldVal || null, newValue: newVal || null });
+        }
+      }
+
+      // Compare numeric fields with normalization
+      const numericFieldsToTrack = [
+        { key: 'transportCharges', label: 'Transport Charges' },
+        { key: 'otherCharges', label: 'Other Charges' },
+        { key: 'totalBags', label: 'Total Bags' },
+        { key: 'totalCost', label: 'Total Cost' },
+        { key: 'totalRevenue', label: 'Total Revenue' },
+        { key: 'totalProfitLoss', label: 'Profit/Loss' },
+        { key: 'totalDueToFarmer', label: 'Total Due' },
+      ];
+
+      for (const { key, label } of numericFieldsToTrack) {
+        const oldVal = existingTxn[key as keyof typeof existingTxn];
+        const newVal = transaction[key as keyof typeof transaction];
+        if (normalizeValue(oldVal) !== normalizeValue(newVal)) {
+          const formattedOld = oldVal !== null ? `₹${parseFloat(String(oldVal)).toLocaleString('en-IN')}` : null;
+          const formattedNew = newVal !== null ? `₹${parseFloat(String(newVal)).toLocaleString('en-IN')}` : null;
+          changes.push({ field: label, oldValue: formattedOld, newValue: formattedNew });
+        }
+      }
+
+      // Track item changes
+      const oldItemsMap = new Map(existingTxn.items.map((i: any) => [i.seedLotId, i]));
+      const newItemsMap = new Map(transaction.items.map((i: any) => [i.seedLotId, i]));
+
+      // Check for removed items
+      for (const oldItem of existingTxn.items) {
+        if (!newItemsMap.has(oldItem.seedLotId)) {
+          changes.push({ 
+            field: `Lot S#${oldItem.serialNumber}`, 
+            oldValue: `${oldItem.bagsMoved} bags @ ₹${parseFloat(oldItem.pricePerBag).toLocaleString('en-IN')}`, 
+            newValue: 'Removed' 
+          });
+        }
+      }
+
+      // Check for added/modified items
+      for (const newItem of transaction.items) {
+        const oldItem = oldItemsMap.get(newItem.seedLotId);
+        if (!oldItem) {
+          changes.push({ 
+            field: `Lot S#${newItem.serialNumber}`, 
+            oldValue: 'Not included', 
+            newValue: `${newItem.bagsMoved} bags @ ₹${parseFloat(newItem.pricePerBag).toLocaleString('en-IN')}` 
+          });
+        } else if (
+          oldItem.bagsMoved !== newItem.bagsMoved || 
+          normalizeValue(oldItem.pricePerBag) !== normalizeValue(newItem.pricePerBag)
+        ) {
+          changes.push({ 
+            field: `Lot S#${newItem.serialNumber}`, 
+            oldValue: `${oldItem.bagsMoved} bags @ ₹${parseFloat(oldItem.pricePerBag).toLocaleString('en-IN')}`, 
+            newValue: `${newItem.bagsMoved} bags @ ₹${parseFloat(newItem.pricePerBag).toLocaleString('en-IN')}` 
+          });
+        }
+      }
+
+      // Save edit history if there are changes
+      if (changes.length > 0) {
+        await storage.createSeedTransactionEditHistory({
+          seedTransactionId: id,
+          merchantId,
+          userId,
+          changeSet: changes,
+        });
       }
 
       res.json(transaction);

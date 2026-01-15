@@ -4,7 +4,7 @@ import {
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
   cashSettings, parties, cashFarmers,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
-  seedTransactions, seedTransactionItems,
+  seedTransactions, seedTransactionItems, seedTransactionEditHistory,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -24,7 +24,8 @@ import {
   type SeedStockEntryEditHistory,
   type SeedTransaction, type InsertSeedTransaction,
   type SeedTransactionItem, type InsertSeedTransactionItem,
-  type SeedTransactionWithItems
+  type SeedTransactionWithItems,
+  type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
@@ -133,9 +134,11 @@ export interface IStorage {
   getSeedTransactionsByMerchant(merchantId: number): Promise<any[]>;
   getSeedTransactionById(id: number, merchantId: number): Promise<any | undefined>;
   createSeedTransaction(transaction: any, items: any[]): Promise<any>;
-  updateSeedTransaction(id: number, merchantId: number, data: any, items: any[]): Promise<any>;
+  updateSeedTransaction(id: number, merchantId: number, data: any, items: any[], userId?: number): Promise<any>;
   getNextSeedTransactionNumber(merchantId: number): Promise<number>;
   getUnsoldSeedInventory(merchantId: number): Promise<any[]>;
+  createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
+  getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1305,6 +1308,31 @@ export class DatabaseStorage implements IStorage {
         serialNumber: entry?.serialNumber || 0,
         supplierName: entry?.supplierName || '',
       };
+    }));
+
+    return result;
+  }
+
+  async createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<SeedTransactionEditHistory> {
+    const [created] = await db.insert(seedTransactionEditHistory).values(data).returning();
+    return created;
+  }
+
+  async getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<(SeedTransactionEditHistory & { userName?: string })[]> {
+    const history = await db.select().from(seedTransactionEditHistory)
+      .where(and(
+        eq(seedTransactionEditHistory.seedTransactionId, seedTransactionId),
+        eq(seedTransactionEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(seedTransactionEditHistory.changedAt));
+    
+    const result = await Promise.all(history.map(async (h) => {
+      let userName: string | undefined;
+      if (h.userId) {
+        const user = await this.getUser(h.userId);
+        userName = user?.name;
+      }
+      return { ...h, userName };
     }));
 
     return result;
