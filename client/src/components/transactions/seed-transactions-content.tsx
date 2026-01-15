@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Receipt, Edit } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -407,77 +407,120 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           </Button>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filteredTransactions.map((txn) => {
             const profitLoss = parseFloat(txn.totalProfitLoss || "0");
-            const isProfit = profitLoss >= 0;
+            const revenue = parseFloat(txn.totalRevenue || "0");
+            const cost = parseFloat(txn.totalCost || "0");
+            const dueAmount = parseFloat(txn.totalDueToFarmer || "0");
             
             return (
-              <Card key={txn.id} className="overflow-hidden" data-testid={`seed-txn-card-${txn.id}`}>
+              <Card key={txn.id} className="hover-elevate" data-testid={`seed-txn-card-${txn.id}`}>
                 <CardContent className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="text-xs font-mono">
-                        #{txn.transactionNumber}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {format(new Date(txn.createdAt), "dd MMM yyyy")}
-                      </span>
-                    </div>
-                    <Badge className={`${isProfit ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"} border-0`}>
-                      {isProfit ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
-                      ₹{Math.abs(profitLoss).toLocaleString("en-IN")}
-                    </Badge>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <div className="font-semibold text-base">{txn.farmerName}</div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
-                      {txn.village && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {txn.village}, {txn.district}
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0 space-y-3">
+                      {/* Row 1: Transaction number, farmer name, badges */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1 mr-1">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#52a7ff]/10">
+                            <Receipt className="h-3.5 w-3.5 text-[#52a7ff]" />
+                          </div>
+                          <span className="font-bold text-sm leading-tight whitespace-nowrap">
+                            Tr No: {txn.transactionNumber}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-sm leading-tight">
+                          - {txn.farmerName}{txn.village ? `, ${txn.village}` : ""}
                         </span>
-                      )}
-                      {txn.farmerContact && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {txn.farmerContact}
-                        </span>
-                      )}
-                      {txn.vehicleNumber && (
-                        <span className="flex items-center gap-1">
-                          <Truck className="h-3 w-3" />
-                          {txn.vehicleNumber}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                        <div className="flex items-center gap-2 ml-auto">
+                          {txn.vehicleNumber && (
+                            <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
+                              <Truck className="h-3 w-3 mr-1" />
+                              {txn.vehicleNumber}
+                            </Badge>
+                          )}
+                          {dueAmount > 0 && (
+                            <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
+                              <TrendingDown className="h-3 w-3 mr-1" />
+                              ₹{dueAmount.toLocaleString("en-IN")}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {txn.items.map((item, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
-                        S#{item.serialNumber} · {item.potatoType} · {item.size} · {item.bagsMoved} bags
-                      </Badge>
-                    ))}
-                  </div>
+                      {/* Row 2: Bags, Cost, Revenue, Due */}
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-2 sm:gap-3 text-sm">
+                        <span className="flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="font-medium">{txn.totalBags}</span>
+                          <span className="text-muted-foreground">{t("Bags", "बोरी")}</span>
+                        </span>
+                        <span className="col-span-1">
+                          <span className="text-muted-foreground">{t("Cost", "लागत")}:</span>
+                          <span className="font-medium ml-1">₹{cost.toLocaleString("en-IN")}</span>
+                        </span>
+                        <span className="col-span-1">
+                          <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
+                          <span className="font-medium ml-1">₹{revenue.toLocaleString("en-IN")}</span>
+                        </span>
+                        {dueAmount > 0 ? (
+                          <div className="col-span-2 sm:col-span-1">
+                            <span className="text-orange-600 dark:text-orange-400 font-medium">
+                              {t("Due", "बकाया")}: ₹{dueAmount.toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        ) : revenue > 0 && (
+                          <div className="col-span-2 sm:col-span-1">
+                            <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-300 dark:border-green-600">
+                              {t("Paid", "भुगतान")}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t text-sm">
-                    <div>
-                      <span className="text-muted-foreground">{t("Bags", "बैग")}:</span>
-                      <span className="ml-1 font-medium">{txn.totalBags}</span>
+                      {/* Row 3: Date and serial badges */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground pt-1 border-t sm:border-0 mt-2 sm:mt-0">
+                        <span className="font-medium text-muted-foreground/80">
+                          {format(new Date(txn.createdAt), "dd MMM yyyy")}
+                        </span>
+                        <span className="hidden sm:inline">|</span>
+                        <div className="flex flex-wrap gap-1.5 mt-1 sm:mt-0">
+                          {txn.items.slice(0, 3).map((item, idx) => (
+                            <Badge 
+                              key={idx} 
+                              variant="outline" 
+                              className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
+                            >
+                              S#{item.serialNumber} ({item.bagsMoved} - {item.size || item.potatoType})
+                            </Badge>
+                          ))}
+                          {txn.items.length > 3 && (
+                            <span className="text-[10px]">{t("and more", "और अधिक")}</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
-                      <span className="ml-1 font-medium text-green-600">₹{parseFloat(txn.totalRevenue || "0").toLocaleString("en-IN")}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{t("Cost", "लागत")}:</span>
-                      <span className="ml-1 font-medium">₹{parseFloat(txn.totalCost || "0").toLocaleString("en-IN")}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{t("Due", "देय")}:</span>
-                      <span className="ml-1 font-medium text-orange-600">₹{parseFloat(txn.totalDueToFarmer || "0").toLocaleString("en-IN")}</span>
+
+                    {/* Action buttons */}
+                    <div className="flex sm:flex-col gap-2 flex-shrink-0 border-t sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0 justify-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1 sm:flex-none h-8 sm:h-9"
+                        data-testid={`button-edit-seed-txn-${txn.id}`}
+                      >
+                        <Edit className="h-3.5 w-3.5 mr-1.5" />
+                        {t("Edit", "संपादित")}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex-1 sm:flex-none h-8 sm:h-9"
+                        data-testid={`button-receipt-seed-txn-${txn.id}`}
+                      >
+                        <Receipt className="h-3.5 w-3.5 mr-1.5" />
+                        {t("Receipt", "रसीद")}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
