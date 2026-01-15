@@ -35,6 +35,12 @@ import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
 
+// Helper function to normalize names for case-insensitive, space-trimmed matching
+function normalizeName(name: string | null | undefined): string {
+  if (!name) return "";
+  return name.trim().toLowerCase();
+}
+
 export interface IStorage {
   sessionStore: session.Store;
   
@@ -649,11 +655,14 @@ export class DatabaseStorage implements IStorage {
     const txns = await db.select().from(transactions)
       .where(eq(transactions.merchantId, merchantId));
     
-    // Group by partyName and calculate dues
-    const partyMap = new Map<string, { partyAddress: string | null; totalDue: number; transactionCount: number }>();
+    // Group by normalized partyName (case-insensitive, trimmed) and calculate dues
+    const partyMap = new Map<string, { displayName: string; partyAddress: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
       if (!txn.partyName) continue;
+      
+      const normalizedName = normalizeName(txn.partyName);
+      if (!normalizedName) continue;
       
       // Calculate revenue from transaction items (more accurate than header)
       const items = await db.select().from(transactionItems)
@@ -667,12 +676,13 @@ export class DatabaseStorage implements IStorage {
       
       if (due <= 0) continue; // Only include parties with pending dues
       
-      const existing = partyMap.get(txn.partyName);
+      const existing = partyMap.get(normalizedName);
       if (existing) {
         existing.totalDue += due;
         existing.transactionCount += 1;
       } else {
-        partyMap.set(txn.partyName, {
+        partyMap.set(normalizedName, {
+          displayName: txn.partyName.trim(), // Keep original casing but trim spaces
           partyAddress: txn.partyAddress,
           totalDue: due,
           transactionCount: 1,
@@ -680,9 +690,11 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(partyMap.entries()).map(([partyName, data]) => ({
-      partyName,
-      ...data,
+    return Array.from(partyMap.entries()).map(([_, data]) => ({
+      partyName: data.displayName,
+      partyAddress: data.partyAddress,
+      totalDue: data.totalDue,
+      transactionCount: data.transactionCount,
     }));
   }
 
@@ -694,10 +706,13 @@ export class DatabaseStorage implements IStorage {
         or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
       ));
     
-    // Group by farmerName and calculate total due from lots
-    const farmerMap = new Map<string, { village: string | null; totalDue: number; entryCount: number }>();
+    // Group by normalized farmerName (case-insensitive, trimmed) and calculate total due from lots
+    const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; entryCount: number }>();
     
     for (const entry of entries) {
+      const normalizedName = normalizeName(entry.farmerName);
+      if (!normalizedName) continue;
+      
       // Get all lots for this entry and calculate total cost
       const entryLots = await db.select().from(lots)
         .where(eq(lots.stockEntryId, entry.id));
@@ -735,12 +750,13 @@ export class DatabaseStorage implements IStorage {
       
       if (entryDue <= 0) continue; // Skip fully paid entries
       
-      const existing = farmerMap.get(entry.farmerName);
+      const existing = farmerMap.get(normalizedName);
       if (existing) {
         existing.totalDue += entryDue;
         existing.entryCount += 1;
       } else {
-        farmerMap.set(entry.farmerName, {
+        farmerMap.set(normalizedName, {
+          displayName: entry.farmerName.trim(), // Keep original casing but trim spaces
           village: entry.village,
           totalDue: entryDue,
           entryCount: 1,
@@ -748,9 +764,11 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(farmerMap.entries()).map(([farmerName, data]) => ({
-      farmerName,
-      ...data,
+    return Array.from(farmerMap.entries()).map(([_, data]) => ({
+      farmerName: data.displayName,
+      village: data.village,
+      totalDue: data.totalDue,
+      entryCount: data.entryCount,
     }));
   }
 
@@ -759,10 +777,13 @@ export class DatabaseStorage implements IStorage {
     const allLots = await db.select().from(lots)
       .where(eq(lots.merchantId, merchantId));
     
-    // Group by coldStoreName and calculate dues
-    const coldStoreMap = new Map<string, { totalDue: number; lotCount: number }>();
+    // Group by normalized coldStoreName (case-insensitive, trimmed) and calculate dues
+    const coldStoreMap = new Map<string, { displayName: string; totalDue: number; lotCount: number }>();
     
     for (const lot of allLots) {
+      const normalizedName = normalizeName(lot.coldStoreName);
+      if (!normalizedName) continue;
+      
       const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
       const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
       
@@ -776,21 +797,23 @@ export class DatabaseStorage implements IStorage {
       
       if (due <= 0) continue; // Skip fully paid lots
       
-      const existing = coldStoreMap.get(lot.coldStoreName);
+      const existing = coldStoreMap.get(normalizedName);
       if (existing) {
         existing.totalDue += due;
         existing.lotCount += 1;
       } else {
-        coldStoreMap.set(lot.coldStoreName, {
+        coldStoreMap.set(normalizedName, {
+          displayName: lot.coldStoreName.trim(), // Keep original casing but trim spaces
           totalDue: due,
           lotCount: 1,
         });
       }
     }
     
-    return Array.from(coldStoreMap.entries()).map(([coldStoreName, data]) => ({
-      coldStoreName,
-      ...data,
+    return Array.from(coldStoreMap.entries()).map(([_, data]) => ({
+      coldStoreName: data.displayName,
+      totalDue: data.totalDue,
+      lotCount: data.lotCount,
     }));
   }
 
@@ -799,21 +822,24 @@ export class DatabaseStorage implements IStorage {
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
     
-    // Group by farmer name and calculate total due
-    const farmerMap = new Map<string, { village: string | null; totalDue: number; transactionCount: number }>();
+    // Group by normalized farmer name (case-insensitive, trimmed) and calculate total due
+    const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
       const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
       
       if (dueToFarmer <= 0) continue; // Skip fully paid
       
-      const key = txn.farmerName.toLowerCase();
+      const key = normalizeName(txn.farmerName);
+      if (!key) continue;
+      
       const existing = farmerMap.get(key);
       if (existing) {
         existing.totalDue += dueToFarmer;
         existing.transactionCount += 1;
       } else {
         farmerMap.set(key, {
+          displayName: txn.farmerName.trim(), // Keep original casing but trim spaces
           village: txn.village || null,
           totalDue: dueToFarmer,
           transactionCount: 1,
@@ -821,14 +847,12 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(farmerMap.entries()).map(([key, data]) => {
-      // Find original farmer name with proper casing
-      const originalTxn = txns.find(t => t.farmerName.toLowerCase() === key);
-      return {
-        farmerName: originalTxn?.farmerName || key,
-        ...data,
-      };
-    }).sort((a, b) => b.totalDue - a.totalDue);
+    return Array.from(farmerMap.entries()).map(([_, data]) => ({
+      farmerName: data.displayName,
+      village: data.village,
+      totalDue: data.totalDue,
+      transactionCount: data.transactionCount,
+    })).sort((a, b) => b.totalDue - a.totalDue);
   }
 
   async getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]> {
@@ -840,8 +864,8 @@ export class DatabaseStorage implements IStorage {
     const allLots = await db.select().from(seedLots)
       .where(eq(seedLots.merchantId, merchantId));
     
-    // Group by supplier name and calculate total due
-    const supplierMap = new Map<string, { district: string | null; totalDue: number; entryCount: number }>();
+    // Group by normalized supplier name (case-insensitive, trimmed) and calculate total due
+    const supplierMap = new Map<string, { displayName: string; district: string | null; totalDue: number; entryCount: number }>();
     
     for (const entry of entries) {
       // Calculate total cost for this entry from its lots
@@ -857,13 +881,16 @@ export class DatabaseStorage implements IStorage {
       
       if (dueAmount <= 0) continue; // Skip fully paid
       
-      const key = entry.supplierName.toLowerCase();
+      const key = normalizeName(entry.supplierName);
+      if (!key) continue;
+      
       const existing = supplierMap.get(key);
       if (existing) {
         existing.totalDue += dueAmount;
         existing.entryCount += 1;
       } else {
         supplierMap.set(key, {
+          displayName: entry.supplierName.trim(), // Keep original casing but trim spaces
           district: entry.district || null,
           totalDue: dueAmount,
           entryCount: 1,
@@ -871,14 +898,12 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(supplierMap.entries()).map(([key, data]) => {
-      // Find original supplier name with proper casing
-      const originalEntry = entries.find(e => e.supplierName.toLowerCase() === key);
-      return {
-        supplierName: originalEntry?.supplierName || key,
-        ...data,
-      };
-    }).sort((a, b) => b.totalDue - a.totalDue);
+    return Array.from(supplierMap.entries()).map(([_, data]) => ({
+      supplierName: data.displayName,
+      district: data.district,
+      totalDue: data.totalDue,
+      entryCount: data.entryCount,
+    })).sort((a, b) => b.totalDue - a.totalDue);
   }
 
   async getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]> {
@@ -913,17 +938,17 @@ export class DatabaseStorage implements IStorage {
       // If this is an inward payment and has a partyName, apply FIFO to transactions
       if (applyFIFO && entry.direction === "inward" && entry.partyName) {
         let remainingAmount = parseFloat(entry.amount);
+        const normalizedPartyName = normalizeName(entry.partyName);
         
-        // Get transactions with due for this party (FIFO order)
+        // Get all transactions for this merchant with party name (FIFO order)
         const txns = await tx.select().from(transactions)
-          .where(and(
-            eq(transactions.merchantId, entry.merchantId),
-            eq(transactions.partyName, entry.partyName)
-          ))
+          .where(eq(transactions.merchantId, entry.merchantId))
           .orderBy(asc(transactions.createdAt));
         
-        // Filter to only those with remaining due
+        // Filter to only those matching party (case-insensitive, trimmed) with remaining due
         const transactionsWithDue = txns.filter(txn => {
+          if (!txn.partyName) return false;
+          if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
           const revenue = parseFloat(txn.revenue || "0");
           const received = parseFloat(txn.amountReceived || "0");
           return revenue > received;
@@ -964,15 +989,20 @@ export class DatabaseStorage implements IStorage {
       // If this is a farmer payment, apply FIFO to stock entries
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
         let remainingAmount = parseFloat(entry.amount);
+        const normalizedFarmerName = normalizeName(entry.farmerName);
         
-        // Get stock entries for this farmer with due amount (FIFO order by createdAt)
-        const farmerEntries = await tx.select().from(stockEntries)
+        // Get stock entries with due amount (FIFO order by createdAt)
+        const allFarmerEntries = await tx.select().from(stockEntries)
           .where(and(
             eq(stockEntries.merchantId, entry.merchantId),
-            eq(stockEntries.farmerName, entry.farmerName),
             or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
           ))
           .orderBy(asc(stockEntries.createdAt));
+        
+        // Filter to only those matching farmer name (case-insensitive, trimmed)
+        const farmerEntries = allFarmerEntries.filter(se => 
+          normalizeName(se.farmerName) === normalizedFarmerName
+        );
         
         for (const stockEntry of farmerEntries) {
           if (remainingAmount <= 0) break;
@@ -1020,17 +1050,16 @@ export class DatabaseStorage implements IStorage {
       // If this is a cold store charge payment, apply FIFO to lots
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && entry.coldStoreName) {
         let remainingAmount = parseFloat(entry.amount);
+        const normalizedColdStoreName = normalizeName(entry.coldStoreName);
         
-        // Get lots for this cold store with due charges (FIFO order by createdAt)
+        // Get all lots for this merchant (FIFO order by createdAt)
         const allLots = await tx.select().from(lots)
-          .where(and(
-            eq(lots.merchantId, entry.merchantId),
-            eq(lots.coldStoreName, entry.coldStoreName)
-          ))
+          .where(eq(lots.merchantId, entry.merchantId))
           .orderBy(asc(lots.createdAt));
         
-        // Filter to only those with remaining due
+        // Filter to only those matching cold store name (case-insensitive, trimmed) with remaining due
         const lotsWithDue = allLots.filter(lot => {
+          if (normalizeName(lot.coldStoreName) !== normalizedColdStoreName) return false;
           const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
           if (chargesPerBag <= 0) return false;
           const totalCharges = chargesPerBag * lot.originalBags;
