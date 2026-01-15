@@ -314,7 +314,12 @@ export default function HomePage() {
           setShowPasswordDialog(false);
         }
       }}>
-        <DialogContent>
+        <DialogContent 
+          onEscapeKeyDown={isFirstLoginDialog ? (e) => e.preventDefault() : undefined}
+          onPointerDownOutside={isFirstLoginDialog ? (e) => e.preventDefault() : undefined}
+          onInteractOutside={isFirstLoginDialog ? (e) => e.preventDefault() : undefined}
+          className={isFirstLoginDialog ? "[&>button]:hidden" : ""}
+        >
           <DialogHeader>
             <DialogTitle>{isFirstLoginDialog ? t("Set New Password", "नया पासवर्ड सेट करें") : t("Change Password", "पासवर्ड बदलें")}</DialogTitle>
           </DialogHeader>
