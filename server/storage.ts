@@ -5,6 +5,7 @@ import {
   cashSettings, parties, cashFarmers,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
+  farmerSettlements,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -147,6 +148,27 @@ export interface IStorage {
   getUnsoldSeedInventory(merchantId: number): Promise<any[]>;
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
+  
+  // Cross-Settlement operations (farmer identity matching across Raw Potato and Seed modules)
+  checkCrossSettlementEligibility(merchantId: number, farmerName: string, farmerVillage?: string | null, farmerContact?: string | null): Promise<{
+    hasSeedDues: boolean;
+    seedDueAmount: number;
+    seedTransactionIds: number[];
+    hasRawPotatoDues: boolean;
+    rawPotatoDueAmount: number;
+    rawPotatoEntryIds: number[];
+  }>;
+  createCashEntryWithCrossSettlement(
+    entry: InsertCashEntry, 
+    applyFIFO: boolean, 
+    crossSettlement?: { 
+      settledAmount: number; 
+      direction: 'raw_to_seed' | 'seed_to_raw';
+      seedTransactionIds: number[];
+      rawPotatoEntryIds: number[];
+    },
+    userId?: number
+  ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[]; crossSettlementId?: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1460,6 +1482,388 @@ export class DatabaseStorage implements IStorage {
     }));
 
     return result;
+  }
+
+  // Cross-Settlement: Check if farmer has dues in the opposite module
+  async checkCrossSettlementEligibility(
+    merchantId: number, 
+    farmerName: string, 
+    farmerVillage?: string | null, 
+    farmerContact?: string | null
+  ): Promise<{
+    hasSeedDues: boolean;
+    seedDueAmount: number;
+    seedTransactionIds: number[];
+    hasRawPotatoDues: boolean;
+    rawPotatoDueAmount: number;
+    rawPotatoEntryIds: number[];
+  }> {
+    const normalizedName = normalizeName(farmerName);
+    const normalizedVillage = normalizeName(farmerVillage);
+    const normalizedContact = normalizeName(farmerContact);
+
+    // Helper to match farmer identity (name required, village and contact optional but must match if provided)
+    const matchesFarmer = (
+      name: string | null | undefined,
+      village: string | null | undefined,
+      contact: string | null | undefined
+    ): boolean => {
+      if (normalizeName(name) !== normalizedName) return false;
+      // If village is provided in search and in record, they must match
+      if (normalizedVillage && normalizeName(village) && normalizeName(village) !== normalizedVillage) return false;
+      // If contact is provided in search and in record, they must match
+      if (normalizedContact && normalizeName(contact) && normalizeName(contact) !== normalizedContact) return false;
+      return true;
+    };
+
+    // Check for seed transaction dues (farmer owes money to merchant)
+    const allSeedTxns = await db.select().from(seedTransactions)
+      .where(eq(seedTransactions.merchantId, merchantId));
+    
+    // Get all seed inward payments to calculate how much has been paid
+    const seedCashEntries = await db.select().from(cashEntries)
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        eq(cashEntries.direction, "inward"),
+        eq(cashEntries.revenueType, "seed_sale")
+      ));
+    
+    // Calculate paid amount per farmer (normalized)
+    const seedPaidByFarmer = new Map<string, number>();
+    for (const entry of seedCashEntries) {
+      if (entry.farmerName) {
+        const key = normalizeName(entry.farmerName);
+        seedPaidByFarmer.set(key, (seedPaidByFarmer.get(key) || 0) + parseFloat(entry.amount || "0"));
+      }
+    }
+
+    let seedDueAmount = 0;
+    const seedTransactionIdsWithDue: number[] = [];
+    
+    for (const txn of allSeedTxns) {
+      if (!matchesFarmer(txn.farmerName, txn.village, txn.farmerContact)) continue;
+      
+      const totalDue = parseFloat(txn.totalDueToFarmer || "0");
+      if (totalDue > 0) {
+        seedDueAmount += totalDue;
+        seedTransactionIdsWithDue.push(txn.id);
+      }
+    }
+    
+    // Subtract what's already been paid
+    const paidTowardsSeed = seedPaidByFarmer.get(normalizedName) || 0;
+    seedDueAmount = Math.max(0, seedDueAmount - paidTowardsSeed);
+
+    // Check for raw potato dues (merchant owes money to farmer)
+    const allStockEntries = await db.select().from(stockEntries)
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
+      ));
+
+    let rawPotatoDueAmount = 0;
+    const rawPotatoEntryIdsWithDue: number[] = [];
+
+    for (const entry of allStockEntries) {
+      if (!matchesFarmer(entry.farmerName, entry.village, entry.farmerContact)) continue;
+      
+      // Calculate total cost for this entry from lots and breakdowns
+      const entryLots = await db.select().from(lots)
+        .where(eq(lots.stockEntryId, entry.id));
+      
+      let entryTotalCost = 0;
+      for (const lot of entryLots) {
+        const breakdownList = await db.select().from(bagBreakdowns)
+          .where(eq(bagBreakdowns.lotId, lot.id));
+        
+        if (breakdownList.length > 0) {
+          entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+        } else if (lot.pricePerKg) {
+          entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+        }
+        
+        // Subtract adjustments
+        const adjustedAmount = parseFloat(lot.adjustedAmount || "0");
+        if (lot.adjustedAmountType === "debit") {
+          entryTotalCost -= adjustedAmount;
+        } else if (lot.adjustedAmountType === "credit") {
+          entryTotalCost += adjustedAmount;
+        }
+      }
+      
+      const currentPaid = parseFloat(entry.amountPaid || "0");
+      const due = entryTotalCost - currentPaid;
+      
+      if (due > 0) {
+        rawPotatoDueAmount += due;
+        rawPotatoEntryIdsWithDue.push(entry.id);
+      }
+    }
+
+    return {
+      hasSeedDues: seedDueAmount > 0,
+      seedDueAmount,
+      seedTransactionIds: seedTransactionIdsWithDue,
+      hasRawPotatoDues: rawPotatoDueAmount > 0,
+      rawPotatoDueAmount,
+      rawPotatoEntryIds: rawPotatoEntryIdsWithDue,
+    };
+  }
+
+  // Create cash entry with cross-settlement support
+  async createCashEntryWithCrossSettlement(
+    entry: InsertCashEntry, 
+    applyFIFO: boolean, 
+    crossSettlement?: { 
+      settledAmount: number; 
+      direction: 'raw_to_seed' | 'seed_to_raw';
+      seedTransactionIds: number[];
+      rawPotatoEntryIds: number[];
+    },
+    userId?: number
+  ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[]; crossSettlementId?: number }> {
+    
+    return await db.transaction(async (tx) => {
+      // Create the base cash entry
+      const [createdEntry] = await tx.insert(cashEntries).values(entry).returning();
+      const allocations: CashEntryAllocation[] = [];
+      const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
+      let crossSettlementId: number | undefined;
+
+      // Handle cross-settlement if provided
+      if (crossSettlement && crossSettlement.settledAmount > 0) {
+        // Record the cross-settlement for audit trail
+        const [settlement] = await tx.insert(farmerSettlements).values({
+          merchantId: entry.merchantId,
+          userId: userId || null,
+          settlementDirection: crossSettlement.direction,
+          settledAmount: crossSettlement.settledAmount.toString(),
+          farmerName: entry.farmerName || "",
+          farmerVillage: entry.farmerVillage,
+          farmerContact: null, // Could be added if needed
+          rawPotatoStockEntryIds: crossSettlement.rawPotatoEntryIds,
+          seedTransactionIds: crossSettlement.seedTransactionIds,
+          cashEntryId: createdEntry.id,
+          remarks: `Auto cross-settlement: ${crossSettlement.direction === 'raw_to_seed' ? 'Adjusted seed dues against farmer payment' : 'Adjusted raw potato dues against seed payment'}`,
+        }).returning();
+        
+        crossSettlementId = settlement.id;
+
+        // Apply the cross-settlement based on direction
+        if (crossSettlement.direction === 'raw_to_seed') {
+          // Paying farmer for raw potatoes, offset against seed dues
+          // The settled amount reduces what farmer owes for seeds (virtual payment toward seed dues)
+          // No actual cash entry needed for the offset - it's recorded as settlement
+        } else if (crossSettlement.direction === 'seed_to_raw') {
+          // Receiving seed payment, offset against raw potato dues
+          // The settled amount reduces what we owe farmer for raw potatoes
+          let remainingSettlement = crossSettlement.settledAmount;
+          
+          for (const entryId of crossSettlement.rawPotatoEntryIds) {
+            if (remainingSettlement <= 0) break;
+            
+            const [stockEntry] = await tx.select().from(stockEntries)
+              .where(eq(stockEntries.id, entryId));
+            
+            if (!stockEntry) continue;
+            
+            // Calculate total cost for this entry
+            const entryLots = await tx.select().from(lots)
+              .where(eq(lots.stockEntryId, stockEntry.id));
+            
+            let entryTotalCost = 0;
+            for (const lot of entryLots) {
+              const breakdownList = await tx.select().from(bagBreakdowns)
+                .where(eq(bagBreakdowns.lotId, lot.id));
+              
+              if (breakdownList.length > 0) {
+                entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+              } else if (lot.pricePerKg) {
+                entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+              }
+            }
+            
+            const currentPaid = parseFloat(stockEntry.amountPaid || "0");
+            const due = entryTotalCost - currentPaid;
+            
+            if (due <= 0) continue;
+            
+            const toApply = Math.min(remainingSettlement, due);
+            const newPaid = currentPaid + toApply;
+            const newDue = entryTotalCost - newPaid;
+            const newStatus = newDue <= 0 ? "paid" : "partial";
+            
+            await tx.update(stockEntries)
+              .set({ 
+                amountPaid: newPaid.toString(),
+                paymentStatus: newStatus
+              })
+              .where(eq(stockEntries.id, stockEntry.id));
+            
+            remainingSettlement -= toApply;
+          }
+        }
+      }
+
+      // Apply standard FIFO logic for the remaining cash (after cross-settlement)
+      // Party payment FIFO
+      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "raw_potato" && entry.partyName) {
+        let remainingAmount = parseFloat(entry.amount);
+        const normalizedPartyName = normalizeName(entry.partyName);
+        
+        const txns = await tx.select().from(transactions)
+          .where(eq(transactions.merchantId, entry.merchantId))
+          .orderBy(asc(transactions.createdAt));
+        
+        const transactionsWithDue = txns.filter(txn => {
+          if (!txn.partyName) return false;
+          if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
+          const revenue = parseFloat(txn.revenue || "0");
+          const received = parseFloat(txn.amountReceived || "0");
+          return revenue > received;
+        });
+        
+        for (const txn of transactionsWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          const revenue = parseFloat(txn.revenue || "0");
+          const currentReceived = parseFloat(txn.amountReceived || "0");
+          const due = revenue - currentReceived;
+          
+          if (due <= 0) continue;
+          
+          const toApply = Math.min(remainingAmount, due);
+          
+          const [allocation] = await tx.insert(cashEntryAllocations).values({
+            cashEntryId: createdEntry.id,
+            transactionId: txn.id,
+            merchantId: entry.merchantId,
+            appliedAmount: toApply.toString(),
+          }).returning();
+          
+          allocations.push(allocation);
+          
+          const newReceived = currentReceived + toApply;
+          await tx.update(transactions)
+            .set({ amountReceived: newReceived.toString() })
+            .where(eq(transactions.id, txn.id));
+          
+          remainingAmount -= toApply;
+        }
+      }
+      
+      // Farmer payment FIFO (for raw potatoes)
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
+        // Actual cash to apply is: entry amount minus cross-settlement
+        let remainingAmount = parseFloat(entry.amount);
+        if (crossSettlement && crossSettlement.direction === 'raw_to_seed') {
+          remainingAmount -= crossSettlement.settledAmount;
+        }
+        
+        if (remainingAmount > 0) {
+          const normalizedFarmerName = normalizeName(entry.farmerName);
+          
+          const allFarmerEntries = await tx.select().from(stockEntries)
+            .where(and(
+              eq(stockEntries.merchantId, entry.merchantId),
+              or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
+            ))
+            .orderBy(asc(stockEntries.createdAt));
+          
+          const farmerEntries = allFarmerEntries.filter(se => 
+            normalizeName(se.farmerName) === normalizedFarmerName
+          );
+          
+          for (const stockEntry of farmerEntries) {
+            if (remainingAmount <= 0) break;
+            
+            const entryLots = await tx.select().from(lots)
+              .where(eq(lots.stockEntryId, stockEntry.id));
+            
+            let entryTotalCost = 0;
+            for (const lot of entryLots) {
+              const breakdownList = await tx.select().from(bagBreakdowns)
+                .where(eq(bagBreakdowns.lotId, lot.id));
+              
+              if (breakdownList.length > 0) {
+                entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+              } else if (lot.pricePerKg) {
+                entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+              }
+            }
+            
+            const currentPaid = parseFloat(stockEntry.amountPaid || "0");
+            const due = entryTotalCost - currentPaid;
+            
+            if (due <= 0) continue;
+            
+            const toApply = Math.min(remainingAmount, due);
+            const newPaid = currentPaid + toApply;
+            const newDue = entryTotalCost - newPaid;
+            const newStatus = newDue <= 0 ? "paid" : "partial";
+            
+            await tx.update(stockEntries)
+              .set({ 
+                amountPaid: newPaid.toString(),
+                paymentStatus: newStatus
+              })
+              .where(eq(stockEntries.id, stockEntry.id));
+            
+            remainingAmount -= toApply;
+          }
+        }
+      }
+      
+      // Cold store charge FIFO
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && entry.coldStoreName) {
+        let remainingAmount = parseFloat(entry.amount);
+        const normalizedColdStoreName = normalizeName(entry.coldStoreName);
+        
+        const allLots = await tx.select().from(lots)
+          .where(eq(lots.merchantId, entry.merchantId))
+          .orderBy(asc(lots.createdAt));
+        
+        const lotsWithDue = allLots.filter(lot => {
+          if (normalizeName(lot.coldStoreName) !== normalizedColdStoreName) return false;
+          const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+          if (chargesPerBag <= 0) return false;
+          const totalCharges = chargesPerBag * lot.originalBags;
+          const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+          return totalCharges > paidAmount;
+        });
+        
+        for (const lot of lotsWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+          const totalCharges = chargesPerBag * lot.originalBags;
+          const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+          const due = totalCharges - currentPaid;
+          
+          if (due <= 0) continue;
+          
+          const toApply = Math.min(remainingAmount, due);
+          
+          const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
+            cashEntryId: createdEntry.id,
+            lotId: lot.id,
+            merchantId: entry.merchantId,
+            appliedAmount: toApply.toString(),
+          }).returning();
+          
+          coldStoreAllocations.push(allocation);
+          
+          const newPaid = currentPaid + toApply;
+          await tx.update(lots)
+            .set({ coldStorageChargesPaid: newPaid.toString() })
+            .where(eq(lots.id, lot.id));
+          
+          remainingAmount -= toApply;
+        }
+      }
+
+      return { ...createdEntry, allocations, coldStoreAllocations, crossSettlementId };
+    });
   }
 }
 
