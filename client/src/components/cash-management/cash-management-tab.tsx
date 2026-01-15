@@ -274,13 +274,15 @@ export function CashManagementTab() {
   
   // Query for cross-settlement eligibility (for farmer payments)
   const { data: farmerCrossSettlement } = useQuery<CrossSettlementEligibility>({
-    queryKey: [`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedOutflowFarmerName)}`],
+    queryKey: ["/api/cash/cross-settlement-check", selectedOutflowFarmerName],
+    queryFn: () => fetch(`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedOutflowFarmerName)}`, { credentials: "include" }).then(res => res.json()),
     enabled: !!selectedOutflowFarmerName,
   });
   
   // Query for cross-settlement eligibility (for seed sale inward payments)
   const { data: seedFarmerCrossSettlement } = useQuery<CrossSettlementEligibility>({
-    queryKey: [`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedInwardSeedFarmerName)}`],
+    queryKey: ["/api/cash/cross-settlement-check", selectedInwardSeedFarmerName],
+    queryFn: () => fetch(`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedInwardSeedFarmerName)}`, { credentials: "include" }).then(res => res.json()),
     enabled: !!selectedInwardSeedFarmerName,
   });
   
