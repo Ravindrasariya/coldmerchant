@@ -65,6 +65,8 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
         description: t("The stock entry has been saved successfully.", "स्टॉक एंट्री सफलतापूर्वक सहेजी गई।"),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/cross-settlement-check"] });
       form.reset();
       onSuccess?.();
     },
