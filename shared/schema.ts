@@ -177,6 +177,41 @@ export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Cash Settings - opening balances for each financial year
+export const cashSettings = pgTable("cash_settings", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  financialYear: text("financial_year").notNull(), // e.g., "2024-25"
+  openingCashInHand: decimal("opening_cash_in_hand", { precision: 12, scale: 2 }).default("0"),
+  openingCashInAccount: decimal("opening_cash_in_account", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Parties - buyer/party management with pending dues
+export const parties = pgTable("parties", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(),
+  contactNumber: text("contact_number"),
+  address: text("address"),
+  pendingDues: decimal("pending_dues", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Cash Farmers - farmer management for cash payments with pending dues
+export const cashFarmers = pgTable("cash_farmers", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(),
+  contactNumber: text("contact_number"),
+  address: text("address"),
+  pendingDueToBePaid: decimal("pending_due_to_be_paid", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -188,6 +223,30 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   cashEntries: many(cashEntries),
   cashEntryAllocations: many(cashEntryAllocations),
   coldStoreChargeAllocations: many(coldStoreChargeAllocations),
+  cashSettings: many(cashSettings),
+  parties: many(parties),
+  cashFarmers: many(cashFarmers),
+}));
+
+export const cashSettingsRelations = relations(cashSettings, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [cashSettings.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const partiesRelations = relations(parties, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [parties.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const cashFarmersRelations = relations(cashFarmers, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [cashFarmers.merchantId],
+    references: [merchants.id],
+  }),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -334,6 +393,9 @@ export const insertTransactionEditHistorySchema = createInsertSchema(transaction
 export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, createdAt: true });
 export const insertCashEntryAllocationSchema = createInsertSchema(cashEntryAllocations).omit({ id: true, createdAt: true });
 export const insertColdStoreChargeAllocationSchema = createInsertSchema(coldStoreChargeAllocations).omit({ id: true, createdAt: true });
+export const insertCashSettingsSchema = createInsertSchema(cashSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -371,6 +433,15 @@ export type InsertCashEntryAllocation = z.infer<typeof insertCashEntryAllocation
 
 export type ColdStoreChargeAllocation = typeof coldStoreChargeAllocations.$inferSelect;
 export type InsertColdStoreChargeAllocation = z.infer<typeof insertColdStoreChargeAllocationSchema>;
+
+export type CashSettings = typeof cashSettings.$inferSelect;
+export type InsertCashSettings = z.infer<typeof insertCashSettingsSchema>;
+
+export type Party = typeof parties.$inferSelect;
+export type InsertParty = z.infer<typeof insertPartySchema>;
+
+export type CashFarmer = typeof cashFarmers.$inferSelect;
+export type InsertCashFarmer = z.infer<typeof insertCashFarmerSchema>;
 
 // Change types for edit history
 export type FieldChange = {
