@@ -659,6 +659,7 @@ export function StockRegisterCard() {
             let totalActual = 0;
             let totalRemaining = 0;
             let entryTotalAmount = 0;
+            let entryAdjustment = 0;
             let entryColdStoreTotalCharges = 0;
             let entryColdStorePaid = 0;
             
@@ -670,14 +671,20 @@ export function StockRegisterCard() {
               if (metrics.totalAmount !== null) {
                 entryTotalAmount += metrics.totalAmount;
               }
-              if (metrics.coldStoreTotalCharges !== null) {
-                entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
+              if (metrics.adjustedAmount > 0 && metrics.adjustedAmountType) {
+                if (metrics.adjustedAmountType === "debit") {
+                  entryAdjustment -= metrics.adjustedAmount;
+                } else if (metrics.adjustedAmountType === "credit") {
+                  entryAdjustment += metrics.adjustedAmount;
+                }
               }
+              entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
               entryColdStorePaid += metrics.coldStorePaid;
             });
             
             const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-            const farmerRemainingDue = entryTotalAmount - farmerAmountPaid;
+            const adjustedEntryTotal = entryTotalAmount + entryAdjustment;
+            const farmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
             const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
             
             const isFarmerPaid = farmerRemainingDue <= 0 && entryTotalAmount > 0;
