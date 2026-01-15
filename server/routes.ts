@@ -1586,11 +1586,14 @@ export async function registerRoutes(
               size: lotData.size,
               pricePerBag: lotData.pricePerBag?.toString(),
               coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
+              coldStoreChargesPaid: lotData.coldStoreChargesPaid?.toString() || "0",
+              hammaliPerBag: lotData.hammaliPerBag?.toString() || null,
+              gradingPerBag: lotData.gradingPerBag?.toString() || null,
               remainingBags: lotData.remainingBags ?? lotData.originalBags,
               remarks: lotData.remarks || null,
             });
-          } else {
-            // Create new lot
+          } else if (lotData.coldStoreName && lotData.originalBags && lotData.potatoType && lotData.bagType && lotData.size && lotData.pricePerBag !== undefined) {
+            // Create new lot - only if all required fields are provided
             await storage.createSeedLot({
               seedEntryId: id,
               merchantId,
@@ -1601,6 +1604,9 @@ export async function registerRoutes(
               size: lotData.size,
               pricePerBag: lotData.pricePerBag.toString(),
               coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
+              coldStoreChargesPaid: lotData.coldStoreChargesPaid?.toString() || "0",
+              hammaliPerBag: lotData.hammaliPerBag?.toString() || null,
+              gradingPerBag: lotData.gradingPerBag?.toString() || null,
               remainingBags: lotData.originalBags,
               remarks: lotData.remarks || null,
             });

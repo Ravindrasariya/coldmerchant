@@ -25,9 +25,15 @@ import { SeedBillPrintDialog } from "./seed-bill-print-dialog";
 function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
   const coldStoreChargesPerBag = lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0;
+  const coldStoreChargesPaid = lot.coldStoreChargesPaid ? parseFloat(lot.coldStoreChargesPaid) : 0;
+  const hammaliPerBag = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
+  const gradingPerBag = lot.gradingPerBag ? parseFloat(lot.gradingPerBag) : 0;
   
   const totalAmount = lot.originalBags * pricePerBag;
   const coldStoreTotal = lot.originalBags * coldStoreChargesPerBag;
+  const coldStoreDue = Math.max(coldStoreTotal - coldStoreChargesPaid, 0);
+  const hammaliTotal = lot.originalBags * hammaliPerBag;
+  const gradingTotal = lot.originalBags * gradingPerBag;
   const soldBags = lot.originalBags - lot.remainingBags;
   
   return {
@@ -38,6 +44,12 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
     totalAmount,
     coldStoreChargesPerBag,
     coldStoreTotal,
+    coldStoreChargesPaid,
+    coldStoreDue,
+    hammaliPerBag,
+    hammaliTotal,
+    gradingPerBag,
+    gradingTotal,
   };
 }
 
@@ -558,9 +570,12 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                             <div className="flex items-center gap-1">
                               <span className="text-muted-foreground">{t("Bags", "बोरी")}:</span>
                               <span className="font-medium">{metrics.originalBags}</span>
-                              {metrics.remainingBags < metrics.originalBags && (
-                                <span className="text-amber-600 dark:text-amber-400">({metrics.remainingBags} {t("left", "बचे")})</span>
-                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">{t("Remaining", "बाकी")}:</span>
+                              <span className={`font-medium ${metrics.remainingBags < metrics.originalBags ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                                {metrics.remainingBags}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="text-muted-foreground">{t("Price/Bag", "मूल्य/बोरी")}:</span>
@@ -570,10 +585,15 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                               <span className="text-muted-foreground">{t("Total", "कुल")}:</span>
                               <span className="font-medium">₹{metrics.totalAmount.toLocaleString()}</span>
                             </div>
-                            {metrics.coldStoreChargesPerBag > 0 && (
+                            {metrics.coldStoreTotal > 0 && (
                               <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground">{t("Cold Charges", "कोल्ड शुल्क")}:</span>
+                                <span className="text-muted-foreground">{t("Cold", "कोल्ड")}:</span>
                                 <span className="font-medium">₹{metrics.coldStoreTotal.toLocaleString()}</span>
+                                <span className="text-muted-foreground">|</span>
+                                <span className="text-muted-foreground">{t("Due", "बाकी")}:</span>
+                                <span className={`font-medium ${metrics.coldStoreDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+                                  ₹{metrics.coldStoreDue.toLocaleString()}
+                                </span>
                               </div>
                             )}
                           </div>

@@ -34,13 +34,16 @@ interface SeedStockEntryEditDialogProps {
 export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStockEntryEditDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus);
+  const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus || "due");
   const [amountPaid, setAmountPaid] = useState(entry.amountPaid ? parseFloat(entry.amountPaid) : 0);
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [seedLots, setSeedLots] = useState(entry.seedLots.map(lot => ({
     ...lot,
     pricePerBag: lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0,
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0,
+    coldStoreChargesPaid: lot.coldStoreChargesPaid ? parseFloat(lot.coldStoreChargesPaid) : 0,
+    hammaliPerBag: lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0,
+    gradingPerBag: lot.gradingPerBag ? parseFloat(lot.gradingPerBag) : 0,
   })));
 
   interface SeedLotUpdate {
@@ -53,6 +56,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     size: string;
     pricePerBag: number;
     coldStoreChargesPerBag: number;
+    coldStoreChargesPaid: number;
+    hammaliPerBag: number;
+    gradingPerBag: number;
     remarks?: string;
   }
 
@@ -103,6 +109,9 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
         size: lot.size,
         pricePerBag: lot.pricePerBag,
         coldStoreChargesPerBag: lot.coldStoreChargesPerBag,
+        coldStoreChargesPaid: lot.coldStoreChargesPaid,
+        hammaliPerBag: lot.hammaliPerBag,
+        gradingPerBag: lot.gradingPerBag,
         remarks: lot.remarks || undefined,
       })),
     });
@@ -242,12 +251,39 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">{t("Cold Store Charges/Bag", "कोल्ड शुल्क/बोरी")}</Label>
+                      <Label className="text-xs">{t("Cold Charges/Bag", "कोल्ड शुल्क/बोरी")}</Label>
                       <Input
                         type="number"
                         value={lot.coldStoreChargesPerBag}
                         onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPerBag", parseFloat(e.target.value) || 0)}
                         data-testid={`input-seed-lot-${lotIndex}-cold-charges`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Cold Charges Paid", "कोल्ड शुल्क भुगतान")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.coldStoreChargesPaid}
+                        onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPaid", parseFloat(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-cold-paid`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Hammali/Bag", "हम्माली/बोरी")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.hammaliPerBag}
+                        onChange={(e) => handleLotChange(lotIndex, "hammaliPerBag", parseFloat(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-hammali`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Grading/Bag", "ग्रेडिंग/बोरी")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.gradingPerBag}
+                        onChange={(e) => handleLotChange(lotIndex, "gradingPerBag", parseFloat(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-grading`}
                       />
                     </div>
                   </div>
