@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Receipt, Edit } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Printer, Edit, FileText } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { LoadSeedTruckDialog } from "./load-seed-truck-dialog";
 import { EditSeedTransactionDialog } from "./edit-seed-transaction-dialog";
+import { SeedSalesReceiptDialog } from "./seed-sales-receipt";
 
 interface SeedTransactionItem {
   id: number;
@@ -64,6 +65,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
   const { toast } = useToast();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
+  const [receiptTransactionId, setReceiptTransactionId] = useState<number | null>(null);
   
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadStartDate, setDownloadStartDate] = useState("");
@@ -286,6 +288,13 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
         onOpenChange={(open) => !open && setEditTransactionId(null)}
       />
 
+      <SeedSalesReceiptDialog
+        transactionId={receiptTransactionId}
+        merchantId={transactions?.[0]?.merchantId || 0}
+        open={receiptTransactionId !== null}
+        onOpenChange={(open) => !open && setReceiptTransactionId(null)}
+      />
+
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t("Seed Transactions", "बीज लेनदेन")}</h1>
@@ -437,7 +446,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="flex items-center gap-1 mr-1">
                           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#52a7ff]/10">
-                            <Receipt className="h-3.5 w-3.5 text-[#52a7ff]" />
+                            <FileText className="h-3.5 w-3.5 text-[#52a7ff]" />
                           </div>
                           <span className="font-bold text-sm leading-tight whitespace-nowrap">
                             Tr No: {txn.transactionNumber}
@@ -550,10 +559,11 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                         variant="outline" 
                         size="sm"
                         className="flex-1 sm:flex-none h-8 sm:h-9"
+                        onClick={() => setReceiptTransactionId(txn.id)}
                         data-testid={`button-receipt-seed-txn-${txn.id}`}
                       >
-                        <Receipt className="h-3.5 w-3.5 mr-1.5" />
-                        {t("Receipt", "रसीद")}
+                        <Printer className="h-3.5 w-3.5 mr-1.5" />
+                        {t("Print", "प्रिंट")}
                       </Button>
                     </div>
                   </div>
