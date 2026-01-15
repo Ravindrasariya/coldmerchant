@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -455,28 +455,59 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">{t("Transactions", "लेनदेन")}</div>
-          <div className="text-lg font-semibold">{summary.count}</div>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <FileText className="h-3.5 w-3.5" />
+              {t("Transactions & Bags", "लेनदेन और बैग")}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-semibold">{summary.count}</span>
+              <span className="text-muted-foreground">|</span>
+              <span className="flex items-center gap-1">
+                <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-lg font-semibold">{summary.totalBags}</span>
+              </span>
+            </div>
+          </CardContent>
         </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">{t("Total Bags", "कुल बैग")}</div>
-          <div className="text-lg font-semibold">{summary.totalBags}</div>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <IndianRupee className="h-3.5 w-3.5" />
+              {t("Revenue", "राजस्व")}
+            </div>
+            <div className="text-lg font-semibold text-green-600">₹{summary.totalRevenue.toLocaleString("en-IN")}</div>
+          </CardContent>
         </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">{t("Revenue", "राजस्व")}</div>
-          <div className="text-lg font-semibold text-green-600">₹{summary.totalRevenue.toLocaleString("en-IN")}</div>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <Receipt className="h-3.5 w-3.5" />
+              {t("Cost", "लागत")}
+            </div>
+            <div className="text-lg font-semibold">₹{summary.totalCost.toLocaleString("en-IN")}</div>
+          </CardContent>
         </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">{t("Cost", "लागत")}</div>
-          <div className="text-lg font-semibold">₹{summary.totalCost.toLocaleString("en-IN")}</div>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              {summary.totalProfitLoss >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+              {t("P&L", "लाभ/हानि")}
+            </div>
+            <div className={`text-lg font-semibold ${summary.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+              ₹{Math.abs(summary.totalProfitLoss).toLocaleString("en-IN")}
+            </div>
+          </CardContent>
         </Card>
-        <Card className="p-3">
-          <div className="text-xs text-muted-foreground">{t("P&L", "लाभ/हानि")}</div>
-          <div className={`text-lg font-semibold ${summary.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-            {summary.totalProfitLoss >= 0 ? <TrendingUp className="inline h-4 w-4 mr-1" /> : <TrendingDown className="inline h-4 w-4 mr-1" />}
-            ₹{Math.abs(summary.totalProfitLoss).toLocaleString("en-IN")}
-          </div>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
+              <Clock className="h-3.5 w-3.5" />
+              {t("Total Due", "कुल बकाया")}
+            </div>
+            <div className="text-lg font-semibold text-orange-600">₹{summary.totalDue.toLocaleString("en-IN")}</div>
+          </CardContent>
         </Card>
       </div>
 
