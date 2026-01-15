@@ -257,6 +257,16 @@ export const seedLots = pgTable("seed_lots", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Seed Stock Entry Edit History - tracks all modifications after initial creation
+export const seedStockEntryEditHistory = pgTable("seed_stock_entry_edit_history", {
+  id: serial("id").primaryKey(),
+  seedEntryId: integer("seed_entry_id").notNull().references(() => seedStockEntries.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  userId: integer("user_id").references(() => users.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changeSet: jsonb("change_set").notNull(), // Array of { scope, entityId, label, changes: [{ field, oldValue, newValue }] }
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -282,6 +292,23 @@ export const seedStockEntriesRelations = relations(seedStockEntries, ({ one, man
     references: [merchants.id],
   }),
   seedLots: many(seedLots),
+  editHistory: many(seedStockEntryEditHistory),
+}));
+
+// Seed Stock Entry Edit History Relations
+export const seedStockEntryEditHistoryRelations = relations(seedStockEntryEditHistory, ({ one }) => ({
+  seedEntry: one(seedStockEntries, {
+    fields: [seedStockEntryEditHistory.seedEntryId],
+    references: [seedStockEntries.id],
+  }),
+  merchant: one(merchants, {
+    fields: [seedStockEntryEditHistory.merchantId],
+    references: [merchants.id],
+  }),
+  user: one(users, {
+    fields: [seedStockEntryEditHistory.userId],
+    references: [users.id],
+  }),
 }));
 
 // Seed Lots Relations
@@ -468,6 +495,7 @@ export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id:
 // Seed schemas
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
 export const insertSeedLotSchema = createInsertSchema(seedLots).omit({ id: true, createdAt: true });
+export const insertSeedStockEntryEditHistorySchema = createInsertSchema(seedStockEntryEditHistory).omit({ id: true, changedAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -520,6 +548,9 @@ export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;
 
 export type SeedLot = typeof seedLots.$inferSelect;
 export type InsertSeedLot = z.infer<typeof insertSeedLotSchema>;
+
+export type SeedStockEntryEditHistory = typeof seedStockEntryEditHistory.$inferSelect;
+export type InsertSeedStockEntryEditHistory = z.infer<typeof insertSeedStockEntryEditHistorySchema>;
 
 // Change types for edit history
 export type FieldChange = {

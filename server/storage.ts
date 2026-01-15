@@ -3,7 +3,7 @@ import {
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
   cashSettings, parties, cashFarmers,
-  seedStockEntries, seedLots,
+  seedStockEntries, seedLots, seedStockEntryEditHistory,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -19,7 +19,8 @@ import {
   type CashFarmer, type InsertCashFarmer,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
-  type SeedStockEntryWithLots
+  type SeedStockEntryWithLots,
+  type SeedStockEntryEditHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
@@ -119,6 +120,10 @@ export interface IStorage {
   getSeedLotsByEntry(seedEntryId: number, merchantId: number): Promise<SeedLot[]>;
   getSeedLotById(id: number, merchantId: number): Promise<SeedLot | undefined>;
   deleteSeedLot(id: number, merchantId: number): Promise<void>;
+  
+  // Seed Edit History operations
+  createSeedEditHistory(seedEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<SeedStockEntryEditHistory>;
+  getSeedEditHistory(seedEntryId: number, merchantId: number): Promise<(SeedStockEntryEditHistory & { userName?: string })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1120,6 +1125,43 @@ export class DatabaseStorage implements IStorage {
   async deleteSeedLot(id: number, merchantId: number): Promise<void> {
     await db.delete(seedLots)
       .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)));
+  }
+
+  // ===================== SEED EDIT HISTORY OPERATIONS =====================
+
+  async createSeedEditHistory(seedEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<SeedStockEntryEditHistory> {
+    const [created] = await db.insert(seedStockEntryEditHistory).values({
+      seedEntryId,
+      merchantId,
+      userId,
+      changeSet,
+    }).returning();
+    return created;
+  }
+
+  async getSeedEditHistory(seedEntryId: number, merchantId: number): Promise<(SeedStockEntryEditHistory & { userName?: string })[]> {
+    const history = await db.select().from(seedStockEntryEditHistory)
+      .where(and(
+        eq(seedStockEntryEditHistory.seedEntryId, seedEntryId),
+        eq(seedStockEntryEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(seedStockEntryEditHistory.changedAt));
+    
+    // Collect unique user IDs and batch fetch them
+    const userIds = Array.from(new Set(history.map(h => h.userId).filter((id): id is number => id !== null)));
+    const userMap = new Map<number, string>();
+    
+    if (userIds.length > 0) {
+      const usersData = await db.select({ id: users.id, name: users.name })
+        .from(users)
+        .where(sql`${users.id} IN ${userIds}`);
+      usersData.forEach(u => userMap.set(u.id, u.name));
+    }
+    
+    return history.map(h => ({
+      ...h,
+      userName: h.userId ? userMap.get(h.userId) : undefined,
+    }));
   }
 }
 

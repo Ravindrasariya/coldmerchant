@@ -1547,6 +1547,7 @@ export async function registerRoutes(
   app.patch("/api/seed-stock-entries/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
       const id = parseInt(req.params.id);
       
       // Validate request body
@@ -1563,20 +1564,102 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Seed stock entry not found" });
       }
 
-      // Update entry-level fields
+      // Helper to normalize values for comparison (handles decimal strings like "20.00" vs 20)
+      const normalizeNum = (val: any): string | null => {
+        if (val === null || val === undefined || val === '') return null;
+        const num = Number(val);
+        if (!isNaN(num)) return String(num);
+        return String(val);
+      };
+
+      // Track changes for edit history
+      const changeSet: ChangeSet = [];
+
+      // Track entry-level changes
+      const entryChanges: FieldChange[] = [];
       const entryUpdates: Partial<{ paymentStatus: string; amountPaid: string; remarks: string }> = {};
-      if (paymentStatus !== undefined) entryUpdates.paymentStatus = paymentStatus;
-      if (amountPaid !== undefined) entryUpdates.amountPaid = amountPaid.toString();
-      if (remarks !== undefined) entryUpdates.remarks = remarks;
+      
+      if (paymentStatus !== undefined && paymentStatus !== existingEntry.paymentStatus) {
+        entryChanges.push({ field: "Payment Status", oldValue: existingEntry.paymentStatus || "due", newValue: paymentStatus });
+        entryUpdates.paymentStatus = paymentStatus;
+      }
+      if (amountPaid !== undefined && normalizeNum(amountPaid) !== normalizeNum(existingEntry.amountPaid)) {
+        entryChanges.push({ field: "Amount Paid", oldValue: normalizeNum(existingEntry.amountPaid) || "0", newValue: normalizeNum(amountPaid) || "0" });
+        entryUpdates.amountPaid = amountPaid.toString();
+      }
+      if (remarks !== undefined && remarks !== existingEntry.remarks) {
+        entryChanges.push({ field: "Remarks", oldValue: existingEntry.remarks || "", newValue: remarks });
+        entryUpdates.remarks = remarks;
+      }
+
+      if (entryChanges.length > 0) {
+        changeSet.push({ scope: "entry", entityId: id, label: "Entry", changes: entryChanges });
+      }
 
       if (Object.keys(entryUpdates).length > 0) {
         await storage.updateSeedEntry(id, merchantId, entryUpdates);
       }
 
-      // Update lots if provided
+      // Update lots if provided and track changes
       if (seedLots && Array.isArray(seedLots)) {
         for (const lotData of seedLots) {
           if (lotData.id) {
+            // Find existing lot to compare changes
+            const existingLot = existingEntry.seedLots.find(l => l.id === lotData.id);
+            const lotChanges: FieldChange[] = [];
+            
+            if (existingLot) {
+              // Track field changes with proper normalization
+              if (lotData.coldStoreName !== undefined && lotData.coldStoreName !== existingLot.coldStoreName) {
+                lotChanges.push({ field: "Cold Store", oldValue: existingLot.coldStoreName, newValue: lotData.coldStoreName });
+              }
+              if (lotData.originalBags !== undefined && lotData.originalBags !== existingLot.originalBags) {
+                lotChanges.push({ field: "Original Bags", oldValue: existingLot.originalBags, newValue: lotData.originalBags });
+              }
+              if (lotData.remainingBags !== undefined && lotData.remainingBags !== existingLot.remainingBags) {
+                lotChanges.push({ field: "Remaining Bags", oldValue: existingLot.remainingBags, newValue: lotData.remainingBags });
+              }
+              if (lotData.potatoType !== undefined && lotData.potatoType !== existingLot.potatoType) {
+                lotChanges.push({ field: "Potato Type", oldValue: existingLot.potatoType, newValue: lotData.potatoType });
+              }
+              if (lotData.bagType !== undefined && lotData.bagType !== existingLot.bagType) {
+                lotChanges.push({ field: "Bag Type", oldValue: existingLot.bagType, newValue: lotData.bagType });
+              }
+              if (lotData.size !== undefined && lotData.size !== existingLot.size) {
+                lotChanges.push({ field: "Size", oldValue: existingLot.size, newValue: lotData.size });
+              }
+              if (lotData.pricePerBag !== undefined && normalizeNum(lotData.pricePerBag) !== normalizeNum(existingLot.pricePerBag)) {
+                lotChanges.push({ field: "Price/Bag", oldValue: normalizeNum(existingLot.pricePerBag), newValue: normalizeNum(lotData.pricePerBag) });
+              }
+              if (lotData.coldStoreChargesPerBag !== undefined && normalizeNum(lotData.coldStoreChargesPerBag) !== normalizeNum(existingLot.coldStoreChargesPerBag)) {
+                lotChanges.push({ field: "Cold Charges/Bag", oldValue: normalizeNum(existingLot.coldStoreChargesPerBag) || "0", newValue: normalizeNum(lotData.coldStoreChargesPerBag) || "0" });
+              }
+              if (lotData.coldStoreChargesPaid !== undefined && normalizeNum(lotData.coldStoreChargesPaid) !== normalizeNum(existingLot.coldStoreChargesPaid)) {
+                lotChanges.push({ field: "Cold Charges Paid", oldValue: normalizeNum(existingLot.coldStoreChargesPaid) || "0", newValue: normalizeNum(lotData.coldStoreChargesPaid) || "0" });
+              }
+              if (lotData.hammaliCharges !== undefined && normalizeNum(lotData.hammaliCharges) !== normalizeNum(existingLot.hammaliCharges)) {
+                lotChanges.push({ field: "Hammali Charges", oldValue: normalizeNum(existingLot.hammaliCharges) || "0", newValue: normalizeNum(lotData.hammaliCharges) || "0" });
+              }
+              if (lotData.gradingCharges !== undefined && normalizeNum(lotData.gradingCharges) !== normalizeNum(existingLot.gradingCharges)) {
+                lotChanges.push({ field: "Grading Charges", oldValue: normalizeNum(existingLot.gradingCharges) || "0", newValue: normalizeNum(lotData.gradingCharges) || "0" });
+              }
+              if (lotData.transportCharges !== undefined && normalizeNum(lotData.transportCharges) !== normalizeNum(existingLot.transportCharges)) {
+                lotChanges.push({ field: "Transport Charges", oldValue: normalizeNum(existingLot.transportCharges) || "0", newValue: normalizeNum(lotData.transportCharges) || "0" });
+              }
+              if (lotData.remarks !== undefined && lotData.remarks !== existingLot.remarks) {
+                lotChanges.push({ field: "Remarks", oldValue: existingLot.remarks || "", newValue: lotData.remarks || "" });
+              }
+
+              if (lotChanges.length > 0) {
+                changeSet.push({ 
+                  scope: "lot", 
+                  entityId: lotData.id, 
+                  label: `${existingLot.coldStoreName} (${existingLot.potatoType})`, 
+                  changes: lotChanges 
+                });
+              }
+            }
+
             // Update existing lot
             await storage.updateSeedLot(lotData.id, merchantId, {
               coldStoreName: lotData.coldStoreName,
@@ -1594,7 +1677,14 @@ export async function registerRoutes(
               remarks: lotData.remarks || null,
             });
           } else if (lotData.coldStoreName && lotData.originalBags && lotData.potatoType && lotData.bagType && lotData.size && lotData.pricePerBag !== undefined) {
-            // Create new lot - only if all required fields are provided
+            // Create new lot - track as structural change
+            changeSet.push({
+              scope: "lot",
+              entityId: 0,
+              label: `New Lot: ${lotData.coldStoreName} (${lotData.potatoType})`,
+              changes: [{ field: "Added", oldValue: null, newValue: `${lotData.originalBags} bags` }]
+            });
+
             await storage.createSeedLot({
               seedEntryId: id,
               merchantId,
@@ -1616,12 +1706,31 @@ export async function registerRoutes(
         }
       }
 
+      // Save edit history if there were changes
+      if (changeSet.length > 0) {
+        await storage.createSeedEditHistory(id, merchantId, userId, changeSet);
+      }
+
       // Fetch and return the updated entry
       const updatedEntry = await storage.getSeedEntryById(id, merchantId);
       res.json(updatedEntry);
     } catch (error) {
       console.error("Error updating seed stock entry:", error);
       res.status(500).json({ message: "Failed to update seed stock entry" });
+    }
+  });
+
+  // GET /api/seed-stock-entries/:id/edit-history - Get edit history for a seed stock entry
+  app.get("/api/seed-stock-entries/:id/edit-history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      const history = await storage.getSeedEditHistory(id, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching seed edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
     }
   });
 

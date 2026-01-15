@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -19,11 +19,17 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Snowflake } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Save, Loader2, Snowflake, ChevronDown, ChevronRight, History } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
-import { SeedStockEntryWithLots, SEED_SIZE_OPTIONS } from "@shared/schema";
+import { SeedStockEntryWithLots, SEED_SIZE_OPTIONS, type SeedStockEntryEditHistory, type ChangeSet } from "@shared/schema";
+import { format } from "date-fns";
 
 interface SeedStockEntryEditDialogProps {
   entry: SeedStockEntryWithLots;
@@ -37,6 +43,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
   const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus || "due");
   const [amountPaid, setAmountPaid] = useState(entry.amountPaid ? parseFloat(entry.amountPaid) : 0);
   const [remarks, setRemarks] = useState(entry.remarks || "");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [seedLots, setSeedLots] = useState(entry.seedLots.map(lot => ({
     ...lot,
     pricePerBag: lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0,
@@ -64,6 +71,11 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     remarks?: string;
   }
 
+  const { data: editHistory = [], isLoading: historyLoading } = useQuery<(SeedStockEntryEditHistory & { userName?: string })[]>({
+    queryKey: ['/api/seed-stock-entries', entry.id, 'edit-history'],
+    enabled: open,
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (data: { paymentStatus: string; amountPaid: number; remarks: string; seedLots: SeedLotUpdate[] }) => {
       const res = await apiRequest("PATCH", `/api/seed-stock-entries/${entry.id}`, data);
@@ -75,6 +87,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
         description: t("The seed stock entry has been updated successfully.", "बीज स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries", entry.id, "edit-history"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -321,6 +334,49 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
               data-testid="textarea-seed-remarks"
             />
           </div>
+
+          {editHistory.length > 0 && (
+            <Collapsible open={historyOpen} onOpenChange={setHistoryOpen} className="border rounded-lg">
+              <CollapsibleTrigger className="flex items-center justify-between w-full p-3 text-sm font-medium hover-elevate" data-testid="button-seed-edit-history-toggle">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  {t("Edit History", "संपादन इतिहास")} ({editHistory.length})
+                </div>
+                {historyOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t">
+                <div className="max-h-60 overflow-y-auto">
+                  {editHistory.map((historyItem, index) => (
+                    <div key={historyItem.id} className={`p-3 text-xs ${index > 0 ? "border-t" : ""}`}>
+                      <div className="flex justify-between items-center mb-2 text-muted-foreground">
+                        <span className="font-medium">
+                          {historyItem.userName || t("System", "सिस्टम")}
+                        </span>
+                        <span>
+                          {historyItem.changedAt ? format(new Date(historyItem.changedAt), "dd MMM yyyy, hh:mm a") : ""}
+                        </span>
+                      </div>
+                      {(historyItem.changeSet as ChangeSet).map((changeItem, itemIndex) => (
+                        <div key={itemIndex} className="pl-2 border-l-2 border-muted mb-2 last:mb-0">
+                          <div className="font-medium text-foreground mb-1">
+                            {changeItem.label}
+                          </div>
+                          {changeItem.changes.map((change, changeIndex) => (
+                            <div key={changeIndex} className="text-muted-foreground">
+                              <span className="text-foreground">{change.field}:</span>{" "}
+                              <span className="line-through text-red-500/70">{change.oldValue ?? "—"}</span>
+                              {" → "}
+                              <span className="text-green-600">{change.newValue ?? "—"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-edit-cancel">
