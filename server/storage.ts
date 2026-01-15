@@ -1782,9 +1782,11 @@ export class DatabaseStorage implements IStorage {
           }
         } else if (crossSettlement.direction === 'seed_to_raw') {
           // Receiving seed payment, offset against raw potato dues
-          // The settled amount reduces what we owe farmer for raw potatoes
+          // 1. The settled amount reduces what we owe farmer for raw potatoes (update stock entries)
+          // 2. Also update seed transactions to reduce seed dues (farmer is paying for seeds via offset)
           let remainingSettlement = crossSettlement.settledAmount;
           
+          // Step 1: Update raw potato stock entries
           for (const entryId of crossSettlement.rawPotatoEntryIds) {
             if (remainingSettlement <= 0) break;
             
@@ -1827,6 +1829,32 @@ export class DatabaseStorage implements IStorage {
               .where(eq(stockEntries.id, stockEntry.id));
             
             remainingSettlement -= toApply;
+          }
+          
+          // Step 2: Update seed transactions (reduce seed dues by full settlement amount)
+          let remainingSeedSettlement = crossSettlement.settledAmount;
+          
+          for (const txnId of crossSettlement.seedTransactionIds) {
+            if (remainingSeedSettlement <= 0) break;
+            
+            const [seedTxn] = await tx.select().from(seedTransactions)
+              .where(eq(seedTransactions.id, txnId));
+            
+            if (!seedTxn) continue;
+            
+            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+            if (currentDue <= 0) continue;
+            
+            const toApply = Math.min(remainingSeedSettlement, currentDue);
+            const newDue = Math.max(0, currentDue - toApply);
+            
+            await tx.update(seedTransactions)
+              .set({ 
+                totalDueToFarmer: newDue.toString()
+              })
+              .where(eq(seedTransactions.id, txnId));
+            
+            remainingSeedSettlement -= toApply;
           }
         }
       }
