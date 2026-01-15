@@ -66,6 +66,29 @@ interface ColdStoreWithDue {
   lotCount: number;
 }
 
+interface ManagedParty {
+  id: number;
+  name: string;
+  contactNumber: string | null;
+  address: string | null;
+  pendingDues: string;
+}
+
+interface ManagedFarmer {
+  id: number;
+  name: string;
+  contactNumber: string | null;
+  address: string | null;
+  pendingDueToBePaid: string;
+}
+
+interface CashSettings {
+  id: number;
+  financialYear: string;
+  openingCashInHand: string;
+  openingCashInAccount: string;
+}
+
 const inwardFormSchema = z.object({
   receiptType: z.string().min(1, "Receipt type is required"),
   partyName: z.string().min(1, "Party name is required"),
@@ -102,6 +125,10 @@ export function CashManagementTab() {
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
 
+  // Calculate current financial year
+  const currentYear = new Date().getFullYear();
+  const financialYear = `${currentYear}-${(currentYear + 1).toString().slice(-2)}`;
+
   const { data: entries = [], isLoading: entriesLoading } = useQuery<CashEntry[]>({
     queryKey: ["/api/cash/entries"],
   });
@@ -116,6 +143,26 @@ export function CashManagementTab() {
 
   const { data: coldStores = [] } = useQuery<ColdStoreWithDue[]>({
     queryKey: ["/api/cash/cold-stores"],
+  });
+
+  // Fetch managed parties for dropdown
+  const { data: managedParties = [] } = useQuery<ManagedParty[]>({
+    queryKey: ["/api/cash/managed-parties"],
+  });
+
+  // Fetch managed farmers for dropdown
+  const { data: managedFarmers = [] } = useQuery<ManagedFarmer[]>({
+    queryKey: ["/api/cash/managed-farmers"],
+  });
+
+  // Fetch cash settings for opening balance
+  const { data: cashSettings } = useQuery<CashSettings>({
+    queryKey: ["/api/cash/settings", financialYear],
+    queryFn: async () => {
+      const res = await fetch(`/api/cash/settings/${financialYear}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch settings");
+      return res.json();
+    },
   });
 
   const inwardForm = useForm<InwardFormValues>({
@@ -188,12 +235,12 @@ export function CashManagementTab() {
   });
 
   const onInwardSubmit = (values: InwardFormValues) => {
-    const selectedParty = parties.find(p => p.partyName === values.partyName);
+    const selectedParty = managedParties.find(p => p.name === values.partyName);
     createEntryMutation.mutate({
       direction: "inward",
       receiptType: values.receiptType,
       partyName: values.partyName,
-      partyVillage: selectedParty?.partyAddress || null,
+      partyVillage: selectedParty?.address || null,
       amount: values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
@@ -202,7 +249,7 @@ export function CashManagementTab() {
 
   const onOutflowSubmit = (values: OutflowFormValues) => {
     const selectedFarmer = values.expenseType === "farmer" 
-      ? farmers.find(f => f.farmerName === values.farmerName)
+      ? managedFarmers.find(f => f.name === values.farmerName)
       : null;
     
     createEntryMutation.mutate({
@@ -210,7 +257,7 @@ export function CashManagementTab() {
       expenseType: values.expenseType,
       paymentMode: values.paymentMode,
       farmerName: values.expenseType === "farmer" ? values.farmerName : null,
-      farmerVillage: selectedFarmer?.village || null,
+      farmerVillage: selectedFarmer?.address || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
       amount: values.amount,
       entryDate: values.entryDate,
@@ -237,8 +284,12 @@ export function CashManagementTab() {
     .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer")
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
-  const netCashInHand = totalCashReceived - totalCashExpense;
-  const netCashInAccount = totalAccountReceived - totalAccountExpense;
+  // Include opening balance from settings
+  const openingCashInHand = cashSettings ? parseFloat(cashSettings.openingCashInHand || "0") : 0;
+  const openingCashInAccount = cashSettings ? parseFloat(cashSettings.openingCashInAccount || "0") : 0;
+  
+  const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense;
+  const netCashInAccount = openingCashInAccount + totalAccountReceived - totalAccountExpense;
 
   // Filter entries
   const filteredEntries = entries.filter(entry => {
@@ -574,15 +625,15 @@ export function CashManagementTab() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {parties.map((party) => (
-                              <SelectItem key={party.partyName} value={party.partyName}>
+                            {managedParties.map((party) => (
+                              <SelectItem key={party.id} value={party.name}>
                                 <div className="flex items-center justify-between gap-4">
-                                  <span>{party.partyName}</span>
-                                  {party.partyAddress && (
-                                    <span className="text-xs text-muted-foreground">({party.partyAddress})</span>
+                                  <span>{party.name}</span>
+                                  {party.address && (
+                                    <span className="text-xs text-muted-foreground">({party.address})</span>
                                   )}
                                   <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                    {t("Due", "बकाया")}: ₹{party.totalDue.toFixed(0)}
+                                    {t("Due", "बकाया")}: ₹{parseFloat(party.pendingDues || "0").toFixed(0)}
                                   </Badge>
                                 </div>
                               </SelectItem>
@@ -694,16 +745,16 @@ export function CashManagementTab() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {farmers.map((farmer) => (
-                                <SelectItem key={farmer.farmerName} value={farmer.farmerName}>
+                              {managedFarmers.map((farmer) => (
+                                <SelectItem key={farmer.id} value={farmer.name}>
                                   <div className="flex items-center justify-between gap-4">
-                                    <span>{farmer.farmerName}</span>
-                                    {farmer.village && (
-                                      <span className="text-xs text-muted-foreground">({farmer.village})</span>
+                                    <span>{farmer.name}</span>
+                                    {farmer.address && (
+                                      <span className="text-xs text-muted-foreground">({farmer.address})</span>
                                     )}
-                                    {farmer.totalDue > 0 && (
+                                    {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
                                       <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                        {t("Due", "बकाया")}: ₹{farmer.totalDue.toFixed(0)}
+                                        {t("Due", "बकाया")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toFixed(0)}
                                       </Badge>
                                     )}
                                   </div>
