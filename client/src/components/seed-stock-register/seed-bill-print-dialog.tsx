@@ -93,6 +93,8 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
           <div style="max-width: 800px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px;">
               <h1 style="font-size: 18px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
+              ${user?.merchantAddress ? `<p style="font-size: 11px; color: #444; margin-bottom: 2px;">${user.merchantAddress}</p>` : ""}
+              ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}
               <p style="font-size: 12px; color: #666;">Seed Purchase Receipt / बीज खरीद रसीद</p>
             </div>
 

@@ -9,7 +9,7 @@ import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
-  user: (SelectUser & { merchantName?: string }) | null;
+  user: (SelectUser & { merchantName?: string; merchantAddress?: string; merchantContact?: string }) | null;
   isLoading: boolean;
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
-  } = useQuery<(SelectUser & { merchantName?: string }) | undefined, Error>({
+  } = useQuery<(SelectUser & { merchantName?: string; merchantAddress?: string; merchantContact?: string }) | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });

@@ -81,17 +81,23 @@ export function setupAuth(app: Express) {
       req.login(user, async (err) => {
         if (err) return next(err);
         
-        // Get merchant name if user has a merchant
+        // Get merchant details if user has a merchant
         let merchantName: string | undefined;
+        let merchantAddress: string | undefined;
+        let merchantContact: string | undefined;
         if (user.merchantId) {
           const merchant = await storage.getMerchant(user.merchantId);
           merchantName = merchant?.name;
+          merchantAddress = merchant?.address || undefined;
+          merchantContact = merchant?.contactNumber || undefined;
         }
         // Remove password from response
         const { password: _, ...userWithoutPassword } = user;
         res.status(200).json({
           ...userWithoutPassword,
           merchantName,
+          merchantAddress,
+          merchantContact,
         });
       });
     })(req, res, next);
@@ -109,17 +115,23 @@ export function setupAuth(app: Express) {
       return res.sendStatus(401);
     }
     
-    // Get merchant name if user has a merchant
+    // Get merchant details if user has a merchant
     let merchantName: string | undefined;
+    let merchantAddress: string | undefined;
+    let merchantContact: string | undefined;
     if (req.user.merchantId) {
       const merchant = await storage.getMerchant(req.user.merchantId);
       merchantName = merchant?.name;
+      merchantAddress = merchant?.address || undefined;
+      merchantContact = merchant?.contactNumber || undefined;
     }
     // Remove password from response
     const { password: _, ...userWithoutPassword } = req.user;
     res.json({
       ...userWithoutPassword,
       merchantName,
+      merchantAddress,
+      merchantContact,
     });
   });
 
