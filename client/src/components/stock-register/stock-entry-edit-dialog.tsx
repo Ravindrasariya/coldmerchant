@@ -59,6 +59,10 @@ interface StockEntryWithLots {
     size: string | null;
     pricePerKg: string | null;
     coldStoreChargesPerBag: string | null;
+    hammaliGradingCharges: string | null;
+    adjustedAmount: string | null;
+    adjustedAmountType: string | null;
+    adjustedAmountRemark: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
@@ -86,6 +90,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const [lots, setLots] = useState(entry.lots.map(lot => ({
     ...lot,
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
+    hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
+    adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
+    adjustedAmountType: lot.adjustedAmountType || null,
+    adjustedAmountRemark: lot.adjustedAmountRemark || "",
     bagBreakdowns: lot.bagBreakdowns.map(bd => ({
       ...bd,
       remainingBags: bd.remainingBags ?? bd.numberOfBags,
@@ -176,7 +184,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const handleLotFieldChange = (
     lotIndex: number,
     field: string,
-    value: number | null
+    value: number | string | null
   ) => {
     const newLots = [...lots];
     (newLots[lotIndex] as any)[field] = value;
@@ -514,9 +522,59 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   </CardContent>
                 )}
                 
+                {/* Adjusted Amount Section - applies to all cut types */}
+                <CardContent className="pt-0 border-t">
+                  <div className="p-3 bg-purple-50/50 dark:bg-purple-900/10 rounded-md">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("Adjustment Type", "समायोजन प्रकार")}</Label>
+                        <Select
+                          value={lot.adjustedAmountType || ""}
+                          onValueChange={(v) => handleLotFieldChange(lotIndex, "adjustedAmountType", v)}
+                        >
+                          <SelectTrigger className="h-8" data-testid={`edit-adjustment-type-${lotIndex}`}>
+                            <SelectValue placeholder={t("Select type", "प्रकार चुनें")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="debit">{t("Debit (Subtract)", "डेबिट (घटाएं)")}</SelectItem>
+                            <SelectItem value="credit">{t("Credit (Add)", "क्रेडिट (जोड़ें)")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("Amount", "राशि")}</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          className="h-8"
+                          placeholder="₹0"
+                          value={lot.adjustedAmount ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            handleLotFieldChange(lotIndex, "adjustedAmount", val === "" ? null : parseFloat(val));
+                          }}
+                          data-testid={`edit-adjustment-amount-${lotIndex}`}
+                        />
+                      </div>
+                      <div className="space-y-1 md:col-span-2">
+                        <Label className="text-xs">{t("Reason", "कारण")}</Label>
+                        <Input
+                          type="text"
+                          className="h-8"
+                          placeholder={t("Enter reason for adjustment...", "समायोजन का कारण दर्ज करें...")}
+                          value={lot.adjustedAmountRemark || ""}
+                          onChange={(e) => handleLotFieldChange(lotIndex, "adjustedAmountRemark", e.target.value)}
+                          data-testid={`edit-adjustment-remark-${lotIndex}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                
                 {/* Cold Store Charges Section - applies to all cut types */}
                 <CardContent className="pt-0 border-t">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-md">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-md">
                     <div className="space-y-1">
                       <Label className="text-xs">{t("Cold Store Charges/Bag", "कोल्ड स्टोर शुल्क/बोरी")}</Label>
                       <Input
@@ -532,6 +590,21 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         data-testid={`edit-coldstore-charge-${lotIndex}`}
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Hammali/Grading", "हम्माली/ग्रेडिंग")}</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        className="h-8"
+                        placeholder="₹0"
+                        value={lot.hammaliGradingCharges ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          handleLotFieldChange(lotIndex, "hammaliGradingCharges", val === "" ? null : parseFloat(val));
+                        }}
+                        data-testid={`edit-hammali-charge-${lotIndex}`}
+                      />
+                    </div>
                     <div>
                       <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
                       <p className="font-medium mt-1">{lot.originalBags}</p>
@@ -539,9 +612,16 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     <div>
                       <Label className="text-xs">{t("Cold Store Due", "कोल्ड स्टोर बकाया")}</Label>
                       <p className="font-medium text-orange-600 dark:text-orange-400 mt-1">
-                        {lot.coldStoreChargesPerBag !== null 
-                          ? `₹${(lot.originalBags * (lot.coldStoreChargesPerBag as number)).toFixed(2)}`
-                          : "—"}
+                        {(() => {
+                          const coldCharge = lot.coldStoreChargesPerBag !== null 
+                            ? lot.originalBags * (lot.coldStoreChargesPerBag as number) 
+                            : 0;
+                          const hammali = lot.hammaliGradingCharges !== null 
+                            ? (lot.hammaliGradingCharges as number) 
+                            : 0;
+                          const total = coldCharge + hammali;
+                          return total > 0 ? `₹${total.toFixed(2)}` : "—";
+                        })()}
                       </p>
                     </div>
                   </div>

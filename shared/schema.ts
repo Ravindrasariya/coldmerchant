@@ -481,6 +481,10 @@ export const lotFormSchema = z.object({
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
   coldStoreChargesPerBag: z.coerce.number().optional(), // charges per bag from cold store
+  hammaliGradingCharges: z.coerce.number().optional(), // hammali and grading charges
+  adjustedAmount: z.coerce.number().optional(), // adjustment amount for farmer due
+  adjustedAmountType: z.enum(["debit", "credit"]).optional(), // debit or credit
+  adjustedAmountRemark: z.string().optional(), // reason for adjustment
   remarks: z.string().optional(),
   bagBreakdowns: z.array(bagBreakdownFormSchema).optional(),
 });

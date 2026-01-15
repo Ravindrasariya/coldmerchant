@@ -212,12 +212,36 @@ export async function registerRoutes(
             if (existingLot && lotData.coldStoreChargesPerBag !== undefined) {
               compareField('coldStoreChargesPerBag', existingLot.coldStoreChargesPerBag, lotData.coldStoreChargesPerBag, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.hammaliGradingCharges !== undefined) {
+              compareField('hammaliGradingCharges', existingLot.hammaliGradingCharges, lotData.hammaliGradingCharges, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.adjustedAmount !== undefined) {
+              compareField('adjustedAmount', existingLot.adjustedAmount, lotData.adjustedAmount, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.adjustedAmountType !== undefined) {
+              compareField('adjustedAmountType', existingLot.adjustedAmountType, lotData.adjustedAmountType, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.adjustedAmountRemark !== undefined) {
+              compareField('adjustedAmountRemark', existingLot.adjustedAmountRemark, lotData.adjustedAmountRemark, lotLabel, 'lot', lotData.id);
+            }
 
             // Update existing lot
             await storage.updateLot(lotData.id, merchantId, {
               remainingBags: lotData.remainingBags,
               coldStoreChargesPerBag: lotData.coldStoreChargesPerBag !== undefined 
                 ? (lotData.coldStoreChargesPerBag ? lotData.coldStoreChargesPerBag.toString() : null)
+                : undefined,
+              hammaliGradingCharges: lotData.hammaliGradingCharges !== undefined
+                ? (lotData.hammaliGradingCharges ? lotData.hammaliGradingCharges.toString() : null)
+                : undefined,
+              adjustedAmount: lotData.adjustedAmount !== undefined
+                ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
+                : undefined,
+              adjustedAmountType: lotData.adjustedAmountType !== undefined
+                ? (lotData.adjustedAmountType || null)
+                : undefined,
+              adjustedAmountRemark: lotData.adjustedAmountRemark !== undefined
+                ? (lotData.adjustedAmountRemark || null)
                 : undefined,
             });
 

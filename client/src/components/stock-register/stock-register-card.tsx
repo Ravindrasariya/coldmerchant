@@ -47,7 +47,11 @@ interface StockEntryWithLots {
     size: string | null;
     pricePerKg: string | null;
     coldStoreChargesPerBag: string | null;
+    hammaliGradingCharges: string | null;
     coldStorageChargesPaid: string | null;
+    adjustedAmount: string | null;
+    adjustedAmountType: string | null;
+    adjustedAmountRemark: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
