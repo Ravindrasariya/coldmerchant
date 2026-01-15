@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -209,6 +209,26 @@ export function CashManagementTab() {
 
   const expenseType = outflowForm.watch("expenseType");
 
+  // Calculate summary values
+  const totalCashReceived = entries
+    .filter(e => e.direction === "inward" && e.receiptType === "cash_received")
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const totalAccountReceived = entries
+    .filter(e => e.direction === "inward" && e.receiptType === "account_received")
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const totalCashExpense = entries
+    .filter(e => e.direction === "outflow" && e.paymentMode === "cash")
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const totalAccountExpense = entries
+    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer")
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const netCashInHand = totalCashReceived - totalCashExpense;
+  const netCashInAccount = totalAccountReceived - totalAccountExpense;
+
   const getReceiptTypeLabel = (type: string) => {
     switch (type) {
       case "cash_received": return t("Cash Received", "नकद प्राप्त");
@@ -238,8 +258,76 @@ export function CashManagementTab() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 p-4 h-full" data-testid="cash-management-tab">
-      <div className="w-full md:w-1/2 space-y-4">
+    <div className="space-y-6" data-testid="cash-management-tab">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <Card data-testid="card-cash-received">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-green-600 mb-1">
+              <Banknote className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Cash Received", "नकद प्राप्त")}</span>
+            </div>
+            <p className="text-lg font-bold text-green-600">₹{totalCashReceived.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-account-received">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-blue-600 mb-1">
+              <Building2 className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Account Received", "खाते में प्राप्त")}</span>
+            </div>
+            <p className="text-lg font-bold text-blue-600">₹{totalAccountReceived.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-cash-expense">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-amber-600 mb-1">
+              <ArrowUpRight className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Cash Expense", "नकद खर्च")}</span>
+            </div>
+            <p className="text-lg font-bold text-amber-600">₹{totalCashExpense.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-account-expense">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-orange-600 mb-1">
+              <CreditCard className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Account Expense", "खाता खर्च")}</span>
+            </div>
+            <p className="text-lg font-bold text-orange-600">₹{totalAccountExpense.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-net-cash">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-teal-600 mb-1">
+              <Wallet className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Net Cash in Hand", "हाथ में शुद्ध नकद")}</span>
+            </div>
+            <p className={`text-lg font-bold ${netCashInHand >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+              ₹{netCashInHand.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-net-account">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-indigo-600 mb-1">
+              <Building2 className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Net in Account", "खाते में शुद्ध")}</span>
+            </div>
+            <p className={`text-lg font-bold ${netCashInAccount >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+              ₹{netCashInAccount.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6 h-full">
+        <div className="w-full md:w-1/2 space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow")}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="inward" className="flex items-center gap-2" data-testid="tab-inward">
@@ -593,6 +681,7 @@ export function CashManagementTab() {
             ))
           )}
         </div>
+      </div>
       </div>
     </div>
   );
