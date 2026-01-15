@@ -87,6 +87,15 @@ interface SeedSupplierWithDue {
   entryCount: number;
 }
 
+interface CrossSettlementEligibility {
+  hasSeedDues: boolean;
+  seedDueAmount: number;
+  seedTransactionIds: number[];
+  hasRawPotatoDues: boolean;
+  rawPotatoDueAmount: number;
+  rawPotatoEntryIds: number[];
+}
+
 interface ManagedParty {
   id: number;
   name: string;
@@ -257,6 +266,24 @@ export function CashManagementTab() {
   // State for seed farmer searchable popover
   const [seedFarmerPopoverOpen, setSeedFarmerPopoverOpen] = useState(false);
   
+  // State for cross-settlement (separate toggles per form)
+  const [outflowCrossSettlementEnabled, setOutflowCrossSettlementEnabled] = useState(true);
+  const [inwardCrossSettlementEnabled, setInwardCrossSettlementEnabled] = useState(true);
+  const [selectedOutflowFarmerName, setSelectedOutflowFarmerName] = useState("");
+  const [selectedInwardSeedFarmerName, setSelectedInwardSeedFarmerName] = useState("");
+  
+  // Query for cross-settlement eligibility (for farmer payments)
+  const { data: farmerCrossSettlement } = useQuery<CrossSettlementEligibility>({
+    queryKey: [`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedOutflowFarmerName)}`],
+    enabled: !!selectedOutflowFarmerName,
+  });
+  
+  // Query for cross-settlement eligibility (for seed sale inward payments)
+  const { data: seedFarmerCrossSettlement } = useQuery<CrossSettlementEligibility>({
+    queryKey: [`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedInwardSeedFarmerName)}`],
+    enabled: !!selectedInwardSeedFarmerName,
+  });
+  
   // Watch revenue type for conditional rendering
   const revenueType = inwardForm.watch("revenueType");
 
@@ -393,8 +420,23 @@ export function CashManagementTab() {
         remarks: values.remarks || null,
       });
     } else {
-      // Seed sale - use seed farmer
+      // Seed sale - use seed farmer with cross-settlement
       const selectedSeedFarmer = seedFarmers.find(f => f.farmerName.toLowerCase() === values.seedFarmerName?.toLowerCase());
+      
+      // Calculate cross-settlement for seed_to_raw direction (receiving seed payment, offset raw potato dues)
+      let crossSettlementData = undefined;
+      if (inwardCrossSettlementEnabled && seedFarmerCrossSettlement?.hasRawPotatoDues) {
+        const settlementAmount = Math.min(values.amount, seedFarmerCrossSettlement.rawPotatoDueAmount);
+        if (settlementAmount > 0) {
+          crossSettlementData = {
+            settledAmount: settlementAmount,
+            direction: 'seed_to_raw' as const,
+            seedTransactionIds: seedFarmerCrossSettlement.seedTransactionIds,
+            rawPotatoEntryIds: seedFarmerCrossSettlement.rawPotatoEntryIds,
+          };
+        }
+      }
+      
       createEntryMutation.mutate({
         direction: "inward",
         receiptType: values.receiptType,
@@ -404,6 +446,7 @@ export function CashManagementTab() {
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
+        crossSettlement: crossSettlementData,
       });
     }
   };
@@ -412,6 +455,20 @@ export function CashManagementTab() {
     const selectedFarmer = values.expenseType === "farmer" 
       ? mergedFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
+    
+    // Calculate cross-settlement for raw_to_seed direction (paying farmer, offset seed dues)
+    let crossSettlementData = undefined;
+    if (outflowCrossSettlementEnabled && values.expenseType === "farmer" && farmerCrossSettlement?.hasSeedDues) {
+      const settlementAmount = Math.min(values.amount, farmerCrossSettlement.seedDueAmount);
+      if (settlementAmount > 0) {
+        crossSettlementData = {
+          settledAmount: settlementAmount,
+          direction: 'raw_to_seed' as const,
+          seedTransactionIds: farmerCrossSettlement.seedTransactionIds,
+          rawPotatoEntryIds: farmerCrossSettlement.rawPotatoEntryIds,
+        };
+      }
+    }
     
     createEntryMutation.mutate({
       direction: "outflow",
@@ -424,6 +481,7 @@ export function CashManagementTab() {
       amount: values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
+      crossSettlement: crossSettlementData,
     });
   };
 
@@ -969,7 +1027,7 @@ export function CashManagementTab() {
                                     {party.address && (
                                       <span className="text-xs text-muted-foreground">({party.address})</span>
                                     )}
-                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                    <Badge variant="secondary">
                                       {t("Due", "बकाया")}: ₹{party.pendingDues.toFixed(0)}
                                     </Badge>
                                   </div>
@@ -984,72 +1042,109 @@ export function CashManagementTab() {
                   )}
 
                   {revenueType === "seed_sale" && (
-                    <FormField
-                      control={inwardForm.control}
-                      name="seedFarmerName"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
-                          <Popover open={seedFarmerPopoverOpen} onOpenChange={setSeedFarmerPopoverOpen}>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  className={cn(
-                                    "w-full justify-between",
-                                    !field.value && "text-muted-foreground"
+                    <>
+                      <FormField
+                        control={inwardForm.control}
+                        name="seedFarmerName"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
+                            <Popover open={seedFarmerPopoverOpen} onOpenChange={setSeedFarmerPopoverOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                      "w-full justify-between",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                    data-testid="select-seed-farmer"
+                                  >
+                                    {field.value
+                                      ? seedFarmers.find(f => f.farmerName === field.value)?.farmerName || field.value
+                                      : t("Select Farmer", "किसान चुनें")}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[350px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
+                                  <CommandList>
+                                    <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
+                                    <CommandGroup>
+                                      {seedFarmers.map((farmer) => (
+                                        <CommandItem
+                                          key={farmer.farmerName}
+                                          value={`${farmer.farmerName} ${farmer.village || ""}`}
+                                          onSelect={() => {
+                                            field.onChange(farmer.farmerName);
+                                            setSelectedInwardSeedFarmerName(farmer.farmerName);
+                                            setSeedFarmerPopoverOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === farmer.farmerName ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          <div className="flex flex-col flex-1">
+                                            <span className="font-medium">{farmer.farmerName}</span>
+                                            {farmer.village && (
+                                              <span className="text-xs text-muted-foreground">{farmer.village}</span>
+                                            )}
+                                          </div>
+                                          <Badge variant="secondary" className="ml-2">
+                                            ₹{farmer.totalDue.toFixed(0)}
+                                          </Badge>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {/* Cross-settlement preview for seed sale payment */}
+                      {seedFarmerCrossSettlement?.hasRawPotatoDues && (
+                        <Card className="border-secondary bg-secondary/50">
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 text-foreground font-medium text-sm mb-1">
+                                  <RefreshCw className="h-4 w-4" />
+                                  {t("Cross-Settlement Available", "क्रॉस-सेटलमेंट उपलब्ध")}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {t(
+                                    `You owe ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(2)} to this farmer for raw potatoes. Payment received will auto-adjust against this.`,
+                                    `आप इस किसान को कच्चे आलू के लिए ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(2)} देय हैं। प्राप्त भुगतान इसके विरुद्ध स्वतः समायोजित होगा।`
                                   )}
-                                  data-testid="select-seed-farmer"
-                                >
-                                  {field.value
-                                    ? seedFarmers.find(f => f.farmerName === field.value)?.farmerName || field.value
-                                    : t("Select Farmer", "किसान चुनें")}
-                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[350px] p-0" align="start">
-                              <Command>
-                                <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
-                                <CommandList>
-                                  <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
-                                  <CommandGroup>
-                                    {seedFarmers.map((farmer) => (
-                                      <CommandItem
-                                        key={farmer.farmerName}
-                                        value={`${farmer.farmerName} ${farmer.village || ""}`}
-                                        onSelect={() => {
-                                          field.onChange(farmer.farmerName);
-                                          setSeedFarmerPopoverOpen(false);
-                                        }}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            field.value === farmer.farmerName ? "opacity-100" : "opacity-0"
-                                          )}
-                                        />
-                                        <div className="flex flex-col flex-1">
-                                          <span className="font-medium">{farmer.farmerName}</span>
-                                          {farmer.village && (
-                                            <span className="text-xs text-muted-foreground">{farmer.village}</span>
-                                          )}
-                                        </div>
-                                        <Badge variant="outline" className="text-orange-600 border-orange-300 ml-2">
-                                          ₹{farmer.totalDue.toFixed(0)}
-                                        </Badge>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs shrink-0"
+                                onClick={() => setInwardCrossSettlementEnabled(!inwardCrossSettlementEnabled)}
+                                data-testid="button-toggle-cross-settlement-inward"
+                              >
+                                {inwardCrossSettlementEnabled 
+                                  ? t("Enabled", "सक्षम") 
+                                  : t("Disabled", "अक्षम")}
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
                       )}
-                    />
+                    </>
                   )}
 
                   <FormField
@@ -1139,40 +1234,82 @@ export function CashManagementTab() {
                   />
 
                   {expenseType === "farmer" && (
-                    <FormField
-                      control={outflowForm.control}
-                      name="farmerName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-farmer-name">
-                                <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {mergedFarmers.map((farmer) => (
-                                <SelectItem key={farmer.name} value={farmer.name}>
-                                  <div className="flex items-center justify-between gap-4">
-                                    <span>{farmer.name}</span>
-                                    {farmer.address && (
-                                      <span className="text-xs text-muted-foreground">({farmer.address})</span>
-                                    )}
-                                    {farmer.pendingDues > 0 && (
-                                      <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                        {t("Due", "बकाया")}: ₹{farmer.pendingDues.toFixed(0)}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
+                    <>
+                      <FormField
+                        control={outflowForm.control}
+                        name="farmerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
+                            <Select 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                setSelectedOutflowFarmerName(value);
+                              }} 
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-farmer-name">
+                                  <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {mergedFarmers.map((farmer) => (
+                                  <SelectItem key={farmer.name} value={farmer.name}>
+                                    <div className="flex items-center justify-between gap-4">
+                                      <span>{farmer.name}</span>
+                                      {farmer.address && (
+                                        <span className="text-xs text-muted-foreground">({farmer.address})</span>
+                                      )}
+                                      {farmer.pendingDues > 0 && (
+                                        <Badge variant="secondary">
+                                          {t("Due", "बकाया")}: ₹{farmer.pendingDues.toFixed(0)}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {/* Cross-settlement preview for farmer payment */}
+                      {farmerCrossSettlement?.hasSeedDues && (
+                        <Card className="border-secondary bg-secondary/50">
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 text-foreground font-medium text-sm mb-1">
+                                  <RefreshCw className="h-4 w-4" />
+                                  {t("Cross-Settlement Available", "क्रॉस-सेटलमेंट उपलब्ध")}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {t(
+                                    `This farmer owes ₹${farmerCrossSettlement.seedDueAmount.toFixed(2)} for seed purchases. Payment will auto-adjust against this.`,
+                                    `इस किसान पर बीज खरीद के लिए ₹${farmerCrossSettlement.seedDueAmount.toFixed(2)} बकाया है। भुगतान इसके विरुद्ध स्वतः समायोजित होगा।`
+                                  )}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs shrink-0"
+                                onClick={() => setOutflowCrossSettlementEnabled(!outflowCrossSettlementEnabled)}
+                                data-testid="button-toggle-cross-settlement"
+                              >
+                                {outflowCrossSettlementEnabled 
+                                  ? t("Enabled", "सक्षम") 
+                                  : t("Disabled", "अक्षम")}
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
                       )}
-                    />
+                    </>
                   )}
 
                   {expenseType === "cold_store_charge" && (
@@ -1193,7 +1330,7 @@ export function CashManagementTab() {
                                 <SelectItem key={store.coldStoreName} value={store.coldStoreName}>
                                   <div className="flex items-center justify-between gap-4">
                                     <span>{store.coldStoreName}</span>
-                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                    <Badge variant="secondary">
                                       {t("Due", "बकाया")}: ₹{store.totalDue.toFixed(0)}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
@@ -1231,7 +1368,7 @@ export function CashManagementTab() {
                                     {supplier.district && (
                                       <span className="text-xs text-muted-foreground">({supplier.district})</span>
                                     )}
-                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                    <Badge variant="secondary">
                                       {t("Due", "बकाया")}: ₹{supplier.totalDue.toFixed(0)}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
