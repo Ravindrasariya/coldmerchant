@@ -61,7 +61,8 @@ interface SeedStockRegisterCardProps {
 export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen, onDownloadDialogClose }: SeedStockRegisterCardProps = {}) {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [filterSerial, setFilterSerial] = useState<string>("");
+  const [filterSupplier, setFilterSupplier] = useState<string>("");
   const [filterPotatoType, setFilterPotatoType] = useState<string>("");
   const [filterColdStore, setFilterColdStore] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
@@ -84,6 +85,18 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
     queryKey: ["/api/seed-stock-entries"],
   });
 
+  const serialNumbers = useMemo(() => {
+    if (!entries) return [];
+    return entries.map(e => e.serialNumber).sort((a, b) => a - b);
+  }, [entries]);
+
+  const supplierNames = useMemo(() => {
+    if (!entries) return [];
+    const suppliers = new Set<string>();
+    entries.forEach(entry => suppliers.add(entry.supplierName));
+    return Array.from(suppliers).sort();
+  }, [entries]);
+
   const coldStores = useMemo(() => {
     if (!entries) return [];
     const stores = new Set<string>();
@@ -92,20 +105,19 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         stores.add(lot.coldStoreName);
       });
     });
-    return Array.from(stores);
+    return Array.from(stores).sort();
   }, [entries]);
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     
     return entries.filter((entry) => {
-      if (searchTerm) {
-        const search = searchTerm.toLowerCase();
-        const matchesSearch = 
-          entry.supplierName.toLowerCase().includes(search) ||
-          entry.serialNumber.toString().includes(search) ||
-          entry.seedLots.some(lot => lot.coldStoreName.toLowerCase().includes(search));
-        if (!matchesSearch) return false;
+      if (filterSerial && entry.serialNumber.toString() !== filterSerial) {
+        return false;
+      }
+
+      if (filterSupplier && entry.supplierName !== filterSupplier) {
+        return false;
       }
 
       if (filterPotatoType) {
@@ -125,34 +137,44 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
 
       return true;
     });
-  }, [entries, searchTerm, filterPotatoType, filterUnsold, filterColdStore]);
+  }, [entries, filterSerial, filterSupplier, filterPotatoType, filterUnsold, filterColdStore]);
 
   const clearFilters = () => {
-    setSearchTerm("");
+    setFilterSerial("");
+    setFilterSupplier("");
     setFilterPotatoType("");
-    setFilterUnsold(false);
     setFilterColdStore("");
+    setFilterUnsold(false);
   };
 
-  const hasActiveFilters = searchTerm || filterPotatoType || filterUnsold || filterColdStore;
+  const hasActiveFilters = filterSerial || filterSupplier || filterPotatoType || filterColdStore || filterUnsold;
 
   const summaryTotals = useMemo(() => {
     let bagsTotal = 0;
     let bagsRemaining = 0;
     let totalValue = 0;
     let coldStoreTotal = 0;
+    let totalExtraCost = 0;
+    let totalColdStoreDue = 0;
+    let totalSupplierDue = 0;
 
     filteredEntries.forEach(entry => {
+      let entryTotalValue = 0;
       entry.seedLots.forEach(lot => {
         const metrics = computeSeedLotMetrics(lot);
         bagsTotal += metrics.originalBags;
         bagsRemaining += metrics.remainingBags;
-        totalValue += metrics.totalAmount;
+        entryTotalValue += metrics.totalAmount;
         coldStoreTotal += metrics.coldStoreTotal;
+        totalExtraCost += metrics.totalExtraCost;
+        totalColdStoreDue += metrics.coldStoreDue;
       });
+      totalValue += entryTotalValue;
+      const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+      totalSupplierDue += Math.max(entryTotalValue - amountPaid, 0);
     });
 
-    return { bagsTotal, bagsRemaining, totalValue, coldStoreTotal };
+    return { bagsTotal, bagsRemaining, totalValue, coldStoreTotal, totalExtraCost, totalColdStoreDue, totalSupplierDue };
   }, [filteredEntries]);
 
   const handleDownloadCSV = () => {
