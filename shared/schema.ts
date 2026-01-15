@@ -216,6 +216,43 @@ export const cashFarmers = pgTable("cash_farmers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ===================== SEED MANAGEMENT TABLES =====================
+
+// Seed Stock Entries - supplier info for seed purchases
+export const seedStockEntries = pgTable("seed_stock_entries", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  serialNumber: integer("serial_number").notNull(),
+  purchaseDate: date("purchase_date").notNull(),
+  supplierName: text("supplier_name").notNull(),
+  supplierContact: text("supplier_contact"),
+  address: text("address"),
+  district: text("district").notNull(),
+  state: text("state").notNull(),
+  paymentStatus: text("payment_status").default("due"), // due, partial, paid
+  amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).default("0"),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Seed Lots - each seed stock entry can have multiple lots
+export const seedLots = pgTable("seed_lots", {
+  id: serial("id").primaryKey(),
+  seedEntryId: integer("seed_entry_id").notNull().references(() => seedStockEntries.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  coldStoreName: text("cold_store_name").notNull(),
+  originalBags: integer("original_bags").notNull(),
+  potatoType: text("potato_type").notNull(), // Jyoti, Pukhraj, Lakar, CS1, CS3, Torus, LR
+  bagType: text("bag_type").notNull(), // Wafer, Ration
+  size: text("size").notNull(), // Small, Medium, Large
+  pricePerBag: decimal("price_per_bag", { precision: 10, scale: 2 }).notNull(),
+  coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }),
+  remainingBags: integer("remaining_bags").notNull(),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -230,6 +267,29 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   cashSettings: many(cashSettings),
   parties: many(parties),
   cashFarmers: many(cashFarmers),
+  seedStockEntries: many(seedStockEntries),
+  seedLots: many(seedLots),
+}));
+
+// Seed Stock Entries Relations
+export const seedStockEntriesRelations = relations(seedStockEntries, ({ one, many }) => ({
+  merchant: one(merchants, {
+    fields: [seedStockEntries.merchantId],
+    references: [merchants.id],
+  }),
+  seedLots: many(seedLots),
+}));
+
+// Seed Lots Relations
+export const seedLotsRelations = relations(seedLots, ({ one }) => ({
+  seedEntry: one(seedStockEntries, {
+    fields: [seedLots.seedEntryId],
+    references: [seedStockEntries.id],
+  }),
+  merchant: one(merchants, {
+    fields: [seedLots.merchantId],
+    references: [merchants.id],
+  }),
 }));
 
 export const cashSettingsRelations = relations(cashSettings, ({ one }) => ({
@@ -401,6 +461,10 @@ export const insertCashSettingsSchema = createInsertSchema(cashSettings).omit({ 
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
 
+// Seed schemas
+export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
+export const insertSeedLotSchema = createInsertSchema(seedLots).omit({ id: true, createdAt: true });
+
 // Types
 export type Merchant = typeof merchants.$inferSelect;
 export type InsertMerchant = z.infer<typeof insertMerchantSchema>;
@@ -446,6 +510,12 @@ export type InsertParty = z.infer<typeof insertPartySchema>;
 
 export type CashFarmer = typeof cashFarmers.$inferSelect;
 export type InsertCashFarmer = z.infer<typeof insertCashFarmerSchema>;
+
+export type SeedStockEntry = typeof seedStockEntries.$inferSelect;
+export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;
+
+export type SeedLot = typeof seedLots.$inferSelect;
+export type InsertSeedLot = z.infer<typeof insertSeedLotSchema>;
 
 // Change types for edit history
 export type FieldChange = {
@@ -528,10 +598,13 @@ export type TransactionForm = z.infer<typeof transactionFormSchema>;
 export const DISTRICTS = ["Ujjain", "Shajapur", "Indore", "Dewas", "Agar Malwa"] as const;
 export const STATES = ["Madhya Pradesh", "Gujarat"] as const;
 export const POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "LR", "Torus", "CS1", "CS3", "Others"] as const;
+export const SEED_POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "CS1", "CS3", "Torus", "LR"] as const;
 export const BAG_TYPES = ["Wafer", "Ration", "Seed"] as const;
+export const SEED_BAG_TYPES = ["Wafer", "Ration"] as const;
 export const QUALITY_OPTIONS = ["Poor", "Medium", "Good"] as const;
 export const CUT_TYPES = ["gate_cut", "bilty_cut"] as const;
 export const SIZE_OPTIONS = ["Large", "Medium", "Small", "Wastage"] as const;
+export const SEED_SIZE_OPTIONS = ["Small", "Medium", "Large"] as const;
 export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
@@ -539,3 +612,58 @@ export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
 export const EXPENSE_TYPES = ["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
+
+// Seed form schemas for frontend
+export const seedLotFormSchema = z.object({
+  coldStoreName: z.string().min(1, "Cold store name is required"),
+  originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
+  potatoType: z.string().min(1, "Potato type is required"),
+  bagType: z.string().min(1, "Bag type is required"),
+  size: z.string().min(1, "Size is required"),
+  pricePerBag: z.coerce.number().min(0, "Price per bag must be positive"),
+  coldStoreChargesPerBag: z.coerce.number().optional(),
+  remarks: z.string().optional(),
+});
+
+export const seedStockEntryFormSchema = z.object({
+  purchaseDate: z.string().min(1, "Purchase date is required"),
+  supplierName: z.string().min(1, "Supplier name is required"),
+  supplierContact: z.string().optional(),
+  address: z.string().optional(),
+  district: z.string().min(1, "District is required"),
+  state: z.string().min(1, "State is required"),
+  remarks: z.string().optional(),
+  seedLots: z.array(seedLotFormSchema).min(1, "At least one seed lot is required"),
+});
+
+export type SeedLotForm = z.infer<typeof seedLotFormSchema>;
+export type SeedStockEntryForm = z.infer<typeof seedStockEntryFormSchema>;
+
+// Seed update schema for PATCH endpoint
+export const seedLotUpdateSchema = z.object({
+  id: z.number(),
+  coldStoreName: z.string().min(1).optional(),
+  originalBags: z.coerce.number().min(1).optional(),
+  remainingBags: z.coerce.number().min(0).optional(),
+  potatoType: z.string().min(1).optional(),
+  bagType: z.string().min(1).optional(),
+  size: z.string().min(1).optional(),
+  pricePerBag: z.coerce.number().min(0).optional(),
+  coldStoreChargesPerBag: z.coerce.number().optional(),
+  remarks: z.string().optional(),
+});
+
+export const seedStockEntryUpdateSchema = z.object({
+  paymentStatus: z.enum(PAYMENT_STATUS).optional(),
+  amountPaid: z.coerce.number().optional(),
+  remarks: z.string().optional(),
+  seedLots: z.array(seedLotUpdateSchema).optional(),
+});
+
+export type SeedLotUpdate = z.infer<typeof seedLotUpdateSchema>;
+export type SeedStockEntryUpdate = z.infer<typeof seedStockEntryUpdateSchema>;
+
+// Extended type for seed entry with lots
+export type SeedStockEntryWithLots = SeedStockEntry & {
+  seedLots: SeedLot[];
+};

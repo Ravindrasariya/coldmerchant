@@ -3,6 +3,7 @@ import {
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
   cashSettings, parties, cashFarmers,
+  seedStockEntries, seedLots,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -15,7 +16,10 @@ import {
   type ColdStoreChargeAllocation, type InsertColdStoreChargeAllocation,
   type CashSettings, type InsertCashSettings,
   type Party, type InsertParty,
-  type CashFarmer, type InsertCashFarmer
+  type CashFarmer, type InsertCashFarmer,
+  type SeedStockEntry, type InsertSeedStockEntry,
+  type SeedLot, type InsertSeedLot,
+  type SeedStockEntryWithLots
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
@@ -101,6 +105,20 @@ export interface IStorage {
   createCashFarmer(farmer: InsertCashFarmer): Promise<CashFarmer>;
   updateCashFarmer(id: number, merchantId: number, data: Partial<CashFarmer>): Promise<CashFarmer | undefined>;
   deleteCashFarmer(id: number, merchantId: number): Promise<void>;
+  
+  // Seed Stock Entry operations
+  getSeedEntriesByMerchant(merchantId: number): Promise<SeedStockEntryWithLots[]>;
+  getSeedEntryById(id: number, merchantId: number): Promise<SeedStockEntryWithLots | undefined>;
+  createSeedEntry(entry: InsertSeedStockEntry & { merchantId: number }): Promise<SeedStockEntry>;
+  updateSeedEntry(id: number, merchantId: number, data: Partial<SeedStockEntry>): Promise<SeedStockEntry | undefined>;
+  getNextSeedSerialNumber(merchantId: number): Promise<number>;
+  
+  // Seed Lot operations
+  createSeedLot(lot: InsertSeedLot): Promise<SeedLot>;
+  updateSeedLot(id: number, merchantId: number, data: Partial<SeedLot>): Promise<SeedLot | undefined>;
+  getSeedLotsByEntry(seedEntryId: number, merchantId: number): Promise<SeedLot[]>;
+  getSeedLotById(id: number, merchantId: number): Promise<SeedLot | undefined>;
+  deleteSeedLot(id: number, merchantId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1015,6 +1033,93 @@ export class DatabaseStorage implements IStorage {
   async deleteCashFarmer(id: number, merchantId: number): Promise<void> {
     await db.delete(cashFarmers)
       .where(and(eq(cashFarmers.id, id), eq(cashFarmers.merchantId, merchantId)));
+  }
+
+  // ===================== SEED STOCK ENTRY OPERATIONS =====================
+  
+  async getSeedEntriesByMerchant(merchantId: number): Promise<SeedStockEntryWithLots[]> {
+    const entries = await db.select().from(seedStockEntries)
+      .where(eq(seedStockEntries.merchantId, merchantId))
+      .orderBy(desc(seedStockEntries.serialNumber));
+
+    const result = await Promise.all(entries.map(async (entry) => {
+      const entryLots = await db.select().from(seedLots)
+        .where(and(eq(seedLots.seedEntryId, entry.id), eq(seedLots.merchantId, merchantId)));
+      
+      return { ...entry, seedLots: entryLots };
+    }));
+
+    return result;
+  }
+
+  async getSeedEntryById(id: number, merchantId: number): Promise<SeedStockEntryWithLots | undefined> {
+    const [entry] = await db.select().from(seedStockEntries)
+      .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)));
+    
+    if (!entry) return undefined;
+
+    const entryLots = await db.select().from(seedLots)
+      .where(and(eq(seedLots.seedEntryId, entry.id), eq(seedLots.merchantId, merchantId)));
+
+    return { ...entry, seedLots: entryLots };
+  }
+
+  async createSeedEntry(entry: InsertSeedStockEntry & { merchantId: number }): Promise<SeedStockEntry> {
+    const serialNumber = await this.getNextSeedSerialNumber(entry.merchantId);
+    const [created] = await db.insert(seedStockEntries).values({
+      ...entry,
+      serialNumber,
+    }).returning();
+    return created;
+  }
+
+  async updateSeedEntry(id: number, merchantId: number, data: Partial<SeedStockEntry>): Promise<SeedStockEntry | undefined> {
+    const [updated] = await db.update(seedStockEntries)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getNextSeedSerialNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: seedStockEntries.serialNumber })
+      .from(seedStockEntries)
+      .where(eq(seedStockEntries.merchantId, merchantId))
+      .orderBy(desc(seedStockEntries.serialNumber))
+      .limit(1);
+    
+    return (result?.maxSerial || 0) + 1;
+  }
+
+  // ===================== SEED LOT OPERATIONS =====================
+
+  async createSeedLot(lot: InsertSeedLot): Promise<SeedLot> {
+    const [created] = await db.insert(seedLots).values(lot).returning();
+    return created;
+  }
+
+  async updateSeedLot(id: number, merchantId: number, data: Partial<SeedLot>): Promise<SeedLot | undefined> {
+    const [updated] = await db.update(seedLots)
+      .set(data)
+      .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getSeedLotsByEntry(seedEntryId: number, merchantId: number): Promise<SeedLot[]> {
+    return await db.select().from(seedLots)
+      .where(and(eq(seedLots.seedEntryId, seedEntryId), eq(seedLots.merchantId, merchantId)));
+  }
+
+  async getSeedLotById(id: number, merchantId: number): Promise<SeedLot | undefined> {
+    const [lot] = await db.select().from(seedLots)
+      .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)));
+    return lot || undefined;
+  }
+
+  async deleteSeedLot(id: number, merchantId: number): Promise<void> {
+    await db.delete(seedLots)
+      .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)));
   }
 }
 

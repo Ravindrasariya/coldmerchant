@@ -17,6 +17,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
 import { StockRegisterCard } from "@/components/stock-register/stock-register-card";
+import { SeedStockEntryForm } from "@/components/seed-stock-entry/seed-stock-entry-form";
+import { SeedStockRegisterCard } from "@/components/seed-stock-register/seed-stock-register-card";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { 
@@ -30,7 +32,8 @@ import {
   Truck,
   Wallet,
   Menu,
-  Download
+  Download,
+  Leaf
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -41,6 +44,7 @@ export default function HomePage() {
   const { user, logoutMutation, changePasswordMutation } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("stock-entry");
+  const [stockMode, setStockMode] = useState<"raw" | "seed">("raw");
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -271,22 +275,90 @@ export default function HomePage() {
         <main className="container max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
           <div className={activeTab === "stock-entry" ? "block" : "hidden"}>
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-semibold">{t("Stock Entry", "स्टॉक एंट्री")}</h1>
+                  <h1 className="text-2xl font-semibold">
+                    {stockMode === "raw" ? t("Stock Entry", "स्टॉक एंट्री") : t("Seed Stock Entry", "बीज स्टॉक एंट्री")}
+                  </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")}
+                    {stockMode === "raw" 
+                      ? t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")
+                      : t("Record new seed purchases from suppliers", "आपूर्तिकर्ताओं से नई बीज खरीद दर्ज करें")}
                   </p>
                 </div>
+                <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                  <Button
+                    variant={stockMode === "raw" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStockMode("raw")}
+                    className="gap-1.5"
+                    data-testid="button-mode-raw"
+                  >
+                    <PackagePlus className="h-4 w-4" />
+                    {t("Raw Potato", "कच्चा आलू")}
+                  </Button>
+                  <Button
+                    variant={stockMode === "seed" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStockMode("seed")}
+                    className="gap-1.5"
+                    data-testid="button-mode-seed"
+                  >
+                    <Leaf className="h-4 w-4" />
+                    {t("Seed", "बीज")}
+                  </Button>
+                </div>
               </div>
-              <StockEntryForm 
-                onSuccess={() => setActiveTab("stock-register")} 
-              />
+              {stockMode === "raw" ? (
+                <StockEntryForm 
+                  onSuccess={() => setActiveTab("stock-register")} 
+                />
+              ) : (
+                <SeedStockEntryForm 
+                  onSuccess={() => setActiveTab("stock-register")} 
+                />
+              )}
             </div>
           </div>
 
           <div className={activeTab === "stock-register" ? "block" : "hidden"}>
-            <StockRegisterCard />
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-semibold">
+                    {stockMode === "raw" ? t("Stock Register", "स्टॉक रजिस्टर") : t("Seed Stock Register", "बीज स्टॉक रजिस्टर")}
+                  </h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {stockMode === "raw" 
+                      ? t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")
+                      : t("View and manage your seed stock", "अपने बीज स्टॉक को देखें और प्रबंधित करें")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                  <Button
+                    variant={stockMode === "raw" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStockMode("raw")}
+                    className="gap-1.5"
+                    data-testid="button-register-mode-raw"
+                  >
+                    <PackagePlus className="h-4 w-4" />
+                    {t("Raw Potato", "कच्चा आलू")}
+                  </Button>
+                  <Button
+                    variant={stockMode === "seed" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setStockMode("seed")}
+                    className="gap-1.5"
+                    data-testid="button-register-mode-seed"
+                  >
+                    <Leaf className="h-4 w-4" />
+                    {t("Seed", "बीज")}
+                  </Button>
+                </div>
+              </div>
+              {stockMode === "raw" ? <StockRegisterCard /> : <SeedStockRegisterCard />}
+            </div>
           </div>
 
           <div className={activeTab === "transactions" ? "block" : "hidden"}>

@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 
 // Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -1452,6 +1452,182 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting farmer:", error);
       res.status(500).json({ message: "Failed to delete farmer" });
+    }
+  });
+
+  // ===================== SEED STOCK ENTRY ROUTES =====================
+
+  // GET /api/seed-stock-entries - Get all seed stock entries for the authenticated merchant
+  app.get("/api/seed-stock-entries", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const entries = await storage.getSeedEntriesByMerchant(merchantId);
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching seed stock entries:", error);
+      res.status(500).json({ message: "Failed to fetch seed stock entries" });
+    }
+  });
+
+  // GET /api/seed-stock-entries/:id - Get a specific seed stock entry
+  app.get("/api/seed-stock-entries/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      const entry = await storage.getSeedEntryById(id, merchantId);
+      if (!entry) {
+        return res.status(404).json({ message: "Seed stock entry not found" });
+      }
+      
+      res.json(entry);
+    } catch (error) {
+      console.error("Error fetching seed stock entry:", error);
+      res.status(500).json({ message: "Failed to fetch seed stock entry" });
+    }
+  });
+
+  // POST /api/seed-stock-entries - Create a new seed stock entry
+  app.post("/api/seed-stock-entries", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const validationResult = seedStockEntryFormSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const data = validationResult.data;
+
+      // Create seed stock entry
+      const seedEntry = await storage.createSeedEntry({
+        merchantId,
+        purchaseDate: data.purchaseDate,
+        supplierName: data.supplierName,
+        supplierContact: data.supplierContact || null,
+        address: data.address || null,
+        district: data.district,
+        state: data.state,
+        remarks: data.remarks || null,
+        paymentStatus: "due",
+      });
+
+      // Create seed lots
+      for (const lotData of data.seedLots) {
+        await storage.createSeedLot({
+          seedEntryId: seedEntry.id,
+          merchantId,
+          coldStoreName: lotData.coldStoreName,
+          originalBags: lotData.originalBags,
+          potatoType: lotData.potatoType,
+          bagType: lotData.bagType,
+          size: lotData.size,
+          pricePerBag: lotData.pricePerBag.toString(),
+          coldStoreChargesPerBag: lotData.coldStoreChargesPerBag 
+            ? lotData.coldStoreChargesPerBag.toString() 
+            : null,
+          remainingBags: lotData.originalBags,
+          remarks: lotData.remarks || null,
+        });
+      }
+
+      // Fetch the complete entry with lots
+      const completeEntry = await storage.getSeedEntryById(seedEntry.id, merchantId);
+      res.status(201).json(completeEntry);
+    } catch (error) {
+      console.error("Error creating seed stock entry:", error);
+      res.status(500).json({ message: "Failed to create seed stock entry" });
+    }
+  });
+
+  // PATCH /api/seed-stock-entries/:id - Update a seed stock entry
+  app.patch("/api/seed-stock-entries/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      // Validate request body
+      const validatedData = seedStockEntryUpdateSchema.safeParse(req.body);
+      if (!validatedData.success) {
+        return res.status(400).json({ message: "Invalid data", errors: validatedData.error.errors });
+      }
+      
+      const { paymentStatus, amountPaid, remarks, seedLots } = validatedData.data;
+
+      // Check if entry exists and belongs to merchant
+      const existingEntry = await storage.getSeedEntryById(id, merchantId);
+      if (!existingEntry) {
+        return res.status(404).json({ message: "Seed stock entry not found" });
+      }
+
+      // Update entry-level fields
+      const entryUpdates: Partial<{ paymentStatus: string; amountPaid: string; remarks: string }> = {};
+      if (paymentStatus !== undefined) entryUpdates.paymentStatus = paymentStatus;
+      if (amountPaid !== undefined) entryUpdates.amountPaid = amountPaid.toString();
+      if (remarks !== undefined) entryUpdates.remarks = remarks;
+
+      if (Object.keys(entryUpdates).length > 0) {
+        await storage.updateSeedEntry(id, merchantId, entryUpdates);
+      }
+
+      // Update lots if provided
+      if (seedLots && Array.isArray(seedLots)) {
+        for (const lotData of seedLots) {
+          if (lotData.id) {
+            // Update existing lot
+            await storage.updateSeedLot(lotData.id, merchantId, {
+              coldStoreName: lotData.coldStoreName,
+              originalBags: lotData.originalBags,
+              potatoType: lotData.potatoType,
+              bagType: lotData.bagType,
+              size: lotData.size,
+              pricePerBag: lotData.pricePerBag?.toString(),
+              coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
+              remainingBags: lotData.remainingBags ?? lotData.originalBags,
+              remarks: lotData.remarks || null,
+            });
+          } else {
+            // Create new lot
+            await storage.createSeedLot({
+              seedEntryId: id,
+              merchantId,
+              coldStoreName: lotData.coldStoreName,
+              originalBags: lotData.originalBags,
+              potatoType: lotData.potatoType,
+              bagType: lotData.bagType,
+              size: lotData.size,
+              pricePerBag: lotData.pricePerBag.toString(),
+              coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
+              remainingBags: lotData.originalBags,
+              remarks: lotData.remarks || null,
+            });
+          }
+        }
+      }
+
+      // Fetch and return the updated entry
+      const updatedEntry = await storage.getSeedEntryById(id, merchantId);
+      res.json(updatedEntry);
+    } catch (error) {
+      console.error("Error updating seed stock entry:", error);
+      res.status(500).json({ message: "Failed to update seed stock entry" });
+    }
+  });
+
+  // DELETE /api/seed-stock-entries/:id/lots/:lotId - Delete a seed lot
+  app.delete("/api/seed-stock-entries/:id/lots/:lotId", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const lotId = parseInt(req.params.lotId);
+      
+      await storage.deleteSeedLot(lotId, merchantId);
+      res.json({ message: "Seed lot deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting seed lot:", error);
+      res.status(500).json({ message: "Failed to delete seed lot" });
     }
   });
 
