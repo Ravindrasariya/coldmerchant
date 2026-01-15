@@ -212,10 +212,6 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
 
   const transportCharges = parseFloat(transaction?.transportCharges || "0");
   const otherCharges = parseFloat(transaction?.otherCharges || "0");
-  const totalCost = parseFloat(transaction?.totalCost || "0");
-  const totalRevenue = parseFloat(transaction?.totalRevenue || "0");
-  const totalProfitLoss = parseFloat(transaction?.totalProfitLoss || "0");
-  const totalDueToFarmer = parseFloat(transaction?.totalDueToFarmer || "0");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -329,21 +325,6 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
                     <span className="font-medium">+ {formatCurrency(transaction.otherCharges)}</span>
                   </div>
                 )}
-
-                <div className="totals-row highlight flex justify-between bg-gray-100 px-2 py-1 font-bold text-xs -mx-2 my-1">
-                  <span>Due to Farmer / किसान को देय:</span>
-                  <span>{formatCurrency(transaction.totalDueToFarmer)}</span>
-                </div>
-
-                <div className="border-t border-black pt-1 mt-1">
-                  <div className="flex justify-between text-[9px] text-gray-600">
-                    <span>Cost: {formatCurrency(transaction.totalCost)}</span>
-                    <span>Revenue: {formatCurrency(transaction.totalRevenue)}</span>
-                    <span className={totalProfitLoss >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
-                      {totalProfitLoss >= 0 ? "Profit" : "Loss"}: {formatCurrency(Math.abs(totalProfitLoss).toString())}
-                    </span>
-                  </div>
-                </div>
 
                 <div className="totals-row final flex justify-between bg-green-100 px-2 py-1.5 font-bold text-xs -mx-2 -mb-2 mt-1 border-t border-black">
                   <span>Amount Payable / भुगतान योग्य:</span>
