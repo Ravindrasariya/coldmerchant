@@ -221,6 +221,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);
@@ -255,6 +256,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);
