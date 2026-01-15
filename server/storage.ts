@@ -131,7 +131,9 @@ export interface IStorage {
   
   // Seed Transaction operations
   getSeedTransactionsByMerchant(merchantId: number): Promise<any[]>;
+  getSeedTransactionById(id: number, merchantId: number): Promise<any | undefined>;
   createSeedTransaction(transaction: any, items: any[]): Promise<any>;
+  updateSeedTransaction(id: number, merchantId: number, data: any, items: any[]): Promise<any>;
   getNextSeedTransactionNumber(merchantId: number): Promise<number>;
   getUnsoldSeedInventory(merchantId: number): Promise<any[]>;
 }
@@ -1188,6 +1190,69 @@ export class DatabaseStorage implements IStorage {
     }));
 
     return result;
+  }
+
+  async getSeedTransactionById(id: number, merchantId: number): Promise<SeedTransactionWithItems | undefined> {
+    const [txn] = await db.select().from(seedTransactions)
+      .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
+    
+    if (!txn) return undefined;
+
+    const items = await db.select().from(seedTransactionItems)
+      .where(eq(seedTransactionItems.seedTransactionId, txn.id));
+    
+    return { ...txn, items };
+  }
+
+  async updateSeedTransaction(
+    id: number,
+    merchantId: number,
+    data: Partial<InsertSeedTransaction>,
+    items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
+  ): Promise<SeedTransactionWithItems | undefined> {
+    // Get existing transaction and items
+    const existingTxn = await this.getSeedTransactionById(id, merchantId);
+    if (!existingTxn) return undefined;
+
+    // Restore bags from old items to seed lots
+    for (const oldItem of existingTxn.items) {
+      const seedLot = await this.getSeedLotById(oldItem.seedLotId, merchantId);
+      if (seedLot) {
+        await this.updateSeedLot(oldItem.seedLotId, merchantId, {
+          remainingBags: seedLot.remainingBags + oldItem.bagsMoved,
+        });
+      }
+    }
+
+    // Delete old items
+    await db.delete(seedTransactionItems)
+      .where(eq(seedTransactionItems.seedTransactionId, id));
+
+    // Update transaction
+    const [updatedTxn] = await db.update(seedTransactions)
+      .set(data)
+      .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)))
+      .returning();
+
+    // Create new items and deduct from seed lots
+    const createdItems: SeedTransactionItem[] = [];
+    for (const item of items) {
+      const [createdItem] = await db.insert(seedTransactionItems).values({
+        ...item,
+        seedTransactionId: id,
+      }).returning();
+      createdItems.push(createdItem);
+
+      // Deduct from seed lot
+      const seedLot = await this.getSeedLotById(item.seedLotId, merchantId);
+      if (seedLot) {
+        await this.updateSeedLot(item.seedLotId, merchantId, {
+          remainingBags: seedLot.remainingBags - item.bagsMoved,
+        });
+      }
+    }
+
+    return { ...updatedTxn, items: createdItems };
   }
 
   async createSeedTransaction(

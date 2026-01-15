@@ -1774,6 +1774,116 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/seed-transactions/:id - Get a single seed transaction by ID
+  app.get("/api/seed-transactions/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const transaction = await storage.getSeedTransactionById(id, merchantId);
+      if (!transaction) {
+        return res.status(404).json({ message: "Seed transaction not found" });
+      }
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error fetching seed transaction:", error);
+      res.status(500).json({ message: "Failed to fetch seed transaction" });
+    }
+  });
+
+  // PATCH /api/seed-transactions/:id - Update a seed transaction
+  app.patch("/api/seed-transactions/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, items } = req.body;
+
+      if (!farmerName || !district || !state || !items || items.length === 0) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Calculate totals
+      let totalBags = 0;
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      const processedItems = [];
+      for (const item of items) {
+        const seedLot = await storage.getSeedLotById(item.seedLotId, merchantId);
+        if (!seedLot) {
+          return res.status(400).json({ message: `Seed lot ${item.seedLotId} not found` });
+        }
+
+        // Get parent entry for serial number
+        const entry = await storage.getSeedEntryById(seedLot.seedEntryId, merchantId);
+        const serialNumber = entry?.serialNumber || 0;
+        
+        const costPerBag = parseFloat(seedLot.pricePerBag) || 0;
+        const pricePerBag = item.pricePerBag || 0;
+        const bags = item.bagsMoved;
+        const cost = bags * costPerBag;
+        const revenue = bags * pricePerBag;
+        const profitLoss = revenue - cost;
+
+        totalBags += bags;
+        totalCost += cost;
+        totalRevenue += revenue;
+
+        processedItems.push({
+          merchantId,
+          seedLotId: item.seedLotId,
+          serialNumber,
+          coldStoreName: seedLot.coldStoreName,
+          potatoType: seedLot.potatoType,
+          size: seedLot.size,
+          bagType: seedLot.bagType,
+          bagsMoved: bags,
+          pricePerBag: pricePerBag.toString(),
+          costPerBag: costPerBag.toString(),
+          revenue: revenue.toString(),
+          cost: cost.toString(),
+          profitLoss: profitLoss.toString(),
+        });
+      }
+
+      const totalProfitLoss = totalRevenue - totalCost;
+      const transportTotal = parseFloat(transportCharges) || 0;
+      const otherTotal = parseFloat(otherCharges) || 0;
+      const totalDueToFarmer = totalRevenue + transportTotal + otherTotal;
+
+      const transaction = await storage.updateSeedTransaction(
+        id,
+        merchantId,
+        {
+          farmerName,
+          farmerContact: farmerContact || null,
+          village: village || null,
+          tehsil: tehsil || null,
+          district,
+          state,
+          vehicleNumber: vehicleNumber || null,
+          transportCharges: transportTotal.toString(),
+          otherCharges: otherTotal.toString(),
+          otherChargesRemarks: otherChargesRemarks || null,
+          totalBags,
+          totalCost: totalCost.toString(),
+          totalRevenue: totalRevenue.toString(),
+          totalProfitLoss: totalProfitLoss.toString(),
+          totalDueToFarmer: totalDueToFarmer.toString(),
+        },
+        processedItems
+      );
+
+      if (!transaction) {
+        return res.status(404).json({ message: "Seed transaction not found" });
+      }
+
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error updating seed transaction:", error);
+      res.status(500).json({ message: "Failed to update seed transaction" });
+    }
+  });
+
   // POST /api/seed-transactions - Create a new seed transaction
   app.post("/api/seed-transactions", requireMerchant, async (req, res) => {
     try {
