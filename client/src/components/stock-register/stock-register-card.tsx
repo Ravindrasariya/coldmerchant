@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download } from "lucide-react";
+import { Search, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -467,48 +467,22 @@ export function StockRegisterCard() {
         </DialogContent>
       </Dialog>
 
-      {/* Header with Download Button */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("Stock Register", "स्टॉक रजिस्टर")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("View and manage all stock entries", "सभी स्टॉक एंट्री देखें और प्रबंधित करें")}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setDownloadDialogOpen(true)}
-          title={t("Download", "डाउनलोड")}
-          data-testid="button-stock-download"
-        >
-          <Download className="h-5 w-5" />
-        </Button>
-      </div>
-
       <Card className="border-border">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t("Search by farmer name, serial # or cold store...", "किसान का नाम, क्रमांक या कोल्ड स्टोर द्वारा खोजें...")}
+                placeholder={t("Search farmer, serial #...", "किसान, क्रमांक खोजें...")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-9"
                 data-testid="input-search"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">{t("Filters:", "फ़िल्टर:")}</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-wrap gap-3">
+
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
-              <SelectTrigger className="w-[140px]" data-testid="filter-payment-status">
+              <SelectTrigger className="w-[120px]" data-testid="filter-payment-status">
                 <SelectValue placeholder={t("Payment", "भुगतान")} />
               </SelectTrigger>
               <SelectContent>
@@ -518,7 +492,7 @@ export function StockRegisterCard() {
             </Select>
 
             <Select value={filterQuality} onValueChange={setFilterQuality}>
-              <SelectTrigger className="w-[130px]" data-testid="filter-quality">
+              <SelectTrigger className="w-[120px]" data-testid="filter-quality">
                 <SelectValue placeholder={t("Quality", "गुणवत्ता")} />
               </SelectTrigger>
               <SelectContent>
@@ -531,7 +505,7 @@ export function StockRegisterCard() {
             </Select>
 
             <Select value={filterColdStore} onValueChange={setFilterColdStore}>
-              <SelectTrigger className="w-[160px]" data-testid="filter-cold-store">
+              <SelectTrigger className="w-[140px]" data-testid="filter-cold-store">
                 <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
               </SelectTrigger>
               <SelectContent>
@@ -550,6 +524,16 @@ export function StockRegisterCard() {
               data-testid="filter-unsold"
             >
               {t("Unsold Only", "केवल बिना बिके")}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDownloadDialogOpen(true)}
+              title={t("Download", "डाउनलोड")}
+              data-testid="button-stock-download"
+            >
+              <Download className="h-4 w-4" />
             </Button>
 
             {hasActiveFilters && (
