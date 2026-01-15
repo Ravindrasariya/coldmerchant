@@ -634,6 +634,91 @@ export function CashManagementTab() {
         </Card>
       </div>
 
+      <div className="w-full md:w-1/2 flex flex-col h-full overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">{t("Recent Entries", "हाल की प्रविष्टियां")}</h3>
+          <Badge variant="outline">{entries.length} {t("Entries", "प्रविष्टियां")}</Badge>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+          {entriesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {t("No entries found", "कोई प्रविष्टि नहीं मिली")}
+            </div>
+          ) : (
+            entries.map((entry) => (
+              <CashEntryCard key={entry.id} entry={entry} />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CashEntryCard({ entry }: { entry: CashEntry }) {
+  const { t } = useLanguage();
+  const isInward = entry.direction === "inward";
+  const amount = parseFloat(entry.amount);
+
+  return (
+    <Card className="hover-elevate">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${isInward ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}>
+              {isInward ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+            </div>
+            <div>
+              <p className="font-medium text-sm">
+                {isInward 
+                  ? (entry.partyName || t("Payment Received", "भुगतान प्राप्त"))
+                  : (entry.farmerName || entry.coldStoreName || t("Expense", "खर्च"))}
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="secondary" className="text-[10px] h-4">
+                  {isInward 
+                    ? (entry.receiptType === "cash_received" ? t("Cash", "नकद") : t("Account", "खाता"))
+                    : (entry.paymentMode === "cash" ? t("Cash", "नकद") : t("Account", "खाता"))}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(entry.entryDate), "dd MMM yyyy")}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className={`font-bold ${isInward ? "text-emerald-600" : "text-rose-600"}`}>
+              {isInward ? "+" : "-"} ₹{amount.toLocaleString()}
+            </p>
+            {entry.remarks && (
+              <p className="text-xs text-muted-foreground truncate max-w-[150px] mt-1">
+                {entry.remarks}
+              </p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+                    ) : (
+                      <ArrowUpRight className="h-4 w-4 mr-2" />
+                    )}
+                    {t("Record Expense", "खर्च दर्ज करें")}
+                  </Button>
+                </form>
+              </Form>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="w-full md:w-1/2 space-y-4">
         <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
         
