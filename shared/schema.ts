@@ -148,12 +148,13 @@ export const cashEntries = pgTable("cash_entries", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   direction: text("direction").notNull(), // "inward" or "outflow"
   receiptType: text("receipt_type"), // For inward: "cash_received", "account_received"
+  revenueType: text("revenue_type"), // For inward: "raw_potato", "seed_sale"
   expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"
   paymentMode: text("payment_mode"), // For outflow: "cash", "account_transfer"
   partyName: text("party_name"), // For inward: buyer name from transactions
   partyVillage: text("party_village"), // For inward: buyer location
-  farmerName: text("farmer_name"), // For farmer outflow
-  farmerVillage: text("farmer_village"), // For farmer outflow
+  farmerName: text("farmer_name"), // For farmer outflow or seed sale inward
+  farmerVillage: text("farmer_village"), // For farmer outflow or seed sale inward
   coldStoreName: text("cold_store_name"), // For cold store charge payment outflow
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),

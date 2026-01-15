@@ -1213,11 +1213,23 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/seed-farmers - Get seed farmers with outstanding dues from seed transactions
+  app.get("/api/cash/seed-farmers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const seedFarmers = await storage.getSeedFarmersWithDue(merchantId);
+      res.json(seedFarmers);
+    } catch (error) {
+      console.error("Error fetching seed farmers:", error);
+      res.status(500).json({ message: "Failed to fetch seed farmers" });
+    }
+  });
+
   // POST /api/cash/entries - Create a cash entry (inward or outflow)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { direction, receiptType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, amount, entryDate, remarks } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, amount, entryDate, remarks } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow"].includes(direction)) {
@@ -1235,7 +1247,19 @@ export async function registerRoutes(
         if (!receiptType || !["cash_received", "account_received"].includes(receiptType)) {
           return res.status(400).json({ message: "Valid receipt type is required for inward entries" });
         }
-        if (!partyName) {
+        // Validate revenue type for inward entries
+        if (revenueType && !["raw_potato", "seed_sale"].includes(revenueType)) {
+          return res.status(400).json({ message: "Valid revenue type is required" });
+        }
+        // For raw_potato, partyName is required; for seed_sale, farmerName is required
+        if (revenueType === "raw_potato" && !partyName) {
+          return res.status(400).json({ message: "Party name is required for raw potato entries" });
+        }
+        if (revenueType === "seed_sale" && !farmerName) {
+          return res.status(400).json({ message: "Farmer name is required for seed sale entries" });
+        }
+        // Fallback for legacy entries without revenueType
+        if (!revenueType && !partyName) {
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
@@ -1263,6 +1287,7 @@ export async function registerRoutes(
         merchantId,
         direction,
         receiptType: receiptType || null,
+        revenueType: revenueType || null,
         expenseType: expenseType || null,
         paymentMode: paymentMode || null,
         partyName: partyName || null,

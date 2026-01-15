@@ -94,6 +94,7 @@ export interface IStorage {
   getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
+  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; transactionCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
   // Cash Settings operations
@@ -784,6 +785,43 @@ export class DatabaseStorage implements IStorage {
       coldStoreName,
       ...data,
     }));
+  }
+
+  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; transactionCount: number }[]> {
+    // Get all seed transactions for this merchant
+    const txns = await db.select().from(seedTransactions)
+      .where(eq(seedTransactions.merchantId, merchantId));
+    
+    // Group by farmer name and calculate total due
+    const farmerMap = new Map<string, { village: string | null; totalDue: number; transactionCount: number }>();
+    
+    for (const txn of txns) {
+      const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
+      
+      if (dueToFarmer <= 0) continue; // Skip fully paid
+      
+      const key = txn.farmerName.toLowerCase();
+      const existing = farmerMap.get(key);
+      if (existing) {
+        existing.totalDue += dueToFarmer;
+        existing.transactionCount += 1;
+      } else {
+        farmerMap.set(key, {
+          village: txn.village || null,
+          totalDue: dueToFarmer,
+          transactionCount: 1,
+        });
+      }
+    }
+    
+    return Array.from(farmerMap.entries()).map(([key, data]) => {
+      // Find original farmer name with proper casing
+      const originalTxn = txns.find(t => t.farmerName.toLowerCase() === key);
+      return {
+        farmerName: originalTxn?.farmerName || key,
+        ...data,
+      };
+    }).sort((a, b) => b.totalDue - a.totalDue);
   }
 
   async getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]> {

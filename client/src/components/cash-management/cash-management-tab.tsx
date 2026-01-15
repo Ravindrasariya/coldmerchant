@@ -12,8 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { CashSettingsDialog } from "./cash-settings-dialog";
 import { useLanguage } from "@/hooks/use-language";
@@ -26,6 +29,7 @@ interface CashEntry {
   merchantId: number;
   direction: string;
   receiptType: string | null;
+  revenueType: string | null;
   expenseType: string | null;
   paymentMode: string | null;
   partyName: string | null;
@@ -68,6 +72,13 @@ interface ColdStoreWithDue {
   lotCount: number;
 }
 
+interface SeedFarmerWithDue {
+  farmerName: string;
+  village: string | null;
+  totalDue: number;
+  transactionCount: number;
+}
+
 interface ManagedParty {
   id: number;
   name: string;
@@ -93,10 +104,27 @@ interface CashSettings {
 
 const inwardFormSchema = z.object({
   receiptType: z.string().min(1, "Receipt type is required"),
-  partyName: z.string().min(1, "Party name is required"),
+  revenueType: z.string().min(1, "Revenue type is required"),
+  partyName: z.string().optional(),
+  seedFarmerName: z.string().optional(),
   amount: z.coerce.number().min(1, "Amount must be greater than 0"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.revenueType === "raw_potato" && (!data.partyName || data.partyName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Party name is required",
+      path: ["partyName"],
+    });
+  }
+  if (data.revenueType === "seed_sale" && (!data.seedFarmerName || data.seedFarmerName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Farmer name is required",
+      path: ["seedFarmerName"],
+    });
+  }
 });
 
 const outflowFormSchema = z.object({
@@ -152,6 +180,11 @@ export function CashManagementTab() {
     queryKey: ["/api/cash/cold-stores"],
   });
 
+  // Fetch seed farmers with dues from seed transactions
+  const { data: seedFarmers = [] } = useQuery<SeedFarmerWithDue[]>({
+    queryKey: ["/api/cash/seed-farmers"],
+  });
+
   // Fetch managed parties for dropdown
   const { data: managedParties = [] } = useQuery<ManagedParty[]>({
     queryKey: ["/api/cash/managed-parties"],
@@ -176,12 +209,20 @@ export function CashManagementTab() {
     resolver: zodResolver(inwardFormSchema),
     defaultValues: {
       receiptType: "cash_received",
+      revenueType: "raw_potato",
       partyName: "",
+      seedFarmerName: "",
       amount: 0,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
     },
   });
+
+  // State for seed farmer searchable popover
+  const [seedFarmerPopoverOpen, setSeedFarmerPopoverOpen] = useState(false);
+  
+  // Watch revenue type for conditional rendering
+  const revenueType = inwardForm.watch("revenueType");
 
   const outflowForm = useForm<OutflowFormValues>({
     resolver: zodResolver(outflowFormSchema),
@@ -206,8 +247,10 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       toast({
         title: t("Success", "सफलता"),
         description: t("Entry recorded successfully", "प्रविष्टि सफलतापूर्वक दर्ज की गई"),
@@ -215,7 +258,9 @@ export function CashManagementTab() {
       if (activeTab === "inward") {
         inwardForm.reset({
           receiptType: "cash_received",
+          revenueType: "raw_potato",
           partyName: "",
+          seedFarmerName: "",
           amount: 0,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -296,16 +341,32 @@ export function CashManagementTab() {
   })();
 
   const onInwardSubmit = (values: InwardFormValues) => {
-    const selectedParty = mergedParties.find(p => p.name.toLowerCase() === values.partyName.toLowerCase());
-    createEntryMutation.mutate({
-      direction: "inward",
-      receiptType: values.receiptType,
-      partyName: values.partyName,
-      partyVillage: selectedParty?.address || null,
-      amount: values.amount,
-      entryDate: values.entryDate,
-      remarks: values.remarks || null,
-    });
+    if (values.revenueType === "raw_potato") {
+      const selectedParty = mergedParties.find(p => p.name.toLowerCase() === values.partyName?.toLowerCase());
+      createEntryMutation.mutate({
+        direction: "inward",
+        receiptType: values.receiptType,
+        revenueType: values.revenueType,
+        partyName: values.partyName,
+        partyVillage: selectedParty?.address || null,
+        amount: values.amount,
+        entryDate: values.entryDate,
+        remarks: values.remarks || null,
+      });
+    } else {
+      // Seed sale - use seed farmer
+      const selectedSeedFarmer = seedFarmers.find(f => f.farmerName.toLowerCase() === values.seedFarmerName?.toLowerCase());
+      createEntryMutation.mutate({
+        direction: "inward",
+        receiptType: values.receiptType,
+        revenueType: values.revenueType,
+        farmerName: values.seedFarmerName,
+        farmerVillage: selectedSeedFarmer?.village || null,
+        amount: values.amount,
+        entryDate: values.entryDate,
+        remarks: values.remarks || null,
+      });
+    }
   };
 
   const onOutflowSubmit = (values: OutflowFormValues) => {
@@ -812,36 +873,143 @@ export function CashManagementTab() {
 
                   <FormField
                     control={inwardForm.control}
-                    name="partyName"
+                    name="revenueType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("Party Name", "पार्टी का नाम")} *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>{t("Revenue Type", "राजस्व प्रकार")} *</FormLabel>
+                        <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          inwardForm.setValue("partyName", "");
+                          inwardForm.setValue("seedFarmerName", "");
+                        }} value={field.value}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-party-name">
-                              <SelectValue placeholder={t("Select Party", "पार्टी चुनें")} />
+                            <SelectTrigger data-testid="select-revenue-type">
+                              <SelectValue placeholder={t("Select revenue type", "राजस्व प्रकार चुनें")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {mergedParties.map((party) => (
-                              <SelectItem key={party.name} value={party.name}>
-                                <div className="flex items-center justify-between gap-4">
-                                  <span>{party.name}</span>
-                                  {party.address && (
-                                    <span className="text-xs text-muted-foreground">({party.address})</span>
-                                  )}
-                                  <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                    {t("Due", "बकाया")}: ₹{party.pendingDues.toFixed(0)}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="raw_potato">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                {t("Raw Potato", "कच्चा आलू")}
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="seed_sale">
+                              <div className="flex items-center gap-2">
+                                <Leaf className="h-4 w-4" />
+                                {t("Seed Sale", "बीज बिक्री")}
+                              </div>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  {revenueType === "raw_potato" && (
+                    <FormField
+                      control={inwardForm.control}
+                      name="partyName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Party Name", "पार्टी का नाम")} *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-party-name">
+                                <SelectValue placeholder={t("Select Party", "पार्टी चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {mergedParties.map((party) => (
+                                <SelectItem key={party.name} value={party.name}>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span>{party.name}</span>
+                                    {party.address && (
+                                      <span className="text-xs text-muted-foreground">({party.address})</span>
+                                    )}
+                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                      {t("Due", "बकाया")}: ₹{party.pendingDues.toFixed(0)}
+                                    </Badge>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {revenueType === "seed_sale" && (
+                    <FormField
+                      control={inwardForm.control}
+                      name="seedFarmerName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
+                          <Popover open={seedFarmerPopoverOpen} onOpenChange={setSeedFarmerPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "w-full justify-between",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="select-seed-farmer"
+                                >
+                                  {field.value
+                                    ? seedFarmers.find(f => f.farmerName === field.value)?.farmerName || field.value
+                                    : t("Select Farmer", "किसान चुनें")}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[350px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
+                                <CommandList>
+                                  <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
+                                  <CommandGroup>
+                                    {seedFarmers.map((farmer) => (
+                                      <CommandItem
+                                        key={farmer.farmerName}
+                                        value={`${farmer.farmerName} ${farmer.village || ""}`}
+                                        onSelect={() => {
+                                          field.onChange(farmer.farmerName);
+                                          setSeedFarmerPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            field.value === farmer.farmerName ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <div className="flex flex-col flex-1">
+                                          <span className="font-medium">{farmer.farmerName}</span>
+                                          {farmer.village && (
+                                            <span className="text-xs text-muted-foreground">{farmer.village}</span>
+                                          )}
+                                        </div>
+                                        <Badge variant="outline" className="text-orange-600 border-orange-300 ml-2">
+                                          ₹{farmer.totalDue.toFixed(0)}
+                                        </Badge>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={inwardForm.control}
