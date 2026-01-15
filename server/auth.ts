@@ -33,13 +33,12 @@ export function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
-    rolling: true, // Reset session expiry on each request for persistent login
     store: storage.sessionStore,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       httpOnly: true,
-      sameSite: "lax", // Allows cookie on same-site navigation
-      maxAge: 90 * 24 * 60 * 60 * 1000, // 90 days - long-term persistent login
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days - persistent login
     },
   };
 
