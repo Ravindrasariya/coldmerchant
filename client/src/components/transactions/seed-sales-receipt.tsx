@@ -92,96 +92,109 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
           <style>
             body {
               font-family: Arial, sans-serif;
-              padding: 20px;
+              padding: 10px 15px;
               max-width: 800px;
               margin: 0 auto;
+              font-size: 11px;
+              line-height: 1.3;
             }
             .header {
               text-align: center;
-              border-bottom: 2px solid #000;
-              padding-bottom: 15px;
-              margin-bottom: 20px;
+              border-bottom: 1px solid #000;
+              padding-bottom: 6px;
+              margin-bottom: 8px;
             }
             .header h1 {
               margin: 0;
-              font-size: 24px;
+              font-size: 16px;
             }
             .header p {
-              margin: 5px 0;
+              margin: 2px 0;
               color: #555;
+              font-size: 10px;
+            }
+            .receipt-title {
+              text-align: center;
+              font-size: 13px;
+              font-weight: 600;
+              margin: 6px 0;
             }
             .receipt-info {
               display: flex;
               justify-content: space-between;
-              margin-bottom: 20px;
+              margin-bottom: 8px;
+              font-size: 10px;
             }
-            .receipt-info div {
-              text-align: left;
-            }
-            .receipt-info .right {
-              text-align: right;
+            .receipt-info p {
+              margin: 1px 0;
             }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 20px;
+              margin-bottom: 8px;
+              font-size: 10px;
             }
             th, td {
-              border: 1px solid #ddd;
-              padding: 10px;
+              border: 1px solid #999;
+              padding: 3px 5px;
               text-align: left;
             }
             th {
-              background-color: #f5f5f5;
+              background-color: #f0f0f0;
+              font-size: 9px;
             }
             .totals-section {
-              margin-top: 20px;
-              border: 2px solid #000;
-              padding: 15px;
+              border: 1px solid #000;
+              padding: 6px 8px;
+              margin-top: 8px;
+            }
+            .totals-section h3 {
+              font-size: 11px;
+              margin: 0 0 4px 0;
+              padding-bottom: 3px;
+              border-bottom: 1px solid #ccc;
+              text-align: center;
             }
             .totals-row {
               display: flex;
               justify-content: space-between;
-              padding: 5px 0;
-              border-bottom: 1px dotted #ccc;
-            }
-            .totals-row:last-child {
-              border-bottom: none;
+              padding: 2px 0;
+              font-size: 10px;
             }
             .totals-row.highlight {
               background-color: #f5f5f5;
               font-weight: bold;
-              font-size: 16px;
-              padding: 10px;
-              margin: 5px -15px;
+              font-size: 11px;
+              padding: 4px 6px;
+              margin: 3px -8px;
             }
             .totals-row.final {
               background-color: #e8f5e9;
               font-weight: bold;
-              font-size: 18px;
-              padding: 12px;
-              margin: 10px -15px -15px -15px;
-              border-top: 2px solid #000;
+              font-size: 12px;
+              padding: 5px 6px;
+              margin: 4px -8px -6px -8px;
+              border-top: 1px solid #000;
             }
             .profit { color: #2e7d32; }
             .loss { color: #c62828; }
-            .bilingual {
-              display: block;
-            }
-            .hindi {
-              font-size: 0.9em;
-              color: #666;
-            }
             .disclaimer {
-              margin-top: 30px;
-              padding: 10px;
+              margin-top: 10px;
+              padding: 4px;
               border: 1px dashed #999;
               text-align: center;
-              font-size: 12px;
+              font-size: 9px;
               color: #666;
             }
+            .disclaimer p { margin: 1px 0; }
+            .thank-you {
+              text-align: center;
+              font-size: 9px;
+              color: #666;
+              margin: 6px 0;
+            }
             @media print {
-              body { padding: 0; }
+              body { padding: 8px; }
               button { display: none; }
             }
           </style>
@@ -227,141 +240,124 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
             <Skeleton className="h-20 w-full" />
           </div>
         ) : transaction && merchant ? (
-          <div ref={printRef} className="space-y-6 p-4 bg-white text-black">
-            <div className="header text-center border-b-2 border-black pb-4">
-              <h1 className="text-2xl font-bold">{merchant.name}</h1>
-              {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
+          <div ref={printRef} className="space-y-2 p-3 bg-white text-black text-xs">
+            <div className="header text-center border-b border-black pb-2">
+              <h1 className="text-base font-bold">{merchant.name}</h1>
+              {merchant.address && <p className="text-[10px] text-gray-600">{merchant.address}</p>}
               {merchant.contactNumber && (
-                <p className="text-sm text-gray-600">
-                  Phone / फोन: {merchant.contactNumber}
-                </p>
+                <p className="text-[10px] text-gray-600">Phone / फोन: {merchant.contactNumber}</p>
               )}
             </div>
 
-            <div className="text-center">
-              <h2 className="text-xl font-semibold">
-                Seed Sales Receipt / बीज बिक्री रसीद
-              </h2>
+            <div className="receipt-title text-center text-sm font-semibold">
+              Seed Sales Receipt / बीज बिक्री रसीद
             </div>
 
-            <div className="receipt-info flex justify-between text-sm">
-              <div>
-                <p><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</p>
-                <p><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
+            <div className="receipt-info flex justify-between text-[10px]">
+              <div className="space-y-0.5">
+                <p><strong>Receipt No:</strong> #{transaction.transactionNumber}</p>
+                <p><strong>Date:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
                   day: "numeric",
-                  month: "long",
+                  month: "short",
                   year: "numeric",
                 })}</p>
-                {transaction.vehicleNumber && (
-                  <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
-                )}
+                {transaction.vehicleNumber && <p><strong>Vehicle:</strong> {transaction.vehicleNumber}</p>}
               </div>
-              <div className="text-right">
-                <p><strong>Farmer / किसान:</strong> {transaction.farmerName}</p>
-                {transaction.farmerContact && (
-                  <p><strong>Contact / संपर्क:</strong> {transaction.farmerContact}</p>
-                )}
-                <p><strong>Location / स्थान:</strong> {[transaction.village, transaction.tehsil, transaction.district, transaction.state].filter(Boolean).join(", ")}</p>
+              <div className="text-right space-y-0.5">
+                <p><strong>Farmer:</strong> {transaction.farmerName}</p>
+                {transaction.farmerContact && <p><strong>Contact:</strong> {transaction.farmerContact}</p>}
+                <p><strong>Location:</strong> {[transaction.village, transaction.district, transaction.state].filter(Boolean).join(", ")}</p>
               </div>
             </div>
 
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse text-[10px]">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border p-2 text-left">S.No / क्र.सं.</th>
-                  <th className="border p-2 text-left">Lot Details / लॉट विवरण</th>
-                  <th className="border p-2 text-left">Type / प्रकार</th>
-                  <th className="border p-2 text-left">Size / आकार</th>
-                  <th className="border p-2 text-right">Bags / बोरी</th>
-                  <th className="border p-2 text-right">Rate/Bag / दर</th>
-                  <th className="border p-2 text-right">Amount / राशि</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-left">S#</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-left">Lot</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-left">Type</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-left">Size</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-right">Bags</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-right">Rate</th>
+                  <th className="border border-gray-400 px-1 py-0.5 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
-                    <td className="border p-2">{idx + 1}</td>
-                    <td className="border p-2">S#{item.serialNumber} - {item.coldStoreName}</td>
-                    <td className="border p-2">{item.potatoType}</td>
-                    <td className="border p-2">{item.size || "Mixed / मिश्रित"}</td>
-                    <td className="border p-2 text-right">{item.bagsMoved}</td>
-                    <td className="border p-2 text-right">{formatCurrency(item.pricePerBag)}</td>
-                    <td className="border p-2 text-right">{formatCurrency(item.totalAmount)}</td>
+                    <td className="border border-gray-400 px-1 py-0.5">{idx + 1}</td>
+                    <td className="border border-gray-400 px-1 py-0.5">S#{item.serialNumber} - {item.coldStoreName}</td>
+                    <td className="border border-gray-400 px-1 py-0.5">{item.potatoType}</td>
+                    <td className="border border-gray-400 px-1 py-0.5">{item.size || "Mixed"}</td>
+                    <td className="border border-gray-400 px-1 py-0.5 text-right">{item.bagsMoved}</td>
+                    <td className="border border-gray-400 px-1 py-0.5 text-right">{formatCurrency(item.pricePerBag)}</td>
+                    <td className="border border-gray-400 px-1 py-0.5 text-right">{formatCurrency(item.totalAmount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="border p-2" colSpan={4}>Total / कुल</td>
-                  <td className="border p-2 text-right">{transaction.totalBags}</td>
-                  <td className="border p-2"></td>
-                  <td className="border p-2 text-right">{formatCurrency(transaction.totalRevenue)}</td>
+                  <td className="border border-gray-400 px-1 py-0.5" colSpan={4}>Total / कुल</td>
+                  <td className="border border-gray-400 px-1 py-0.5 text-right">{transaction.totalBags}</td>
+                  <td className="border border-gray-400 px-1 py-0.5"></td>
+                  <td className="border border-gray-400 px-1 py-0.5 text-right">{formatCurrency(transaction.totalRevenue)}</td>
                 </tr>
               </tfoot>
             </table>
 
-            <div className="totals-section border-2 border-black p-4">
-              <h3 className="text-lg font-semibold mb-3 text-center border-b pb-2">
+            <div className="totals-section border border-black p-2">
+              <h3 className="text-xs font-semibold mb-1 text-center border-b border-gray-300 pb-1">
                 Bill Summary / बिल सारांश
               </h3>
               
-              <div className="space-y-2">
-                <div className="totals-row flex justify-between py-1 border-b border-dotted border-gray-300">
-                  <span>Total Sale Amount / कुल बिक्री राशि:</span>
+              <div className="space-y-0.5 text-[10px]">
+                <div className="totals-row flex justify-between">
+                  <span>Sale Amount / बिक्री राशि:</span>
                   <span className="font-medium">{formatCurrency(transaction.totalRevenue)}</span>
                 </div>
                 
                 {transportCharges > 0 && (
-                  <div className="totals-row flex justify-between py-1 border-b border-dotted border-gray-300">
-                    <span>Transport Charges / परिवहन शुल्क:</span>
+                  <div className="totals-row flex justify-between">
+                    <span>Transport / परिवहन:</span>
                     <span className="font-medium">+ {formatCurrency(transaction.transportCharges)}</span>
                   </div>
                 )}
                 
                 {otherCharges > 0 && (
-                  <div className="totals-row flex justify-between py-1 border-b border-dotted border-gray-300">
-                    <span>
-                      Other Charges / अन्य शुल्क
-                      {transaction.otherChargesRemarks && <span className="text-gray-500 text-sm"> ({transaction.otherChargesRemarks})</span>}:
-                    </span>
+                  <div className="totals-row flex justify-between">
+                    <span>Other{transaction.otherChargesRemarks && ` (${transaction.otherChargesRemarks})`}:</span>
                     <span className="font-medium">+ {formatCurrency(transaction.otherCharges)}</span>
                   </div>
                 )}
 
-                <div className="totals-row highlight flex justify-between bg-gray-100 p-3 font-bold text-lg -mx-4 my-2">
-                  <span>Total Due to Farmer / किसान को देय:</span>
+                <div className="totals-row highlight flex justify-between bg-gray-100 px-2 py-1 font-bold text-xs -mx-2 my-1">
+                  <span>Due to Farmer / किसान को देय:</span>
                   <span>{formatCurrency(transaction.totalDueToFarmer)}</span>
                 </div>
 
-                <div className="border-t-2 border-black pt-3 mt-3">
-                  <div className="totals-row flex justify-between py-1 text-sm text-gray-600">
-                    <span>Purchase Cost / खरीद लागत:</span>
-                    <span>{formatCurrency(transaction.totalCost)}</span>
-                  </div>
-                  <div className="totals-row flex justify-between py-1 text-sm text-gray-600">
-                    <span>Sale Revenue / बिक्री आय:</span>
-                    <span>{formatCurrency(transaction.totalRevenue)}</span>
-                  </div>
-                  <div className={`totals-row flex justify-between py-2 font-semibold ${totalProfitLoss >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    <span>{totalProfitLoss >= 0 ? "Profit / लाभ:" : "Loss / हानि:"}</span>
-                    <span>{totalProfitLoss >= 0 ? "" : "-"}{formatCurrency(Math.abs(totalProfitLoss).toString())}</span>
+                <div className="border-t border-black pt-1 mt-1">
+                  <div className="flex justify-between text-[9px] text-gray-600">
+                    <span>Cost: {formatCurrency(transaction.totalCost)}</span>
+                    <span>Revenue: {formatCurrency(transaction.totalRevenue)}</span>
+                    <span className={totalProfitLoss >= 0 ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>
+                      {totalProfitLoss >= 0 ? "Profit" : "Loss"}: {formatCurrency(Math.abs(totalProfitLoss).toString())}
+                    </span>
                   </div>
                 </div>
 
-                <div className="totals-row final flex justify-between bg-green-100 p-4 font-bold text-lg -mx-4 -mb-4 mt-4 border-t-2 border-black">
-                  <span>Amount Payable / भुगतान योग्य राशि:</span>
-                  <span className="text-xl">{formatCurrency(transaction.totalDueToFarmer)}</span>
+                <div className="totals-row final flex justify-between bg-green-100 px-2 py-1.5 font-bold text-xs -mx-2 -mb-2 mt-1 border-t border-black">
+                  <span>Amount Payable / भुगतान योग्य:</span>
+                  <span className="text-sm">{formatCurrency(transaction.totalDueToFarmer)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="border-t pt-4 text-center text-sm text-gray-500">
-              <p>Thank you for your business! / आपके व्यापार के लिए धन्यवाद!</p>
+            <div className="thank-you text-center text-[9px] text-gray-500 pt-1">
+              Thank you! / धन्यवाद!
             </div>
 
-            <div className="disclaimer border border-dashed border-gray-400 p-3 text-center text-sm text-gray-600 mt-6">
-              <p>No need to sign/stamp the online generated receipt</p>
-              <p className="hindi">ऑनलाइन जनरेट रसीद पर हस्ताक्षर/मुहर की आवश्यकता नहीं है</p>
+            <div className="disclaimer border border-dashed border-gray-400 p-1 text-center text-[8px] text-gray-500">
+              <p>No signature/stamp required for online receipt | ऑनलाइन रसीद पर हस्ताक्षर/मुहर आवश्यक नहीं</p>
             </div>
           </div>
         ) : (
