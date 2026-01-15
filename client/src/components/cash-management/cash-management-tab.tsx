@@ -234,8 +234,62 @@ export function CashManagementTab() {
     },
   });
 
+  const expenseType = outflowForm.watch("expenseType");
+
+  // Merge managed parties with transaction-derived parties (de-duplicate by name)
+  const mergedParties = (() => {
+    const partyMap = new Map<string, { name: string; address: string | null; pendingDues: number }>();
+    
+    // Add transaction-derived parties first
+    parties.forEach(p => {
+      partyMap.set(p.partyName.toLowerCase(), {
+        name: p.partyName,
+        address: p.partyAddress,
+        pendingDues: p.totalDue,
+      });
+    });
+    
+    // Add/override with managed parties (they take precedence for address/dues from settings)
+    managedParties.forEach(p => {
+      const existing = partyMap.get(p.name.toLowerCase());
+      partyMap.set(p.name.toLowerCase(), {
+        name: p.name,
+        address: p.address || existing?.address || null,
+        pendingDues: parseFloat(p.pendingDues || "0") + (existing?.pendingDues || 0),
+      });
+    });
+    
+    return Array.from(partyMap.values());
+  })();
+
+  // Merge managed farmers with stock-entry-derived farmers (de-duplicate by name)
+  const mergedFarmers = (() => {
+    const farmerMap = new Map<string, { name: string; address: string | null; pendingDues: number }>();
+    
+    // Add stock-entry-derived farmers first
+    farmers.forEach(f => {
+      farmerMap.set(f.farmerName.toLowerCase(), {
+        name: f.farmerName,
+        address: f.village,
+        pendingDues: f.totalDue,
+      });
+    });
+    
+    // Add/override with managed farmers (they take precedence)
+    managedFarmers.forEach(f => {
+      const existing = farmerMap.get(f.name.toLowerCase());
+      farmerMap.set(f.name.toLowerCase(), {
+        name: f.name,
+        address: f.address || existing?.address || null,
+        pendingDues: parseFloat(f.pendingDueToBePaid || "0") + (existing?.pendingDues || 0),
+      });
+    });
+    
+    return Array.from(farmerMap.values());
+  })();
+
   const onInwardSubmit = (values: InwardFormValues) => {
-    const selectedParty = managedParties.find(p => p.name === values.partyName);
+    const selectedParty = mergedParties.find(p => p.name.toLowerCase() === values.partyName.toLowerCase());
     createEntryMutation.mutate({
       direction: "inward",
       receiptType: values.receiptType,
@@ -249,7 +303,7 @@ export function CashManagementTab() {
 
   const onOutflowSubmit = (values: OutflowFormValues) => {
     const selectedFarmer = values.expenseType === "farmer" 
-      ? managedFarmers.find(f => f.name === values.farmerName)
+      ? mergedFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
     createEntryMutation.mutate({
@@ -264,8 +318,6 @@ export function CashManagementTab() {
       remarks: values.remarks || null,
     });
   };
-
-  const expenseType = outflowForm.watch("expenseType");
 
   // Calculate summary values
   const totalCashReceived = entries
@@ -625,15 +677,15 @@ export function CashManagementTab() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {managedParties.map((party) => (
-                              <SelectItem key={party.id} value={party.name}>
+                            {mergedParties.map((party) => (
+                              <SelectItem key={party.name} value={party.name}>
                                 <div className="flex items-center justify-between gap-4">
                                   <span>{party.name}</span>
                                   {party.address && (
                                     <span className="text-xs text-muted-foreground">({party.address})</span>
                                   )}
                                   <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                    {t("Due", "बकाया")}: ₹{parseFloat(party.pendingDues || "0").toFixed(0)}
+                                    {t("Due", "बकाया")}: ₹{party.pendingDues.toFixed(0)}
                                   </Badge>
                                 </div>
                               </SelectItem>
@@ -745,16 +797,16 @@ export function CashManagementTab() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {managedFarmers.map((farmer) => (
-                                <SelectItem key={farmer.id} value={farmer.name}>
+                              {mergedFarmers.map((farmer) => (
+                                <SelectItem key={farmer.name} value={farmer.name}>
                                   <div className="flex items-center justify-between gap-4">
                                     <span>{farmer.name}</span>
                                     {farmer.address && (
                                       <span className="text-xs text-muted-foreground">({farmer.address})</span>
                                     )}
-                                    {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
+                                    {farmer.pendingDues > 0 && (
                                       <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                        {t("Due", "बकाया")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toFixed(0)}
+                                        {t("Due", "बकाया")}: ₹{farmer.pendingDues.toFixed(0)}
                                       </Badge>
                                     )}
                                   </div>
