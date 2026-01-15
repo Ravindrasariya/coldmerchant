@@ -1708,11 +1708,54 @@ export class DatabaseStorage implements IStorage {
 
         // Apply the cross-settlement based on direction
         if (crossSettlement.direction === 'raw_to_seed') {
-          // Paying farmer for raw potatoes, offset against seed dues
-          // The settled amount is recorded in farmerSettlements table
-          // getSeedFarmersWithDues and checkCrossSettlementEligibility will account for this
-          // by subtracting farmerSettlements with direction 'raw_to_seed' from seed dues
-          // No direct update needed - the settlement record handles the offset
+          // Paying farmer for raw potatoes via cross-settlement (offsetting seed dues)
+          // 1. Update stock register amountPaid by settlement amount (farmer is effectively paid)
+          // 2. Seed dues are reduced via farmerSettlements record (no direct update needed)
+          let remainingSettlement = crossSettlement.settledAmount;
+          
+          for (const entryId of crossSettlement.rawPotatoEntryIds) {
+            if (remainingSettlement <= 0) break;
+            
+            const [stockEntry] = await tx.select().from(stockEntries)
+              .where(eq(stockEntries.id, entryId));
+            
+            if (!stockEntry) continue;
+            
+            // Calculate total cost for this entry
+            const entryLots = await tx.select().from(lots)
+              .where(eq(lots.stockEntryId, stockEntry.id));
+            
+            let entryTotalCost = 0;
+            for (const lot of entryLots) {
+              const breakdownList = await tx.select().from(bagBreakdowns)
+                .where(eq(bagBreakdowns.lotId, lot.id));
+              
+              if (breakdownList.length > 0) {
+                entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+              } else if (lot.pricePerKg) {
+                entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+              }
+            }
+            
+            const currentPaid = parseFloat(stockEntry.amountPaid || "0");
+            const due = entryTotalCost - currentPaid;
+            
+            if (due <= 0) continue;
+            
+            const toApply = Math.min(remainingSettlement, due);
+            const newPaid = currentPaid + toApply;
+            const newDue = entryTotalCost - newPaid;
+            const newStatus = newDue <= 0 ? "paid" : "partial";
+            
+            await tx.update(stockEntries)
+              .set({ 
+                amountPaid: newPaid.toString(),
+                paymentStatus: newStatus
+              })
+              .where(eq(stockEntries.id, stockEntry.id));
+            
+            remainingSettlement -= toApply;
+          }
         } else if (crossSettlement.direction === 'seed_to_raw') {
           // Receiving seed payment, offset against raw potato dues
           // The settled amount reduces what we owe farmer for raw potatoes

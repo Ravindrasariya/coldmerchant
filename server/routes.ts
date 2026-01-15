@@ -1272,8 +1272,13 @@ export async function registerRoutes(
       if (!direction || !["inward", "outflow"].includes(direction)) {
         return res.status(400).json({ message: "Valid direction (inward/outflow) is required" });
       }
-      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-        return res.status(400).json({ message: "Valid positive amount is required" });
+      // Amount can be 0 if cross-settlement is provided (the settlement is the main payment)
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount < 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      if (parsedAmount === 0 && !crossSettlement) {
+        return res.status(400).json({ message: "Amount must be greater than 0 when no cross-settlement" });
       }
       if (!entryDate) {
         return res.status(400).json({ message: "Entry date is required" });
