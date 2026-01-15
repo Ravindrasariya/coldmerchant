@@ -143,7 +143,12 @@ function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnT
   return 'partial';
 }
 
-export function StockRegisterCard() {
+interface StockRegisterCardProps {
+  downloadDialogOpen?: boolean;
+  onDownloadDialogClose?: () => void;
+}
+
+export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose }: StockRegisterCardProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [filterSerial, setFilterSerial] = useState<string>("");
@@ -156,7 +161,12 @@ export function StockRegisterCard() {
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
   
   // Download dialog state
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
+  const isDownloadDialogOpen = downloadDialogOpen || internalDownloadDialogOpen;
+  const handleDownloadDialogClose = () => {
+    setInternalDownloadDialogOpen(false);
+    onDownloadDialogClose?.();
+  };
   const [downloadStartDate, setDownloadStartDate] = useState("");
   const [downloadEndDate, setDownloadEndDate] = useState("");
 
@@ -418,7 +428,7 @@ export function StockRegisterCard() {
     link.click();
     URL.revokeObjectURL(link.href);
 
-    setDownloadDialogOpen(false);
+    handleDownloadDialogClose();
     setDownloadStartDate("");
     setDownloadEndDate("");
     
@@ -441,7 +451,7 @@ export function StockRegisterCard() {
   return (
     <div className="space-y-4">
       {/* Download Dialog */}
-      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+      <Dialog open={isDownloadDialogOpen} onOpenChange={(open) => !open && handleDownloadDialogClose()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("Download Stock Entries", "स्टॉक प्रविष्टियाँ डाउनलोड करें")}</DialogTitle>
@@ -469,7 +479,7 @@ export function StockRegisterCard() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDownloadDialogOpen(false)} data-testid="button-stock-download-cancel">
+            <Button variant="outline" onClick={handleDownloadDialogClose} data-testid="button-stock-download-cancel">
               {t("Cancel", "रद्द करें")}
             </Button>
             <Button onClick={handleDownloadCSV} data-testid="button-stock-download-csv">
@@ -550,16 +560,6 @@ export function StockRegisterCard() {
               data-testid="filter-unsold"
             >
               {t("Unsold Only", "केवल बिना बिके")}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDownloadDialogOpen(true)}
-              title={t("Download", "डाउनलोड")}
-              data-testid="button-stock-download"
-            >
-              <Download className="h-4 w-4" />
             </Button>
 
             {hasActiveFilters && (

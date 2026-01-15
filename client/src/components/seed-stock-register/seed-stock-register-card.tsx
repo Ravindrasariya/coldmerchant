@@ -389,16 +389,6 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
               {t("Unsold Only", "केवल अनबिके")}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setDownloadDialogOpen(true)}
-              title={t("Download", "डाउनलोड")}
-              data-testid="button-seed-download"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
                 <X className="h-4 w-4 mr-1" />

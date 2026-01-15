@@ -46,6 +46,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState("stock-entry");
   const [stockMode, setStockMode] = useState<"raw" | "seed">("raw");
   const [seedDownloadDialogOpen, setSeedDownloadDialogOpen] = useState(false);
+  const [rawDownloadDialogOpen, setRawDownloadDialogOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -358,21 +359,22 @@ export default function HomePage() {
                       {t("Seed", "बीज")}
                     </Button>
                   </div>
-                  {stockMode === "seed" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSeedDownloadDialogOpen(true)}
-                      title={t("Download CSV", "CSV डाउनलोड")}
-                      data-testid="button-seed-download-header"
-                    >
-                      <Download className="h-5 w-5" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => stockMode === "raw" ? setRawDownloadDialogOpen(true) : setSeedDownloadDialogOpen(true)}
+                    title={t("Download CSV", "CSV डाउनलोड")}
+                    data-testid={stockMode === "raw" ? "button-raw-download-header" : "button-seed-download-header"}
+                  >
+                    <Download className="h-5 w-5" />
+                  </Button>
                 </div>
               </div>
               {stockMode === "raw" ? (
-                <StockRegisterCard />
+                <StockRegisterCard 
+                  downloadDialogOpen={rawDownloadDialogOpen}
+                  onDownloadDialogClose={() => setRawDownloadDialogOpen(false)}
+                />
               ) : (
                 <SeedStockRegisterCard 
                   downloadDialogOpen={seedDownloadDialogOpen}
