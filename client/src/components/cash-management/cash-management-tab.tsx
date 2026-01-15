@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings } from "lucide-react";
+import { CashSettingsDialog } from "./cash-settings-dialog";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -90,6 +91,9 @@ export function CashManagementTab() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"inward" | "outflow">("inward");
+  
+  // Settings dialog state
+  const [settingsOpen, setSettingsOpen] = useState(false);
   
   // Filter state
   const [filterPartyName, setFilterPartyName] = useState<string>("");
@@ -308,6 +312,22 @@ export function CashManagementTab() {
 
   return (
     <div className="space-y-6" data-testid="cash-management-tab">
+      {/* Settings Dialog */}
+      <CashSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      
+      {/* Header with Settings Button */}
+      <div className="flex justify-end">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSettingsOpen(true)}
+          title={t("Settings", "सेटिंग्स")}
+          data-testid="button-cash-settings"
+        >
+          <Settings className="h-5 w-5" />
+        </Button>
+      </div>
+      
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card data-testid="card-cash-received">

@@ -27,6 +27,11 @@ export function CashSettingsDialog({ open, onOpenChange }: CashSettingsDialogPro
 
   const { data: settings, isLoading: settingsLoading } = useQuery<CashSettings>({
     queryKey: ["/api/cash/settings", financialYear],
+    queryFn: async () => {
+      const res = await fetch(`/api/cash/settings/${financialYear}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch settings");
+      return res.json();
+    },
     enabled: open,
   });
 
@@ -105,13 +110,10 @@ function OpeningBalanceSection({ settings, financialYear, isLoading }: OpeningBa
 
   const saveMutation = useMutation({
     mutationFn: async (data: { financialYear: string; openingCashInHand: string; openingCashInAccount: string }) => {
-      return apiRequest("/api/cash/settings", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/cash/settings", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/settings", financialYear] });
       toast({ title: t("Settings saved", "सेटिंग्स सहेजी गईं") });
     },
     onError: () => {
@@ -189,10 +191,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("/api/cash/managed-parties", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/cash/managed-parties", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
@@ -207,10 +206,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
-      return apiRequest(`/api/cash/managed-parties/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/cash/managed-parties/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
@@ -224,9 +220,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/cash/managed-parties/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/cash/managed-parties/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
@@ -436,10 +430,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      return apiRequest("/api/cash/managed-farmers", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("POST", "/api/cash/managed-farmers", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
@@ -454,10 +445,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
-      return apiRequest(`/api/cash/managed-farmers/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      });
+      return apiRequest("PATCH", `/api/cash/managed-farmers/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
@@ -471,9 +459,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/cash/managed-farmers/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/cash/managed-farmers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
