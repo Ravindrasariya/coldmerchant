@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { LoadSeedTruckDialog } from "./load-seed-truck-dialog";
+import { EditSeedTransactionDialog } from "./edit-seed-transaction-dialog";
 
 interface SeedTransactionItem {
   id: number;
@@ -62,6 +63,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
   const { t } = useLanguage();
   const { toast } = useToast();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadStartDate, setDownloadStartDate] = useState("");
@@ -276,6 +278,12 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
       <LoadSeedTruckDialog
         open={showLoadDialog}
         onOpenChange={setShowLoadDialog}
+      />
+
+      <EditSeedTransactionDialog
+        transactionId={editTransactionId}
+        open={editTransactionId !== null}
+        onOpenChange={(open) => !open && setEditTransactionId(null)}
       />
 
       <div className="flex items-center justify-between gap-4">
@@ -531,6 +539,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                       <Button 
                         variant="outline" 
                         size="sm"
+                        onClick={() => setEditTransactionId(txn.id)}
                         className="flex-1 sm:flex-none h-8 sm:h-9"
                         data-testid={`button-edit-seed-txn-${txn.id}`}
                       >
