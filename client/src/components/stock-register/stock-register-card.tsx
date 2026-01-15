@@ -253,9 +253,9 @@ export function StockRegisterCard() {
         entryColdStorePaid += metrics.coldStorePaid;
       });
 
-      farmerTotal += entryTotalAmount;
-      const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       const adjustedEntryTotal = entryTotalAmount + entryAdjustment;
+      farmerTotal += adjustedEntryTotal;
+      const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       farmerDue += Math.max(adjustedEntryTotal - amountPaid, 0);
       
       coldStoreTotal += entryColdStoreTotalCharges;
@@ -740,10 +740,10 @@ export function StockRegisterCard() {
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
-                        {entryTotalAmount > 0 && (
+                        {(entryTotalAmount > 0 || entryAdjustment !== 0) && (
                           <div className="flex items-center gap-1">
                             <span className="text-muted-foreground">{t("Farmer Total", "किसान कुल")}</span>{" "}
-                            <span className="font-medium">₹ {entryTotalAmount.toFixed(0)}</span>
+                            <span className="font-medium">₹ {adjustedEntryTotal.toFixed(0)}</span>
                             <span className="text-muted-foreground mx-1">|</span>
                             <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
                             <span className={`font-medium ${farmerRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
