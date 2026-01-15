@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { CashSettingsDialog } from "./cash-settings-dialog";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
@@ -117,6 +119,11 @@ export function CashManagementTab() {
   
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false);
+  
+  // Download dialog state
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadStartDate, setDownloadStartDate] = useState("");
+  const [downloadEndDate, setDownloadEndDate] = useState("");
   
   // Filter state
   const [filterPartyName, setFilterPartyName] = useState<string>("");
@@ -413,10 +420,132 @@ export function CashManagementTab() {
     }
   };
 
+  const handleDownloadCSV = () => {
+    if (!downloadStartDate || !downloadEndDate) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const startDate = new Date(downloadStartDate);
+    const endDate = new Date(downloadEndDate);
+    
+    if (startDate > endDate) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filteredForDownload = entries.filter(entry => {
+      const entryDate = new Date(entry.entryDate);
+      return entryDate >= startDate && entryDate <= endDate;
+    });
+
+    if (filteredForDownload.length === 0) {
+      toast({
+        title: t("No Data", "कोई डेटा नहीं"),
+        description: t("No entries found in the selected date range", "चयनित तिथि सीमा में कोई प्रविष्टि नहीं मिली"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = [
+      t("Date", "तिथि"),
+      t("Direction", "दिशा"),
+      t("Receipt/Expense Type", "रसीद/खर्च प्रकार"),
+      t("Payment Mode", "भुगतान माध्यम"),
+      t("Party Name", "पार्टी का नाम"),
+      t("Farmer Name", "किसान का नाम"),
+      t("Cold Store", "शीत भंडार"),
+      t("Amount", "राशि"),
+      t("Remarks", "टिप्पणी"),
+    ];
+
+    const rows = filteredForDownload.map(entry => [
+      format(new Date(entry.entryDate), "dd/MM/yyyy"),
+      entry.direction === "inward" ? t("Inward", "आवक") : t("Outflow", "जावक"),
+      entry.direction === "inward" ? getReceiptTypeLabel(entry.receiptType || "") : getExpenseTypeLabel(entry.expenseType || ""),
+      entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "-",
+      entry.partyName || "-",
+      entry.farmerName || "-",
+      entry.coldStoreName || "-",
+      entry.amount,
+      entry.remarks || "-",
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `cash_entries_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    setDownloadDialogOpen(false);
+    setDownloadStartDate("");
+    setDownloadEndDate("");
+    
+    toast({
+      title: t("Success", "सफल"),
+      description: t("CSV downloaded successfully", "CSV सफलतापूर्वक डाउनलोड हुई"),
+    });
+  };
+
   return (
     <div className="space-y-6" data-testid="cash-management-tab">
       {/* Settings Dialog */}
       <CashSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      
+      {/* Download Dialog */}
+      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("Download Cash Entries", "नकद प्रविष्टियाँ डाउनलोड करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="start-date">{t("Start Date", "आरंभ तिथि")}</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={downloadStartDate}
+                onChange={(e) => setDownloadStartDate(e.target.value)}
+                data-testid="input-download-start-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end-date">{t("End Date", "समाप्ति तिथि")}</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={downloadEndDate}
+                onChange={(e) => setDownloadEndDate(e.target.value)}
+                data-testid="input-download-end-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDownloadDialogOpen(false)} data-testid="button-download-cancel">
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button onClick={handleDownloadCSV} data-testid="button-download-csv">
+              <Download className="h-4 w-4 mr-2" />
+              {t("Download CSV", "CSV डाउनलोड करें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Header with Settings Button */}
       <div className="flex items-center justify-between gap-4">
@@ -426,15 +555,26 @@ export function CashManagementTab() {
             {t("Track payments received and expenses", "प्राप्त भुगतान और खर्चों को ट्रैक करें")}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSettingsOpen(true)}
-          title={t("Settings", "सेटिंग्स")}
-          data-testid="button-cash-settings"
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDownloadDialogOpen(true)}
+            title={t("Download", "डाउनलोड")}
+            data-testid="button-cash-download"
+          >
+            <Download className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSettingsOpen(true)}
+            title={t("Settings", "सेटिंग्स")}
+            data-testid="button-cash-settings"
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
       
       {/* Summary Cards */}
