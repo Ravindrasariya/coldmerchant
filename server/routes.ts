@@ -2191,5 +2191,43 @@ export async function registerRoutes(
     }
   });
 
+  // Season Reset Endpoint
+  app.post("/api/season/reset", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      
+      // Check for remaining bags in raw potato stock
+      const rawPotatoRemaining = await storage.checkRemainingBags(merchantId);
+      
+      // Check for remaining bags in seed stock
+      const seedRemaining = await storage.checkSeedRemainingBags(merchantId);
+      
+      if (rawPotatoRemaining.hasRemaining || seedRemaining.hasRemaining) {
+        const issues: string[] = [];
+        
+        if (rawPotatoRemaining.hasRemaining) {
+          issues.push(`Raw Potato: ${rawPotatoRemaining.count} lots with ${rawPotatoRemaining.totalBags} remaining bags`);
+        }
+        
+        if (seedRemaining.hasRemaining) {
+          issues.push(`Seed: ${seedRemaining.count} lots with ${seedRemaining.totalBags} remaining bags`);
+        }
+        
+        return res.status(400).json({ 
+          message: `Cannot reset: There are still bags left to be sold. ${issues.join(". ")}`,
+          details: { rawPotatoRemaining, seedRemaining }
+        });
+      }
+      
+      // Perform the reset - delete all stock entries (transactions are NOT affected)
+      await storage.resetSeasonStockEntries(merchantId);
+      
+      res.json({ message: "Season reset completed successfully" });
+    } catch (error) {
+      console.error("Error resetting season:", error);
+      res.status(500).json({ message: "Failed to reset season" });
+    }
+  });
+
   return httpServer;
 }

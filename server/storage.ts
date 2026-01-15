@@ -169,6 +169,11 @@ export interface IStorage {
     },
     userId?: number
   ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[]; crossSettlementId?: number }>;
+  
+  // Season Reset operations
+  checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
+  checkSeedRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
+  resetSeasonStockEntries(merchantId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2018,6 +2023,53 @@ export class DatabaseStorage implements IStorage {
 
       return { ...createdEntry, allocations, coldStoreAllocations, crossSettlementId };
     });
+  }
+
+  // Season Reset operations
+  async checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }> {
+    // Check raw potato lots for remaining bags
+    const lotsWithRemaining = await db.select()
+      .from(lots)
+      .where(and(
+        eq(lots.merchantId, merchantId),
+        gt(lots.remainingBags, 0)
+      ));
+    
+    const totalBags = lotsWithRemaining.reduce((sum, lot) => sum + lot.remainingBags, 0);
+    
+    return {
+      hasRemaining: lotsWithRemaining.length > 0,
+      count: lotsWithRemaining.length,
+      totalBags
+    };
+  }
+
+  async checkSeedRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }> {
+    // Check seed lots for remaining bags
+    const seedLotsWithRemaining = await db.select()
+      .from(seedLots)
+      .where(and(
+        eq(seedLots.merchantId, merchantId),
+        gt(seedLots.remainingBags, 0)
+      ));
+    
+    const totalBags = seedLotsWithRemaining.reduce((sum, lot) => sum + lot.remainingBags, 0);
+    
+    return {
+      hasRemaining: seedLotsWithRemaining.length > 0,
+      count: seedLotsWithRemaining.length,
+      totalBags
+    };
+  }
+
+  async resetSeasonStockEntries(merchantId: number): Promise<void> {
+    // Delete all raw potato stock entries (cascade deletes lots and bag breakdowns)
+    await db.delete(stockEntries)
+      .where(eq(stockEntries.merchantId, merchantId));
+    
+    // Delete all seed stock entries (cascade deletes seed lots)
+    await db.delete(seedStockEntries)
+      .where(eq(seedStockEntries.merchantId, merchantId));
   }
 }
 
