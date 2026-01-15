@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -285,6 +285,17 @@ export function CashManagementTab() {
     queryFn: () => fetch(`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedInwardSeedFarmerName)}`, { credentials: "include" }).then(res => res.json()),
     enabled: !!selectedInwardSeedFarmerName,
   });
+  
+  // Reset cross-settlement state when farmer name changes
+  useEffect(() => {
+    // Reset inward cross-settlement enabled when farmer changes
+    setInwardCrossSettlementEnabled(true);
+  }, [selectedInwardSeedFarmerName]);
+  
+  useEffect(() => {
+    // Reset outflow cross-settlement enabled when farmer changes
+    setOutflowCrossSettlementEnabled(true);
+  }, [selectedOutflowFarmerName]);
   
   // Watch revenue type for conditional rendering
   const revenueType = inwardForm.watch("revenueType");
@@ -1172,7 +1183,7 @@ export function CashManagementTab() {
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                   {inwardCrossSettlementEnabled ? t(
-                                    `Auto-settling ₹${Math.min(seedFarmerCrossSettlement.seedDueAmount, seedFarmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} (min of seed dues ₹${seedFarmerCrossSettlement.seedDueAmount.toFixed(0)} and raw dues ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(0)}). Any amount below is additional cash.`,
+                                    `Auto-settling ₹${Math.min(seedFarmerCrossSettlement.seedDueAmount, seedFarmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} (min of seed dues ₹${seedFarmerCrossSettlement.seedDueAmount.toFixed(0)} and raw dues ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(0)}). Any amount above is additional cash.`,
                                     `₹${Math.min(seedFarmerCrossSettlement.seedDueAmount, seedFarmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} स्वतः सेटल। नीचे की राशि अतिरिक्त नकद है।`
                                   ) : t(
                                     `Farmer owes ₹${seedFarmerCrossSettlement.seedDueAmount.toFixed(0)} for seeds. You owe farmer ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} for raw potatoes.`,
@@ -1357,7 +1368,7 @@ export function CashManagementTab() {
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                   {outflowCrossSettlementEnabled ? t(
-                                    `Auto-settling ₹${Math.min(farmerCrossSettlement.seedDueAmount, farmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} (min of seed dues ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} and raw dues ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)}). Any amount below is additional cash.`,
+                                    `Auto-settling ₹${Math.min(farmerCrossSettlement.seedDueAmount, farmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} (min of seed dues ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} and raw dues ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)}). Any amount above is additional cash.`,
                                     `₹${Math.min(farmerCrossSettlement.seedDueAmount, farmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} स्वतः सेटल (बीज बकाया ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} और कच्चे बकाया ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} का न्यूनतम)। नीचे की राशि अतिरिक्त नकद है।`
                                   ) : t(
                                     `Farmer owes ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} for seeds. You owe farmer ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} for raw potatoes.`,
