@@ -145,19 +145,21 @@ export function setupAuth(app: Express) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      // Always validate mobile number for all password changes
+      if (!mobileNumber) {
+        return res.status(400).json({ message: "Registered mobile number is required" });
+      }
+      if (user.mobileNumber !== mobileNumber) {
+        return res.status(400).json({ message: "Mobile number does not match registered number" });
+      }
+
       // If user must change password (first login) and isFirstLogin flag is set,
-      // we allow changing without verifying current password (they know it's the default)
-      // Otherwise, we require current password verification AND mobile number validation
+      // we skip current password verification (they know it's the default)
+      // Otherwise, we also require current password verification
       if (user.mustChangePassword && isFirstLogin) {
-        // First login - just update the password
+        // First login - mobile already validated, skip current password check
       } else {
-        // Regular password change - verify mobile number and current password
-        if (!mobileNumber) {
-          return res.status(400).json({ message: "Registered mobile number is required" });
-        }
-        if (user.mobileNumber !== mobileNumber) {
-          return res.status(400).json({ message: "Mobile number does not match registered number" });
-        }
+        // Regular password change - also verify current password
         if (!currentPassword) {
           return res.status(400).json({ message: "Current password is required" });
         }
