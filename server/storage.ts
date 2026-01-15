@@ -2,6 +2,7 @@ import {
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
+  cashSettings, parties, cashFarmers,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -11,7 +12,10 @@ import {
   type TransactionEditHistory, type InsertTransactionEditHistory,
   type CashEntry, type InsertCashEntry,
   type CashEntryAllocation, type InsertCashEntryAllocation,
-  type ColdStoreChargeAllocation, type InsertColdStoreChargeAllocation
+  type ColdStoreChargeAllocation, type InsertColdStoreChargeAllocation,
+  type CashSettings, type InsertCashSettings,
+  type Party, type InsertParty,
+  type CashFarmer, type InsertCashFarmer
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
@@ -81,6 +85,22 @@ export interface IStorage {
   getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
+  
+  // Cash Settings operations
+  getCashSettings(merchantId: number, financialYear: string): Promise<CashSettings | undefined>;
+  upsertCashSettings(merchantId: number, financialYear: string, data: Partial<InsertCashSettings>): Promise<CashSettings>;
+  
+  // Party operations
+  getPartiesByMerchant(merchantId: number): Promise<Party[]>;
+  createParty(party: InsertParty): Promise<Party>;
+  updateParty(id: number, merchantId: number, data: Partial<Party>): Promise<Party | undefined>;
+  deleteParty(id: number, merchantId: number): Promise<void>;
+  
+  // Cash Farmer operations
+  getCashFarmersByMerchant(merchantId: number): Promise<CashFarmer[]>;
+  createCashFarmer(farmer: InsertCashFarmer): Promise<CashFarmer>;
+  updateCashFarmer(id: number, merchantId: number, data: Partial<CashFarmer>): Promise<CashFarmer | undefined>;
+  deleteCashFarmer(id: number, merchantId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -905,6 +925,81 @@ export class DatabaseStorage implements IStorage {
       
       return { ...createdEntry, allocations, coldStoreAllocations };
     });
+  }
+
+  // Cash Settings operations
+  async getCashSettings(merchantId: number, financialYear: string): Promise<CashSettings | undefined> {
+    const [settings] = await db.select().from(cashSettings)
+      .where(and(eq(cashSettings.merchantId, merchantId), eq(cashSettings.financialYear, financialYear)));
+    return settings || undefined;
+  }
+
+  async upsertCashSettings(merchantId: number, financialYear: string, data: Partial<InsertCashSettings>): Promise<CashSettings> {
+    const existing = await this.getCashSettings(merchantId, financialYear);
+    if (existing) {
+      const [updated] = await db.update(cashSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(and(eq(cashSettings.merchantId, merchantId), eq(cashSettings.financialYear, financialYear)))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(cashSettings).values({
+        merchantId,
+        financialYear,
+        ...data,
+      }).returning();
+      return created;
+    }
+  }
+
+  // Party operations
+  async getPartiesByMerchant(merchantId: number): Promise<Party[]> {
+    return await db.select().from(parties)
+      .where(eq(parties.merchantId, merchantId))
+      .orderBy(asc(parties.name));
+  }
+
+  async createParty(party: InsertParty): Promise<Party> {
+    const [created] = await db.insert(parties).values(party).returning();
+    return created;
+  }
+
+  async updateParty(id: number, merchantId: number, data: Partial<Party>): Promise<Party | undefined> {
+    const [updated] = await db.update(parties)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(parties.id, id), eq(parties.merchantId, merchantId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteParty(id: number, merchantId: number): Promise<void> {
+    await db.delete(parties)
+      .where(and(eq(parties.id, id), eq(parties.merchantId, merchantId)));
+  }
+
+  // Cash Farmer operations
+  async getCashFarmersByMerchant(merchantId: number): Promise<CashFarmer[]> {
+    return await db.select().from(cashFarmers)
+      .where(eq(cashFarmers.merchantId, merchantId))
+      .orderBy(asc(cashFarmers.name));
+  }
+
+  async createCashFarmer(farmer: InsertCashFarmer): Promise<CashFarmer> {
+    const [created] = await db.insert(cashFarmers).values(farmer).returning();
+    return created;
+  }
+
+  async updateCashFarmer(id: number, merchantId: number, data: Partial<CashFarmer>): Promise<CashFarmer | undefined> {
+    const [updated] = await db.update(cashFarmers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(cashFarmers.id, id), eq(cashFarmers.merchantId, merchantId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteCashFarmer(id: number, merchantId: number): Promise<void> {
+    await db.delete(cashFarmers)
+      .where(and(eq(cashFarmers.id, id), eq(cashFarmers.merchantId, merchantId)));
   }
 }
 

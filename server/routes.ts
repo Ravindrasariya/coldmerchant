@@ -1258,5 +1258,178 @@ export async function registerRoutes(
     }
   });
 
+  // Cash Settings Routes
+  app.get("/api/cash/settings/:year", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const financialYear = req.params.year;
+      const settings = await storage.getCashSettings(merchantId, financialYear);
+      res.json(settings || { financialYear, openingCashInHand: "0", openingCashInAccount: "0" });
+    } catch (error) {
+      console.error("Error fetching cash settings:", error);
+      res.status(500).json({ message: "Failed to fetch cash settings" });
+    }
+  });
+
+  app.post("/api/cash/settings", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { financialYear, openingCashInHand, openingCashInAccount } = req.body;
+      
+      if (!financialYear) {
+        return res.status(400).json({ message: "Financial year is required" });
+      }
+
+      const settings = await storage.upsertCashSettings(merchantId, financialYear, {
+        openingCashInHand: openingCashInHand?.toString() || "0",
+        openingCashInAccount: openingCashInAccount?.toString() || "0",
+      });
+      res.json(settings);
+    } catch (error) {
+      console.error("Error saving cash settings:", error);
+      res.status(500).json({ message: "Failed to save cash settings" });
+    }
+  });
+
+  // Managed Parties Routes (for settings)
+  app.get("/api/cash/managed-parties", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const parties = await storage.getPartiesByMerchant(merchantId);
+      res.json(parties);
+    } catch (error) {
+      console.error("Error fetching managed parties:", error);
+      res.status(500).json({ message: "Failed to fetch managed parties" });
+    }
+  });
+
+  app.post("/api/cash/managed-parties", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, contactNumber, address, pendingDues } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: "Party name is required" });
+      }
+
+      const party = await storage.createParty({
+        merchantId,
+        name,
+        contactNumber: contactNumber || null,
+        address: address || null,
+        pendingDues: pendingDues?.toString() || "0",
+      });
+      res.status(201).json(party);
+    } catch (error) {
+      console.error("Error creating party:", error);
+      res.status(500).json({ message: "Failed to create party" });
+    }
+  });
+
+  app.patch("/api/cash/managed-parties/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const { name, contactNumber, address, pendingDues } = req.body;
+
+      const party = await storage.updateParty(id, merchantId, {
+        ...(name && { name }),
+        ...(contactNumber !== undefined && { contactNumber }),
+        ...(address !== undefined && { address }),
+        ...(pendingDues !== undefined && { pendingDues: pendingDues?.toString() }),
+      });
+      
+      if (!party) {
+        return res.status(404).json({ message: "Party not found" });
+      }
+      res.json(party);
+    } catch (error) {
+      console.error("Error updating party:", error);
+      res.status(500).json({ message: "Failed to update party" });
+    }
+  });
+
+  app.delete("/api/cash/managed-parties/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      await storage.deleteParty(id, merchantId);
+      res.json({ message: "Party deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting party:", error);
+      res.status(500).json({ message: "Failed to delete party" });
+    }
+  });
+
+  // Managed Cash Farmers Routes (for settings)
+  app.get("/api/cash/managed-farmers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const farmers = await storage.getCashFarmersByMerchant(merchantId);
+      res.json(farmers);
+    } catch (error) {
+      console.error("Error fetching managed farmers:", error);
+      res.status(500).json({ message: "Failed to fetch managed farmers" });
+    }
+  });
+
+  app.post("/api/cash/managed-farmers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, contactNumber, address, pendingDueToBePaid } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+
+      const farmer = await storage.createCashFarmer({
+        merchantId,
+        name,
+        contactNumber: contactNumber || null,
+        address: address || null,
+        pendingDueToBePaid: pendingDueToBePaid?.toString() || "0",
+      });
+      res.status(201).json(farmer);
+    } catch (error) {
+      console.error("Error creating farmer:", error);
+      res.status(500).json({ message: "Failed to create farmer" });
+    }
+  });
+
+  app.patch("/api/cash/managed-farmers/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const { name, contactNumber, address, pendingDueToBePaid } = req.body;
+
+      const farmer = await storage.updateCashFarmer(id, merchantId, {
+        ...(name && { name }),
+        ...(contactNumber !== undefined && { contactNumber }),
+        ...(address !== undefined && { address }),
+        ...(pendingDueToBePaid !== undefined && { pendingDueToBePaid: pendingDueToBePaid?.toString() }),
+      });
+      
+      if (!farmer) {
+        return res.status(404).json({ message: "Farmer not found" });
+      }
+      res.json(farmer);
+    } catch (error) {
+      console.error("Error updating farmer:", error);
+      res.status(500).json({ message: "Failed to update farmer" });
+    }
+  });
+
+  app.delete("/api/cash/managed-farmers/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      await storage.deleteCashFarmer(id, merchantId);
+      res.json({ message: "Farmer deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting farmer:", error);
+      res.status(500).json({ message: "Failed to delete farmer" });
+    }
+  });
+
   return httpServer;
 }
