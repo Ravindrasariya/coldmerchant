@@ -37,6 +37,7 @@ interface CashEntry {
   farmerName: string | null;
   farmerVillage: string | null;
   coldStoreName: string | null;
+  supplierName: string | null;
   amount: string;
   entryDate: string;
   remarks: string | null;
@@ -77,6 +78,13 @@ interface SeedFarmerWithDue {
   village: string | null;
   totalDue: number;
   transactionCount: number;
+}
+
+interface SeedSupplierWithDue {
+  supplierName: string;
+  district: string | null;
+  totalDue: number;
+  entryCount: number;
 }
 
 interface ManagedParty {
@@ -132,6 +140,7 @@ const outflowFormSchema = z.object({
   paymentMode: z.string().min(1, "Payment mode is required"),
   farmerName: z.string().optional(),
   coldStoreName: z.string().optional(),
+  supplierName: z.string().optional(),
   amount: z.coerce.number().min(1, "Amount must be greater than 0"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -185,6 +194,11 @@ export function CashManagementTab() {
     queryKey: ["/api/cash/seed-farmers"],
   });
 
+  // Fetch seed suppliers with dues from seed stock entries
+  const { data: seedSuppliers = [] } = useQuery<SeedSupplierWithDue[]>({
+    queryKey: ["/api/cash/seed-suppliers"],
+  });
+
   // Fetch managed parties for dropdown
   const { data: managedParties = [] } = useQuery<ManagedParty[]>({
     queryKey: ["/api/cash/managed-parties"],
@@ -231,6 +245,7 @@ export function CashManagementTab() {
       paymentMode: "cash",
       farmerName: "",
       coldStoreName: "",
+      supplierName: "",
       amount: 0,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -248,6 +263,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
@@ -271,6 +287,7 @@ export function CashManagementTab() {
           paymentMode: "cash",
           farmerName: "",
           coldStoreName: "",
+          supplierName: "",
           amount: 0,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -381,6 +398,7 @@ export function CashManagementTab() {
       farmerName: values.expenseType === "farmer" ? values.farmerName : null,
       farmerVillage: selectedFarmer?.address || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
+      supplierName: values.expenseType === "supplier" ? values.supplierName : null,
       amount: values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
@@ -469,6 +487,7 @@ export function CashManagementTab() {
       case "hammali": return t("Hammali", "हम्माली");
       case "farmer": return t("Farmer", "किसान");
       case "cold_store_charge": return t("Cold Store Charge", "शीत भंडार शुल्क");
+      case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       default: return type;
     }
   };
@@ -1169,6 +1188,44 @@ export function CashManagementTab() {
                     />
                   )}
 
+                  {expenseType === "supplier" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="supplierName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Supplier Name", "आपूर्तिकर्ता का नाम")} *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-supplier-name">
+                                <SelectValue placeholder={t("Select Supplier", "आपूर्तिकर्ता चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {seedSuppliers.map((supplier) => (
+                                <SelectItem key={supplier.supplierName} value={supplier.supplierName}>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <span>{supplier.supplierName}</span>
+                                    {supplier.district && (
+                                      <span className="text-xs text-muted-foreground">({supplier.district})</span>
+                                    )}
+                                    <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                      {t("Due", "बकाया")}: ₹{supplier.totalDue.toFixed(0)}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({supplier.entryCount} {t("entries", "प्रविष्टियाँ")})
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   <FormField
                     control={outflowForm.control}
                     name="paymentMode"
@@ -1310,6 +1367,8 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
       case "farmer": return t("Farmer", "किसान");
+      case "cold_store_charge": return t("Cold Store", "शीत भंडार");
+      case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       default: return type || "";
     }
   };
@@ -1328,7 +1387,7 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
               <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
             )}
             <span className="font-semibold truncate">
-              {isInward ? entry.partyName : (entry.farmerName || entry.coldStoreName || getExpenseTypeLabel(entry.expenseType))}
+              {isInward ? entry.partyName : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 

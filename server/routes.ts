@@ -1225,11 +1225,23 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/seed-suppliers - Get seed suppliers with outstanding dues from seed stock entries
+  app.get("/api/cash/seed-suppliers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const seedSuppliers = await storage.getSeedSuppliersWithDue(merchantId);
+      res.json(seedSuppliers);
+    } catch (error) {
+      console.error("Error fetching seed suppliers:", error);
+      res.status(500).json({ message: "Failed to fetch seed suppliers" });
+    }
+  });
+
   // POST /api/cash/entries - Create a cash entry (inward or outflow)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, amount, entryDate, remarks } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, supplierName, amount, entryDate, remarks } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow"].includes(direction)) {
@@ -1263,7 +1275,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge", "supplier"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
         }
         if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
@@ -1274,6 +1286,9 @@ export async function registerRoutes(
         }
         if (expenseType === "cold_store_charge" && !coldStoreName) {
           return res.status(400).json({ message: "Cold store name is required when expense type is cold store charge" });
+        }
+        if (expenseType === "supplier" && !supplierName) {
+          return res.status(400).json({ message: "Supplier name is required when expense type is supplier" });
         }
       }
 
@@ -1295,6 +1310,7 @@ export async function registerRoutes(
         farmerName: farmerName || null,
         farmerVillage: farmerVillage || null,
         coldStoreName: coldStoreName || null,
+        supplierName: supplierName || null,
         amount: amount.toString(),
         entryDate,
         remarks: remarks || null,

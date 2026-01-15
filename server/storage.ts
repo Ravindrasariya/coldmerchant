@@ -95,6 +95,7 @@ export interface IStorage {
   getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
   getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; transactionCount: number }[]>;
+  getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
   // Cash Settings operations
@@ -819,6 +820,56 @@ export class DatabaseStorage implements IStorage {
       const originalTxn = txns.find(t => t.farmerName.toLowerCase() === key);
       return {
         farmerName: originalTxn?.farmerName || key,
+        ...data,
+      };
+    }).sort((a, b) => b.totalDue - a.totalDue);
+  }
+
+  async getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]> {
+    // Get all seed stock entries for this merchant
+    const entries = await db.select().from(seedStockEntries)
+      .where(eq(seedStockEntries.merchantId, merchantId));
+    
+    // Get all seed lots to calculate total costs
+    const allLots = await db.select().from(seedLots)
+      .where(eq(seedLots.merchantId, merchantId));
+    
+    // Group by supplier name and calculate total due
+    const supplierMap = new Map<string, { district: string | null; totalDue: number; entryCount: number }>();
+    
+    for (const entry of entries) {
+      // Calculate total cost for this entry from its lots
+      const entryLots = allLots.filter(lot => lot.seedEntryId === entry.id);
+      const totalCost = entryLots.reduce((sum, lot) => {
+        const bags = lot.originalBags || 0;
+        const pricePerBag = parseFloat(lot.pricePerBag || "0");
+        return sum + (bags * pricePerBag);
+      }, 0);
+      
+      const amountPaid = parseFloat(entry.amountPaid || "0");
+      const dueAmount = totalCost - amountPaid;
+      
+      if (dueAmount <= 0) continue; // Skip fully paid
+      
+      const key = entry.supplierName.toLowerCase();
+      const existing = supplierMap.get(key);
+      if (existing) {
+        existing.totalDue += dueAmount;
+        existing.entryCount += 1;
+      } else {
+        supplierMap.set(key, {
+          district: entry.district || null,
+          totalDue: dueAmount,
+          entryCount: 1,
+        });
+      }
+    }
+    
+    return Array.from(supplierMap.entries()).map(([key, data]) => {
+      // Find original supplier name with proper casing
+      const originalEntry = entries.find(e => e.supplierName.toLowerCase() === key);
+      return {
+        supplierName: originalEntry?.supplierName || key,
         ...data,
       };
     }).sort((a, b) => b.totalDue - a.totalDue);

@@ -156,6 +156,7 @@ export const cashEntries = pgTable("cash_entries", {
   farmerName: text("farmer_name"), // For farmer outflow or seed sale inward
   farmerVillage: text("farmer_village"), // For farmer outflow or seed sale inward
   coldStoreName: text("cold_store_name"), // For cold store charge payment outflow
+  supplierName: text("supplier_name"), // For supplier outflow (seed stock suppliers)
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
@@ -756,7 +757,7 @@ export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
 export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
-export const EXPENSE_TYPES = ["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"] as const;
+export const EXPENSE_TYPES = ["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge", "supplier"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 
