@@ -6,8 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Printer, Edit, FileText } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -72,7 +75,10 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
   const [downloadEndDate, setDownloadEndDate] = useState("");
   
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
-  const [filterFarmer, setFilterFarmer] = useState("all");
+  const [filterSerialNumber, setFilterSerialNumber] = useState("");
+  const [filterFarmer, setFilterFarmer] = useState("");
+  const [filterPaymentDue, setFilterPaymentDue] = useState("all");
+  const [farmerDropdownOpen, setFarmerDropdownOpen] = useState(false);
 
   const { data: transactions, isLoading } = useQuery<SeedTransaction[]>({
     queryKey: ["/api/seed-transactions"],
@@ -91,18 +97,31 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
       if (filterTxnNumber && !txn.transactionNumber.toString().includes(filterTxnNumber)) {
         return false;
       }
-      if (filterFarmer !== "all" && txn.farmerName !== filterFarmer) {
+      if (filterSerialNumber) {
+        const hasMatchingSerial = txn.items.some(item => 
+          item.serialNumber.toString().includes(filterSerialNumber)
+        );
+        if (!hasMatchingSerial) return false;
+      }
+      if (filterFarmer && !txn.farmerName.toLowerCase().includes(filterFarmer.toLowerCase())) {
         return false;
+      }
+      if (filterPaymentDue !== "all") {
+        const dueAmount = parseFloat(txn.totalDueToFarmer || "0");
+        if (filterPaymentDue === "due" && dueAmount <= 0) return false;
+        if (filterPaymentDue === "paid" && dueAmount > 0) return false;
       }
       return true;
     });
-  }, [transactions, filterTxnNumber, filterFarmer]);
+  }, [transactions, filterTxnNumber, filterSerialNumber, filterFarmer, filterPaymentDue]);
 
-  const hasActiveFilters = filterTxnNumber || filterFarmer !== "all";
+  const hasActiveFilters = filterTxnNumber || filterSerialNumber || filterFarmer || filterPaymentDue !== "all";
 
   const clearFilters = () => {
     setFilterTxnNumber("");
-    setFilterFarmer("all");
+    setFilterSerialNumber("");
+    setFilterFarmer("");
+    setFilterPaymentDue("all");
   };
 
   const summary = useMemo(() => {
@@ -351,19 +370,70 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                 placeholder={t("Transaction #", "लेनदेन #")}
                 value={filterTxnNumber}
                 onChange={(e) => setFilterTxnNumber(e.target.value)}
-                className="w-32 h-9"
+                className="w-28 h-9"
                 data-testid="filter-seed-txn-number"
               />
+
+              <Input
+                placeholder={t("Serial #", "सीरियल #")}
+                value={filterSerialNumber}
+                onChange={(e) => setFilterSerialNumber(e.target.value)}
+                className="w-24 h-9"
+                data-testid="filter-seed-serial-number"
+              />
                 
-              <Select value={filterFarmer} onValueChange={setFilterFarmer}>
-                <SelectTrigger className="w-40 h-9" data-testid="filter-seed-farmer">
-                  <SelectValue placeholder={t("Farmer", "किसान")} />
+              <Popover open={farmerDropdownOpen} onOpenChange={setFarmerDropdownOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={farmerDropdownOpen}
+                    className="w-44 h-9 justify-between font-normal"
+                    data-testid="filter-seed-farmer"
+                  >
+                    {filterFarmer || t("Farmer", "किसान")}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-44 p-0">
+                  <Command>
+                    <CommandInput 
+                      placeholder={t("Search farmer...", "किसान खोजें...")} 
+                      value={filterFarmer}
+                      onValueChange={setFilterFarmer}
+                    />
+                    <CommandList>
+                      <CommandEmpty>{t("No farmer found", "कोई किसान नहीं मिला")}</CommandEmpty>
+                      <CommandGroup>
+                        {farmerNames
+                          .filter(name => name.toLowerCase().includes(filterFarmer.toLowerCase()))
+                          .map(name => (
+                            <CommandItem
+                              key={name}
+                              value={name}
+                              onSelect={(value) => {
+                                setFilterFarmer(value === filterFarmer ? "" : value);
+                                setFarmerDropdownOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", filterFarmer === name ? "opacity-100" : "opacity-0")} />
+                              {name}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              <Select value={filterPaymentDue} onValueChange={setFilterPaymentDue}>
+                <SelectTrigger className="w-32 h-9" data-testid="filter-seed-payment-due">
+                  <SelectValue placeholder={t("Payment", "भुगतान")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
-                  {farmerNames.map(name => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
-                  ))}
+                  <SelectItem value="all">{t("All", "सभी")}</SelectItem>
+                  <SelectItem value="due">{t("Due", "बकाया")}</SelectItem>
+                  <SelectItem value="paid">{t("Paid", "भुगतान")}</SelectItem>
                 </SelectContent>
               </Select>
 
