@@ -209,25 +209,6 @@ export function CashManagementTab() {
 
   const expenseType = outflowForm.watch("expenseType");
 
-  const cashReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "cash_received")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-  
-  const accountReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "account_received")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-    
-  const cashExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "cash")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-    
-  const accountExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer")
-    .reduce((sum, e) => sum + Number(e.amount), 0);
-
-  const netCashInHand = cashReceived - cashExpense;
-  const netCashInAccount = accountReceived - accountExpense;
-
   const getReceiptTypeLabel = (type: string) => {
     switch (type) {
       case "cash_received": return t("Cash Received", "नकद प्राप्त");
@@ -257,48 +238,8 @@ export function CashManagementTab() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 h-full" data-testid="cash-management-tab">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">{t("Cash Received", "नकद प्राप्त")}</span>
-            <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">₹{cashReceived.toLocaleString()}</span>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wider">{t("Account Received", "खाते में प्राप्त")}</span>
-            <span className="text-lg font-bold text-blue-700 dark:text-blue-300">₹{accountReceived.toLocaleString()}</span>
-          </CardContent>
-        </Card>
-        <Card className="bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-rose-600 dark:text-rose-400 font-medium uppercase tracking-wider">{t("Cash Expense", "नकद खर्च")}</span>
-            <span className="text-lg font-bold text-rose-700 dark:text-rose-300">₹{cashExpense.toLocaleString()}</span>
-          </CardContent>
-        </Card>
-        <Card className="bg-orange-50 border-orange-100 dark:bg-orange-950/20 dark:border-orange-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-orange-600 dark:text-orange-400 font-medium uppercase tracking-wider">{t("Account Expense", "खाता खर्च")}</span>
-            <span className="text-lg font-bold text-orange-700 dark:text-orange-300">₹{accountExpense.toLocaleString()}</span>
-          </CardContent>
-        </Card>
-        <Card className="bg-teal-50 border-teal-100 dark:bg-teal-950/20 dark:border-teal-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-teal-600 dark:text-teal-400 font-medium uppercase tracking-wider">{t("Cash In Hand", "हाथ में नकद")}</span>
-            <span className="text-lg font-bold text-teal-700 dark:text-teal-300">₹{netCashInHand.toLocaleString()}</span>
-          </CardContent>
-        </Card>
-        <Card className="bg-indigo-50 border-indigo-100 dark:bg-indigo-950/20 dark:border-indigo-900">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-            <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium uppercase tracking-wider">{t("In Account", "खाते में")}</span>
-            <span className="text-lg font-bold text-indigo-700 dark:text-indigo-300">₹{netCashInAccount.toLocaleString()}</span>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-6 h-full">
-        <div className="w-full md:w-1/2 space-y-4">
+    <div className="flex flex-col md:flex-row gap-6 p-4 h-full" data-testid="cash-management-tab">
+      <div className="w-full md:w-1/2 space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow")}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="inward" className="flex items-center gap-2" data-testid="tab-inward">
@@ -622,91 +563,6 @@ export function CashManagementTab() {
                   >
                     {createEntryMutation.isPending ? (
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <ArrowUpRight className="h-4 w-4 mr-2" />
-                    )}
-                    {t("Record Expense", "खर्च दर्ज करें")}
-                  </Button>
-                </form>
-              </Form>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="w-full md:w-1/2 flex flex-col h-full overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium">{t("Recent Entries", "हाल की प्रविष्टियां")}</h3>
-          <Badge variant="outline">{entries.length} {t("Entries", "प्रविष्टियां")}</Badge>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-          {entriesLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {t("No entries found", "कोई प्रविष्टि नहीं मिली")}
-            </div>
-          ) : (
-            entries.map((entry) => (
-              <CashEntryCard key={entry.id} entry={entry} />
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CashEntryCard({ entry }: { entry: CashEntry }) {
-  const { t } = useLanguage();
-  const isInward = entry.direction === "inward";
-  const amount = parseFloat(entry.amount);
-
-  return (
-    <Card className="hover-elevate">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${isInward ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}>
-              {isInward ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-            </div>
-            <div>
-              <p className="font-medium text-sm">
-                {isInward 
-                  ? (entry.partyName || t("Payment Received", "भुगतान प्राप्त"))
-                  : (entry.farmerName || entry.coldStoreName || t("Expense", "खर्च"))}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="secondary" className="text-[10px] h-4">
-                  {isInward 
-                    ? (entry.receiptType === "cash_received" ? t("Cash", "नकद") : t("Account", "खाता"))
-                    : (entry.paymentMode === "cash" ? t("Cash", "नकद") : t("Account", "खाता"))}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(entry.entryDate), "dd MMM yyyy")}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className={`font-bold ${isInward ? "text-emerald-600" : "text-rose-600"}`}>
-              {isInward ? "+" : "-"} ₹{amount.toLocaleString()}
-            </p>
-            {entry.remarks && (
-              <p className="text-xs text-muted-foreground truncate max-w-[150px] mt-1">
-                {entry.remarks}
-              </p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
                     ) : (
                       <ArrowUpRight className="h-4 w-4 mr-2" />
                     )}
