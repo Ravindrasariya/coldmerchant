@@ -322,6 +322,26 @@ export const seedTransactionEditHistory = pgTable("seed_transaction_edit_history
   changeSet: jsonb("change_set").notNull(), // Array of { field, oldValue, newValue }
 });
 
+// Farmer Settlements - tracks cross-module adjustments between raw potato and seed transactions
+export const farmerSettlements = pgTable("farmer_settlements", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  userId: integer("user_id").references(() => users.id),
+  settlementDirection: text("settlement_direction").notNull(), // "raw_to_seed" (paying farmer, offset seed dues) or "seed_to_raw" (receiving seed payment, offset raw potato dues)
+  settledAmount: decimal("settled_amount", { precision: 12, scale: 2 }).notNull(),
+  // Farmer identity for matching
+  farmerName: text("farmer_name").notNull(),
+  farmerVillage: text("farmer_village"),
+  farmerContact: text("farmer_contact"),
+  // Source entries affected (can be multiple, stored as JSON array of IDs)
+  rawPotatoStockEntryIds: jsonb("raw_potato_stock_entry_ids"), // IDs of stock entries affected
+  seedTransactionIds: jsonb("seed_transaction_ids"), // IDs of seed transactions affected
+  // Related cash entry if this was triggered by a payment
+  cashEntryId: integer("cash_entry_id").references(() => cashEntries.id),
+  remarks: text("remarks"),
+  settledAt: timestamp("settled_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -340,6 +360,7 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   seedLots: many(seedLots),
   seedTransactions: many(seedTransactions),
   seedTransactionItems: many(seedTransactionItems),
+  farmerSettlements: many(farmerSettlements),
 }));
 
 // Seed Stock Entries Relations
@@ -575,6 +596,21 @@ export const coldStoreChargeAllocationsRelations = relations(coldStoreChargeAllo
   }),
 }));
 
+export const farmerSettlementsRelations = relations(farmerSettlements, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [farmerSettlements.merchantId],
+    references: [merchants.id],
+  }),
+  user: one(users, {
+    fields: [farmerSettlements.userId],
+    references: [users.id],
+  }),
+  cashEntry: one(cashEntries, {
+    fields: [farmerSettlements.cashEntryId],
+    references: [cashEntries.id],
+  }),
+}));
+
 // Zod schemas for validation
 export const insertMerchantSchema = createInsertSchema(merchants).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -599,6 +635,9 @@ export const insertSeedStockEntryEditHistorySchema = createInsertSchema(seedStoc
 export const insertSeedTransactionSchema = createInsertSchema(seedTransactions).omit({ id: true, createdAt: true, transactionNumber: true });
 export const insertSeedTransactionItemSchema = createInsertSchema(seedTransactionItems).omit({ id: true, createdAt: true });
 export const insertSeedTransactionEditHistorySchema = createInsertSchema(seedTransactionEditHistory).omit({ id: true, changedAt: true });
+
+// Farmer settlement schema
+export const insertFarmerSettlementSchema = createInsertSchema(farmerSettlements).omit({ id: true, settledAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -663,6 +702,9 @@ export type InsertSeedTransactionItem = z.infer<typeof insertSeedTransactionItem
 
 export type SeedTransactionEditHistory = typeof seedTransactionEditHistory.$inferSelect;
 export type InsertSeedTransactionEditHistory = z.infer<typeof insertSeedTransactionEditHistorySchema>;
+
+export type FarmerSettlement = typeof farmerSettlements.$inferSelect;
+export type InsertFarmerSettlement = z.infer<typeof insertFarmerSettlementSchema>;
 
 // Change types for edit history
 export type FieldChange = {
