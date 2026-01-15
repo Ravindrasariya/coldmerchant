@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -90,6 +90,13 @@ export function CashManagementTab() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"inward" | "outflow">("inward");
+  
+  // Filter state
+  const [filterPartyName, setFilterPartyName] = useState<string>("");
+  const [filterExpenseType, setFilterExpenseType] = useState<string>("");
+  const [filterFarmerName, setFilterFarmerName] = useState<string>("");
+  const [filterMonth, setFilterMonth] = useState<string>("");
+  const [filterYear, setFilterYear] = useState<string>("");
 
   const { data: entries = [], isLoading: entriesLoading } = useQuery<CashEntry[]>({
     queryKey: ["/api/cash/entries"],
@@ -229,6 +236,48 @@ export function CashManagementTab() {
   const netCashInHand = totalCashReceived - totalCashExpense;
   const netCashInAccount = totalAccountReceived - totalAccountExpense;
 
+  // Filter entries
+  const filteredEntries = entries.filter(entry => {
+    const entryDate = new Date(entry.entryDate);
+    const entryMonth = (entryDate.getMonth() + 1).toString();
+    const entryYear = entryDate.getFullYear().toString();
+
+    if (filterPartyName && filterPartyName !== "all" && entry.partyName !== filterPartyName) return false;
+    if (filterExpenseType && filterExpenseType !== "all" && entry.expenseType !== filterExpenseType) return false;
+    if (filterFarmerName && filterFarmerName !== "all" && entry.farmerName !== filterFarmerName) return false;
+    if (filterMonth && filterMonth !== "all" && entryMonth !== filterMonth) return false;
+    if (filterYear && filterYear !== "all" && entryYear !== filterYear) return false;
+    return true;
+  });
+
+  // Filtered summary
+  const filteredInflow = filteredEntries
+    .filter(e => e.direction === "inward")
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const filteredOutflow = filteredEntries
+    .filter(e => e.direction === "outflow")
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+  // Get unique values for filter dropdowns
+  const uniquePartyNames = Array.from(new Set(entries.filter(e => e.partyName).map(e => e.partyName!)));
+  const uniqueFarmerNames = Array.from(new Set(entries.filter(e => e.farmerName).map(e => e.farmerName!)));
+  const uniqueYears = Array.from(new Set(entries.map(e => new Date(e.entryDate).getFullYear().toString()))).sort().reverse();
+
+  const hasActiveFilters = (filterPartyName && filterPartyName !== "all") || 
+    (filterExpenseType && filterExpenseType !== "all") || 
+    (filterFarmerName && filterFarmerName !== "all") || 
+    (filterMonth && filterMonth !== "all") || 
+    (filterYear && filterYear !== "all");
+
+  const clearFilters = () => {
+    setFilterPartyName("");
+    setFilterExpenseType("");
+    setFilterFarmerName("");
+    setFilterMonth("");
+    setFilterYear("");
+  };
+
   const getReceiptTypeLabel = (type: string) => {
     switch (type) {
       case "cash_received": return t("Cash Received", "नकद प्राप्त");
@@ -326,6 +375,120 @@ export function CashManagementTab() {
         </Card>
       </div>
 
+      {/* Filters Section */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-sm">{t("Filters", "फ़िल्टर")}</span>
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="ml-auto text-xs h-7"
+                data-testid="button-clear-filters"
+              >
+                <X className="h-3 w-3 mr-1" />
+                {t("Clear", "साफ़ करें")}
+              </Button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <Select value={filterPartyName} onValueChange={setFilterPartyName}>
+              <SelectTrigger data-testid="filter-party-name" className="h-9">
+                <SelectValue placeholder={t("Party Name", "पार्टी का नाम")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Parties", "सभी पार्टी")}</SelectItem>
+                {uniquePartyNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterExpenseType} onValueChange={setFilterExpenseType}>
+              <SelectTrigger data-testid="filter-expense-type" className="h-9">
+                <SelectValue placeholder={t("Expense Type", "खर्च प्रकार")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Types", "सभी प्रकार")}</SelectItem>
+                {EXPENSE_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>{getExpenseTypeLabel(type)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterFarmerName} onValueChange={setFilterFarmerName}>
+              <SelectTrigger data-testid="filter-farmer-name" className="h-9">
+                <SelectValue placeholder={t("Farmer Name", "किसान का नाम")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
+                {uniqueFarmerNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger data-testid="filter-month" className="h-9">
+                <SelectValue placeholder={t("Month", "महीना")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Months", "सभी महीने")}</SelectItem>
+                <SelectItem value="1">{t("January", "जनवरी")}</SelectItem>
+                <SelectItem value="2">{t("February", "फरवरी")}</SelectItem>
+                <SelectItem value="3">{t("March", "मार्च")}</SelectItem>
+                <SelectItem value="4">{t("April", "अप्रैल")}</SelectItem>
+                <SelectItem value="5">{t("May", "मई")}</SelectItem>
+                <SelectItem value="6">{t("June", "जून")}</SelectItem>
+                <SelectItem value="7">{t("July", "जुलाई")}</SelectItem>
+                <SelectItem value="8">{t("August", "अगस्त")}</SelectItem>
+                <SelectItem value="9">{t("September", "सितम्बर")}</SelectItem>
+                <SelectItem value="10">{t("October", "अक्टूबर")}</SelectItem>
+                <SelectItem value="11">{t("November", "नवम्बर")}</SelectItem>
+                <SelectItem value="12">{t("December", "दिसम्बर")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger data-testid="filter-year" className="h-9">
+                <SelectValue placeholder={t("Year", "वर्ष")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Years", "सभी वर्ष")}</SelectItem>
+                {uniqueYears.length > 0 ? (
+                  uniqueYears.map((year) => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))
+                ) : (
+                  <>
+                    <SelectItem value="2026">2026</SelectItem>
+                    <SelectItem value="2025">2025</SelectItem>
+                    <SelectItem value="2024">2024</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Filtered Summary */}
+          {hasActiveFilters && (
+            <div className="mt-3 pt-3 border-t flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">{t("Filtered Total", "फ़िल्टर्ड कुल")}:</span>
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400">
+                {t("Inflow", "आवक")}: ₹{filteredInflow.toLocaleString()}
+              </Badge>
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400">
+                {t("Outflow", "बहिर्वाह")}: ₹{filteredOutflow.toLocaleString()}
+              </Badge>
+              <span className="text-muted-foreground">({filteredEntries.length} {t("entries", "प्रविष्टियाँ")})</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="flex flex-col md:flex-row gap-6 h-full">
         <div className="w-full md:w-1/2 space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow")}>
@@ -383,11 +546,11 @@ export function CashManagementTab() {
                     name="partyName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t("Buyer Name", "खरीदार का नाम")} *</FormLabel>
+                        <FormLabel>{t("Party Name", "पार्टी का नाम")} *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-party-name">
-                              <SelectValue placeholder={t("Select Buyer", "खरीदार चुनें")} />
+                              <SelectValue placeholder={t("Select Party", "पार्टी चुनें")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -671,12 +834,14 @@ export function CashManagementTab() {
             <div className="text-center py-8 text-muted-foreground">
               {t("Loading...", "लोड हो रहा है...")}
             </div>
-          ) : entries.length === 0 ? (
+          ) : filteredEntries.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {t("No entries yet", "अभी तक कोई प्रविष्टि नहीं")}
+              {hasActiveFilters 
+                ? t("No entries match the selected filters", "चयनित फ़िल्टर से कोई प्रविष्टि मेल नहीं खाती")
+                : t("No entries yet", "अभी तक कोई प्रविष्टि नहीं")}
             </div>
           ) : (
-            entries.map((entry) => (
+            filteredEntries.map((entry) => (
               <CashEntryCard key={entry.id} entry={entry} />
             ))
           )}
