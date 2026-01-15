@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
@@ -48,10 +52,16 @@ interface Transaction {
 
 export function TransactionsTab() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const { user } = useAuth();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
+  
+  // Download dialog state
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadStartDate, setDownloadStartDate] = useState("");
+  const [downloadEndDate, setDownloadEndDate] = useState("");
   
   // Filter states
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
@@ -121,6 +131,98 @@ export function TransactionsTab() {
     setFilterPaymentDue("all");
   };
 
+  const handleDownloadCSV = () => {
+    if (!downloadStartDate || !downloadEndDate) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const startDate = new Date(downloadStartDate);
+    const endDate = new Date(downloadEndDate);
+    
+    if (startDate > endDate) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filteredForDownload = (transactions || []).filter(txn => {
+      const txnDate = new Date(txn.createdAt);
+      return txnDate >= startDate && txnDate <= endDate;
+    });
+
+    if (filteredForDownload.length === 0) {
+      toast({
+        title: t("No Data", "कोई डेटा नहीं"),
+        description: t("No transactions found in the selected date range", "चयनित तिथि सीमा में कोई लेनदेन नहीं मिला"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = [
+      t("Txn #", "लेनदेन #"),
+      t("Date", "तिथि"),
+      t("Party Name", "पार्टी का नाम"),
+      t("Vehicle #", "वाहन #"),
+      t("Total Bags", "कुल बैग"),
+      t("Net Weight", "शुद्ध वज़न"),
+      t("Revenue", "राजस्व"),
+      t("Amount Received", "प्राप्त राशि"),
+      t("Due Amount", "बकाया राशि"),
+      t("Profit/Loss", "लाभ/हानि"),
+    ];
+
+    const rows = filteredForDownload.map(txn => {
+      const revenue = txn.revenue 
+        ? parseFloat(txn.revenue) 
+        : txn.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
+      const amountReceived = parseFloat(txn.amountReceived || "0");
+      const dueAmount = Math.max(revenue - amountReceived, 0);
+      
+      return [
+        txn.transactionNumber.toString(),
+        format(new Date(txn.createdAt), "dd/MM/yyyy"),
+        txn.partyName || "-",
+        txn.vehicleNumber || "-",
+        txn.totalBags.toString(),
+        txn.totalNetWeight || "-",
+        revenue.toFixed(0),
+        amountReceived.toFixed(0),
+        dueAmount.toFixed(0),
+        txn.profitLoss || "-",
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `transactions_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    setDownloadDialogOpen(false);
+    setDownloadStartDate("");
+    setDownloadEndDate("");
+    
+    toast({
+      title: t("Success", "सफल"),
+      description: t("CSV downloaded successfully", "CSV सफलतापूर्वक डाउनलोड हुई"),
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -136,17 +238,68 @@ export function TransactionsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Download Dialog */}
+      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("Download Transactions", "लेनदेन डाउनलोड करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="txn-start-date">{t("Start Date", "आरंभ तिथि")}</Label>
+              <Input
+                id="txn-start-date"
+                type="date"
+                value={downloadStartDate}
+                onChange={(e) => setDownloadStartDate(e.target.value)}
+                data-testid="input-txn-download-start-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="txn-end-date">{t("End Date", "समाप्ति तिथि")}</Label>
+              <Input
+                id="txn-end-date"
+                type="date"
+                value={downloadEndDate}
+                onChange={(e) => setDownloadEndDate(e.target.value)}
+                data-testid="input-txn-download-end-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDownloadDialogOpen(false)} data-testid="button-txn-download-cancel">
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button onClick={handleDownloadCSV} data-testid="button-txn-download-csv">
+              <Download className="h-4 w-4 mr-2" />
+              {t("Download CSV", "CSV डाउनलोड करें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{t("Transactions", "लेनदेन")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {t("Manage truck loading and sales transactions", "ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")}
           </p>
         </div>
-        <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-truck">
-          <Truck className="h-4 w-4 mr-2" />
-          {t("Load A Truck", "ट्रक लोड करें")}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDownloadDialogOpen(true)}
+            title={t("Download", "डाउनलोड")}
+            data-testid="button-txn-download"
+          >
+            <Download className="h-5 w-5" />
+          </Button>
+          <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-truck">
+            <Truck className="h-4 w-4 mr-2" />
+            {t("Load A Truck", "ट्रक लोड करें")}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

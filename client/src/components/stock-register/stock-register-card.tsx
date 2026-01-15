@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2 } from "lucide-react";
+import { Search, Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 import { QUALITY_OPTIONS } from "@shared/schema";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
@@ -129,6 +133,7 @@ function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnT
 
 export function StockRegisterCard() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
@@ -136,6 +141,11 @@ export function StockRegisterCard() {
   const [filterColdStore, setFilterColdStore] = useState<string>("");
   const [editEntry, setEditEntry] = useState<StockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
+  
+  // Download dialog state
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadStartDate, setDownloadStartDate] = useState("");
+  const [downloadEndDate, setDownloadEndDate] = useState("");
 
   const { data: entries, isLoading, error } = useQuery<StockEntryWithLots[]>({
     queryKey: ["/api/stock-entries"],
@@ -236,6 +246,98 @@ export function StockRegisterCard() {
     return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue };
   }, [filteredEntries]);
 
+  const handleDownloadCSV = () => {
+    if (!downloadStartDate || !downloadEndDate) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const startDate = new Date(downloadStartDate);
+    const endDate = new Date(downloadEndDate);
+    
+    if (startDate > endDate) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const filteredForDownload = (entries || []).filter(entry => {
+      const entryDate = new Date(entry.purchaseDate);
+      return entryDate >= startDate && entryDate <= endDate;
+    });
+
+    if (filteredForDownload.length === 0) {
+      toast({
+        title: t("No Data", "कोई डेटा नहीं"),
+        description: t("No entries found in the selected date range", "चयनित तिथि सीमा में कोई प्रविष्टि नहीं मिली"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = [
+      t("Serial #", "क्रमांक"),
+      t("Date", "तिथि"),
+      t("Farmer Name", "किसान का नाम"),
+      t("Village", "गाँव"),
+      t("Cold Store", "कोल्ड स्टोर"),
+      t("Potato Type", "आलू का प्रकार"),
+      t("Original Bags", "मूल बैग"),
+      t("Remaining Bags", "बचे बैग"),
+      t("Total Amount", "कुल राशि"),
+      t("Amount Paid", "भुगतान राशि"),
+      t("Payment Status", "भुगतान स्थिति"),
+    ];
+
+    const rows: string[][] = [];
+    filteredForDownload.forEach(entry => {
+      entry.lots.forEach(lot => {
+        const metrics = computeLotMetrics(lot);
+        rows.push([
+          entry.serialNumber.toString(),
+          format(new Date(entry.purchaseDate), "dd/MM/yyyy"),
+          entry.farmerName,
+          entry.village || "-",
+          lot.coldStoreName,
+          lot.potatoType,
+          metrics.originalBags.toString(),
+          metrics.remainingToSell.toString(),
+          metrics.totalAmount !== null ? metrics.totalAmount.toFixed(0) : "-",
+          entry.amountPaid || "0",
+          entry.paymentStatus === "paid" ? t("Paid", "भुगतान हो गया") : t("Due", "बाकी"),
+        ]);
+      });
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `stock_entries_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    setDownloadDialogOpen(false);
+    setDownloadStartDate("");
+    setDownloadEndDate("");
+    
+    toast({
+      title: t("Success", "सफल"),
+      description: t("CSV downloaded successfully", "CSV सफलतापूर्वक डाउनलोड हुई"),
+    });
+  };
+
   if (error) {
     return (
       <Card>
@@ -248,6 +350,65 @@ export function StockRegisterCard() {
 
   return (
     <div className="space-y-4">
+      {/* Download Dialog */}
+      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("Download Stock Entries", "स्टॉक प्रविष्टियाँ डाउनलोड करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="stock-start-date">{t("Start Date", "आरंभ तिथि")}</Label>
+              <Input
+                id="stock-start-date"
+                type="date"
+                value={downloadStartDate}
+                onChange={(e) => setDownloadStartDate(e.target.value)}
+                data-testid="input-stock-download-start-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stock-end-date">{t("End Date", "समाप्ति तिथि")}</Label>
+              <Input
+                id="stock-end-date"
+                type="date"
+                value={downloadEndDate}
+                onChange={(e) => setDownloadEndDate(e.target.value)}
+                data-testid="input-stock-download-end-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDownloadDialogOpen(false)} data-testid="button-stock-download-cancel">
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button onClick={handleDownloadCSV} data-testid="button-stock-download-csv">
+              <Download className="h-4 w-4 mr-2" />
+              {t("Download CSV", "CSV डाउनलोड करें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Header with Download Button */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{t("Stock Register", "स्टॉक रजिस्टर")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t("View and manage all stock entries", "सभी स्टॉक एंट्री देखें और प्रबंधित करें")}
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setDownloadDialogOpen(true)}
+          title={t("Download", "डाउनलोड")}
+          data-testid="button-stock-download"
+        >
+          <Download className="h-5 w-5" />
+        </Button>
+      </div>
+
       <Card className="border-border">
         <CardHeader className="pb-4">
           <div className="flex flex-col sm:flex-row gap-4">

@@ -29,7 +29,8 @@ import {
   Loader2,
   Truck,
   Wallet,
-  Menu
+  Menu,
+  Download
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -283,17 +284,7 @@ export default function HomePage() {
           </div>
 
           <div className={activeTab === "stock-register" ? "block" : "hidden"}>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold">{t("Stock Register", "स्टॉक रजिस्टर")}</h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t("View and manage all stock entries", "सभी स्टॉक एंट्री देखें और प्रबंधित करें")}
-                  </p>
-                </div>
-              </div>
-              <StockRegisterCard />
-            </div>
+            <StockRegisterCard />
           </div>
 
           <div className={activeTab === "transactions" ? "block" : "hidden"}>
