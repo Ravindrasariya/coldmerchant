@@ -172,6 +172,7 @@ export function TransactionsTab() {
       t("Date", "तिथि"),
       t("Party Name", "पार्टी का नाम"),
       t("Vehicle #", "वाहन #"),
+      t("Items (S# - Bags - Size)", "आइटम (क्रमांक - बैग - साइज)"),
       t("Total Bags", "कुल बैग"),
       t("Net Weight", "शुद्ध वज़न"),
       t("Revenue", "राजस्व"),
@@ -187,11 +188,17 @@ export function TransactionsTab() {
       const amountReceived = parseFloat(txn.amountReceived || "0");
       const dueAmount = Math.max(revenue - amountReceived, 0);
       
+      // Format items as "S#2 (48 - Large), S#3 (180 - Large)"
+      const itemsDetail = txn.items.map(item => 
+        `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})`
+      ).join(", ");
+      
       return [
         txn.transactionNumber.toString(),
         format(new Date(txn.createdAt), "dd/MM/yyyy"),
         txn.partyName || "-",
         txn.vehicleNumber || "-",
+        itemsDetail || "-",
         txn.totalBags.toString(),
         txn.totalNetWeight || "-",
         revenue.toFixed(0),
@@ -371,7 +378,7 @@ export function TransactionsTab() {
                 <IndianRupee className="h-4 w-4" />
                 {t("Total Revenue", "कुल राजस्व")}
               </div>
-              <p className="text-xl font-bold">
+              <p className="text-lg font-bold">
                 ₹{filteredTransactions.reduce((sum, txn) => {
                   const rev = txn.revenue 
                     ? parseFloat(txn.revenue) 
@@ -387,7 +394,7 @@ export function TransactionsTab() {
                 <Receipt className="h-4 w-4" />
                 {t("Total Cost", "कुल लागत")}
               </div>
-              <p className="text-xl font-bold">
+              <p className="text-lg font-bold">
                 ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
@@ -414,7 +421,7 @@ export function TransactionsTab() {
                       )}
                       {t("Total P&L", "कुल लाभ/हानि")}
                     </div>
-                    <p className={`text-xl font-bold ${totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <p className={`text-lg font-bold ${totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {totalPL >= 0 ? "+" : ""}₹{Math.abs(totalPL).toLocaleString("en-IN")}
                     </p>
                   </>
@@ -428,7 +435,7 @@ export function TransactionsTab() {
                 <Wallet className="h-4 w-4" />
                 {t("Total Paid", "कुल भुगतान")}
               </div>
-              <p className="text-xl font-bold text-green-600">
+              <p className="text-lg font-bold text-green-600">
                 ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.amountReceived || "0")), 0).toLocaleString("en-IN")}
               </p>
             </CardContent>
@@ -439,7 +446,7 @@ export function TransactionsTab() {
                 <CreditCard className="h-4 w-4" />
                 {t("Total Due", "कुल बकाया")}
               </div>
-              <p className="text-xl font-bold text-orange-600">
+              <p className="text-lg font-bold text-orange-600">
                 ₹{Math.max(0, filteredTransactions.reduce((sum, txn) => {
                   const rev = txn.revenue 
                     ? parseFloat(txn.revenue) 
