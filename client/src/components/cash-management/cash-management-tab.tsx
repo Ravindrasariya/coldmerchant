@@ -209,6 +209,25 @@ export function CashManagementTab() {
 
   const expenseType = outflowForm.watch("expenseType");
 
+  const cashReceived = entries
+    .filter(e => e.direction === "inward" && e.receiptType === "cash_received")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+  
+  const accountReceived = entries
+    .filter(e => e.direction === "inward" && e.receiptType === "account_received")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+    
+  const cashExpense = entries
+    .filter(e => e.direction === "outflow" && e.paymentMode === "cash")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+    
+  const accountExpense = entries
+    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const netCashInHand = cashReceived - cashExpense;
+  const netCashInAccount = accountReceived - accountExpense;
+
   const getReceiptTypeLabel = (type: string) => {
     switch (type) {
       case "cash_received": return t("Cash Received", "नकद प्राप्त");
@@ -238,8 +257,48 @@ export function CashManagementTab() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 p-4 h-full" data-testid="cash-management-tab">
-      <div className="w-full md:w-1/2 space-y-4">
+    <div className="flex flex-col gap-6 p-4 h-full" data-testid="cash-management-tab">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card className="bg-emerald-50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">{t("Cash Received", "नकद प्राप्त")}</span>
+            <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">₹{cashReceived.toLocaleString()}</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wider">{t("Account Received", "खाते में प्राप्त")}</span>
+            <span className="text-lg font-bold text-blue-700 dark:text-blue-300">₹{accountReceived.toLocaleString()}</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-rose-50 border-rose-100 dark:bg-rose-950/20 dark:border-rose-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-xs text-rose-600 dark:text-rose-400 font-medium uppercase tracking-wider">{t("Cash Expense", "नकद खर्च")}</span>
+            <span className="text-lg font-bold text-rose-700 dark:text-rose-300">₹{cashExpense.toLocaleString()}</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-50 border-orange-100 dark:bg-orange-950/20 dark:border-orange-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-xs text-orange-600 dark:text-orange-400 font-medium uppercase tracking-wider">{t("Account Expense", "खाता खर्च")}</span>
+            <span className="text-lg font-bold text-orange-700 dark:text-orange-300">₹{accountExpense.toLocaleString()}</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-teal-50 border-teal-100 dark:bg-teal-950/20 dark:border-teal-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-xs text-teal-600 dark:text-teal-400 font-medium uppercase tracking-wider">{t("Cash In Hand", "हाथ में नकद")}</span>
+            <span className="text-lg font-bold text-teal-700 dark:text-teal-300">₹{netCashInHand.toLocaleString()}</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-indigo-50 border-indigo-100 dark:bg-indigo-950/20 dark:border-indigo-900">
+          <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+            <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium uppercase tracking-wider">{t("In Account", "खाते में")}</span>
+            <span className="text-lg font-bold text-indigo-700 dark:text-indigo-300">₹{netCashInAccount.toLocaleString()}</span>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-6 h-full">
+        <div className="w-full md:w-1/2 space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow")}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="inward" className="flex items-center gap-2" data-testid="tab-inward">
