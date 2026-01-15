@@ -1748,5 +1748,126 @@ export async function registerRoutes(
     }
   });
 
+  // ===================== SEED TRANSACTION ROUTES =====================
+
+  // GET /api/seed-transactions - Get all seed transactions for the authenticated merchant
+  app.get("/api/seed-transactions", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const transactions = await storage.getSeedTransactionsByMerchant(merchantId);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching seed transactions:", error);
+      res.status(500).json({ message: "Failed to fetch seed transactions" });
+    }
+  });
+
+  // GET /api/seed-transactions/unsold-inventory - Get unsold seed inventory
+  app.get("/api/seed-transactions/unsold-inventory", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const inventory = await storage.getUnsoldSeedInventory(merchantId);
+      res.json(inventory);
+    } catch (error) {
+      console.error("Error fetching unsold seed inventory:", error);
+      res.status(500).json({ message: "Failed to fetch unsold seed inventory" });
+    }
+  });
+
+  // POST /api/seed-transactions - Create a new seed transaction
+  app.post("/api/seed-transactions", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, items } = req.body;
+
+      if (!farmerName || !district || !state || !items || items.length === 0) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Calculate totals
+      let totalBags = 0;
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      const processedItems = [];
+      for (const item of items) {
+        const seedLot = await storage.getSeedLotById(item.seedLotId, merchantId);
+        if (!seedLot) {
+          return res.status(400).json({ message: `Seed lot ${item.seedLotId} not found` });
+        }
+        
+        if (seedLot.remainingBags < item.bagsMoved) {
+          return res.status(400).json({ message: `Not enough bags in seed lot ${item.seedLotId}. Available: ${seedLot.remainingBags}` });
+        }
+
+        // Get parent entry for serial number
+        const entry = await storage.getSeedEntryById(seedLot.seedEntryId, merchantId);
+        const serialNumber = entry?.serialNumber || 0;
+        
+        const costPerBag = parseFloat(seedLot.pricePerBag) || 0;
+        const pricePerBag = item.pricePerBag || 0;
+        const bags = item.bagsMoved;
+        const cost = bags * costPerBag;
+        const revenue = bags * pricePerBag;
+        const profitLoss = revenue - cost;
+
+        totalBags += bags;
+        totalCost += cost;
+        totalRevenue += revenue;
+
+        processedItems.push({
+          merchantId,
+          seedLotId: item.seedLotId,
+          serialNumber,
+          coldStoreName: seedLot.coldStoreName,
+          potatoType: seedLot.potatoType,
+          size: seedLot.size,
+          bagType: seedLot.bagType,
+          bagsMoved: bags,
+          pricePerBag: pricePerBag.toString(),
+          costPerBag: costPerBag.toString(),
+          revenue: revenue.toString(),
+          cost: cost.toString(),
+          profitLoss: profitLoss.toString(),
+        });
+      }
+
+      const totalProfitLoss = totalRevenue - totalCost;
+      const transportTotal = parseFloat(transportCharges) || 0;
+      const otherTotal = parseFloat(otherCharges) || 0;
+      const totalDueToFarmer = totalRevenue + transportTotal + otherTotal;
+
+      const transactionNumber = await storage.getNextSeedTransactionNumber(merchantId);
+
+      const transaction = await storage.createSeedTransaction(
+        {
+          merchantId,
+          transactionNumber,
+          farmerName,
+          farmerContact: farmerContact || null,
+          village: village || null,
+          tehsil: tehsil || null,
+          district,
+          state,
+          vehicleNumber: vehicleNumber || null,
+          transportCharges: transportTotal.toString(),
+          otherCharges: otherTotal.toString(),
+          otherChargesRemarks: otherChargesRemarks || null,
+          totalBags,
+          totalCost: totalCost.toString(),
+          totalRevenue: totalRevenue.toString(),
+          totalProfitLoss: totalProfitLoss.toString(),
+          totalDueToFarmer: totalDueToFarmer.toString(),
+        },
+        processedItems
+      );
+
+      res.status(201).json(transaction);
+    } catch (error) {
+      console.error("Error creating seed transaction:", error);
+      res.status(500).json({ message: "Failed to create seed transaction" });
+    }
+  });
+
   return httpServer;
 }

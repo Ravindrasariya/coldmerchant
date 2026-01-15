@@ -267,6 +267,49 @@ export const seedStockEntryEditHistory = pgTable("seed_stock_entry_edit_history"
   changeSet: jsonb("change_set").notNull(), // Array of { scope, entityId, label, changes: [{ field, oldValue, newValue }] }
 });
 
+// Seed Transactions - "Load a Seed Truck" transactions
+export const seedTransactions = pgTable("seed_transactions", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  transactionNumber: integer("transaction_number").notNull(),
+  farmerName: text("farmer_name").notNull(),
+  farmerContact: text("farmer_contact"),
+  village: text("village"),
+  tehsil: text("tehsil"),
+  district: text("district").notNull(),
+  state: text("state").notNull(),
+  vehicleNumber: text("vehicle_number"),
+  transportCharges: decimal("transport_charges", { precision: 12, scale: 2 }),
+  otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),
+  otherChargesRemarks: text("other_charges_remarks"),
+  totalBags: integer("total_bags").notNull(),
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }), // cost of goods from seed lots
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }), // revenue from sale
+  totalProfitLoss: decimal("total_profit_loss", { precision: 12, scale: 2 }),
+  totalDueToFarmer: decimal("total_due_to_farmer", { precision: 12, scale: 2 }), // Revenue + Transport + Other charges
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Seed Transaction Items - each seed lot selection in a transaction
+export const seedTransactionItems = pgTable("seed_transaction_items", {
+  id: serial("id").primaryKey(),
+  seedTransactionId: integer("seed_transaction_id").notNull().references(() => seedTransactions.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  seedLotId: integer("seed_lot_id").notNull().references(() => seedLots.id),
+  serialNumber: integer("serial_number").notNull(), // cached from seed stock entry
+  coldStoreName: text("cold_store_name").notNull(), // cached
+  potatoType: text("potato_type").notNull(), // cached
+  size: text("size").notNull(), // cached
+  bagType: text("bag_type").notNull(), // cached
+  bagsMoved: integer("bags_moved").notNull(),
+  pricePerBag: decimal("price_per_bag", { precision: 10, scale: 2 }).notNull(), // sale price per bag
+  costPerBag: decimal("cost_per_bag", { precision: 10, scale: 2 }).notNull(), // purchase cost from seed lot
+  revenue: decimal("revenue", { precision: 12, scale: 2 }).notNull(), // bags * pricePerBag
+  cost: decimal("cost", { precision: 12, scale: 2 }).notNull(), // bags * costPerBag
+  profitLoss: decimal("profit_loss", { precision: 12, scale: 2 }).notNull(), // revenue - cost
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -283,6 +326,8 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   cashFarmers: many(cashFarmers),
   seedStockEntries: many(seedStockEntries),
   seedLots: many(seedLots),
+  seedTransactions: many(seedTransactions),
+  seedTransactionItems: many(seedTransactionItems),
 }));
 
 // Seed Stock Entries Relations
@@ -312,7 +357,7 @@ export const seedStockEntryEditHistoryRelations = relations(seedStockEntryEditHi
 }));
 
 // Seed Lots Relations
-export const seedLotsRelations = relations(seedLots, ({ one }) => ({
+export const seedLotsRelations = relations(seedLots, ({ one, many }) => ({
   seedEntry: one(seedStockEntries, {
     fields: [seedLots.seedEntryId],
     references: [seedStockEntries.id],
@@ -320,6 +365,32 @@ export const seedLotsRelations = relations(seedLots, ({ one }) => ({
   merchant: one(merchants, {
     fields: [seedLots.merchantId],
     references: [merchants.id],
+  }),
+  seedTransactionItems: many(seedTransactionItems),
+}));
+
+// Seed Transaction Relations
+export const seedTransactionsRelations = relations(seedTransactions, ({ one, many }) => ({
+  merchant: one(merchants, {
+    fields: [seedTransactions.merchantId],
+    references: [merchants.id],
+  }),
+  items: many(seedTransactionItems),
+}));
+
+// Seed Transaction Items Relations
+export const seedTransactionItemsRelations = relations(seedTransactionItems, ({ one }) => ({
+  seedTransaction: one(seedTransactions, {
+    fields: [seedTransactionItems.seedTransactionId],
+    references: [seedTransactions.id],
+  }),
+  merchant: one(merchants, {
+    fields: [seedTransactionItems.merchantId],
+    references: [merchants.id],
+  }),
+  seedLot: one(seedLots, {
+    fields: [seedTransactionItems.seedLotId],
+    references: [seedLots.id],
   }),
 }));
 
@@ -496,6 +567,8 @@ export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id:
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
 export const insertSeedLotSchema = createInsertSchema(seedLots).omit({ id: true, createdAt: true });
 export const insertSeedStockEntryEditHistorySchema = createInsertSchema(seedStockEntryEditHistory).omit({ id: true, changedAt: true });
+export const insertSeedTransactionSchema = createInsertSchema(seedTransactions).omit({ id: true, createdAt: true, transactionNumber: true });
+export const insertSeedTransactionItemSchema = createInsertSchema(seedTransactionItems).omit({ id: true, createdAt: true });
 
 // Types
 export type Merchant = typeof merchants.$inferSelect;
@@ -551,6 +624,12 @@ export type InsertSeedLot = z.infer<typeof insertSeedLotSchema>;
 
 export type SeedStockEntryEditHistory = typeof seedStockEntryEditHistory.$inferSelect;
 export type InsertSeedStockEntryEditHistory = z.infer<typeof insertSeedStockEntryEditHistorySchema>;
+
+export type SeedTransaction = typeof seedTransactions.$inferSelect;
+export type InsertSeedTransaction = z.infer<typeof insertSeedTransactionSchema>;
+
+export type SeedTransactionItem = typeof seedTransactionItems.$inferSelect;
+export type InsertSeedTransactionItem = z.infer<typeof insertSeedTransactionItemSchema>;
 
 // Change types for edit history
 export type FieldChange = {
@@ -631,6 +710,7 @@ export type TransactionForm = z.infer<typeof transactionFormSchema>;
 
 // Dropdown options
 export const DISTRICTS = ["Ujjain", "Shajapur", "Indore", "Dewas", "Agar Malwa"] as const;
+export const SEED_DISTRICTS = ["Ujjain", "Agar Malwa", "Shajapur", "Dewas", "Indore", "Ratlam", "Rajgarh", "Other"] as const;
 export const STATES = ["Madhya Pradesh", "Gujarat"] as const;
 export const POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "LR", "Torus", "CS1", "CS3", "Others"] as const;
 export const SEED_POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "CS1", "CS3", "Torus", "LR"] as const;
@@ -705,4 +785,33 @@ export type SeedStockEntryUpdate = z.infer<typeof seedStockEntryUpdateSchema>;
 // Extended type for seed entry with lots
 export type SeedStockEntryWithLots = SeedStockEntry & {
   seedLots: SeedLot[];
+};
+
+// Seed Transaction form schemas for frontend
+export const seedTransactionItemFormSchema = z.object({
+  seedLotId: z.coerce.number().min(1, "Seed lot is required"),
+  bagsMoved: z.coerce.number().min(1, "Number of bags is required"),
+  pricePerBag: z.coerce.number().min(0, "Price per bag must be positive"),
+});
+
+export const seedTransactionFormSchema = z.object({
+  farmerName: z.string().min(1, "Farmer name is required"),
+  farmerContact: z.string().optional(),
+  village: z.string().optional(),
+  tehsil: z.string().optional(),
+  district: z.string().min(1, "District is required"),
+  state: z.string().min(1, "State is required"),
+  vehicleNumber: z.string().optional(),
+  transportCharges: z.coerce.number().optional(),
+  otherCharges: z.coerce.number().optional(),
+  otherChargesRemarks: z.string().optional(),
+  items: z.array(seedTransactionItemFormSchema).min(1, "At least one seed lot is required"),
+});
+
+export type SeedTransactionItemForm = z.infer<typeof seedTransactionItemFormSchema>;
+export type SeedTransactionForm = z.infer<typeof seedTransactionFormSchema>;
+
+// Extended type for seed transaction with items
+export type SeedTransactionWithItems = SeedTransaction & {
+  items: SeedTransactionItem[];
 };

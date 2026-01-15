@@ -4,6 +4,7 @@ import {
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
   cashSettings, parties, cashFarmers,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
+  seedTransactions, seedTransactionItems,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -20,7 +21,10 @@ import {
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
   type SeedStockEntryWithLots,
-  type SeedStockEntryEditHistory
+  type SeedStockEntryEditHistory,
+  type SeedTransaction, type InsertSeedTransaction,
+  type SeedTransactionItem, type InsertSeedTransactionItem,
+  type SeedTransactionWithItems
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
@@ -124,6 +128,12 @@ export interface IStorage {
   // Seed Edit History operations
   createSeedEditHistory(seedEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<SeedStockEntryEditHistory>;
   getSeedEditHistory(seedEntryId: number, merchantId: number): Promise<(SeedStockEntryEditHistory & { userName?: string })[]>;
+  
+  // Seed Transaction operations
+  getSeedTransactionsByMerchant(merchantId: number): Promise<any[]>;
+  createSeedTransaction(transaction: any, items: any[]): Promise<any>;
+  getNextSeedTransactionNumber(merchantId: number): Promise<number>;
+  getUnsoldSeedInventory(merchantId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1162,6 +1172,77 @@ export class DatabaseStorage implements IStorage {
       ...h,
       userName: h.userId ? userMap.get(h.userId) : undefined,
     }));
+  }
+
+  // ===================== SEED TRANSACTION OPERATIONS =====================
+
+  async getSeedTransactionsByMerchant(merchantId: number): Promise<SeedTransactionWithItems[]> {
+    const txns = await db.select().from(seedTransactions)
+      .where(eq(seedTransactions.merchantId, merchantId))
+      .orderBy(desc(seedTransactions.transactionNumber));
+
+    const result = await Promise.all(txns.map(async (txn) => {
+      const items = await db.select().from(seedTransactionItems)
+        .where(eq(seedTransactionItems.seedTransactionId, txn.id));
+      return { ...txn, items };
+    }));
+
+    return result;
+  }
+
+  async createSeedTransaction(
+    transaction: InsertSeedTransaction & { transactionNumber: number },
+    items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
+  ): Promise<SeedTransactionWithItems> {
+    const [createdTxn] = await db.insert(seedTransactions).values(transaction).returning();
+    
+    const createdItems: SeedTransactionItem[] = [];
+    for (const item of items) {
+      const [createdItem] = await db.insert(seedTransactionItems).values({
+        ...item,
+        seedTransactionId: createdTxn.id,
+      }).returning();
+      createdItems.push(createdItem);
+      
+      // Update seed lot remaining bags
+      const seedLot = await this.getSeedLotById(item.seedLotId, transaction.merchantId);
+      if (seedLot) {
+        await this.updateSeedLot(item.seedLotId, transaction.merchantId, {
+          remainingBags: seedLot.remainingBags - item.bagsMoved,
+        });
+      }
+    }
+
+    return { ...createdTxn, items: createdItems };
+  }
+
+  async getNextSeedTransactionNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select({ maxNum: seedTransactions.transactionNumber })
+      .from(seedTransactions)
+      .where(eq(seedTransactions.merchantId, merchantId))
+      .orderBy(desc(seedTransactions.transactionNumber))
+      .limit(1);
+    
+    return (result?.maxNum || 0) + 1;
+  }
+
+  async getUnsoldSeedInventory(merchantId: number): Promise<any[]> {
+    // Get all seed lots with remaining bags > 0, along with their parent entry info
+    const lotsWithRemaining = await db.select().from(seedLots)
+      .where(and(eq(seedLots.merchantId, merchantId), gt(seedLots.remainingBags, 0)));
+
+    const result = await Promise.all(lotsWithRemaining.map(async (lot) => {
+      const [entry] = await db.select().from(seedStockEntries)
+        .where(eq(seedStockEntries.id, lot.seedEntryId));
+      
+      return {
+        ...lot,
+        serialNumber: entry?.serialNumber || 0,
+        supplierName: entry?.supplierName || '',
+      };
+    }));
+
+    return result;
   }
 }
 

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, Leaf } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -16,6 +16,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
 import { SalesReceiptDialog } from "./sales-receipt";
+import { SeedTransactionsContent } from "./seed-transactions-content";
 
 interface TransactionItem {
   id: number;
@@ -54,6 +55,7 @@ export function TransactionsTab() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [transactionMode, setTransactionMode] = useState<"raw" | "seed">("raw");
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
@@ -68,6 +70,16 @@ export function TransactionsTab() {
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterParty, setFilterParty] = useState("all");
   const [filterPaymentDue, setFilterPaymentDue] = useState("all");
+  
+  // If in seed mode, render seed transactions component
+  if (transactionMode === "seed") {
+    return (
+      <SeedTransactionsContent
+        transactionMode={transactionMode}
+        setTransactionMode={setTransactionMode}
+      />
+    );
+  }
 
   const { data: transactions, isLoading } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions"],
@@ -292,7 +304,30 @@ export function TransactionsTab() {
             {t("Manage truck loading and sales transactions", "ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Raw Potato / Seed Toggle */}
+          <div className="flex items-center border rounded-md p-0.5 bg-muted/30">
+            <Button
+              variant={transactionMode === "raw" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTransactionMode("raw")}
+              className="h-8 text-xs gap-1"
+              data-testid="button-txn-raw-mode"
+            >
+              <Package className="h-3.5 w-3.5" />
+              {t("Raw Potato", "कच्चा आलू")}
+            </Button>
+            <Button
+              variant={transactionMode === "seed" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setTransactionMode("seed")}
+              className="h-8 text-xs gap-1"
+              data-testid="button-txn-seed-mode"
+            >
+              <Leaf className="h-3.5 w-3.5" />
+              {t("Seed", "बीज")}
+            </Button>
+          </div>
           <Button
             variant="ghost"
             size="icon"
