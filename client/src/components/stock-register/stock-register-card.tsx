@@ -284,34 +284,80 @@ export function StockRegisterCard() {
 
     const headers = [
       t("Serial #", "क्रमांक"),
+      t("Lot #", "लॉट #"),
       t("Date", "तिथि"),
       t("Farmer Name", "किसान का नाम"),
       t("Village", "गाँव"),
       t("Cold Store", "कोल्ड स्टोर"),
       t("Potato Type", "आलू का प्रकार"),
+      t("Quality", "गुणवत्ता"),
+      t("Cut Type", "कट प्रकार"),
       t("Original Bags", "मूल बैग"),
+      t("Actual Bags", "वास्तविक बैग"),
+      t("Large", "बड़ा"),
+      t("Medium", "मध्यम"),
+      t("Small", "छोटा"),
       t("Remaining Bags", "बचे बैग"),
-      t("Total Amount", "कुल राशि"),
-      t("Amount Paid", "भुगतान राशि"),
-      t("Payment Status", "भुगतान स्थिति"),
+      t("Farmer Total ₹", "किसान कुल ₹"),
+      t("Farmer Due ₹", "किसान बकाया ₹"),
+      t("Cold Total ₹", "कोल्ड कुल ₹"),
+      t("Cold Due ₹", "कोल्ड बकाया ₹"),
     ];
 
     const rows: string[][] = [];
     filteredForDownload.forEach(entry => {
-      entry.lots.forEach(lot => {
+      // Calculate entry-level totals for proration
+      const entryLotMetrics = entry.lots.map(lot => computeLotMetrics(lot));
+      const entryFarmerTotal = entryLotMetrics.reduce((sum, m) => sum + (m.totalAmount ?? 0), 0);
+      const entryAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+      
+      entry.lots.forEach((lot, lotIndex) => {
         const metrics = computeLotMetrics(lot);
+        
+        // Get size distribution from sellable breakdowns
+        const largeBags = metrics.sellableBreakdowns
+          .filter(bd => bd.size === "Large")
+          .reduce((sum, bd) => sum + bd.numberOfBags, 0);
+        const mediumBags = metrics.sellableBreakdowns
+          .filter(bd => bd.size === "Medium")
+          .reduce((sum, bd) => sum + bd.numberOfBags, 0);
+        const smallBags = metrics.sellableBreakdowns
+          .filter(bd => bd.size === "Small")
+          .reduce((sum, bd) => sum + bd.numberOfBags, 0);
+        
+        // Farmer due per lot (prorated by totalAmount)
+        const lotFarmerTotal = metrics.totalAmount ?? 0;
+        const lotPaidRatio = entryFarmerTotal > 0 ? lotFarmerTotal / entryFarmerTotal : 0;
+        const lotFarmerPaid = entryAmountPaid * lotPaidRatio;
+        const lotFarmerDue = Math.max(lotFarmerTotal - lotFarmerPaid, 0);
+        
+        // Cold store charges
+        const coldTotal = metrics.coldStoreTotalCharges ?? 0;
+        const coldDue = metrics.coldStoreRemaining ?? 0;
+        
+        // Cut type display
+        const cutTypeDisplay = lot.cutType === "gate_cut" ? t("Gate Cut", "गेट कट") : t("Pile Cut", "ढेर कट");
+        
         rows.push([
           entry.serialNumber.toString(),
+          (lotIndex + 1).toString(),
           format(new Date(entry.purchaseDate), "dd/MM/yyyy"),
           entry.farmerName,
           entry.village || "-",
           lot.coldStoreName,
           lot.potatoType,
+          lot.quality,
+          cutTypeDisplay,
           metrics.originalBags.toString(),
+          metrics.actualSellableBags.toString(),
+          largeBags.toString(),
+          mediumBags.toString(),
+          smallBags.toString(),
           metrics.remainingToSell.toString(),
-          metrics.totalAmount !== null ? metrics.totalAmount.toFixed(0) : "-",
-          entry.amountPaid || "0",
-          entry.paymentStatus === "paid" ? t("Paid", "भुगतान हो गया") : t("Due", "बाकी"),
+          lotFarmerTotal.toFixed(0),
+          lotFarmerDue.toFixed(0),
+          coldTotal.toFixed(0),
+          coldDue.toFixed(0),
         ]);
       });
     });
