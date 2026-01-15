@@ -1,0 +1,286 @@
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Save, Loader2, Snowflake } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/use-language";
+import { SeedStockEntryWithLots, SEED_SIZE_OPTIONS } from "@shared/schema";
+
+interface SeedStockEntryEditDialogProps {
+  entry: SeedStockEntryWithLots;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStockEntryEditDialogProps) {
+  const { toast } = useToast();
+  const { t } = useLanguage();
+  const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus);
+  const [amountPaid, setAmountPaid] = useState(entry.amountPaid ? parseFloat(entry.amountPaid) : 0);
+  const [remarks, setRemarks] = useState(entry.remarks || "");
+  const [seedLots, setSeedLots] = useState(entry.seedLots.map(lot => ({
+    ...lot,
+    pricePerBag: lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0,
+    coldStoreChargesPerBag: lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0,
+  })));
+
+  interface SeedLotUpdate {
+    id: number;
+    coldStoreName: string;
+    originalBags: number;
+    remainingBags: number;
+    potatoType: string;
+    bagType: string;
+    size: string;
+    pricePerBag: number;
+    coldStoreChargesPerBag: number;
+    remarks?: string;
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { paymentStatus: string; amountPaid: number; remarks: string; seedLots: SeedLotUpdate[] }) => {
+      const res = await apiRequest("PATCH", `/api/seed-stock-entries/${entry.id}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: t("Entry Updated", "एंट्री अपडेट हो गई"),
+        description: t("The seed stock entry has been updated successfully.", "बीज स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLotChange = (
+    lotIndex: number,
+    field: string,
+    value: number | string
+  ) => {
+    const newLots = [...seedLots];
+    (newLots[lotIndex] as any)[field] = value;
+    setSeedLots(newLots);
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate({
+      paymentStatus,
+      amountPaid,
+      remarks,
+      seedLots: seedLots.map(lot => ({
+        id: lot.id,
+        coldStoreName: lot.coldStoreName,
+        originalBags: lot.originalBags,
+        remainingBags: lot.remainingBags,
+        potatoType: lot.potatoType,
+        bagType: lot.bagType,
+        size: lot.size,
+        pricePerBag: lot.pricePerBag,
+        coldStoreChargesPerBag: lot.coldStoreChargesPerBag,
+        remarks: lot.remarks || undefined,
+      })),
+    });
+  };
+
+  const calculateTotalValue = () => {
+    return seedLots.reduce((sum, lot) => sum + (lot.originalBags * lot.pricePerBag), 0);
+  };
+
+  const totalValue = calculateTotalValue();
+  const remainingDue = Math.max(totalValue - amountPaid, 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {t("Edit Seed Stock Entry", "बीज स्टॉक एंट्री संपादित करें")} #{entry.serialNumber}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base">{t("Supplier Details", "आपूर्तिकर्ता विवरण")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("Supplier", "आपूर्तिकर्ता")}:</span>{" "}
+                  <span className="font-medium">{entry.supplierName}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("Date", "तिथि")}:</span>{" "}
+                  <span className="font-medium">{entry.purchaseDate}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("Location", "स्थान")}:</span>{" "}
+                  <span className="font-medium">{entry.district}, {entry.state}</span>
+                </div>
+                {entry.supplierContact && (
+                  <div>
+                    <span className="text-muted-foreground">{t("Contact", "संपर्क")}:</span>{" "}
+                    <span className="font-medium">{entry.supplierContact}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base">{t("Payment Details", "भुगतान विवरण")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t("Payment Status", "भुगतान स्थिति")}</Label>
+                  <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                    <SelectTrigger data-testid="select-seed-payment-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="due">{t("Due", "बाकी")}</SelectItem>
+                      <SelectItem value="paid">{t("Paid", "भुगतान हो गया")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t("Amount Paid", "भुगतान राशि")}</Label>
+                  <Input
+                    type="number"
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
+                    data-testid="input-seed-amount-paid"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("Total Value", "कुल मूल्य")}:</span>{" "}
+                  <span className="font-medium">₹{totalValue.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("Remaining Due", "बाकी राशि")}:</span>{" "}
+                  <span className={`font-medium ${remainingDue > 0 ? "text-orange-600" : "text-green-600"}`}>
+                    ₹{remainingDue.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            <h3 className="font-medium">{t("Seed Lots", "बीज लॉट")}</h3>
+            {seedLots.map((lot, lotIndex) => (
+              <Card key={lot.id} className="border-border/50">
+                <CardHeader className="py-2 px-4">
+                  <div className="flex items-center gap-2">
+                    <Snowflake className="h-4 w-4 text-blue-500" />
+                    <span className="font-medium">{lot.coldStoreName}</span>
+                    <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
+                      {lot.potatoType}
+                    </Badge>
+                    <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0">
+                      {lot.size}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="py-3 px-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.originalBags}
+                        onChange={(e) => handleLotChange(lotIndex, "originalBags", parseInt(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-original-bags`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Remaining Bags", "बचे बोरी")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.remainingBags}
+                        onChange={(e) => handleLotChange(lotIndex, "remainingBags", parseInt(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-remaining-bags`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Price/Bag", "मूल्य/बोरी")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.pricePerBag}
+                        onChange={(e) => handleLotChange(lotIndex, "pricePerBag", parseFloat(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-price`}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("Cold Store Charges/Bag", "कोल्ड शुल्क/बोरी")}</Label>
+                      <Input
+                        type="number"
+                        value={lot.coldStoreChargesPerBag}
+                        onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPerBag", parseFloat(e.target.value) || 0)}
+                        data-testid={`input-seed-lot-${lotIndex}-cold-charges`}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("Remarks", "टिप्पणी")}</Label>
+            <Textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder={t("Add any notes...", "कोई नोट जोड़ें...")}
+              data-testid="textarea-seed-remarks"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-edit-cancel">
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-seed-edit-save">
+              {updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {t("Save Changes", "परिवर्तन सहेजें")}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

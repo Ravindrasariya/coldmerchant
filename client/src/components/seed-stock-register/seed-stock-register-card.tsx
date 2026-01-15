@@ -12,13 +12,15 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock } from "lucide-react";
+import { Search, X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SeedStockEntryWithLots, SEED_POTATO_TYPES } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
+import { SeedStockEntryEditDialog } from "./seed-stock-entry-edit-dialog";
+import { SeedBillPrintDialog } from "./seed-bill-print-dialog";
 
 function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
@@ -55,6 +57,8 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
   const [downloadStartDate, setDownloadStartDate] = useState("");
   const [downloadEndDate, setDownloadEndDate] = useState("");
+  const [editEntry, setEditEntry] = useState<SeedStockEntryWithLots | null>(null);
+  const [printEntry, setPrintEntry] = useState<SeedStockEntryWithLots | null>(null);
   
   const downloadDialogOpen = externalDownloadOpen ?? internalDownloadOpen;
   const setDownloadDialogOpen = (open: boolean) => {
@@ -496,6 +500,29 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                         )}
                       </div>
                     </div>
+                    
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 gap-1.5 justify-start"
+                        onClick={() => setEditEntry(entry)}
+                        data-testid={`button-seed-edit-${entry.id}`}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        {t("Edit", "संपादित")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 gap-1.5 justify-start"
+                        onClick={() => setPrintEntry(entry)}
+                        data-testid={`button-seed-print-${entry.id}`}
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        {t("Print", "प्रिंट")}
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 
@@ -559,6 +586,22 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             );
           })}
         </div>
+      )}
+      
+      {editEntry && (
+        <SeedStockEntryEditDialog
+          entry={editEntry}
+          open={!!editEntry}
+          onOpenChange={(open) => !open && setEditEntry(null)}
+        />
+      )}
+      
+      {printEntry && (
+        <SeedBillPrintDialog
+          entry={printEntry}
+          open={!!printEntry}
+          onOpenChange={(open) => !open && setPrintEntry(null)}
+        />
       )}
     </div>
   );
