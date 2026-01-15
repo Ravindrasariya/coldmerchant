@@ -144,6 +144,28 @@ const outflowFormSchema = z.object({
   amount: z.coerce.number().min(1, "Amount must be greater than 0"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.expenseType === "farmer" && (!data.farmerName || data.farmerName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Farmer name is required",
+      path: ["farmerName"],
+    });
+  }
+  if (data.expenseType === "cold_store_charge" && (!data.coldStoreName || data.coldStoreName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Cold store name is required",
+      path: ["coldStoreName"],
+    });
+  }
+  if (data.expenseType === "supplier" && (!data.supplierName || data.supplierName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Supplier name is required",
+      path: ["supplierName"],
+    });
+  }
 });
 
 type InwardFormValues = z.infer<typeof inwardFormSchema>;
