@@ -104,9 +104,14 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const wastageBreakdowns = lot.bagBreakdowns.filter(bd => bd.size === "Wastage");
   
   const coldStoreChargesPerBag = lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null;
-  const coldStoreTotalCharges = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : null;
+  const hammaliGradingCharges = lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : 0;
+  const perBagTotal = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : 0;
+  const coldStoreTotalCharges = perBagTotal + hammaliGradingCharges;
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
-  const coldStoreRemaining = coldStoreTotalCharges !== null ? coldStoreTotalCharges - coldStorePaid : null;
+  const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
+  
+  const adjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
+  const adjustedAmountType = lot.adjustedAmountType;
   
   return {
     originalBags: lot.originalBags,
@@ -118,9 +123,12 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     totalAmount,
     pricePerKg: lot.pricePerKg ? parseFloat(lot.pricePerKg) : null,
     coldStoreChargesPerBag,
+    hammaliGradingCharges,
     coldStoreTotalCharges,
     coldStorePaid,
     coldStoreRemaining,
+    adjustedAmount,
+    adjustedAmountType,
     sellableBreakdowns,
     wastageBreakdowns,
   };
@@ -223,6 +231,7 @@ export function StockRegisterCard() {
 
     filteredEntries.forEach(entry => {
       let entryTotalAmount = 0;
+      let entryAdjustment = 0;
       let entryColdStoreTotalCharges = 0;
       let entryColdStorePaid = 0;
 
@@ -233,15 +242,21 @@ export function StockRegisterCard() {
         if (metrics.totalAmount !== null) {
           entryTotalAmount += metrics.totalAmount;
         }
-        if (metrics.coldStoreTotalCharges !== null) {
-          entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
+        if (metrics.adjustedAmount > 0 && metrics.adjustedAmountType) {
+          if (metrics.adjustedAmountType === "debit") {
+            entryAdjustment -= metrics.adjustedAmount;
+          } else if (metrics.adjustedAmountType === "credit") {
+            entryAdjustment += metrics.adjustedAmount;
+          }
         }
+        entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
         entryColdStorePaid += metrics.coldStorePaid;
       });
 
       farmerTotal += entryTotalAmount;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      farmerDue += Math.max(entryTotalAmount - amountPaid, 0);
+      const adjustedEntryTotal = entryTotalAmount + entryAdjustment;
+      farmerDue += Math.max(adjustedEntryTotal - amountPaid, 0);
       
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
@@ -313,6 +328,12 @@ export function StockRegisterCard() {
       // Calculate entry-level totals for proration
       const entryLotMetrics = entry.lots.map(lot => computeLotMetrics(lot));
       const entryFarmerTotal = entryLotMetrics.reduce((sum, m) => sum + (m.totalAmount ?? 0), 0);
+      const entryAdjustment = entryLotMetrics.reduce((sum, m) => {
+        if (m.adjustedAmount > 0 && m.adjustedAmountType) {
+          return sum + (m.adjustedAmountType === "debit" ? -m.adjustedAmount : m.adjustedAmount);
+        }
+        return sum;
+      }, 0);
       const entryAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       
       entry.lots.forEach((lot, lotIndex) => {
@@ -329,15 +350,21 @@ export function StockRegisterCard() {
           .filter(bd => bd.size === "Small")
           .reduce((sum, bd) => sum + bd.numberOfBags, 0);
         
-        // Farmer due per lot (prorated by totalAmount)
+        // Lot adjustment
+        let lotAdjustment = 0;
+        if (metrics.adjustedAmount > 0 && metrics.adjustedAmountType) {
+          lotAdjustment = metrics.adjustedAmountType === "debit" ? -metrics.adjustedAmount : metrics.adjustedAmount;
+        }
+        
+        // Farmer due per lot (prorated by totalAmount, then apply adjustment)
         const lotFarmerTotal = metrics.totalAmount ?? 0;
         const lotPaidRatio = entryFarmerTotal > 0 ? lotFarmerTotal / entryFarmerTotal : 0;
         const lotFarmerPaid = entryAmountPaid * lotPaidRatio;
-        const lotFarmerDue = Math.max(lotFarmerTotal - lotFarmerPaid, 0);
+        const lotFarmerDue = Math.max(lotFarmerTotal + lotAdjustment - lotFarmerPaid, 0);
         
-        // Cold store charges
-        const coldTotal = metrics.coldStoreTotalCharges ?? 0;
-        const coldDue = metrics.coldStoreRemaining ?? 0;
+        // Cold store charges (already includes hammali/grading)
+        const coldTotal = metrics.coldStoreTotalCharges;
+        const coldDue = metrics.coldStoreRemaining;
         
         // Cut type display
         const cutTypeDisplay = lot.cutType === "gate_cut" ? t("Gate Cut", "गेट कट") : t("Pile Cut", "ढेर कट");

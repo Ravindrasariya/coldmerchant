@@ -657,6 +657,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(lots.stockEntryId, entry.id));
       
       let entryTotalCost = 0;
+      let entryAdjustment = 0;
       for (const lot of entryLots) {
         // Get breakdowns to calculate total weight and cost
         const breakdownList = await db.select().from(bagBreakdowns)
@@ -669,11 +670,22 @@ export class DatabaseStorage implements IStorage {
           // Estimate from lot's pricePerKg and bags (approx 50kg per bag)
           entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
         }
+        
+        // Apply adjustment (debit subtracts, credit adds)
+        if (lot.adjustedAmount && lot.adjustedAmountType) {
+          const adjustedAmount = parseFloat(lot.adjustedAmount);
+          if (lot.adjustedAmountType === "debit") {
+            entryAdjustment -= adjustedAmount;
+          } else if (lot.adjustedAmountType === "credit") {
+            entryAdjustment += adjustedAmount;
+          }
+        }
       }
       
-      // Calculate due by subtracting amount already paid
+      // Calculate due by subtracting amount already paid, and apply adjustment
       const amountPaid = parseFloat(entry.amountPaid || "0");
-      const entryDue = Math.max(0, entryTotalCost - amountPaid);
+      const adjustedTotal = entryTotalCost + entryAdjustment;
+      const entryDue = Math.max(0, adjustedTotal - amountPaid);
       
       if (entryDue <= 0) continue; // Skip fully paid entries
       
@@ -706,10 +718,13 @@ export class DatabaseStorage implements IStorage {
     
     for (const lot of allLots) {
       const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
-      if (chargesPerBag <= 0) continue;
+      const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
       
-      // Calculate total cold store charges for this lot
-      const totalCharges = chargesPerBag * lot.originalBags;
+      // Skip lots with no charges at all
+      if (chargesPerBag <= 0 && hammaliGradingCharges <= 0) continue;
+      
+      // Calculate total cold store charges for this lot (per-bag + hammali/grading)
+      const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges;
       const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
       const due = totalCharges - paidAmount;
       
