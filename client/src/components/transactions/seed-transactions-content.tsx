@@ -318,57 +318,51 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           >
             <Download className="h-5 w-5" />
           </Button>
-          <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-seed-truck">
-            <Truck className="h-4 w-4 mr-2" />
-            {t("Load Seed Truck", "बीज ट्रक लोड करें")}
-          </Button>
         </div>
       </div>
 
       {/* Filters */}
-      {transactions && transactions.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-              </div>
-              
-              <Input
-                placeholder={t("Transaction #", "लेनदेन #")}
-                value={filterTxnNumber}
-                onChange={(e) => setFilterTxnNumber(e.target.value)}
-                className="w-32 h-9"
-                data-testid="filter-seed-txn-number"
-              />
-              
-              <Select value={filterFarmer} onValueChange={setFilterFarmer}>
-                <SelectTrigger className="w-40 h-9" data-testid="filter-seed-farmer">
-                  <SelectValue placeholder={t("Farmer", "किसान")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
-                  {farmerNames.map(name => (
-                    <SelectItem key={name} value={name}>{name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button onClick={() => setShowLoadDialog(true)} size="sm" data-testid="button-load-seed-truck-filter">
-                <Truck className="h-4 w-4 mr-2" />
-                {t("Load Seed Truck", "बीज ट्रक")}
-              </Button>
-              
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
-                  <X className="h-4 w-4 mr-1" />
-                  {t("Clear", "साफ़ करें")}
-                </Button>
-              )}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
             </div>
-          </CardContent>
-        </Card>
-      )}
+            
+            <Input
+              placeholder={t("Transaction #", "लेनदेन #")}
+              value={filterTxnNumber}
+              onChange={(e) => setFilterTxnNumber(e.target.value)}
+              className="w-32 h-9"
+              data-testid="filter-seed-txn-number"
+            />
+              
+            <Select value={filterFarmer} onValueChange={setFilterFarmer}>
+              <SelectTrigger className="w-40 h-9" data-testid="filter-seed-farmer">
+                <SelectValue placeholder={t("Farmer", "किसान")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
+                {farmerNames.map(name => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
+                <X className="h-4 w-4 mr-1" />
+                {t("Clear", "साफ़ करें")}
+              </Button>
+            )}
+
+            <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-seed-truck">
+              <Truck className="h-4 w-4 mr-2" />
+              {t("Load Seed Truck", "बीज ट्रक लोड करें")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
