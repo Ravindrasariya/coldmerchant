@@ -1348,6 +1348,7 @@ export async function registerRoutes(
 
       // Determine if FIFO should be applied
       const applyFIFO = (direction === "inward" && !!partyName) || 
+                        (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 

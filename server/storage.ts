@@ -1106,6 +1106,7 @@ export class DatabaseStorage implements IStorage {
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
         let remainingAmount = parseFloat(entry.amount);
         const normalizedFarmerName = normalizeName(entry.farmerName);
+        const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
         
         // Get stock entries with due amount (FIFO order by createdAt)
         const allFarmerEntries = await tx.select().from(stockEntries)
@@ -1115,10 +1116,13 @@ export class DatabaseStorage implements IStorage {
           ))
           .orderBy(asc(stockEntries.createdAt));
         
-        // Filter to only those matching farmer name (case-insensitive, trimmed)
-        const farmerEntries = allFarmerEntries.filter(se => 
-          normalizeName(se.farmerName) === normalizedFarmerName
-        );
+        // Filter to only those matching farmer using composite key (name + village)
+        const farmerEntries = allFarmerEntries.filter(se => {
+          if (normalizeName(se.farmerName) !== normalizedFarmerName) return false;
+          // If village is provided, check it matches
+          if (normalizedFarmerVillage && se.village && normalizeName(se.village) !== normalizedFarmerVillage) return false;
+          return true;
+        });
         
         for (const stockEntry of farmerEntries) {
           if (remainingAmount <= 0) break;
