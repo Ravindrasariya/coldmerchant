@@ -206,6 +206,9 @@ export function CashManagementTab() {
   const [downloadStartDate, setDownloadStartDate] = useState("");
   const [downloadEndDate, setDownloadEndDate] = useState("");
   
+  // View details dialog state
+  const [viewDetailsEntry, setViewDetailsEntry] = useState<CashEntry | null>(null);
+  
   // Filter state
   const [filterPartyName, setFilterPartyName] = useState<string>("");
   const [filterExpenseType, setFilterExpenseType] = useState<string>("");
@@ -648,6 +651,14 @@ export function CashManagementTab() {
     }
   };
 
+  const getRevenueTypeLabel = (type: string) => {
+    switch (type) {
+      case "raw_potato": return t("Raw Potato", "कच्चा आलू");
+      case "seed_sale": return t("Seed Sale", "बीज बिक्री");
+      default: return type;
+    }
+  };
+
   const handleDownloadCSV = () => {
     if (!downloadStartDate || !downloadEndDate) {
       toast({
@@ -687,27 +698,39 @@ export function CashManagementTab() {
     const headers = [
       t("Date", "तिथि"),
       t("Direction", "दिशा"),
-      t("Receipt/Expense Type", "रसीद/खर्च प्रकार"),
+      t("Receipt Type", "रसीद प्रकार"),
+      t("Revenue Type", "राजस्व प्रकार"),
+      t("Expense Type", "खर्च प्रकार"),
       t("Payment Mode", "भुगतान माध्यम"),
       t("Party Name", "पार्टी का नाम"),
+      t("Party Village", "पार्टी का गाँव"),
       t("Farmer Name", "किसान का नाम"),
+      t("Farmer Village", "किसान का गाँव"),
       t("Cold Store", "शीत भंडार"),
+      t("Supplier Name", "आपूर्तिकर्ता का नाम"),
       t("Amount", "राशि"),
       t("Status", "स्थिति"),
       t("Remarks", "टिप्पणी"),
+      t("Created At", "बनाया गया"),
     ];
 
     const rows = filteredForDownload.map(entry => [
       format(new Date(entry.entryDate), "dd/MM/yyyy"),
       entry.direction === "inward" ? t("Inward", "आवक") : t("Outflow", "जावक"),
-      entry.direction === "inward" ? getReceiptTypeLabel(entry.receiptType || "") : getExpenseTypeLabel(entry.expenseType || ""),
-      entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "-",
-      entry.partyName || "-",
-      entry.farmerName || "-",
-      entry.coldStoreName || "-",
+      entry.receiptType ? getReceiptTypeLabel(entry.receiptType) : "",
+      entry.revenueType ? getRevenueTypeLabel(entry.revenueType) : "",
+      entry.expenseType ? getExpenseTypeLabel(entry.expenseType) : "",
+      entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "",
+      entry.partyName || "",
+      entry.partyVillage || "",
+      entry.farmerName || "",
+      entry.farmerVillage || "",
+      entry.coldStoreName || "",
+      entry.supplierName || "",
       entry.amount,
       entry.isReversed ? t("Reversed", "उलट दिया गया") : t("Active", "सक्रिय"),
-      entry.remarks || "-",
+      entry.remarks || "",
+      format(new Date(entry.createdAt), "dd/MM/yyyy HH:mm"),
     ]);
 
     const csvContent = [
@@ -772,6 +795,158 @@ export function CashManagementTab() {
             <Button onClick={handleDownloadCSV} data-testid="button-download-csv">
               <Download className="h-4 w-4 mr-2" />
               {t("Download CSV", "CSV डाउनलोड करें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* View Details Dialog */}
+      <Dialog open={!!viewDetailsEntry} onOpenChange={(open) => !open && setViewDetailsEntry(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("Cash Entry Details", "नकद प्रविष्टि विवरण")}</DialogTitle>
+          </DialogHeader>
+          {viewDetailsEntry && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">{t("Entry Date", "प्रविष्टि तिथि")}</Label>
+                  <p className="font-medium">{format(new Date(viewDetailsEntry.entryDate), "dd/MM/yyyy")}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">{t("Direction", "दिशा")}</Label>
+                  <p className="font-medium">{viewDetailsEntry.direction === "inward" ? t("Inward", "आवक") : t("Outflow", "जावक")}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")}</Label>
+                  <p className={cn("font-bold text-lg", viewDetailsEntry.direction === "inward" ? "text-green-600" : "text-amber-600")}>
+                    {viewDetailsEntry.direction === "inward" ? "+" : "-"}₹{parseFloat(viewDetailsEntry.amount).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">{t("Status", "स्थिति")}</Label>
+                  <p className="font-medium">{viewDetailsEntry.isReversed ? t("Reversed", "उलट दिया गया") : t("Active", "सक्रिय")}</p>
+                </div>
+              </div>
+
+              {viewDetailsEntry.direction === "inward" && (
+                <>
+                  <div className="border-t pt-3">
+                    <h4 className="font-semibold text-sm mb-2">{t("Inward Details", "आवक विवरण")}</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t("Receipt Type", "रसीद प्रकार")}</Label>
+                        <p className="font-medium">{getReceiptTypeLabel(viewDetailsEntry.receiptType || "")}</p>
+                      </div>
+                      {viewDetailsEntry.revenueType && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">{t("Revenue Type", "राजस्व प्रकार")}</Label>
+                          <p className="font-medium">{getRevenueTypeLabel(viewDetailsEntry.revenueType)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {viewDetailsEntry.partyName && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t("Party Name", "पार्टी का नाम")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.partyName}</p>
+                      </div>
+                      {viewDetailsEntry.partyVillage && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">{t("Party Village", "पार्टी का गाँव")}</Label>
+                          <p className="font-medium">{viewDetailsEntry.partyVillage}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {viewDetailsEntry.farmerName && viewDetailsEntry.revenueType === "seed_sale" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t("Farmer Name", "किसान का नाम")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.farmerName}</p>
+                      </div>
+                      {viewDetailsEntry.farmerVillage && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">{t("Farmer Village", "किसान का गाँव")}</Label>
+                          <p className="font-medium">{viewDetailsEntry.farmerVillage}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {viewDetailsEntry.direction === "outflow" && (
+                <>
+                  <div className="border-t pt-3">
+                    <h4 className="font-semibold text-sm mb-2">{t("Outflow Details", "जावक विवरण")}</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t("Expense Type", "खर्च प्रकार")}</Label>
+                        <p className="font-medium">{getExpenseTypeLabel(viewDetailsEntry.expenseType || "")}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t("Payment Mode", "भुगतान माध्यम")}</Label>
+                        <p className="font-medium">{getPaymentModeLabel(viewDetailsEntry.paymentMode || "")}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {viewDetailsEntry.farmerName && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">{t("Farmer Name", "किसान का नाम")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.farmerName}</p>
+                      </div>
+                      {viewDetailsEntry.farmerVillage && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">{t("Farmer Village", "किसान का गाँव")}</Label>
+                          <p className="font-medium">{viewDetailsEntry.farmerVillage}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {viewDetailsEntry.coldStoreName && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">{t("Cold Store Name", "शीत भंडार का नाम")}</Label>
+                      <p className="font-medium">{viewDetailsEntry.coldStoreName}</p>
+                    </div>
+                  )}
+                  
+                  {viewDetailsEntry.supplierName && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">{t("Supplier Name", "आपूर्तिकर्ता का नाम")}</Label>
+                      <p className="font-medium">{viewDetailsEntry.supplierName}</p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {viewDetailsEntry.remarks && (
+                <div className="border-t pt-3">
+                  <Label className="text-xs text-muted-foreground">{t("Remarks", "टिप्पणी")}</Label>
+                  <p className="font-medium">{viewDetailsEntry.remarks}</p>
+                </div>
+              )}
+
+              <div className="border-t pt-3 text-xs text-muted-foreground">
+                <p>{t("Created", "बनाया गया")}: {format(new Date(viewDetailsEntry.createdAt), "dd/MM/yyyy HH:mm")}</p>
+                {viewDetailsEntry.reversedAt && (
+                  <p>{t("Reversed", "उलटा गया")}: {format(new Date(viewDetailsEntry.reversedAt), "dd/MM/yyyy HH:mm")}</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDetailsEntry(null)} data-testid="button-close-details">
+              {t("Close", "बंद करें")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1605,7 +1780,7 @@ export function CashManagementTab() {
             </div>
           ) : (
             filteredEntries.map((entry) => (
-              <CashEntryCard key={entry.id} entry={entry} />
+              <CashEntryCard key={entry.id} entry={entry} onViewDetails={() => setViewDetailsEntry(entry)} />
             ))
           )}
         </div>
@@ -1615,7 +1790,7 @@ export function CashManagementTab() {
   );
 }
 
-function CashEntryCard({ entry }: { entry: CashEntry }) {
+function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetails: () => void }) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const isInward = entry.direction === "inward";
@@ -1676,8 +1851,9 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
     <Card 
       className={cn(
         isInward ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500',
-        isReversed ? 'opacity-60 blur-[0.5px]' : 'hover-elevate'
+        isReversed ? 'opacity-60 blur-[0.5px]' : 'hover-elevate cursor-pointer'
       )}
+      onClick={onViewDetails}
       data-testid={`card-cash-entry-${entry.id}`}
     >
       <CardContent className="p-3">
@@ -1729,6 +1905,7 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
                     variant="ghost" 
                     size="icon" 
                     title={t("Reverse Entry", "प्रविष्टि उलटें")}
+                    onClick={(e) => e.stopPropagation()}
                     data-testid={`button-reverse-entry-${entry.id}`}
                   >
                     <Undo2 className="h-4 w-4 text-muted-foreground" />
