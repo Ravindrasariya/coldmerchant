@@ -852,22 +852,10 @@ export class DatabaseStorage implements IStorage {
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
     
-    // Get seed sale cash entries (payments received from farmers for seeds)
-    const seedCashEntries = await db.select().from(cashEntries)
-      .where(and(
-        eq(cashEntries.merchantId, merchantId),
-        eq(cashEntries.direction, "inward"),
-        eq(cashEntries.revenueType, "seed_sale")
-      ));
+    // Note: seed_sale cash entries are already applied via FIFO to reduce totalDueToFarmer,
+    // so we don't need to subtract them again here. Just use totalDueToFarmer directly.
     
-    // Get cross-settlements (raw_to_seed) that offset seed dues
-    const rawToSeedSettlements = await db.select().from(farmerSettlements)
-      .where(and(
-        eq(farmerSettlements.merchantId, merchantId),
-        eq(farmerSettlements.settlementDirection, "raw_to_seed")
-      ));
-    
-    // Build farmer map FIRST from seed transactions
+    // Build farmer map from seed transactions (totalDueToFarmer is already reduced by FIFO payments)
     const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
@@ -893,29 +881,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Calculate total paid per farmer (from cash entries and settlements)
-    const paidByFarmer = new Map<string, number>();
-    
-    for (const entry of seedCashEntries) {
-      if (entry.farmerName) {
-        // Match using composite key (name + village) for consistency
-        const key = normalizeName(entry.farmerName) + "|" + normalizeName(entry.farmerVillage || "");
-        paidByFarmer.set(key, (paidByFarmer.get(key) || 0) + parseFloat(entry.amount || "0"));
-      }
-    }
-    
-    // Cross-settlements are now directly applied to seed transactions (totalDueToFarmer updated)
-    // So we don't need to track them separately here - the dues are already reduced in the seed transactions
-    
-    // Subtract payments and settlements from dues
-    Array.from(paidByFarmer.entries()).forEach(([key, paidAmount]) => {
-      const farmer = farmerMap.get(key);
-      if (farmer) {
-        farmer.totalDue = Math.max(0, farmer.totalDue - paidAmount);
-      }
-    });
-    
-    // Filter out farmers with no remaining due
+    // Return farmers with remaining due (already reduced by FIFO payments and cross-settlements)
     return Array.from(farmerMap.entries())
       .filter(([_, data]) => data.totalDue > 0)
       .map(([_, data]) => ({
