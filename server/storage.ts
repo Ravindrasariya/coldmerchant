@@ -1963,6 +1963,58 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
+      // Seed sale FIFO - update totalDueToFarmer on seed transactions
+      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
+        // Actual cash to apply is: entry amount minus cross-settlement
+        let remainingAmount = parseFloat(entry.amount);
+        if (crossSettlement && crossSettlement.direction === 'seed_to_raw') {
+          remainingAmount -= crossSettlement.settledAmount;
+        }
+        
+        if (remainingAmount > 0) {
+          const normalizedFarmerName = normalizeName(entry.farmerName);
+          const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
+          
+          // Get seed transactions for this merchant (FIFO order by createdAt)
+          const allSeedTxns = await tx.select().from(seedTransactions)
+            .where(eq(seedTransactions.merchantId, entry.merchantId))
+            .orderBy(asc(seedTransactions.createdAt));
+          
+          // Filter to only those matching farmer using composite identity (name + village)
+          const matchingSeedTxns = allSeedTxns.filter(txn => {
+            if (normalizeName(txn.farmerName) !== normalizedFarmerName) return false;
+            // If village is provided, check it matches
+            if (normalizedFarmerVillage && txn.village && normalizeName(txn.village) !== normalizedFarmerVillage) return false;
+            return true;
+          });
+          
+          // Filter to only those with remaining due
+          const seedTxnsWithDue = matchingSeedTxns.filter(txn => {
+            const totalDue = parseFloat(txn.totalDueToFarmer || "0");
+            return totalDue > 0;
+          });
+          
+          for (const seedTxn of seedTxnsWithDue) {
+            if (remainingAmount <= 0) break;
+            
+            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+            
+            if (currentDue <= 0) continue;
+            
+            // Calculate how much to apply to this seed transaction
+            const toApply = Math.min(remainingAmount, currentDue);
+            
+            // Update seed transaction's totalDueToFarmer (reduce by payment amount)
+            const newDue = currentDue - toApply;
+            await tx.update(seedTransactions)
+              .set({ totalDueToFarmer: newDue.toString() })
+              .where(eq(seedTransactions.id, seedTxn.id));
+            
+            remainingAmount -= toApply;
+          }
+        }
+      }
+      
       // Farmer payment FIFO (for raw potatoes)
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
         // Actual cash to apply is: entry amount minus cross-settlement
@@ -1973,6 +2025,7 @@ export class DatabaseStorage implements IStorage {
         
         if (remainingAmount > 0) {
           const normalizedFarmerName = normalizeName(entry.farmerName);
+          const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
           
           const allFarmerEntries = await tx.select().from(stockEntries)
             .where(and(
@@ -1981,9 +2034,13 @@ export class DatabaseStorage implements IStorage {
             ))
             .orderBy(asc(stockEntries.createdAt));
           
-          const farmerEntries = allFarmerEntries.filter(se => 
-            normalizeName(se.farmerName) === normalizedFarmerName
-          );
+          // Filter to only those matching farmer using composite key (name + village)
+          const farmerEntries = allFarmerEntries.filter(se => {
+            if (normalizeName(se.farmerName) !== normalizedFarmerName) return false;
+            // If village is provided, check it matches
+            if (normalizedFarmerVillage && se.village && normalizeName(se.village) !== normalizedFarmerVillage) return false;
+            return true;
+          });
           
           for (const stockEntry of farmerEntries) {
             if (remainingAmount <= 0) break;
