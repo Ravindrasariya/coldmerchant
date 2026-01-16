@@ -14,7 +14,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -41,6 +52,8 @@ interface CashEntry {
   amount: string;
   entryDate: string;
   remarks: string | null;
+  isReversed: boolean | null;
+  reversedAt: string | null;
   createdAt: string;
   allocations: CashEntryAllocation[];
 }
@@ -680,6 +693,7 @@ export function CashManagementTab() {
       t("Farmer Name", "किसान का नाम"),
       t("Cold Store", "शीत भंडार"),
       t("Amount", "राशि"),
+      t("Status", "स्थिति"),
       t("Remarks", "टिप्पणी"),
     ];
 
@@ -692,6 +706,7 @@ export function CashManagementTab() {
       entry.farmerName || "-",
       entry.coldStoreName || "-",
       entry.amount,
+      entry.isReversed ? t("Reversed", "उलट दिया गया") : t("Active", "सक्रिय"),
       entry.remarks || "-",
     ]);
 
@@ -1602,9 +1617,39 @@ export function CashManagementTab() {
 
 function CashEntryCard({ entry }: { entry: CashEntry }) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const isInward = entry.direction === "inward";
   const amount = parseFloat(entry.amount);
   const totalApplied = entry.allocations.reduce((sum, a) => sum + parseFloat(a.appliedAmount), 0);
+  const isReversed = entry.isReversed === true;
+
+  const reverseMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/cash/entries/${entry.id}/reverse`);
+    },
+    onSuccess: () => {
+      toast({
+        title: t("Entry Reversed", "प्रविष्टि उलट दी गई"),
+        description: t("The cash entry has been reversed successfully.", "नकद प्रविष्टि सफलतापूर्वक उलट दी गई है।"),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message || t("Failed to reverse entry", "प्रविष्टि उलटने में विफल"),
+        variant: "destructive",
+      });
+    },
+  });
 
   const getReceiptTypeLabel = (type: string | null) => {
     switch (type) {
@@ -1629,7 +1674,10 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
 
   return (
     <Card 
-      className={`hover-elevate ${isInward ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500'}`}
+      className={cn(
+        isInward ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500',
+        isReversed ? 'opacity-60 blur-[0.5px]' : 'hover-elevate'
+      )}
       data-testid={`card-cash-entry-${entry.id}`}
     >
       <CardContent className="p-3">
@@ -1640,26 +1688,86 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
             ) : (
               <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
             )}
-            <span className="font-semibold truncate">
+            <span className={cn("font-semibold truncate", isReversed && "line-through text-muted-foreground")}>
               {isInward ? entry.partyName : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 
-              className={`shrink-0 ${isInward 
-                ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600" 
-                : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
-              }`}
+              className={cn(
+                `shrink-0`,
+                isReversed 
+                  ? "bg-gray-100 text-gray-500 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-600"
+                  : isInward 
+                    ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600" 
+                    : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
+              )}
             >
               {isInward ? t("Inflow", "आवक") : t("Outflow", "बहिर्वाह")}
             </Badge>
+            {isReversed && (
+              <Badge 
+                variant="outline" 
+                className="shrink-0 bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-600"
+              >
+                {t("Reversed", "उलट दिया गया")}
+              </Badge>
+            )}
           </div>
-          <span className={`font-bold shrink-0 ${isInward ? 'text-green-600' : 'text-amber-600'}`}>
-            {isInward ? '+' : '-'}₹{amount.toLocaleString()}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={cn(
+              "font-bold",
+              isReversed ? "text-muted-foreground line-through" : isInward ? 'text-green-600' : 'text-amber-600'
+            )}>
+              {isInward ? '+' : '-'}₹{amount.toLocaleString()}
+            </span>
+            {!isReversed && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    title={t("Reverse Entry", "प्रविष्टि उलटें")}
+                    data-testid={`button-reverse-entry-${entry.id}`}
+                  >
+                    <Undo2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("Reverse Cash Entry?", "नकद प्रविष्टि उलटें?")}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t(
+                        "Are you sure you want to reverse this payment? This will restore all affected dues (farmer, buyer, supplier, cold store) to their previous state. The entry will remain in history but marked as reversed.",
+                        "क्या आप वाकई इस भुगतान को उलटना चाहते हैं? यह सभी प्रभावित बकाया (किसान, खरीदार, आपूर्तिकर्ता, शीत भंडार) को उनकी पिछली स्थिति में बहाल कर देगा। प्रविष्टि इतिहास में रहेगी लेकिन उलट के रूप में चिह्नित होगी।"
+                      )}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-reverse">
+                      {t("Cancel", "रद्द करें")}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => reverseMutation.mutate()}
+                      disabled={reverseMutation.isPending}
+                      className="bg-destructive text-destructive-foreground"
+                      data-testid="button-confirm-reverse"
+                    >
+                      {reverseMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Undo2 className="h-4 w-4 mr-2" />
+                      )}
+                      {t("Yes, Reverse", "हाँ, उलटें")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
 
         <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-          <span>{format(new Date(entry.entryDate), "dd/MM/yyyy")}</span>
+          <span className={isReversed ? "line-through" : ""}>{format(new Date(entry.entryDate), "dd/MM/yyyy")}</span>
           {isInward && entry.receiptType && (
             <Badge variant="secondary" className="text-xs py-0">
               {getReceiptTypeLabel(entry.receiptType)}
@@ -1670,13 +1778,18 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
               {entry.paymentMode === "cash" ? t("Cash", "नकद") : t("Account", "खाता")}
             </Badge>
           )}
-          {isInward && totalApplied > 0 && (
+          {isInward && totalApplied > 0 && !isReversed && (
             <span className="text-green-600">
               {t("Applied", "लागू")}: ₹{totalApplied.toLocaleString()}
             </span>
           )}
           {entry.remarks && (
-            <span className="italic truncate max-w-[200px]">{entry.remarks}</span>
+            <span className={cn("italic truncate max-w-[200px]", isReversed && "line-through")}>{entry.remarks}</span>
+          )}
+          {isReversed && entry.reversedAt && (
+            <span className="text-red-500 text-xs">
+              {t("Reversed on", "उलटा गया")} {format(new Date(entry.reversedAt), "dd/MM/yyyy")}
+            </span>
           )}
         </div>
       </CardContent>

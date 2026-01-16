@@ -160,6 +160,8 @@ export const cashEntries = pgTable("cash_entries", {
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
+  isReversed: boolean("is_reversed").default(false), // soft delete flag
+  reversedAt: timestamp("reversed_at"), // when the entry was reversed
   createdAt: timestamp("created_at").defaultNow(),
 });
 

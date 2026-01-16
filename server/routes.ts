@@ -1377,6 +1377,30 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/cash/entries/:id/reverse - Reverse a cash entry (soft delete with undo)
+  app.post("/api/cash/entries/:id/reverse", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const cashEntryId = parseInt(req.params.id);
+      
+      if (isNaN(cashEntryId)) {
+        return res.status(400).json({ message: "Invalid cash entry ID" });
+      }
+      
+      const reversedEntry = await storage.reverseCashEntry(cashEntryId, merchantId);
+      res.json(reversedEntry);
+    } catch (error: any) {
+      console.error("Error reversing cash entry:", error);
+      if (error.message === "Cash entry not found") {
+        return res.status(404).json({ message: "Cash entry not found" });
+      }
+      if (error.message === "Cash entry is already reversed") {
+        return res.status(400).json({ message: "Cash entry is already reversed" });
+      }
+      res.status(500).json({ message: "Failed to reverse cash entry" });
+    }
+  });
+
   // Cash Settings Routes
   app.get("/api/cash/settings/:year", requireMerchant, async (req, res) => {
     try {

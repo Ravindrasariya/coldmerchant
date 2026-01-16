@@ -174,6 +174,9 @@ export interface IStorage {
   checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
   checkSeedRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
   resetSeasonStockEntries(merchantId: number): Promise<void>;
+  
+  // Cash Entry Reversal operations
+  reverseCashEntry(cashEntryId: number, merchantId: number): Promise<CashEntry>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2070,6 +2073,322 @@ export class DatabaseStorage implements IStorage {
     // Delete all seed stock entries (cascade deletes seed lots)
     await db.delete(seedStockEntries)
       .where(eq(seedStockEntries.merchantId, merchantId));
+  }
+
+  async reverseCashEntry(cashEntryId: number, merchantId: number): Promise<CashEntry> {
+    return await db.transaction(async (tx) => {
+      // 1. Fetch the cash entry
+      const [entry] = await tx.select().from(cashEntries)
+        .where(and(eq(cashEntries.id, cashEntryId), eq(cashEntries.merchantId, merchantId)));
+      
+      if (!entry) {
+        throw new Error("Cash entry not found");
+      }
+      
+      if (entry.isReversed) {
+        throw new Error("Cash entry is already reversed");
+      }
+
+      // 2. Get all allocations for this entry
+      const entryAllocations = await tx.select().from(cashEntryAllocations)
+        .where(eq(cashEntryAllocations.cashEntryId, cashEntryId));
+      
+      const coldStoreAllocs = await tx.select().from(coldStoreChargeAllocations)
+        .where(eq(coldStoreChargeAllocations.cashEntryId, cashEntryId));
+      
+      // 3. Get related cross-settlement if any
+      const [settlement] = await tx.select().from(farmerSettlements)
+        .where(eq(farmerSettlements.cashEntryId, cashEntryId));
+
+      // Helper function to match farmer using composite identity (name + village + contact)
+      const matchesFarmerIdentity = (
+        se: { farmerName: string; village?: string | null; farmerContact?: string | null },
+        targetName: string, 
+        targetVillage?: string | null,
+        targetContact?: string | null
+      ) => {
+        if (normalizeName(se.farmerName) !== normalizeName(targetName)) return false;
+        // If village is specified, match on village as well
+        if (targetVillage && se.village && normalizeName(se.village) !== normalizeName(targetVillage)) return false;
+        // If contact is specified, match on contact as well
+        if (targetContact && se.farmerContact && normalizeName(se.farmerContact) !== normalizeName(targetContact)) return false;
+        return true;
+      };
+
+      // 4. Reverse allocations based on entry type
+      
+      // 4a. Reverse party payment allocations (buyer receipts for raw_potato)
+      if (entry.direction === "inward" && entry.revenueType === "raw_potato") {
+        for (const alloc of entryAllocations) {
+          const [txn] = await tx.select().from(transactions)
+            .where(eq(transactions.id, alloc.transactionId));
+          
+          if (txn) {
+            const currentReceived = parseFloat(txn.amountReceived || "0");
+            const newReceived = Math.max(0, currentReceived - parseFloat(alloc.appliedAmount));
+            
+            await tx.update(transactions)
+              .set({ amountReceived: newReceived.toString() })
+              .where(eq(transactions.id, txn.id));
+          }
+        }
+      }
+      
+      // 4b. Reverse seed sale inflow (add back dues to seedTransactions.totalDueToFarmer)
+      // Uses composite identity (name + village + contact) and distributes reversal proportionally
+      if (entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
+        // Find seed transactions for this farmer using composite identity matching
+        const allSeedTxns = await tx.select().from(seedTransactions)
+          .where(eq(seedTransactions.merchantId, merchantId))
+          .orderBy(asc(seedTransactions.createdAt));
+        
+        // Use composite identity helper for seed transactions (adapt to same field names)
+        const matchingTxns = allSeedTxns.filter(txn => {
+          // Adapt seed transaction fields to match the helper signature
+          const adapted = {
+            farmerName: txn.farmerName,
+            village: txn.village,
+            farmerContact: txn.farmerContact
+          };
+          return matchesFarmerIdentity(adapted, entry.farmerName!, entry.farmerVillage, entry.farmerContact);
+        });
+        
+        let amountToRestore = parseFloat(entry.amount);
+        if (settlement && settlement.settlementDirection === 'seed_to_raw') {
+          amountToRestore -= parseFloat(settlement.settledAmount);
+        }
+        
+        // Restore dues in reverse FIFO order (most recent first, distributed across transactions)
+        for (const txn of matchingTxns.reverse()) {
+          if (amountToRestore <= 0) break;
+          
+          // Calculate original total due for this transaction to determine max restoreable
+          const originalDue = parseFloat(txn.totalRevenue || "0") + parseFloat(txn.transportCharges || "0") + parseFloat(txn.otherCharges || "0");
+          const currentDue = parseFloat(txn.totalDueToFarmer || "0");
+          
+          // Max we can restore is originalDue - currentDue (what was already paid/reduced)
+          const alreadyPaid = originalDue - currentDue;
+          const toRestore = Math.min(amountToRestore, alreadyPaid);
+          
+          if (toRestore > 0) {
+            const newDue = currentDue + toRestore;
+            
+            await tx.update(seedTransactions)
+              .set({ totalDueToFarmer: newDue.toString() })
+              .where(eq(seedTransactions.id, txn.id));
+            
+            amountToRestore -= toRestore;
+          }
+        }
+      }
+      
+      // 4c. Reverse farmer payment (reduces amountPaid on stock entries)
+      if (entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
+        // Find stock entries for this farmer using composite identity
+        const farmerStockEntries = await tx.select().from(stockEntries)
+          .where(eq(stockEntries.merchantId, merchantId))
+          .orderBy(asc(stockEntries.createdAt));
+        
+        const matchingEntries = farmerStockEntries.filter(se => 
+          matchesFarmerIdentity(se, entry.farmerName!, entry.farmerVillage, entry.farmerContact)
+        );
+        
+        // Calculate total amount to reverse (excluding cross-settlement if any)
+        let amountToReverse = parseFloat(entry.amount);
+        if (settlement && settlement.settlementDirection === 'raw_to_seed') {
+          amountToReverse -= parseFloat(settlement.settledAmount);
+        }
+        
+        // Reverse from most recent entries first (reverse FIFO order)
+        for (const se of matchingEntries.reverse()) {
+          if (amountToReverse <= 0) break;
+          
+          const currentPaid = parseFloat(se.amountPaid || "0");
+          if (currentPaid <= 0) continue;
+          
+          const toReverse = Math.min(amountToReverse, currentPaid);
+          const newPaid = currentPaid - toReverse;
+          const newStatus = newPaid <= 0 ? "due" : "partial";
+          
+          await tx.update(stockEntries)
+            .set({ 
+              amountPaid: newPaid.toString(),
+              paymentStatus: newStatus
+            })
+            .where(eq(stockEntries.id, se.id));
+          
+          amountToReverse -= toReverse;
+        }
+      }
+      
+      // 4d. Reverse supplier payment (update seedStockEntries)
+      if (entry.direction === "outflow" && entry.expenseType === "supplier" && entry.supplierName) {
+        const normalizedSupplierName = normalizeName(entry.supplierName);
+        
+        const allSeedEntries = await tx.select().from(seedStockEntries)
+          .where(eq(seedStockEntries.merchantId, merchantId))
+          .orderBy(asc(seedStockEntries.createdAt));
+        
+        const matchingEntries = allSeedEntries.filter(se => 
+          normalizeName(se.supplierName) === normalizedSupplierName
+        );
+        
+        let amountToReverse = parseFloat(entry.amount);
+        
+        // Reverse from most recent entries first
+        for (const se of matchingEntries.reverse()) {
+          if (amountToReverse <= 0) break;
+          
+          const currentPaid = parseFloat(se.amountPaid || "0");
+          if (currentPaid <= 0) continue;
+          
+          const toReverse = Math.min(amountToReverse, currentPaid);
+          const newPaid = currentPaid - toReverse;
+          const newStatus = newPaid <= 0 ? "due" : "partial";
+          
+          await tx.update(seedStockEntries)
+            .set({ 
+              amountPaid: newPaid.toString(),
+              paymentStatus: newStatus
+            })
+            .where(eq(seedStockEntries.id, se.id));
+          
+          amountToReverse -= toReverse;
+        }
+      }
+      
+      // 4e. Reverse cold store charge allocations (only for cold_store_charge outflows)
+      if (entry.direction === "outflow" && entry.expenseType === "cold_store_charge") {
+        for (const alloc of coldStoreAllocs) {
+          const [lot] = await tx.select().from(lots)
+            .where(eq(lots.id, alloc.lotId));
+          
+          if (lot) {
+            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+            const newPaid = Math.max(0, currentPaid - parseFloat(alloc.appliedAmount));
+            
+            await tx.update(lots)
+              .set({ coldStorageChargesPaid: newPaid.toString() })
+              .where(eq(lots.id, lot.id));
+          }
+        }
+      }
+      
+      // 5. Reverse cross-settlement if any
+      if (settlement) {
+        const settledAmount = parseFloat(settlement.settledAmount);
+        const seedTxnIds = (settlement.seedTransactionIds as number[]) || [];
+        const rawEntryIds = (settlement.rawPotatoStockEntryIds as number[]) || [];
+        
+        if (settlement.settlementDirection === 'raw_to_seed') {
+          // Reverse: Add back dues to seedTransactions, reduce amountPaid on stockEntries
+          
+          // Add back seed dues
+          let remainingToRestore = settledAmount;
+          for (const txnId of seedTxnIds) {
+            if (remainingToRestore <= 0) break;
+            
+            const [seedTxn] = await tx.select().from(seedTransactions)
+              .where(eq(seedTransactions.id, txnId));
+            
+            if (seedTxn) {
+              const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+              // Restore the due (add it back)
+              const newDue = currentDue + remainingToRestore;
+              
+              await tx.update(seedTransactions)
+                .set({ totalDueToFarmer: newDue.toString() })
+                .where(eq(seedTransactions.id, txnId));
+              
+              remainingToRestore = 0; // Applied all
+            }
+          }
+          
+          // Reduce amountPaid on raw potato entries (reverse the settlement payment)
+          let remainingToReduce = settledAmount;
+          for (const entryId of rawEntryIds.reverse()) {
+            if (remainingToReduce <= 0) break;
+            
+            const [se] = await tx.select().from(stockEntries)
+              .where(eq(stockEntries.id, entryId));
+            
+            if (se) {
+              const currentPaid = parseFloat(se.amountPaid || "0");
+              const toReduce = Math.min(remainingToReduce, currentPaid);
+              const newPaid = currentPaid - toReduce;
+              const newStatus = newPaid <= 0 ? "due" : "partial";
+              
+              await tx.update(stockEntries)
+                .set({ 
+                  amountPaid: newPaid.toString(),
+                  paymentStatus: newStatus
+                })
+                .where(eq(stockEntries.id, se.id));
+              
+              remainingToReduce -= toReduce;
+            }
+          }
+        } else if (settlement.settlementDirection === 'seed_to_raw') {
+          // Reverse: Add back dues to seedTransactions, reduce amountPaid on stockEntries
+          
+          // Add back seed dues
+          let remainingToRestore = settledAmount;
+          for (const txnId of seedTxnIds) {
+            if (remainingToRestore <= 0) break;
+            
+            const [seedTxn] = await tx.select().from(seedTransactions)
+              .where(eq(seedTransactions.id, txnId));
+            
+            if (seedTxn) {
+              const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+              const newDue = currentDue + remainingToRestore;
+              
+              await tx.update(seedTransactions)
+                .set({ totalDueToFarmer: newDue.toString() })
+                .where(eq(seedTransactions.id, txnId));
+              
+              remainingToRestore = 0;
+            }
+          }
+          
+          // Reduce amountPaid on raw potato entries
+          let remainingToReduce = settledAmount;
+          for (const entryId of rawEntryIds.reverse()) {
+            if (remainingToReduce <= 0) break;
+            
+            const [se] = await tx.select().from(stockEntries)
+              .where(eq(stockEntries.id, entryId));
+            
+            if (se) {
+              const currentPaid = parseFloat(se.amountPaid || "0");
+              const toReduce = Math.min(remainingToReduce, currentPaid);
+              const newPaid = currentPaid - toReduce;
+              const newStatus = newPaid <= 0 ? "due" : "partial";
+              
+              await tx.update(stockEntries)
+                .set({ 
+                  amountPaid: newPaid.toString(),
+                  paymentStatus: newStatus
+                })
+                .where(eq(stockEntries.id, se.id));
+              
+              remainingToReduce -= toReduce;
+            }
+          }
+        }
+      }
+
+      // 6. Mark the entry as reversed
+      const [reversedEntry] = await tx.update(cashEntries)
+        .set({ 
+          isReversed: true, 
+          reversedAt: new Date() 
+        })
+        .where(and(eq(cashEntries.id, cashEntryId), eq(cashEntries.merchantId, merchantId)))
+        .returning();
+      
+      return reversedEntry;
+    });
   }
 }
 
