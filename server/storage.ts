@@ -1057,6 +1057,51 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
+      // If this is a seed sale inward payment, apply FIFO to seed transactions (reduce totalDueToFarmer)
+      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
+        let remainingAmount = parseFloat(entry.amount);
+        const normalizedFarmerName = normalizeName(entry.farmerName);
+        const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
+        
+        // Get seed transactions for this merchant (FIFO order by createdAt)
+        const allSeedTxns = await tx.select().from(seedTransactions)
+          .where(eq(seedTransactions.merchantId, entry.merchantId))
+          .orderBy(asc(seedTransactions.createdAt));
+        
+        // Filter to only those matching farmer using composite identity (name + village)
+        const matchingSeedTxns = allSeedTxns.filter(txn => {
+          if (normalizeName(txn.farmerName) !== normalizedFarmerName) return false;
+          // If village is provided, check it matches
+          if (normalizedFarmerVillage && txn.village && normalizeName(txn.village) !== normalizedFarmerVillage) return false;
+          return true;
+        });
+        
+        // Filter to only those with remaining due
+        const seedTxnsWithDue = matchingSeedTxns.filter(txn => {
+          const totalDue = parseFloat(txn.totalDueToFarmer || "0");
+          return totalDue > 0;
+        });
+        
+        for (const seedTxn of seedTxnsWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+          
+          if (currentDue <= 0) continue;
+          
+          // Calculate how much to apply to this seed transaction
+          const toApply = Math.min(remainingAmount, currentDue);
+          
+          // Update seed transaction's totalDueToFarmer (reduce by payment amount)
+          const newDue = currentDue - toApply;
+          await tx.update(seedTransactions)
+            .set({ totalDueToFarmer: newDue.toString() })
+            .where(and(eq(seedTransactions.id, seedTxn.id), eq(seedTransactions.merchantId, entry.merchantId)));
+          
+          remainingAmount -= toApply;
+        }
+      }
+      
       // If this is a farmer payment, apply FIFO to stock entries
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
         let remainingAmount = parseFloat(entry.amount);
@@ -2135,7 +2180,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // 4b. Reverse seed sale inflow (add back dues to seedTransactions.totalDueToFarmer)
-      // Uses composite identity (name + village + contact) and distributes reversal proportionally
+      // Uses composite identity (name + village) and distributes reversal proportionally
       if (entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
         // Find seed transactions for this farmer using composite identity matching
         const allSeedTxns = await tx.select().from(seedTransactions)
@@ -2150,7 +2195,7 @@ export class DatabaseStorage implements IStorage {
             village: txn.village,
             farmerContact: txn.farmerContact
           };
-          return matchesFarmerIdentity(adapted, entry.farmerName!, entry.farmerVillage, entry.farmerContact);
+          return matchesFarmerIdentity(adapted, entry.farmerName!, entry.farmerVillage, null);
         });
         
         let amountToRestore = parseFloat(entry.amount);
@@ -2190,7 +2235,7 @@ export class DatabaseStorage implements IStorage {
           .orderBy(asc(stockEntries.createdAt));
         
         const matchingEntries = farmerStockEntries.filter(se => 
-          matchesFarmerIdentity(se, entry.farmerName!, entry.farmerVillage, entry.farmerContact)
+          matchesFarmerIdentity(se, entry.farmerName!, entry.farmerVillage, null)
         );
         
         // Calculate total amount to reverse (excluding cross-settlement if any)
