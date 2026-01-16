@@ -1688,8 +1688,10 @@ function CashEntryCard({ entry }: { entry: CashEntry }) {
             ) : (
               <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
             )}
-            <span className={cn("font-semibold truncate", isReversed && "line-through text-muted-foreground")}>
-              {isInward ? entry.partyName : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
+            <span className={cn("font-semibold truncate", isReversed && "line-through text-muted-foreground")} data-testid={`text-entry-name-${entry.id}`}>
+              {isInward 
+                ? (entry.partyName || entry.farmerName || t("Unknown", "अज्ञात"))
+                : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 
