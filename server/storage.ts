@@ -188,6 +188,15 @@ export interface IStorage {
     state: string;
     source: 'stock_entry' | 'seed_transaction';
   }[]>;
+  
+  // Supplier Lookup operations (for auto-fill in seed stock entries)
+  searchSuppliers(merchantId: number, query: string): Promise<{
+    supplierName: string;
+    supplierContact: string | null;
+    address: string | null;
+    district: string;
+    state: string;
+  }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2563,6 +2572,61 @@ export class DatabaseStorage implements IStorage {
 
     // Sort by farmer name for consistent ordering
     return results.sort((a, b) => a.farmerName.localeCompare(b.farmerName));
+  }
+
+  async searchSuppliers(merchantId: number, query: string): Promise<{
+    supplierName: string;
+    supplierContact: string | null;
+    address: string | null;
+    district: string;
+    state: string;
+  }[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+
+    // Get suppliers from seed stock entries
+    const suppliers = await db.select({
+      supplierName: seedStockEntries.supplierName,
+      supplierContact: seedStockEntries.supplierContact,
+      address: seedStockEntries.address,
+      district: seedStockEntries.district,
+      state: seedStockEntries.state,
+    })
+    .from(seedStockEntries)
+    .where(eq(seedStockEntries.merchantId, merchantId));
+
+    // Create a map to deduplicate suppliers by composite key (name + contact + address)
+    const supplierMap = new Map<string, {
+      supplierName: string;
+      supplierContact: string | null;
+      address: string | null;
+      district: string;
+      state: string;
+    }>();
+
+    for (const supplier of suppliers) {
+      const key = `${(supplier.supplierName || '').toLowerCase().trim()}|${(supplier.supplierContact || '').toLowerCase().trim()}|${(supplier.address || '').toLowerCase().trim()}`;
+      if (!supplierMap.has(key)) {
+        supplierMap.set(key, {
+          supplierName: supplier.supplierName,
+          supplierContact: supplier.supplierContact,
+          address: supplier.address,
+          district: supplier.district,
+          state: supplier.state,
+        });
+      }
+    }
+
+    // Filter by query matching name, contact, or address
+    const results = Array.from(supplierMap.values()).filter(supplier => {
+      const nameMatch = supplier.supplierName.toLowerCase().includes(normalizedQuery);
+      const contactMatch = supplier.supplierContact?.toLowerCase().includes(normalizedQuery);
+      const addressMatch = supplier.address?.toLowerCase().includes(normalizedQuery);
+      return nameMatch || contactMatch || addressMatch;
+    });
+
+    // Sort by supplier name for consistent ordering
+    return results.sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }
 }
 

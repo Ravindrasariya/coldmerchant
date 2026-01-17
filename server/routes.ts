@@ -1214,6 +1214,19 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/suppliers/search - Search suppliers for autocomplete (from seed stock entries)
+  app.get("/api/suppliers/search", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const query = (req.query.q as string) || "";
+      const suppliers = await storage.searchSuppliers(merchantId, query);
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error searching suppliers:", error);
+      res.status(500).json({ message: "Failed to search suppliers" });
+    }
+  });
+
   // GET /api/cash/cold-stores - Get cold stores with outstanding dues
   app.get("/api/cash/cold-stores", requireMerchant, async (req, res) => {
     try {
