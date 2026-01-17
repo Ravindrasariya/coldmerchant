@@ -288,7 +288,7 @@ export default function HomePage() {
                       : t("Record new seed purchases from suppliers", "आपूर्तिकर्ताओं से नई बीज खरीद दर्ज करें")}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
                   <Button
                     variant={stockMode === "raw" ? "default" : "ghost"}
                     size="sm"
@@ -337,7 +337,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
                     <Button
                       variant={stockMode === "raw" ? "default" : "ghost"}
                       size="sm"
