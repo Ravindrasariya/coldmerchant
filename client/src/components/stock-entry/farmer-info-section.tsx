@@ -232,7 +232,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="farmerContact"
             render={({ field }) => (
               <FormItem className="relative">
-                <FormLabel>{t("Contact Number", "संपर्क नंबर")}</FormLabel>
+                <FormLabel>{t("Contact Number", "संपर्क नंबर")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter contact number", "संपर्क नंबर दर्ज करें")} 
@@ -288,7 +288,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="village"
             render={({ field }) => (
               <FormItem className="relative">
-                <FormLabel>{t("Village", "गाँव")}</FormLabel>
+                <FormLabel>{t("Village", "गाँव")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter village", "गाँव दर्ज करें")} 
@@ -344,7 +344,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             name="tehsil"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("Tehsil", "तहसील")}</FormLabel>
+                <FormLabel>{t("Tehsil", "तहसील")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter tehsil", "तहसील दर्ज करें")} 

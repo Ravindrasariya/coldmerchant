@@ -753,9 +753,9 @@ export const lotFormSchema = z.object({
 export const stockEntryFormSchema = z.object({
   purchaseDate: z.string().min(1, "Purchase date is required"),
   farmerName: z.string().min(1, "Farmer name is required"),
-  farmerContact: z.string().optional(),
-  village: z.string().optional(),
-  tehsil: z.string().optional(),
+  farmerContact: z.string().min(1, "Contact number is required"),
+  village: z.string().min(1, "Village name is required"),
+  tehsil: z.string().min(1, "Tehsil is required"),
   district: z.string().min(1, "District is required"),
   state: z.string().min(1, "State is required"),
   remarks: z.string().optional(),
@@ -820,8 +820,8 @@ export const seedLotFormSchema = z.object({
 export const seedStockEntryFormSchema = z.object({
   purchaseDate: z.string().min(1, "Purchase date is required"),
   supplierName: z.string().min(1, "Supplier name is required"),
-  supplierContact: z.string().optional(),
-  address: z.string().optional(),
+  supplierContact: z.string().min(1, "Contact number is required"),
+  address: z.string().min(1, "Address is required"),
   district: z.string().min(1, "District is required"),
   state: z.string().min(1, "State is required"),
   remarks: z.string().optional(),

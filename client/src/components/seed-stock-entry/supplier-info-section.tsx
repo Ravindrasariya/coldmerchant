@@ -214,7 +214,7 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
             name="supplierContact"
             render={({ field }) => (
               <FormItem className="relative">
-                <FormLabel>{t("Contact Number", "संपर्क नंबर")}</FormLabel>
+                <FormLabel>{t("Contact Number", "संपर्क नंबर")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter contact number", "संपर्क नंबर दर्ज करें")} 
@@ -272,7 +272,7 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
             name="address"
             render={({ field }) => (
               <FormItem className="relative">
-                <FormLabel>{t("Address", "पता")}</FormLabel>
+                <FormLabel>{t("Address", "पता")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter address", "पता दर्ज करें")} 
