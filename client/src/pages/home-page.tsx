@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import vyaparVriddhiLogo from "@assets/Screenshot_2026-01-17_at_10.27.58_AM_1768625967467.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,8 +113,8 @@ export default function HomePage() {
           <div className="flex h-16 items-center px-2 sm:px-4 md:px-6 gap-2 sm:gap-4 md:gap-6">
             {/* Brand */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0 md:ml-4 lg:ml-12 xl:ml-16">
-              <div className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-md bg-primary">
-                <PackagePlus className="h-5 w-5 sm:h-6 sm:w-6 text-primary-foreground" />
+              <div className="flex h-9 w-9 sm:h-12 sm:w-12 items-center justify-center rounded-md border-2 border-primary bg-white overflow-hidden">
+                <img src={vyaparVriddhiLogo} alt="Vyapar Vriddhi" className="h-full w-full object-contain bg-white" />
               </div>
               <div className="flex flex-col h-9 sm:h-12">
                 <span className="font-bold text-base sm:text-xl leading-tight text-primary">Vyapar Vriddhi</span>
@@ -216,8 +217,8 @@ export default function HomePage() {
                   <div className="flex flex-col h-full">
                     <div className="p-4 border-b">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary">
-                          <PackagePlus className="h-6 w-6 text-primary-foreground" />
+                        <div className="flex h-12 w-12 items-center justify-center rounded-md border-2 border-primary bg-white overflow-hidden">
+                          <img src={vyaparVriddhiLogo} alt="Vyapar Vriddhi" className="h-full w-full object-contain bg-white" />
                         </div>
                         <div className="flex flex-col h-12 justify-center">
                           <span className="font-bold text-xl leading-tight text-primary">Vyapar Vriddhi</span>
