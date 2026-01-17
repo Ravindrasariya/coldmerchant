@@ -197,6 +197,9 @@ export interface IStorage {
     district: string;
     state: string;
   }[]>;
+  
+  // Cold Store Lookup operations (for autocomplete in lot forms)
+  searchColdStores(merchantId: number, query: string): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2627,6 +2630,47 @@ export class DatabaseStorage implements IStorage {
 
     // Sort by supplier name for consistent ordering
     return results.sort((a, b) => a.supplierName.localeCompare(b.supplierName));
+  }
+
+  async searchColdStores(merchantId: number, query: string): Promise<string[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+
+    // Get cold store names from raw potato lots
+    const rawLots = await db.select({
+      coldStoreName: lots.coldStoreName,
+    })
+    .from(lots)
+    .where(eq(lots.merchantId, merchantId));
+
+    // Get cold store names from seed lots
+    const seedLotsData = await db.select({
+      coldStoreName: seedLots.coldStoreName,
+    })
+    .from(seedLots)
+    .where(eq(seedLots.merchantId, merchantId));
+
+    // Create a set to deduplicate cold store names
+    const coldStoreSet = new Set<string>();
+
+    for (const lot of rawLots) {
+      if (lot.coldStoreName) {
+        coldStoreSet.add(lot.coldStoreName);
+      }
+    }
+
+    for (const lot of seedLotsData) {
+      if (lot.coldStoreName) {
+        coldStoreSet.add(lot.coldStoreName);
+      }
+    }
+
+    // Filter by query and sort alphabetically
+    const results = Array.from(coldStoreSet)
+      .filter(name => name.toLowerCase().includes(normalizedQuery))
+      .sort((a, b) => a.localeCompare(b));
+
+    return results;
   }
 }
 

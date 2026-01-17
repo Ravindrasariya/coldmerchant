@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useFieldArray, UseFormReturn } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,66 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
     control: form.control,
     name: `lots.${lotIndex}.bagBreakdowns`,
   });
+
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState(false);
+  const [coldStoreQuery, setColdStoreQuery] = useState("");
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const searchColdStores = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setColdStoreSuggestions([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/cold-stores/search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setColdStoreSuggestions(data);
+      }
+    } catch (error) {
+      console.error("Error searching cold stores:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      searchColdStores(coldStoreQuery);
+    }, 300);
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [coldStoreQuery, searchColdStores]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const suggestionElements = document.querySelectorAll('[data-coldstore-suggestion-dropdown]');
+      let isInsideSuggestion = false;
+      suggestionElements.forEach(el => {
+        if (el.contains(target)) {
+          isInsideSuggestion = true;
+        }
+      });
+      if (!isInsideSuggestion) {
+        setShowColdStoreSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectColdStore = (name: string) => {
+    form.setValue(`lots.${lotIndex}.coldStoreName`, name);
+    setShowColdStoreSuggestions(false);
+    setColdStoreSuggestions([]);
+    setColdStoreQuery("");
+  };
 
   const cutType = form.watch(`lots.${lotIndex}.cutType`);
   const originalBags = form.watch(`lots.${lotIndex}.originalBags`) || 0;
@@ -84,15 +145,47 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             control={form.control}
             name={`lots.${lotIndex}.coldStoreName`}
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="relative">
                 <FormLabel>{t("Cold Store Name", "कोल्ड स्टोर का नाम")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter cold store name", "कोल्ड स्टोर का नाम दर्ज करें")} 
-                    {...field} 
+                    {...field}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setColdStoreQuery(e.target.value);
+                      setShowColdStoreSuggestions(true);
+                    }}
+                    onFocus={() => {
+                      if (field.value && field.value.length >= 2) {
+                        setColdStoreQuery(field.value);
+                        setShowColdStoreSuggestions(true);
+                      }
+                    }}
+                    autoComplete="off"
                     data-testid={`input-cold-store-${lotIndex}`}
                   />
                 </FormControl>
+                {showColdStoreSuggestions && coldStoreSuggestions.length > 0 && (
+                  <div 
+                    data-coldstore-suggestion-dropdown
+                    className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
+                  >
+                    {coldStoreSuggestions.map((name, index) => (
+                      <div
+                        key={`${name}-${index}`}
+                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectColdStore(name);
+                        }}
+                        data-testid={`suggestion-coldstore-${lotIndex}-${index}`}
+                      >
+                        <div className="font-medium">{name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <FormMessage />
               </FormItem>
             )}

@@ -1227,6 +1227,19 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cold-stores/search - Search cold stores for autocomplete (from lots and seed lots)
+  app.get("/api/cold-stores/search", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const query = (req.query.q as string) || "";
+      const coldStores = await storage.searchColdStores(merchantId, query);
+      res.json(coldStores);
+    } catch (error) {
+      console.error("Error searching cold stores:", error);
+      res.status(500).json({ message: "Failed to search cold stores" });
+    }
+  });
+
   // GET /api/cash/cold-stores - Get cold stores with outstanding dues
   app.get("/api/cash/cold-stores", requireMerchant, async (req, res) => {
     try {
