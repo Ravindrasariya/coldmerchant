@@ -1200,6 +1200,19 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to fetch farmers" });
     }
   });
+  
+  // GET /api/farmers/search - Search farmers for autocomplete (from stock entries and seed transactions)
+  app.get("/api/farmers/search", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const query = (req.query.q as string) || "";
+      const farmers = await storage.searchFarmers(merchantId, query);
+      res.json(farmers);
+    } catch (error) {
+      console.error("Error searching farmers:", error);
+      res.status(500).json({ message: "Failed to search farmers" });
+    }
+  });
 
   // GET /api/cash/cold-stores - Get cold stores with outstanding dues
   app.get("/api/cash/cold-stores", requireMerchant, async (req, res) => {

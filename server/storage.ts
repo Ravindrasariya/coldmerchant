@@ -177,6 +177,17 @@ export interface IStorage {
   
   // Cash Entry Reversal operations
   reverseCashEntry(cashEntryId: number, merchantId: number): Promise<CashEntry>;
+  
+  // Farmer Lookup operations (for auto-fill)
+  searchFarmers(merchantId: number, query: string): Promise<{
+    farmerName: string;
+    farmerContact: string | null;
+    village: string | null;
+    tehsil: string | null;
+    district: string;
+    state: string;
+    source: 'stock_entry' | 'seed_transaction';
+  }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2461,6 +2472,97 @@ export class DatabaseStorage implements IStorage {
       
       return reversedEntry;
     });
+  }
+
+  async searchFarmers(merchantId: number, query: string): Promise<{
+    farmerName: string;
+    farmerContact: string | null;
+    village: string | null;
+    tehsil: string | null;
+    district: string;
+    state: string;
+    source: 'stock_entry' | 'seed_transaction';
+  }[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return [];
+
+    // Get farmers from stock entries
+    const stockFarmers = await db.select({
+      farmerName: stockEntries.farmerName,
+      farmerContact: stockEntries.farmerContact,
+      village: stockEntries.village,
+      tehsil: stockEntries.tehsil,
+      district: stockEntries.district,
+      state: stockEntries.state,
+    })
+    .from(stockEntries)
+    .where(eq(stockEntries.merchantId, merchantId));
+
+    // Get farmers from seed transactions
+    const seedFarmers = await db.select({
+      farmerName: seedTransactions.farmerName,
+      farmerContact: seedTransactions.farmerContact,
+      village: seedTransactions.village,
+      tehsil: seedTransactions.tehsil,
+      district: seedTransactions.district,
+      state: seedTransactions.state,
+    })
+    .from(seedTransactions)
+    .where(eq(seedTransactions.merchantId, merchantId));
+
+    // Create a map to deduplicate farmers by composite key (name + village + contact)
+    const farmerMap = new Map<string, {
+      farmerName: string;
+      farmerContact: string | null;
+      village: string | null;
+      tehsil: string | null;
+      district: string;
+      state: string;
+      source: 'stock_entry' | 'seed_transaction';
+    }>();
+
+    // Add stock entry farmers
+    for (const farmer of stockFarmers) {
+      const key = `${(farmer.farmerName || '').toLowerCase().trim()}|${(farmer.village || '').toLowerCase().trim()}|${(farmer.farmerContact || '').toLowerCase().trim()}`;
+      if (!farmerMap.has(key)) {
+        farmerMap.set(key, {
+          farmerName: farmer.farmerName,
+          farmerContact: farmer.farmerContact,
+          village: farmer.village,
+          tehsil: farmer.tehsil,
+          district: farmer.district,
+          state: farmer.state,
+          source: 'stock_entry',
+        });
+      }
+    }
+
+    // Add seed transaction farmers (won't overwrite if key exists)
+    for (const farmer of seedFarmers) {
+      const key = `${(farmer.farmerName || '').toLowerCase().trim()}|${(farmer.village || '').toLowerCase().trim()}|${(farmer.farmerContact || '').toLowerCase().trim()}`;
+      if (!farmerMap.has(key)) {
+        farmerMap.set(key, {
+          farmerName: farmer.farmerName,
+          farmerContact: farmer.farmerContact,
+          village: farmer.village,
+          tehsil: farmer.tehsil,
+          district: farmer.district,
+          state: farmer.state,
+          source: 'seed_transaction',
+        });
+      }
+    }
+
+    // Filter by query matching any of name, contact, or village
+    const results = Array.from(farmerMap.values()).filter(farmer => {
+      const nameMatch = farmer.farmerName.toLowerCase().includes(normalizedQuery);
+      const contactMatch = farmer.farmerContact?.toLowerCase().includes(normalizedQuery);
+      const villageMatch = farmer.village?.toLowerCase().includes(normalizedQuery);
+      return nameMatch || contactMatch || villageMatch;
+    });
+
+    // Sort by farmer name for consistent ordering
+    return results.sort((a, b) => a.farmerName.localeCompare(b.farmerName));
   }
 }
 
