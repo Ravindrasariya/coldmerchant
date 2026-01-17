@@ -75,6 +75,7 @@ interface PartyWithDue {
 
 interface FarmerWithDue {
   farmerName: string;
+  farmerContact: string | null;
   village: string | null;
   totalDue: number;
   entryCount: number;
@@ -88,6 +89,7 @@ interface ColdStoreWithDue {
 
 interface SeedFarmerWithDue {
   farmerName: string;
+  farmerContact: string | null;
   village: string | null;
   totalDue: number;
   transactionCount: number;
@@ -411,12 +413,13 @@ export function CashManagementTab() {
 
   // Merge managed farmers with stock-entry-derived farmers (de-duplicate by name)
   const mergedFarmers = (() => {
-    const farmerMap = new Map<string, { name: string; address: string | null; pendingDues: number }>();
+    const farmerMap = new Map<string, { name: string; contact: string | null; address: string | null; pendingDues: number }>();
     
     // Add stock-entry-derived farmers first
     farmers.forEach(f => {
       farmerMap.set(f.farmerName.toLowerCase(), {
         name: f.farmerName,
+        contact: f.farmerContact,
         address: f.village,
         pendingDues: f.totalDue,
       });
@@ -427,6 +430,7 @@ export function CashManagementTab() {
       const existing = farmerMap.get(f.name.toLowerCase());
       farmerMap.set(f.name.toLowerCase(), {
         name: f.name,
+        contact: f.contactNumber || existing?.contact || null,
         address: f.address || existing?.address || null,
         pendingDues: parseFloat(f.pendingDueToBePaid || "0") + (existing?.pendingDues || 0),
       });
@@ -605,7 +609,23 @@ export function CashManagementTab() {
 
   // Get unique values for filter dropdowns
   const uniquePartyNames = Array.from(new Set(entries.filter(e => e.partyName).map(e => e.partyName!)));
-  const uniqueFarmerNames = Array.from(new Set(entries.filter(e => e.farmerName).map(e => e.farmerName!)));
+  const uniqueFarmerOptions = (() => {
+    const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
+    entries.filter(e => e.farmerName).forEach(e => {
+      const key = e.farmerName!.toLowerCase();
+      if (!farmerMap.has(key)) {
+        // Try to find contact info from the farmers query data
+        const farmerWithDue = farmers.find(f => f.farmerName.toLowerCase() === key);
+        farmerMap.set(key, {
+          name: e.farmerName!,
+          village: e.farmerVillage || farmerWithDue?.village || null,
+          contact: farmerWithDue?.farmerContact || null,
+        });
+      }
+    });
+    return Array.from(farmerMap.values());
+  })();
+  const uniqueFarmerNames = uniqueFarmerOptions.map(f => f.name);
   const uniqueYears = Array.from(new Set(entries.map(e => new Date(e.entryDate).getFullYear().toString()))).sort().reverse();
 
   const hasActiveFilters = (filterPartyName && filterPartyName !== "all") || 
@@ -1099,8 +1119,19 @@ export function CashManagementTab() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
-                {uniqueFarmerNames.map((name) => (
-                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                {uniqueFarmerOptions.map((farmer) => (
+                  <SelectItem key={farmer.name} value={farmer.name}>
+                    <div className="flex flex-col">
+                      <span>{farmer.name}</span>
+                      {(farmer.village || farmer.contact) && (
+                        <span className="text-xs text-muted-foreground">
+                          {farmer.village || ""}
+                          {farmer.village && farmer.contact && " • "}
+                          {farmer.contact || ""}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -1337,9 +1368,11 @@ export function CashManagementTab() {
                                           />
                                           <div className="flex flex-col flex-1">
                                             <span className="font-medium">{farmer.farmerName}</span>
-                                            {farmer.village && (
-                                              <span className="text-xs text-muted-foreground">{farmer.village}</span>
-                                            )}
+                                            <span className="text-xs text-muted-foreground">
+                                              {farmer.village || ""}
+                                              {farmer.village && farmer.farmerContact && " • "}
+                                              {farmer.farmerContact || ""}
+                                            </span>
                                           </div>
                                           <Badge variant="secondary" className="ml-2">
                                             ₹{farmer.totalDue.toFixed(0)}
@@ -1523,9 +1556,11 @@ export function CashManagementTab() {
                                   <SelectItem key={farmer.name} value={farmer.name}>
                                     <div className="flex items-center justify-between gap-4">
                                       <span>{farmer.name}</span>
-                                      {farmer.address && (
-                                        <span className="text-xs text-muted-foreground">({farmer.address})</span>
-                                      )}
+                                      <span className="text-xs text-muted-foreground">
+                                        {farmer.address || ""}
+                                        {farmer.address && farmer.contact && " • "}
+                                        {farmer.contact || ""}
+                                      </span>
                                       {farmer.pendingDues > 0 && (
                                         <Badge variant="secondary">
                                           {t("Due", "बकाया")}: ₹{farmer.pendingDues.toFixed(0)}

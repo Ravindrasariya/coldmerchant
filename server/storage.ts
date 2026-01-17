@@ -98,10 +98,10 @@ export interface IStorage {
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
-  getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]>;
+  getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
-  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; transactionCount: number }[]>;
+  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number }[]>;
   getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
@@ -751,7 +751,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; entryCount: number }[]> {
+  async getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]> {
     // Get stock entries with payment status "due" or "partial" 
     const entries = await db.select().from(stockEntries)
       .where(and(
@@ -760,7 +760,7 @@ export class DatabaseStorage implements IStorage {
       ));
     
     // Group by normalized farmerName (case-insensitive, trimmed) and calculate total due from lots
-    const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; entryCount: number }>();
+    const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }>();
     
     for (const entry of entries) {
       const normalizedName = normalizeName(entry.farmerName);
@@ -807,9 +807,14 @@ export class DatabaseStorage implements IStorage {
       if (existing) {
         existing.totalDue += entryDue;
         existing.entryCount += 1;
+        // Update contact if not already set
+        if (!existing.farmerContact && entry.farmerContact) {
+          existing.farmerContact = entry.farmerContact;
+        }
       } else {
         farmerMap.set(normalizedName, {
           displayName: entry.farmerName.trim(), // Keep original casing but trim spaces
+          farmerContact: entry.farmerContact || null,
           village: entry.village,
           totalDue: entryDue,
           entryCount: 1,
@@ -819,6 +824,7 @@ export class DatabaseStorage implements IStorage {
     
     return Array.from(farmerMap.entries()).map(([_, data]) => ({
       farmerName: data.displayName,
+      farmerContact: data.farmerContact,
       village: data.village,
       totalDue: data.totalDue,
       entryCount: data.entryCount,
@@ -870,7 +876,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; village: string | null; totalDue: number; transactionCount: number }[]> {
+  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number }[]> {
     // Get all seed transactions for this merchant
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
@@ -879,7 +885,7 @@ export class DatabaseStorage implements IStorage {
     // so we don't need to subtract them again here. Just use totalDueToFarmer directly.
     
     // Build farmer map from seed transactions (totalDueToFarmer is already reduced by FIFO payments)
-    const farmerMap = new Map<string, { displayName: string; village: string | null; totalDue: number; transactionCount: number }>();
+    const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
       const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
@@ -894,9 +900,14 @@ export class DatabaseStorage implements IStorage {
       if (existing) {
         existing.totalDue += dueToFarmer;
         existing.transactionCount += 1;
+        // Update contact if not already set
+        if (!existing.farmerContact && txn.farmerContact) {
+          existing.farmerContact = txn.farmerContact;
+        }
       } else {
         farmerMap.set(key, {
           displayName: txn.farmerName.trim(), // Keep original casing but trim spaces
+          farmerContact: txn.farmerContact || null,
           village: txn.village || null,
           totalDue: dueToFarmer,
           transactionCount: 1,
@@ -909,6 +920,7 @@ export class DatabaseStorage implements IStorage {
       .filter(([_, data]) => data.totalDue > 0)
       .map(([_, data]) => ({
         farmerName: data.displayName,
+        farmerContact: data.farmerContact,
         village: data.village,
         totalDue: data.totalDue,
         transactionCount: data.transactionCount,

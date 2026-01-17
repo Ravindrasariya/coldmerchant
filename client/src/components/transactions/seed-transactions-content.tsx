@@ -93,11 +93,27 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
     return uniqueYears.length > 0 ? uniqueYears : [new Date().getFullYear().toString()];
   }, [transactions]);
 
-  const farmerNames = useMemo(() => {
+  const farmerOptions = useMemo(() => {
     if (!transactions) return [];
-    const names = transactions.map(t => t.farmerName).filter(Boolean);
-    return Array.from(new Set(names));
+    const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
+    transactions.forEach(t => {
+      if (t.farmerName) {
+        const key = t.farmerName.toLowerCase();
+        if (!farmerMap.has(key)) {
+          farmerMap.set(key, {
+            name: t.farmerName,
+            village: t.village,
+            contact: t.farmerContact,
+          });
+        }
+      }
+    });
+    return Array.from(farmerMap.values());
   }, [transactions]);
+
+  const farmerNames = useMemo(() => {
+    return farmerOptions.map(f => f.name);
+  }, [farmerOptions]);
 
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
@@ -431,19 +447,26 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
                     <CommandList>
                       <CommandEmpty>{t("No farmer found", "कोई किसान नहीं मिला")}</CommandEmpty>
                       <CommandGroup>
-                        {farmerNames
-                          .filter(name => name.toLowerCase().includes(filterFarmer.toLowerCase()))
-                          .map(name => (
+                        {farmerOptions
+                          .filter(f => f.name.toLowerCase().includes(filterFarmer.toLowerCase()))
+                          .map(farmer => (
                             <CommandItem
-                              key={name}
-                              value={name}
+                              key={farmer.name}
+                              value={farmer.name}
                               onSelect={(value) => {
                                 setFilterFarmer(value === filterFarmer ? "" : value);
                                 setFarmerDropdownOpen(false);
                               }}
                             >
-                              <Check className={cn("mr-2 h-4 w-4", filterFarmer === name ? "opacity-100" : "opacity-0")} />
-                              {name}
+                              <Check className={cn("mr-2 h-4 w-4", filterFarmer === farmer.name ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col flex-1">
+                                <span className="font-medium">{farmer.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {farmer.village || ""}
+                                  {farmer.village && farmer.contact && " • "}
+                                  {farmer.contact || ""}
+                                </span>
+                              </div>
                             </CommandItem>
                           ))}
                       </CommandGroup>

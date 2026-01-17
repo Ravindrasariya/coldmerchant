@@ -194,12 +194,25 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     return entries.map(e => e.serialNumber).sort((a, b) => a - b);
   }, [entries]);
 
-  const farmerNames = useMemo(() => {
+  const farmerOptions = useMemo(() => {
     if (!entries) return [];
-    const names = new Set<string>();
-    entries.forEach(entry => names.add(entry.farmerName));
-    return Array.from(names).sort();
+    const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
+    entries.forEach(entry => {
+      const key = entry.farmerName.toLowerCase();
+      if (!farmerMap.has(key)) {
+        farmerMap.set(key, {
+          name: entry.farmerName,
+          village: entry.village,
+          contact: entry.farmerContact,
+        });
+      }
+    });
+    return Array.from(farmerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [entries]);
+
+  const farmerNames = useMemo(() => {
+    return farmerOptions.map(f => f.name);
+  }, [farmerOptions]);
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
@@ -534,19 +547,26 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                   <CommandList>
                     <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
                     <CommandGroup>
-                      {farmerNames.map((name) => (
+                      {farmerOptions.map((farmer) => (
                         <CommandItem
-                          key={name}
-                          value={name}
+                          key={farmer.name}
+                          value={farmer.name}
                           onSelect={(currentValue) => {
                             setFilterFarmer(currentValue === filterFarmer ? "" : currentValue);
                             setFarmerPopoverOpen(false);
                           }}
                         >
                           <Check
-                            className={`mr-2 h-4 w-4 ${filterFarmer === name ? "opacity-100" : "opacity-0"}`}
+                            className={`mr-2 h-4 w-4 ${filterFarmer === farmer.name ? "opacity-100" : "opacity-0"}`}
                           />
-                          {name}
+                          <div className="flex flex-col flex-1">
+                            <span className="font-medium">{farmer.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {farmer.village || ""}
+                              {farmer.village && farmer.contact && " • "}
+                              {farmer.contact || ""}
+                            </span>
+                          </div>
                         </CommandItem>
                       ))}
                     </CommandGroup>
