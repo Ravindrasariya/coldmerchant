@@ -100,15 +100,22 @@ export async function registerRoutes(
         const lot = await storage.createLot({
           stockEntryId: stockEntry.id,
           merchantId,
-          coldStoreName: lotData.coldStoreName,
+          place: lotData.place || "cold_store",
+          coldStoreName: lotData.place === "cold_store" ? (lotData.coldStoreName || null) : null,
+          coldStoreLotNumber: lotData.place === "cold_store" ? (lotData.coldStoreLotNumber || null) : null,
+          crop: lotData.crop || "potato",
           originalBags: lotData.originalBags,
-          potatoType: lotData.potatoType,
+          potatoType: lotData.crop === "potato" ? (lotData.potatoType || null) : null,
+          harvestPotatoType: lotData.crop === "potato" ? (lotData.harvestPotatoType || null) : null,
           bagType: lotData.bagType,
           quality: lotData.quality,
           cutType: lotData.cutType,
           size: lotData.cutType === "gate_cut" ? (lotData.size || null) : null,
           pricePerKg: lotData.cutType === "gate_cut" && lotData.pricePerKg 
             ? lotData.pricePerKg.toString() 
+            : null,
+          expectedColdCharges: lotData.expectedColdCharges 
+            ? lotData.expectedColdCharges.toString() 
             : null,
           coldStoreChargesPerBag: lotData.coldStoreChargesPerBag 
             ? lotData.coldStoreChargesPerBag.toString() 
@@ -1064,8 +1071,8 @@ export async function registerRoutes(
             lotId,
             breakdownId,
             serialNumber: entry?.serialNumber || 0,
-            coldStoreName: lot.coldStoreName,
-            potatoType: lot.potatoType,
+            coldStoreName: lot.coldStoreName || "",
+            potatoType: lot.potatoType || "",
             size,
             bagsMoved: itemChange.bagsMoved,
             netWeight: netWeight.toString(),

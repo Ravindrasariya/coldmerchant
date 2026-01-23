@@ -19,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Plus, Trash2, Package } from "lucide-react";
-import { StockEntryForm, POTATO_TYPES, BAG_TYPES, QUALITY_OPTIONS, SIZE_OPTIONS } from "@shared/schema";
+import { StockEntryForm, POTATO_TYPES, HARVEST_POTATO_TYPES, QUALITY_OPTIONS, SIZE_OPTIONS } from "@shared/schema";
 import { BagBreakdownRow } from "./bag-breakdown-row";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -97,6 +97,8 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
     setColdStoreQuery("");
   };
 
+  const place = form.watch(`lots.${lotIndex}.place`) || "cold_store";
+  const crop = form.watch(`lots.${lotIndex}.crop`) || "potato";
   const cutType = form.watch(`lots.${lotIndex}.cutType`);
   const originalBags = form.watch(`lots.${lotIndex}.originalBags`) || 0;
 
@@ -143,49 +145,117 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <FormField
             control={form.control}
-            name={`lots.${lotIndex}.coldStoreName`}
+            name={`lots.${lotIndex}.place`}
             render={({ field }) => (
-              <FormItem className="relative">
-                <FormLabel>{t("Cold Store Name", "कोल्ड स्टोर का नाम")} *</FormLabel>
-                <FormControl>
-                  <Input 
-                    placeholder={t("Enter cold store name", "कोल्ड स्टोर का नाम दर्ज करें")} 
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      setColdStoreQuery(e.target.value);
-                      setShowColdStoreSuggestions(true);
-                    }}
-                    onFocus={() => {
-                      if (field.value && field.value.length >= 2) {
-                        setColdStoreQuery(field.value);
-                        setShowColdStoreSuggestions(true);
-                      }
-                    }}
-                    autoComplete="off"
-                    data-testid={`input-cold-store-${lotIndex}`}
-                  />
-                </FormControl>
-                {showColdStoreSuggestions && coldStoreSuggestions.length > 0 && (
-                  <div 
-                    data-coldstore-suggestion-dropdown
-                    className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
-                  >
-                    {coldStoreSuggestions.map((name, index) => (
-                      <div
-                        key={`${name}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectColdStore(name);
+              <FormItem>
+                <FormLabel>{t("Place", "स्थान")} *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || "cold_store"}>
+                  <FormControl>
+                    <SelectTrigger data-testid={`select-place-${lotIndex}`}>
+                      <SelectValue placeholder={t("Select place", "स्थान चुनें")} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="farm_gate">{t("Farm Gate", "खेत गेट")}</SelectItem>
+                    <SelectItem value="cold_store">{t("Cold Store", "कोल्ड स्टोर")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {place === "cold_store" && (
+            <>
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.coldStoreName`}
+                render={({ field }) => (
+                  <FormItem className="relative">
+                    <FormLabel>{t("Cold Store Name", "कोल्ड स्टोर का नाम")} *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder={t("Enter cold store name", "कोल्ड स्टोर का नाम दर्ज करें")} 
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setColdStoreQuery(e.target.value);
+                          setShowColdStoreSuggestions(true);
                         }}
-                        data-testid={`suggestion-coldstore-${lotIndex}-${index}`}
+                        onFocus={() => {
+                          if (field.value && field.value.length >= 2) {
+                            setColdStoreQuery(field.value);
+                            setShowColdStoreSuggestions(true);
+                          }
+                        }}
+                        autoComplete="off"
+                        data-testid={`input-cold-store-${lotIndex}`}
+                      />
+                    </FormControl>
+                    {showColdStoreSuggestions && coldStoreSuggestions.length > 0 && (
+                      <div 
+                        data-coldstore-suggestion-dropdown
+                        className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                       >
-                        <div className="font-medium">{name}</div>
+                        {coldStoreSuggestions.map((name, index) => (
+                          <div
+                            key={`${name}-${index}`}
+                            className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectColdStore(name);
+                            }}
+                            data-testid={`suggestion-coldstore-${lotIndex}-${index}`}
+                          >
+                            <div className="font-medium">{name}</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
                 )}
+              />
+
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.coldStoreLotNumber`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Cold Store Lot #", "कोल्ड स्टोर लॉट #")}</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder={t("Enter lot number", "लॉट नंबर दर्ज करें")} 
+                        {...field}
+                        value={field.value || ""}
+                        data-testid={`input-cold-store-lot-number-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
+
+          <FormField
+            control={form.control}
+            name={`lots.${lotIndex}.crop`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("Crop", "फसल")} *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || "potato"}>
+                  <FormControl>
+                    <SelectTrigger data-testid={`select-crop-${lotIndex}`}>
+                      <SelectValue placeholder={t("Select crop", "फसल चुनें")} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="potato">{t("Potato", "आलू")}</SelectItem>
+                    <SelectItem value="onion">{t("Onion", "प्याज")}</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -216,30 +286,59 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name={`lots.${lotIndex}.potatoType`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("Type of Potato", "आलू का प्रकार")} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-testid={`select-potato-type-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select type", "प्रकार चुनें")} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {POTATO_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {crop === "potato" && (
+            <>
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.potatoType`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Variety", "किस्म")} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid={`select-variety-${lotIndex}`}>
+                          <SelectValue placeholder={t("Select variety", "किस्म चुनें")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {POTATO_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.harvestPotatoType`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Potato Type", "आलू का प्रकार")} *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid={`select-potato-type-${lotIndex}`}>
+                          <SelectValue placeholder={t("Select type", "प्रकार चुनें")} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {HARVEST_POTATO_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
 
           <FormField
             control={form.control}
@@ -247,20 +346,14 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>{t("Bag Type", "बोरी का प्रकार")} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-testid={`select-bag-type-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select bag type", "बोरी का प्रकार चुनें")} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {BAG_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <Input 
+                    placeholder={t("Enter bag type", "बोरी का प्रकार दर्ज करें")} 
+                    {...field}
+                    value={field.value || ""}
+                    data-testid={`input-bag-type-${lotIndex}`}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -296,11 +389,11 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             name={`lots.${lotIndex}.cutType`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("Cut Type", "कट प्रकार")} *</FormLabel>
+                <FormLabel>{t("Delivery Type", "डिलीवरी प्रकार")} *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
-                    <SelectTrigger data-testid={`select-cut-type-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select cut type", "कट प्रकार चुनें")} />
+                    <SelectTrigger data-testid={`select-delivery-type-${lotIndex}`}>
+                      <SelectValue placeholder={t("Select delivery type", "डिलीवरी प्रकार चुनें")} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -369,10 +462,10 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
 
           <FormField
             control={form.control}
-            name={`lots.${lotIndex}.coldStoreChargesPerBag`}
+            name={`lots.${lotIndex}.expectedColdCharges`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("Cold Store Charges/Bag", "कोल्ड स्टोर शुल्क/बोरी")}</FormLabel>
+                <FormLabel>{t("Expected Cold Charges", "अपेक्षित कोल्ड शुल्क")}</FormLabel>
                 <FormControl>
                   <Input 
                     type="text"
@@ -384,7 +477,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                       const val = e.target.value.replace(/[^0-9.]/g, '');
                       field.onChange(val === "" ? undefined : parseFloat(val));
                     }}
-                    data-testid={`input-coldstore-charge-${lotIndex}`}
+                    data-testid={`input-expected-cold-charges-${lotIndex}`}
                   />
                 </FormControl>
                 <FormMessage />

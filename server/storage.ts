@@ -840,17 +840,18 @@ export class DatabaseStorage implements IStorage {
     const coldStoreMap = new Map<string, { displayName: string; totalDue: number; lotCount: number }>();
     
     for (const lot of allLots) {
-      const normalizedName = normalizeName(lot.coldStoreName);
+      const normalizedName = normalizeName(lot.coldStoreName || "");
       if (!normalizedName) continue;
       
       const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
       const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
+      const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
       
       // Skip lots with no charges at all
-      if (chargesPerBag <= 0 && hammaliGradingCharges <= 0) continue;
+      if (chargesPerBag <= 0 && hammaliGradingCharges <= 0 && expectedColdCharges <= 0) continue;
       
-      // Calculate total cold store charges for this lot (per-bag + hammali/grading)
-      const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges;
+      // Calculate total cold store charges for this lot (per-bag + hammali/grading + expected cold charges)
+      const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges;
       const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
       const due = totalCharges - paidAmount;
       
@@ -862,7 +863,7 @@ export class DatabaseStorage implements IStorage {
         existing.lotCount += 1;
       } else {
         coldStoreMap.set(normalizedName, {
-          displayName: lot.coldStoreName.trim(), // Keep original casing but trim spaces
+          displayName: (lot.coldStoreName || "").trim(), // Keep original casing but trim spaces
           totalDue: due,
           lotCount: 1,
         });
