@@ -39,9 +39,21 @@ The system isolates data by merchant:
 - **Merchants**: Top-level tenant entity with name, contact, address
 - **Users**: Linked to merchants with role-based access (isSystemAdmin, canEdit, mustChangePassword flags)
 - **Stock Entries**: Per-merchant with auto-incrementing serial numbers
-- **Lots**: Child of stock entries, tracks cold store inventory
+- **Lots**: Child of stock entries, tracks inventory with flexible field structure:
+  - **Place**: Farm Gate or Cold Store (determines conditional field display)
+  - **Crop**: Potato or Onion (determines variety/type field visibility)
+  - **Cold Store Fields**: Name, Lot Number (only visible when Place=Cold Store)
+  - **Potato Fields**: Variety (potatoType), Harvest Potato Type (only visible when Crop=Potato)
+  - **Delivery Type**: Gate Cut or Full Truck
+  - **Expected Cold Charges**: Total amount that feeds into cold store dues
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
 - **Edit History**: Audit trail of all modifications to stock entries after initial creation
+
+### Cold Store Dues Calculation
+Cold store dues are calculated as: `(chargesPerBag × originalBags) + hammaliGradingCharges + expectedColdCharges`
+- All three components contribute to the total dues owed to a cold store
+- FIFO allocation applies payments to oldest outstanding lots first
+- Dues are grouped by normalized cold store name (case-insensitive)
 
 ### Edit History System
 - All modifications to stock entries after initial creation are automatically recorded
