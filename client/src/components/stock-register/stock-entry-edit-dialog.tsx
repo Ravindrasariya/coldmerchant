@@ -49,16 +49,21 @@ interface StockEntryWithLots {
   remarks: string | null;
   lots: Array<{
     id: number;
-    coldStoreName: string;
+    place: string | null;
+    coldStoreName: string | null;
+    coldStoreLotNumber: string | null;
+    crop: string | null;
     originalBags: number;
     remainingBags: number;
-    potatoType: string;
+    potatoType: string | null;
+    harvestPotatoType: string | null;
     bagType: string;
     quality: string;
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
     coldStoreChargesPerBag: string | null;
+    expectedColdCharges: string | null;
     hammaliGradingCharges: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -89,7 +94,14 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [lots, setLots] = useState(entry.lots.map(lot => ({
     ...lot,
+    place: lot.place || "cold_store",
+    coldStoreName: lot.coldStoreName || "",
+    coldStoreLotNumber: lot.coldStoreLotNumber || "",
+    crop: lot.crop || "potato",
+    potatoType: lot.potatoType || "",
+    harvestPotatoType: lot.harvestPotatoType || "",
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
+    expectedColdCharges: lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : null,
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
     adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
     adjustedAmountType: lot.adjustedAmountType || null,

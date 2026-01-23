@@ -222,6 +222,9 @@ export async function registerRoutes(
             if (existingLot && lotData.hammaliGradingCharges !== undefined) {
               compareField('hammaliGradingCharges', existingLot.hammaliGradingCharges, lotData.hammaliGradingCharges, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.expectedColdCharges !== undefined) {
+              compareField('expectedColdCharges', existingLot.expectedColdCharges, lotData.expectedColdCharges, lotLabel, 'lot', lotData.id);
+            }
             if (existingLot && lotData.adjustedAmount !== undefined) {
               compareField('adjustedAmount', existingLot.adjustedAmount, lotData.adjustedAmount, lotLabel, 'lot', lotData.id);
             }
@@ -230,6 +233,18 @@ export async function registerRoutes(
             }
             if (existingLot && lotData.adjustedAmountRemark !== undefined) {
               compareField('adjustedAmountRemark', existingLot.adjustedAmountRemark, lotData.adjustedAmountRemark, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.place !== undefined) {
+              compareField('place', existingLot.place, lotData.place, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.crop !== undefined) {
+              compareField('crop', existingLot.crop, lotData.crop, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.harvestPotatoType !== undefined) {
+              compareField('harvestPotatoType', existingLot.harvestPotatoType, lotData.harvestPotatoType, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.coldStoreLotNumber !== undefined) {
+              compareField('coldStoreLotNumber', existingLot.coldStoreLotNumber, lotData.coldStoreLotNumber, lotLabel, 'lot', lotData.id);
             }
 
             // Update existing lot
@@ -241,6 +256,9 @@ export async function registerRoutes(
               hammaliGradingCharges: lotData.hammaliGradingCharges !== undefined
                 ? (lotData.hammaliGradingCharges ? lotData.hammaliGradingCharges.toString() : null)
                 : undefined,
+              expectedColdCharges: lotData.expectedColdCharges !== undefined
+                ? (lotData.expectedColdCharges ? lotData.expectedColdCharges.toString() : null)
+                : undefined,
               adjustedAmount: lotData.adjustedAmount !== undefined
                 ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
                 : undefined,
@@ -249,6 +267,18 @@ export async function registerRoutes(
                 : undefined,
               adjustedAmountRemark: lotData.adjustedAmountRemark !== undefined
                 ? (lotData.adjustedAmountRemark || null)
+                : undefined,
+              place: lotData.place !== undefined
+                ? (lotData.place || "cold_store")
+                : undefined,
+              crop: lotData.crop !== undefined
+                ? (lotData.crop || "potato")
+                : undefined,
+              harvestPotatoType: lotData.harvestPotatoType !== undefined
+                ? (lotData.harvestPotatoType || null)
+                : undefined,
+              coldStoreLotNumber: lotData.coldStoreLotNumber !== undefined
+                ? (lotData.coldStoreLotNumber || null)
                 : undefined,
             });
 

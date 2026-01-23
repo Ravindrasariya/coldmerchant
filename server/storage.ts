@@ -1181,10 +1181,13 @@ export class DatabaseStorage implements IStorage {
         
         // Filter to only those matching cold store name (case-insensitive, trimmed) with remaining due
         const lotsWithDue = allLots.filter(lot => {
-          if (normalizeName(lot.coldStoreName) !== normalizedColdStoreName) return false;
+          if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
           const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
-          if (chargesPerBag <= 0) return false;
-          const totalCharges = chargesPerBag * lot.originalBags;
+          const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
+          const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
+          // Check if there are any charges
+          if (chargesPerBag <= 0 && hammaliGradingCharges <= 0 && expectedColdCharges <= 0) return false;
+          const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges;
           const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
           return totalCharges > paidAmount;
         });
@@ -1193,7 +1196,9 @@ export class DatabaseStorage implements IStorage {
           if (remainingAmount <= 0) break;
           
           const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
-          const totalCharges = chargesPerBag * lot.originalBags;
+          const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
+          const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
+          const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges;
           const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
           const due = totalCharges - currentPaid;
           
