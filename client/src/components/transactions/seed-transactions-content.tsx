@@ -353,7 +353,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Raw Potato / Seed Toggle */}
+          {/* Harvest / Seed Toggle */}
           <div className="flex items-center border rounded-md p-0.5 bg-muted/30">
             <Button
               variant={transactionMode === "raw" ? "default" : "ghost"}
@@ -363,7 +363,7 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
               data-testid="button-seed-txn-raw-mode"
             >
               <Package className="h-3.5 w-3.5" />
-              {t("Raw Potato", "कच्चा आलू")}
+              {t("Harvest", "फसल")}
             </Button>
             <Button
               variant={transactionMode === "seed" ? "default" : "ghost"}

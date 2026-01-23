@@ -298,7 +298,7 @@ export default function HomePage() {
                     data-testid="button-mode-raw"
                   >
                     <PackagePlus className="h-4 w-4" />
-                    {t("Raw Potato", "कच्चा आलू")}
+                    {t("Harvest", "फसल")}
                   </Button>
                   <Button
                     variant={stockMode === "seed" ? "default" : "ghost"}
@@ -347,7 +347,7 @@ export default function HomePage() {
                       data-testid="button-register-mode-raw"
                     >
                       <PackagePlus className="h-4 w-4" />
-                      {t("Raw Potato", "कच्चा आलू")}
+                      {t("Harvest", "फसल")}
                     </Button>
                     <Button
                       variant={stockMode === "seed" ? "default" : "ghost"}
