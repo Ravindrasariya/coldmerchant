@@ -50,15 +50,20 @@ export const lots = pgTable("lots", {
   id: serial("id").primaryKey(),
   stockEntryId: integer("stock_entry_id").notNull().references(() => stockEntries.id, { onDelete: "cascade" }),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  coldStoreName: text("cold_store_name").notNull(),
+  place: text("place").default("cold_store"), // farm_gate, cold_store
+  coldStoreName: text("cold_store_name"), // required only for cold_store place (made nullable)
+  coldStoreLotNumber: text("cold_store_lot_number"), // lot number at cold store
+  crop: text("crop").default("potato"), // potato, onion
   originalBags: integer("original_bags").notNull(),
-  potatoType: text("potato_type").notNull(), // Jyoti, Pukhraj, Lakar, LR, Torus, CS1, CS3, Others
-  bagType: text("bag_type").notNull(), // Wafer, Ration, Seed
+  potatoType: text("potato_type"), // Jyoti, Pukhraj, Lakar, LR, Torus, CS1, CS3, Others - variety (potato only, made nullable)
+  harvestPotatoType: text("harvest_potato_type"), // Wafer, Ration, Seed - for potato crop only
+  bagType: text("bag_type").notNull(), // editable text field now
   quality: text("quality").notNull(), // Poor, Medium, Good
-  cutType: text("cut_type").notNull(), // gate_cut, bilty_cut
+  cutType: text("cut_type").notNull(), // gate_cut, bilty_cut (now called Delivery Type in UI)
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
-  coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // charges per bag from cold store
+  expectedColdCharges: decimal("expected_cold_charges", { precision: 12, scale: 2 }), // total expected cold storage charges
+  coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // legacy: charges per bag from cold store
   hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // hammali and grading charges
   coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges
   adjustedAmount: decimal("adjusted_amount", { precision: 12, scale: 2 }), // adjustment amount for farmer due
@@ -733,15 +738,20 @@ export const bagBreakdownFormSchema = z.object({
 });
 
 export const lotFormSchema = z.object({
-  coldStoreName: z.string().min(1, "Cold store name is required"),
+  place: z.enum(["farm_gate", "cold_store"]).default("cold_store"),
+  coldStoreName: z.string().optional(), // required only for cold_store place
+  coldStoreLotNumber: z.string().optional(), // lot number at cold store
+  crop: z.enum(["potato", "onion"]).default("potato"),
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
-  potatoType: z.string().min(1, "Potato type is required"),
-  bagType: z.string().min(1, "Bag type is required"),
+  potatoType: z.string().optional(), // variety - required only for potato crop
+  harvestPotatoType: z.string().optional(), // Wafer, Ration, Seed - for potato crop only
+  bagType: z.string().min(1, "Bag type is required"), // editable text field
   quality: z.string().min(1, "Quality is required"),
-  cutType: z.enum(["gate_cut", "bilty_cut"]),
+  cutType: z.enum(["gate_cut", "bilty_cut"]), // now called Delivery Type in UI
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
-  coldStoreChargesPerBag: z.coerce.number().optional(), // charges per bag from cold store
+  expectedColdCharges: z.coerce.number().optional(), // total expected cold storage charges
+  coldStoreChargesPerBag: z.coerce.number().optional(), // legacy: charges per bag from cold store
   hammaliGradingCharges: z.coerce.number().optional(), // hammali and grading charges
   adjustedAmount: z.coerce.number().optional(), // adjustment amount for farmer due
   adjustedAmountType: z.enum(["debit", "credit"]).optional(), // debit or credit
@@ -789,12 +799,15 @@ export type TransactionForm = z.infer<typeof transactionFormSchema>;
 export const DISTRICTS = ["Ujjain", "Shajapur", "Indore", "Dewas", "Agar Malwa"] as const;
 export const SEED_DISTRICTS = ["Ujjain", "Agar Malwa", "Shajapur", "Dewas", "Indore", "Ratlam", "Rajgarh", "Other"] as const;
 export const STATES = ["Madhya Pradesh", "Gujarat"] as const;
+export const PLACE_OPTIONS = ["farm_gate", "cold_store"] as const;
+export const CROP_OPTIONS = ["potato", "onion"] as const;
 export const POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "LR", "Torus", "CS1", "CS3", "Others"] as const;
+export const HARVEST_POTATO_TYPES = ["Wafer", "Ration", "Seed"] as const; // Potato type for harvest entries
 export const SEED_POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "CS1", "CS3", "Torus", "LR"] as const;
 export const BAG_TYPES = ["Wafer", "Ration", "Seed"] as const;
 export const SEED_BAG_TYPES = ["Wafer", "Ration"] as const;
 export const QUALITY_OPTIONS = ["Poor", "Medium", "Good"] as const;
-export const CUT_TYPES = ["gate_cut", "bilty_cut"] as const;
+export const CUT_TYPES = ["gate_cut", "bilty_cut"] as const; // Delivery Types
 export const SIZE_OPTIONS = ["Large", "Medium", "Small", "Wastage"] as const;
 export const SEED_SIZE_OPTIONS = ["Small", "Medium", "Large"] as const;
 export const PAYMENT_STATUS = ["due", "paid"] as const;
