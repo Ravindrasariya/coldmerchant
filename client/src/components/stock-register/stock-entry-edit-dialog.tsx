@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Save, Loader2, Plus, Trash2, Package, History, ChevronDown, ChevronRight } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { SIZE_OPTIONS } from "@shared/schema";
+import { SIZE_OPTIONS, CHARGE_TYPES } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryWithLots {
@@ -207,8 +207,77 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     setLots(newLots);
   };
 
+  const handleChargeAdd = (lotIndex: number) => {
+    const newLots = [...lots];
+    const currentCharges = newLots[lotIndex].charges || [];
+    newLots[lotIndex].charges = [...currentCharges, { type: "", amount: 0 }];
+    setLots(newLots);
+  };
+
+  const handleChargeChange = (
+    lotIndex: number,
+    chargeIndex: number,
+    field: "type" | "amount",
+    value: string | number
+  ) => {
+    const newLots = [...lots];
+    const currentCharges = [...(newLots[lotIndex].charges || [])];
+    currentCharges[chargeIndex] = {
+      ...currentCharges[chargeIndex],
+      [field]: value
+    };
+    newLots[lotIndex].charges = currentCharges;
+    setLots(newLots);
+  };
+
+  const handleChargeRemove = (lotIndex: number, chargeIndex: number) => {
+    const newLots = [...lots];
+    const currentCharges = [...(newLots[lotIndex].charges || [])];
+    currentCharges.splice(chargeIndex, 1);
+    newLots[lotIndex].charges = currentCharges;
+    setLots(newLots);
+  };
+
   const handleSave = () => {
-    updateMutation.mutate({ paymentStatus, remarks, lots });
+    // Validate charges before saving
+    for (let i = 0; i < lots.length; i++) {
+      const lot = lots[i];
+      const charges = lot.charges || [];
+      for (let j = 0; j < charges.length; j++) {
+        const charge = charges[j];
+        // Check if charge has type but no valid amount
+        if (charge.type && charge.type.length > 0 && (!charge.amount || charge.amount <= 0)) {
+          toast({
+            title: t("Validation Error", "सत्यापन त्रुटि"),
+            description: t(
+              `Lot ${i + 1}: ${charge.type} must have an amount greater than 0`,
+              `लॉट ${i + 1}: ${charge.type} की राशि 0 से अधिक होनी चाहिए`
+            ),
+            variant: "destructive"
+          });
+          return;
+        }
+        // Check if amount is provided but type is missing
+        if (charge.amount && charge.amount > 0 && (!charge.type || charge.type.length === 0)) {
+          toast({
+            title: t("Validation Error", "सत्यापन त्रुटि"),
+            description: t(
+              `Lot ${i + 1}: Please select a charge type for amount ₹${charge.amount}`,
+              `लॉट ${i + 1}: कृपया ₹${charge.amount} के लिए शुल्क प्रकार चुनें`
+            ),
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+    }
+    
+    // Clean up charges before saving - remove empty entries
+    const cleanedLots = lots.map(lot => ({
+      ...lot,
+      charges: (lot.charges || []).filter(c => c.type && c.type.length > 0 && c.amount > 0)
+    }));
+    updateMutation.mutate({ paymentStatus, remarks, lots: cleanedLots });
   };
 
   return (
@@ -635,11 +704,82 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           const hammali = lot.hammaliGradingCharges !== null 
                             ? (lot.hammaliGradingCharges as number) 
                             : 0;
-                          const total = coldCharge + hammali;
+                          // Sum dynamic charges for cold store dues (Cold Charges + Ware House Charges)
+                          const dynamicColdCharges = (lot.charges || [])
+                            .filter(c => c.type === "Cold Charges" || c.type === "Ware House Charges")
+                            .reduce((sum, c) => sum + (c.amount || 0), 0);
+                          const total = coldCharge + hammali + dynamicColdCharges;
                           return total > 0 ? `₹${total.toFixed(2)}` : "—";
                         })()}
                       </p>
                     </div>
+                  </div>
+                </CardContent>
+                
+                {/* Dynamic Charges Section */}
+                <CardContent className="pt-0 border-t">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">{t("Additional Charges", "अतिरिक्त शुल्क")}</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleChargeAdd(lotIndex)}
+                        data-testid={`edit-add-charge-${lotIndex}`}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        {t("Add Charge", "शुल्क जोड़ें")}
+                      </Button>
+                    </div>
+                    
+                    {(lot.charges || []).map((charge, chargeIndex) => (
+                      <div key={chargeIndex} className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                        <Select
+                          value={charge.type || ""}
+                          onValueChange={(v) => handleChargeChange(lotIndex, chargeIndex, "type", v)}
+                        >
+                          <SelectTrigger className="h-8 flex-1" data-testid={`edit-charge-type-${lotIndex}-${chargeIndex}`}>
+                            <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CHARGE_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          className="h-8 w-28"
+                          placeholder="₹0"
+                          value={charge.amount || ""}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            handleChargeChange(lotIndex, chargeIndex, "amount", val === "" ? 0 : parseFloat(val));
+                          }}
+                          data-testid={`edit-charge-amount-${lotIndex}-${chargeIndex}`}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleChargeRemove(lotIndex, chargeIndex)}
+                          data-testid={`edit-charge-remove-${lotIndex}-${chargeIndex}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    
+                    {(!lot.charges || lot.charges.length === 0) && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        {t("No additional charges added", "कोई अतिरिक्त शुल्क नहीं जोड़ा गया")}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

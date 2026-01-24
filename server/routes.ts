@@ -156,6 +156,31 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const { paymentStatus, remarks, lots } = req.body;
 
+      // Validate charges in lots if present using CHARGE_TYPES
+      const validChargeTypes = ["Advance", "Bag Charges", "Cold Charges", "Freight Charges", "Grading Charges", "Hammali Charges", "Kata Charges", "Other Charges", "Ware House Charges"];
+      if (lots && Array.isArray(lots)) {
+        for (const lot of lots) {
+          if (lot.charges && Array.isArray(lot.charges)) {
+            // Filter out empty charges and validate
+            lot.charges = lot.charges.filter((charge: any) => charge.type && charge.type.length > 0);
+            for (const charge of lot.charges) {
+              // Validate charge type is in allowed list
+              if (!validChargeTypes.includes(charge.type)) {
+                return res.status(400).json({ 
+                  message: `Invalid charge type: ${charge.type}. Allowed types: ${validChargeTypes.join(", ")}` 
+                });
+              }
+              // Validate amount is a positive number
+              if (typeof charge.amount !== 'number' || charge.amount <= 0) {
+                return res.status(400).json({ 
+                  message: `Invalid charge amount: ${charge.type} must have amount greater than 0` 
+                });
+              }
+            }
+          }
+        }
+      }
+
       // Check if entry exists and belongs to merchant - this is our snapshot
       const existingEntry = await storage.getStockEntryById(id, merchantId);
       if (!existingEntry) {
