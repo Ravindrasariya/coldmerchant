@@ -66,9 +66,9 @@ export interface IStorage {
   // Stock Entry operations
   getStockEntriesByMerchant(merchantId: number): Promise<any[]>;
   getStockEntryById(id: number, merchantId: number): Promise<any | undefined>;
-  createStockEntry(entry: InsertStockEntry & { merchantId: number }): Promise<StockEntry>;
+  createStockEntry(entry: InsertStockEntry & { merchantId: number; crop?: string }): Promise<StockEntry>;
   updateStockEntry(id: number, merchantId: number, data: Partial<StockEntry>): Promise<StockEntry | undefined>;
-  getNextSerialNumber(merchantId: number): Promise<number>;
+  getNextSerialNumber(merchantId: number, crop?: string): Promise<number>;
   
   // Lot operations
   createLot(lot: InsertLot): Promise<Lot>;
@@ -90,7 +90,7 @@ export interface IStorage {
   // Transaction operations
   getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: TransactionItem[] })[]>;
   createTransaction(transaction: InsertTransaction & { transactionNumber: number }, items: Omit<InsertTransactionItem, 'transactionId'>[]): Promise<Transaction & { items: TransactionItem[] }>;
-  getNextTransactionNumber(merchantId: number): Promise<number>;
+  getNextTransactionNumber(merchantId: number, crop?: string): Promise<number>;
   getUnsoldInventory(merchantId: number): Promise<any[]>;
   
   // Cash Entry operations
@@ -326,10 +326,12 @@ export class DatabaseStorage implements IStorage {
     return { ...entry, lots: lotsWithBreakdowns };
   }
 
-  async createStockEntry(entry: InsertStockEntry & { merchantId: number }): Promise<StockEntry> {
-    const serialNumber = await this.getNextSerialNumber(entry.merchantId);
+  async createStockEntry(entry: InsertStockEntry & { merchantId: number; crop?: string }): Promise<StockEntry> {
+    const crop = entry.crop || "potato";
+    const serialNumber = await this.getNextSerialNumber(entry.merchantId, crop);
     const [created] = await db.insert(stockEntries).values({
       ...entry,
+      crop,
       serialNumber,
     }).returning();
     return created;
@@ -343,10 +345,13 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  async getNextSerialNumber(merchantId: number): Promise<number> {
+  async getNextSerialNumber(merchantId: number, crop: string = "potato"): Promise<number> {
     const [result] = await db.select({ maxSerial: stockEntries.serialNumber })
       .from(stockEntries)
-      .where(eq(stockEntries.merchantId, merchantId))
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        eq(stockEntries.crop, crop)
+      ))
       .orderBy(desc(stockEntries.serialNumber))
       .limit(1);
     
@@ -499,10 +504,13 @@ export class DatabaseStorage implements IStorage {
     return { ...created, items: createdItems };
   }
 
-  async getNextTransactionNumber(merchantId: number): Promise<number> {
+  async getNextTransactionNumber(merchantId: number, crop: string = "potato"): Promise<number> {
     const [result] = await db.select()
       .from(transactions)
-      .where(eq(transactions.merchantId, merchantId))
+      .where(and(
+        eq(transactions.merchantId, merchantId),
+        eq(transactions.crop, crop)
+      ))
       .orderBy(desc(transactions.transactionNumber))
       .limit(1);
     

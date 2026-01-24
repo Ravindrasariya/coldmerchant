@@ -1,4 +1,4 @@
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/use-language";
 
 interface CropToggleProps {
@@ -10,29 +10,27 @@ export function CropToggle({ value, onChange }: CropToggleProps) {
   const { t } = useLanguage();
   
   return (
-    <ToggleGroup 
-      type="single" 
-      value={value}
-      onValueChange={(val) => {
-        if (val) onChange(val as "potato" | "onion");
-      }}
-      className="border rounded-md"
-      data-testid="toggle-crop"
-    >
-      <ToggleGroupItem 
-        value="potato" 
-        className="px-3 h-9 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+    <div className="flex rounded-md border" data-testid="toggle-crop">
+      <Button
+        type="button"
+        variant={value === "potato" ? "default" : "ghost"}
+        size="sm"
+        onClick={() => onChange("potato")}
+        className="rounded-r-none border-0 px-3"
         data-testid="toggle-crop-potato"
       >
         {t("Potato", "आलू")}
-      </ToggleGroupItem>
-      <ToggleGroupItem 
-        value="onion" 
-        className="px-3 h-9 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+      </Button>
+      <Button
+        type="button"
+        variant={value === "onion" ? "default" : "ghost"}
+        size="sm"
+        onClick={() => onChange("onion")}
+        className="rounded-l-none border-0 px-3"
         data-testid="toggle-crop-onion"
       >
         {t("Onion", "प्याज")}
-      </ToggleGroupItem>
-    </ToggleGroup>
+      </Button>
+    </div>
   );
 }

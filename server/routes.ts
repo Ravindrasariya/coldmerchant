@@ -80,10 +80,14 @@ export async function registerRoutes(
       }
 
       const data = validationResult.data;
+      
+      // Determine crop from first lot (all lots in an entry should have the same crop)
+      const entryCrop = data.lots?.[0]?.crop || "potato";
 
       // Create stock entry
       const stockEntry = await storage.createStockEntry({
         merchantId,
+        crop: entryCrop,
         purchaseDate: data.purchaseDate,
         farmerName: data.farmerName,
         farmerContact: data.farmerContact || null,
@@ -772,8 +776,12 @@ export async function registerRoutes(
         });
       }
 
-      // Get next transaction number
-      const transactionNumber = await storage.getNextTransactionNumber(merchantId);
+      // Determine crop from first item's lot
+      const firstLot = await storage.getLotById(parsedItems[0].lotId, merchantId);
+      const transactionCrop = firstLot?.crop || "potato";
+
+      // Get next transaction number for this crop
+      const transactionNumber = await storage.getNextTransactionNumber(merchantId, transactionCrop);
 
       // Calculate totals
       let totalBags = 0;
@@ -831,6 +839,7 @@ export async function registerRoutes(
         {
           merchantId,
           transactionNumber,
+          crop: transactionCrop,
           partyName: partyName || null,
           partyAddress: partyAddress || null,
           vehicleNumber: vehicleNumber || null,
