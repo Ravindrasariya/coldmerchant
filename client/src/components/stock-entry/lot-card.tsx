@@ -466,6 +466,31 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.totalWeight`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Total Weight (Kg)", "कुल वजन (किलो)")}</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="" 
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          field.onChange(val === "" ? undefined : parseFloat(val));
+                        }}
+                        data-testid={`input-total-weight-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </>
           )}
 

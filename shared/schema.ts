@@ -75,6 +75,7 @@ export const lots = pgTable("lots", {
   cutType: text("cut_type").notNull(), // gate_cut, bilty_cut (now called Delivery Type in UI)
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
+  totalWeight: decimal("total_weight", { precision: 12, scale: 2 }), // Total weight in kg (optional)
   charges: jsonb("charges"), // Dynamic charges array: [{ type: string, amount: number }]
   expectedColdCharges: decimal("expected_cold_charges", { precision: 12, scale: 2 }), // legacy: total expected cold storage charges
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // legacy: charges per bag from cold store
@@ -772,6 +773,7 @@ export const lotFormSchema = z.object({
   cutType: z.enum(["gate_cut", "bilty_cut"]), // now called Delivery Type in UI
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
+  totalWeight: z.coerce.number().optional(), // Total weight in kg (optional)
   charges: z.array(chargeEntrySchema).optional(), // Dynamic charges array
   adjustedAmount: z.coerce.number().optional(), // adjustment amount for farmer due
   adjustedAmountType: z.enum(["debit", "credit"]).optional(), // debit or credit
