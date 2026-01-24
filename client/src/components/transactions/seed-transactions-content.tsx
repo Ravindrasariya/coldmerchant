@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, Leaf, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -58,12 +58,7 @@ interface SeedTransaction {
   items: SeedTransactionItem[];
 }
 
-interface SeedTransactionsContentProps {
-  transactionMode: "raw" | "seed";
-  setTransactionMode: (mode: "raw" | "seed") => void;
-}
-
-export function SeedTransactionsContent({ transactionMode, setTransactionMode }: SeedTransactionsContentProps) {
+export function SeedTransactionsContent() {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
@@ -353,29 +348,6 @@ export function SeedTransactionsContent({ transactionMode, setTransactionMode }:
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Harvest / Seed Toggle */}
-          <div className="flex items-center border rounded-md p-0.5 bg-muted/30">
-            <Button
-              variant={transactionMode === "raw" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTransactionMode("raw")}
-              className="h-8 text-xs gap-1"
-              data-testid="button-seed-txn-raw-mode"
-            >
-              <Package className="h-3.5 w-3.5" />
-              {t("Harvest", "फसल")}
-            </Button>
-            <Button
-              variant={transactionMode === "seed" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setTransactionMode("seed")}
-              className="h-8 text-xs gap-1"
-              data-testid="button-seed-txn-seed-mode"
-            >
-              <Leaf className="h-3.5 w-3.5" />
-              {t("Seed", "बीज")}
-            </Button>
-          </div>
           <Button
             variant="ghost"
             size="icon"

@@ -18,8 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
 import { StockRegisterCard } from "@/components/stock-register/stock-register-card";
-import { SeedStockEntryForm } from "@/components/seed-stock-entry/seed-stock-entry-form";
-import { SeedStockRegisterCard } from "@/components/seed-stock-register/seed-stock-register-card";
+import { SeedSection } from "@/components/seed/seed-section";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
 import { 
@@ -45,7 +44,6 @@ export default function HomePage() {
   const { user, logoutMutation, changePasswordMutation } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("stock-entry");
-  const [stockMode, setStockMode] = useState<"raw" | "seed">("raw");
   const [seedDownloadDialogOpen, setSeedDownloadDialogOpen] = useState(false);
   const [rawDownloadDialogOpen, setRawDownloadDialogOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -159,6 +157,14 @@ export default function HomePage() {
                   <Wallet className="h-4 w-4" />
                   {t("Cash", "नकद")}
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="seed" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-seed"
+                >
+                  <Leaf className="h-4 w-4" />
+                  {t("Seed", "बीज")}
+                </TabsTrigger>
               </TabsList>
             </nav>
 
@@ -266,6 +272,15 @@ export default function HomePage() {
                           <Wallet className="h-4 w-4" />
                           {t("Cash", "नकद")}
                         </TabsTrigger>
+                        <TabsTrigger 
+                          value="seed" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-seed-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Leaf className="h-4 w-4" />
+                          {t("Seed", "बीज")}
+                        </TabsTrigger>
                       </TabsList>
                     </nav>
                   </div>
@@ -281,46 +296,16 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h1 className="text-2xl font-semibold">
-                    {stockMode === "raw" ? t("Stock Entry", "स्टॉक एंट्री") : t("Seed Stock Entry", "बीज स्टॉक एंट्री")}
+                    {t("Stock Entry", "स्टॉक एंट्री")}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {stockMode === "raw" 
-                      ? t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")
-                      : t("Record new seed purchases from suppliers", "आपूर्तिकर्ताओं से नई बीज खरीद दर्ज करें")}
+                    {t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
-                  <Button
-                    variant={stockMode === "raw" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStockMode("raw")}
-                    className="gap-1.5"
-                    data-testid="button-mode-raw"
-                  >
-                    <PackagePlus className="h-4 w-4" />
-                    {t("Harvest", "फसल")}
-                  </Button>
-                  <Button
-                    variant={stockMode === "seed" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setStockMode("seed")}
-                    className="gap-1.5"
-                    data-testid="button-mode-seed"
-                  >
-                    <Leaf className="h-4 w-4" />
-                    {t("Seed", "बीज")}
-                  </Button>
-                </div>
               </div>
-              {stockMode === "raw" ? (
-                <StockEntryForm 
-                  onSuccess={() => setActiveTab("stock-register")} 
-                />
-              ) : (
-                <SeedStockEntryForm 
-                  onSuccess={() => setActiveTab("stock-register")} 
-                />
-              )}
+              <StockEntryForm 
+                onSuccess={() => setActiveTab("stock-register")} 
+              />
             </div>
           </div>
 
@@ -329,59 +314,28 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h1 className="text-2xl font-semibold">
-                    {stockMode === "raw" ? t("Stock Register", "स्टॉक रजिस्टर") : t("Seed Stock Register", "बीज स्टॉक रजिस्टर")}
+                    {t("Stock Register", "स्टॉक रजिस्टर")}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {stockMode === "raw" 
-                      ? t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")
-                      : t("View and manage your seed stock", "अपने बीज स्टॉक को देखें और प्रबंधित करें")}
+                    {t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
-                    <Button
-                      variant={stockMode === "raw" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setStockMode("raw")}
-                      className="gap-1.5"
-                      data-testid="button-register-mode-raw"
-                    >
-                      <PackagePlus className="h-4 w-4" />
-                      {t("Harvest", "फसल")}
-                    </Button>
-                    <Button
-                      variant={stockMode === "seed" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setStockMode("seed")}
-                      className="gap-1.5"
-                      data-testid="button-register-mode-seed"
-                    >
-                      <Leaf className="h-4 w-4" />
-                      {t("Seed", "बीज")}
-                    </Button>
-                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => stockMode === "raw" ? setRawDownloadDialogOpen(true) : setSeedDownloadDialogOpen(true)}
+                    onClick={() => setRawDownloadDialogOpen(true)}
                     title={t("Download CSV", "CSV डाउनलोड")}
-                    data-testid={stockMode === "raw" ? "button-raw-download-header" : "button-seed-download-header"}
+                    data-testid="button-raw-download-header"
                   >
                     <Download className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
-              {stockMode === "raw" ? (
-                <StockRegisterCard 
-                  downloadDialogOpen={rawDownloadDialogOpen}
-                  onDownloadDialogClose={() => setRawDownloadDialogOpen(false)}
-                />
-              ) : (
-                <SeedStockRegisterCard 
-                  downloadDialogOpen={seedDownloadDialogOpen}
-                  onDownloadDialogClose={() => setSeedDownloadDialogOpen(false)}
-                />
-              )}
+              <StockRegisterCard 
+                downloadDialogOpen={rawDownloadDialogOpen}
+                onDownloadDialogClose={() => setRawDownloadDialogOpen(false)}
+              />
             </div>
           </div>
 
@@ -391,6 +345,13 @@ export default function HomePage() {
 
           <div className={activeTab === "cash-management" ? "block" : "hidden"}>
             <CashManagementTab />
+          </div>
+
+          <div className={activeTab === "seed" ? "block" : "hidden"}>
+            <SeedSection 
+              seedDownloadDialogOpen={seedDownloadDialogOpen}
+              setSeedDownloadDialogOpen={setSeedDownloadDialogOpen}
+            />
           </div>
 
           <footer className="mt-8 pt-4 border-t flex flex-col items-center text-center gap-2 text-sm text-muted-foreground">
