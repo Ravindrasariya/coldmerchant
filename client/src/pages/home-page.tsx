@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { CropToggle } from "@/components/crop-toggle";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
 import { StockRegisterCard } from "@/components/stock-register/stock-register-card";
 import { SeedSection } from "@/components/seed/seed-section";
@@ -49,6 +50,7 @@ export default function HomePage() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedCrop, setSelectedCrop] = useState<"potato" | "onion">("potato");
   const [passwordForm, setPasswordForm] = useState({
     mobileNumber: "",
     currentPassword: "",
@@ -299,12 +301,19 @@ export default function HomePage() {
                     {t("Stock Entry", "स्टॉक एंट्री")}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")}
+                    {selectedCrop === "potato" 
+                      ? t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")
+                      : t("Record new onion purchases from farmers", "किसानों से नई प्याज खरीद दर्ज करें")
+                    }
                   </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} />
                 </div>
               </div>
               <StockEntryForm 
                 onSuccess={() => setActiveTab("stock-register")} 
+                selectedCrop={selectedCrop}
               />
             </div>
           </div>
@@ -317,10 +326,14 @@ export default function HomePage() {
                     {t("Stock Register", "स्टॉक रजिस्टर")}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")}
+                    {selectedCrop === "potato"
+                      ? t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")
+                      : t("View and manage your onion stock", "अपने प्याज स्टॉक को देखें और प्रबंधित करें")
+                    }
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -335,12 +348,13 @@ export default function HomePage() {
               <StockRegisterCard 
                 downloadDialogOpen={rawDownloadDialogOpen}
                 onDownloadDialogClose={() => setRawDownloadDialogOpen(false)}
+                selectedCrop={selectedCrop}
               />
             </div>
           </div>
 
           <div className={activeTab === "transactions" ? "block" : "hidden"}>
-            <TransactionsTab />
+            <TransactionsTab selectedCrop={selectedCrop} onCropChange={setSelectedCrop} />
           </div>
 
           <div className={activeTab === "cash-management" ? "block" : "hidden"}>

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download } from "lucide-react";
+import { CropToggle } from "@/components/crop-toggle";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -28,6 +29,7 @@ interface TransactionItem {
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
   revenue: string | null;
+  crop?: string;
 }
 
 interface Transaction {
@@ -47,10 +49,16 @@ interface Transaction {
   totalCostOfGoods: string | null;
   profitLoss: string | null;
   createdAt: string;
+  crop?: string;
   items: TransactionItem[];
 }
 
-export function TransactionsTab() {
+interface TransactionsTabProps {
+  selectedCrop?: "potato" | "onion";
+  onCropChange?: (crop: "potato" | "onion") => void;
+}
+
+export function TransactionsTab({ selectedCrop = "potato", onCropChange }: TransactionsTabProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -96,6 +104,10 @@ export function TransactionsTab() {
     if (!transactions) return [];
     
     return transactions.filter(txn => {
+      // Filter by crop - check if transaction or any item has matching crop
+      const txnCrop = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
+      if (txnCrop !== selectedCrop) return false;
+
       // Filter by year
       if (filterYear && new Date(txn.createdAt).getFullYear().toString() !== filterYear) {
         return false;
@@ -134,7 +146,7 @@ export function TransactionsTab() {
       
       return true;
     });
-  }, [transactions, filterYear, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
+  }, [transactions, selectedCrop, filterYear, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
 
   const currentYear = new Date().getFullYear().toString();
   const hasActiveFilters = filterYear !== currentYear || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
@@ -305,10 +317,16 @@ export function TransactionsTab() {
         <div>
           <h1 className="text-2xl font-semibold">{t("Transactions", "लेनदेन")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {t("Manage truck loading and sales transactions", "ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")}
+            {selectedCrop === "potato"
+              ? t("Manage truck loading and sales transactions", "ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
+              : t("Manage onion truck loading and sales transactions", "प्याज ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
+            }
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onCropChange && (
+            <CropToggle value={selectedCrop} onChange={onCropChange} />
+          )}
           <Button
             variant="ghost"
             size="icon"

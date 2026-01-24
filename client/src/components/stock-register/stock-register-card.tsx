@@ -38,9 +38,11 @@ interface StockEntryWithLots {
   paymentStatus: string;
   amountPaid: string | null;
   remarks: string | null;
+  crop?: string;
   lots: Array<{
     id: number;
     coldStoreName: string;
+    crop?: string;
     originalBags: number;
     remainingBags: number;
     potatoType: string;
@@ -149,9 +151,10 @@ function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnT
 interface StockRegisterCardProps {
   downloadDialogOpen?: boolean;
   onDownloadDialogClose?: () => void;
+  selectedCrop?: "potato" | "onion";
 }
 
-export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose }: StockRegisterCardProps) {
+export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose, selectedCrop = "potato" }: StockRegisterCardProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [filterSerial, setFilterSerial] = useState<string>("");
@@ -218,6 +221,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     if (!entries) return [];
     
     return entries.filter((entry) => {
+      // Filter by crop - entry must have at least one lot with matching crop
+      const hasCropMatch = entry.lots.some(lot => (lot.crop || "potato") === selectedCrop);
+      if (!hasCropMatch) return false;
+
       if (filterSerial && entry.serialNumber.toString() !== filterSerial) {
         return false;
       }
@@ -247,7 +254,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
       return true;
     });
-  }, [entries, filterSerial, filterFarmer, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, selectedCrop, filterSerial, filterFarmer, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const clearFilters = () => {
     setFilterSerial("");

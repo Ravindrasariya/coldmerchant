@@ -14,9 +14,10 @@ import { useLanguage } from "@/hooks/use-language";
 interface StockEntryFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
+  selectedCrop?: "potato" | "onion";
 }
 
-export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
+export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }: StockEntryFormProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
   
@@ -36,7 +37,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
           place: "cold_store",
           coldStoreName: "",
           coldStoreLotNumber: "",
-          crop: "potato",
+          crop: selectedCrop,
           originalBags: 0,
           potatoType: "",
           harvestPotatoType: "",
@@ -88,7 +89,7 @@ export function StockEntryForm({ onSuccess, onCancel }: StockEntryFormProps) {
       place: "cold_store",
       coldStoreName: "",
       coldStoreLotNumber: "",
-      crop: "potato",
+      crop: selectedCrop,
       originalBags: 0,
       potatoType: "",
       harvestPotatoType: "",
