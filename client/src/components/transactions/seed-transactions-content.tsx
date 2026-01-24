@@ -340,26 +340,6 @@ export function SeedTransactionsContent() {
         onOpenChange={(open) => !open && setReceiptTransactionId(null)}
       />
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("Seed Transactions", "बीज लेनदेन")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("Manage seed sales transactions", "बीज बिक्री लेनदेन प्रबंधित करें")}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setDownloadDialogOpen(true)}
-            title={t("Download", "डाउनलोड")}
-            data-testid="button-seed-txn-download"
-          >
-            <Download className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-
       {/* Filters Row */}
       <div className="flex items-center gap-3">
         <Card className="flex-1">
@@ -468,6 +448,15 @@ export function SeedTransactionsContent() {
           </CardContent>
         </Card>
 
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setDownloadDialogOpen(true)}
+          title={t("Download", "डाउनलोड")}
+          data-testid="button-seed-txn-download"
+        >
+          <Download className="h-4 w-4" />
+        </Button>
         <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-seed-truck">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load Seed Truck", "बीज ट्रक लोड करें")}
