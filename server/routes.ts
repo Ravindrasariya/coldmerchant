@@ -114,12 +114,7 @@ export async function registerRoutes(
           pricePerKg: lotData.cutType === "gate_cut" && lotData.pricePerKg 
             ? lotData.pricePerKg.toString() 
             : null,
-          expectedColdCharges: lotData.expectedColdCharges 
-            ? lotData.expectedColdCharges.toString() 
-            : null,
-          coldStoreChargesPerBag: lotData.coldStoreChargesPerBag 
-            ? lotData.coldStoreChargesPerBag.toString() 
-            : null,
+          charges: lotData.charges && lotData.charges.length > 0 ? lotData.charges : null,
           remainingBags: lotData.originalBags,
         });
 
@@ -279,6 +274,9 @@ export async function registerRoutes(
                 : undefined,
               coldStoreLotNumber: lotData.coldStoreLotNumber !== undefined
                 ? (lotData.coldStoreLotNumber || null)
+                : undefined,
+              charges: lotData.charges !== undefined
+                ? (lotData.charges && lotData.charges.length > 0 ? lotData.charges : null)
                 : undefined,
             });
 

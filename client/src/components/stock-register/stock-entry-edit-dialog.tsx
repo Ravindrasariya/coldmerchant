@@ -62,6 +62,7 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    charges: Array<{ type: string; amount: number }> | null;
     coldStoreChargesPerBag: string | null;
     expectedColdCharges: string | null;
     hammaliGradingCharges: string | null;
@@ -100,6 +101,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     crop: lot.crop || "potato",
     potatoType: lot.potatoType || "",
     harvestPotatoType: lot.harvestPotatoType || "",
+    charges: lot.charges || [],
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
     expectedColdCharges: lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : null,
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,

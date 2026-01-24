@@ -19,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Plus, Trash2, Package } from "lucide-react";
-import { StockEntryForm, POTATO_TYPES, HARVEST_POTATO_TYPES, QUALITY_OPTIONS, SIZE_OPTIONS } from "@shared/schema";
+import { StockEntryForm, POTATO_TYPES, HARVEST_POTATO_TYPES, QUALITY_OPTIONS, SIZE_OPTIONS, CHARGE_TYPES } from "@shared/schema";
 import { BagBreakdownRow } from "./bag-breakdown-row";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -36,6 +36,15 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
     control: form.control,
     name: `lots.${lotIndex}.bagBreakdowns`,
   });
+
+  const { fields: chargeFields, append: appendCharge, remove: removeCharge } = useFieldArray({
+    control: form.control,
+    name: `lots.${lotIndex}.charges`,
+  });
+
+  const handleAddCharge = () => {
+    appendCharge({ type: "", amount: 0 });
+  };
 
   const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
   const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState(false);
@@ -460,30 +469,97 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             </>
           )}
 
-          <FormField
-            control={form.control}
-            name={`lots.${lotIndex}.expectedColdCharges`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("Expected Cold Charges", "अपेक्षित कोल्ड शुल्क")}</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="" 
-                    {...field}
-                    value={field.value ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9.]/g, '');
-                      field.onChange(val === "" ? undefined : parseFloat(val));
-                    }}
-                    data-testid={`input-expected-cold-charges-${lotIndex}`}
+        </div>
+
+        {/* Dynamic Charges Section */}
+        <div className="space-y-4 pt-4 border-t">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">{t("Charges", "शुल्क")}</h4>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddCharge}
+              data-testid={`button-add-charge-${lotIndex}`}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {t("Add Charges", "शुल्क जोड़ें")}
+            </Button>
+          </div>
+
+          {chargeFields.length > 0 && (
+            <div className="space-y-3">
+              {chargeFields.map((chargeField, chargeIndex) => (
+                <div key={chargeField.id} className="flex items-end gap-3">
+                  <FormField
+                    control={form.control}
+                    name={`lots.${lotIndex}.charges.${chargeIndex}.type`}
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        {chargeIndex === 0 && (
+                          <FormLabel>{t("Charge Type", "शुल्क प्रकार")} *</FormLabel>
+                        )}
+                        <Select 
+                          onValueChange={field.onChange} 
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
+                              <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CHARGE_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  <FormField
+                    control={form.control}
+                    name={`lots.${lotIndex}.charges.${chargeIndex}.amount`}
+                    render={({ field }) => (
+                      <FormItem className="w-32">
+                        {chargeIndex === 0 && (
+                          <FormLabel>{t("Amount", "राशि")} *</FormLabel>
+                        )}
+                        <FormControl>
+                          <Input 
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0" 
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9.]/g, '');
+                              field.onChange(val === "" ? 0 : parseFloat(val));
+                            }}
+                            data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeCharge(chargeIndex)}
+                    className="text-destructive h-9 w-9"
+                    data-testid={`button-remove-charge-${lotIndex}-${chargeIndex}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {cutType === "bilty_cut" && (

@@ -45,6 +45,19 @@ export const stockEntries = pgTable("stock_entries", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Charge types for dynamic charges system
+export const CHARGE_TYPES = [
+  "Advance",
+  "Bag Charges",
+  "Cold Charges",
+  "Freight Charges",
+  "Grading Charges",
+  "Hammali Charges",
+  "Kata Charges",
+  "Other Charges",
+  "Ware House Charges",
+] as const;
+
 // Lots - each stock entry can have multiple lots
 export const lots = pgTable("lots", {
   id: serial("id").primaryKey(),
@@ -62,9 +75,10 @@ export const lots = pgTable("lots", {
   cutType: text("cut_type").notNull(), // gate_cut, bilty_cut (now called Delivery Type in UI)
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
-  expectedColdCharges: decimal("expected_cold_charges", { precision: 12, scale: 2 }), // total expected cold storage charges
+  charges: jsonb("charges"), // Dynamic charges array: [{ type: string, amount: number }]
+  expectedColdCharges: decimal("expected_cold_charges", { precision: 12, scale: 2 }), // legacy: total expected cold storage charges
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // legacy: charges per bag from cold store
-  hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // hammali and grading charges
+  hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // legacy: hammali and grading charges
   coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges
   adjustedAmount: decimal("adjusted_amount", { precision: 12, scale: 2 }), // adjustment amount for farmer due
   adjustedAmountType: text("adjusted_amount_type"), // "debit" or "credit"
@@ -737,6 +751,14 @@ export const bagBreakdownFormSchema = z.object({
   pricePerKg: z.coerce.number().optional(),
 });
 
+// Schema for individual charge entry
+export const chargeEntrySchema = z.object({
+  type: z.string().min(1, "Charge type is required"),
+  amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
+});
+
+export type ChargeEntry = z.infer<typeof chargeEntrySchema>;
+
 export const lotFormSchema = z.object({
   place: z.enum(["farm_gate", "cold_store"]).default("cold_store"),
   coldStoreName: z.string().optional(), // required only for cold_store place
@@ -750,9 +772,7 @@ export const lotFormSchema = z.object({
   cutType: z.enum(["gate_cut", "bilty_cut"]), // now called Delivery Type in UI
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
-  expectedColdCharges: z.coerce.number().optional(), // total expected cold storage charges
-  coldStoreChargesPerBag: z.coerce.number().optional(), // legacy: charges per bag from cold store
-  hammaliGradingCharges: z.coerce.number().optional(), // hammali and grading charges
+  charges: z.array(chargeEntrySchema).optional(), // Dynamic charges array
   adjustedAmount: z.coerce.number().optional(), // adjustment amount for farmer due
   adjustedAmountType: z.enum(["debit", "credit"]).optional(), // debit or credit
   adjustedAmountRemark: z.string().optional(), // reason for adjustment

@@ -836,6 +836,15 @@ export class DatabaseStorage implements IStorage {
     const allLots = await db.select().from(lots)
       .where(eq(lots.merchantId, merchantId));
     
+    // Helper to calculate cold store related charges from the charges array
+    const getColdStoreChargesFromArray = (charges: unknown): number => {
+      if (!Array.isArray(charges)) return 0;
+      const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+      return charges
+        .filter((c: any) => c && coldStoreTypes.includes(c.type))
+        .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+    };
+    
     // Group by normalized coldStoreName (case-insensitive, trimmed) and calculate dues
     const coldStoreMap = new Map<string, { displayName: string; totalDue: number; lotCount: number }>();
     
@@ -843,15 +852,19 @@ export class DatabaseStorage implements IStorage {
       const normalizedName = normalizeName(lot.coldStoreName || "");
       if (!normalizedName) continue;
       
+      // Legacy fields (for backward compatibility)
       const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
       const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
       const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
       
-      // Skip lots with no charges at all
-      if (chargesPerBag <= 0 && hammaliGradingCharges <= 0 && expectedColdCharges <= 0) continue;
+      // New dynamic charges (cold store related only)
+      const dynamicColdCharges = getColdStoreChargesFromArray(lot.charges);
       
-      // Calculate total cold store charges for this lot (per-bag + hammali/grading + expected cold charges)
-      const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges;
+      // Skip lots with no charges at all
+      if (chargesPerBag <= 0 && hammaliGradingCharges <= 0 && expectedColdCharges <= 0 && dynamicColdCharges <= 0) continue;
+      
+      // Calculate total cold store charges for this lot (legacy + dynamic cold charges)
+      const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges + dynamicColdCharges;
       const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
       const due = totalCharges - paidAmount;
       
@@ -1179,15 +1192,25 @@ export class DatabaseStorage implements IStorage {
           .where(eq(lots.merchantId, entry.merchantId))
           .orderBy(asc(lots.createdAt));
         
+        // Helper to calculate cold store related charges from the charges array
+        const getColdStoreChargesFromArray = (charges: unknown): number => {
+          if (!Array.isArray(charges)) return 0;
+          const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+          return charges
+            .filter((c: any) => c && coldStoreTypes.includes(c.type))
+            .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+        };
+        
         // Filter to only those matching cold store name (case-insensitive, trimmed) with remaining due
         const lotsWithDue = allLots.filter(lot => {
           if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
           const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
           const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
           const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
+          const dynamicColdCharges = getColdStoreChargesFromArray(lot.charges);
           // Check if there are any charges
-          if (chargesPerBag <= 0 && hammaliGradingCharges <= 0 && expectedColdCharges <= 0) return false;
-          const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges;
+          if (chargesPerBag <= 0 && hammaliGradingCharges <= 0 && expectedColdCharges <= 0 && dynamicColdCharges <= 0) return false;
+          const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges + dynamicColdCharges;
           const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
           return totalCharges > paidAmount;
         });
@@ -1198,7 +1221,8 @@ export class DatabaseStorage implements IStorage {
           const chargesPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
           const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
           const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
-          const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges;
+          const dynamicColdCharges = getColdStoreChargesFromArray(lot.charges);
+          const totalCharges = (chargesPerBag * lot.originalBags) + hammaliGradingCharges + expectedColdCharges + dynamicColdCharges;
           const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
           const due = totalCharges - currentPaid;
           
