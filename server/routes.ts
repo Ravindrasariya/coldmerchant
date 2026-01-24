@@ -114,6 +114,9 @@ export async function registerRoutes(
           pricePerKg: lotData.cutType === "gate_cut" && lotData.pricePerKg 
             ? lotData.pricePerKg.toString() 
             : null,
+          totalWeight: lotData.cutType === "gate_cut" && lotData.totalWeight 
+            ? lotData.totalWeight.toString() 
+            : null,
           charges: lotData.charges && lotData.charges.length > 0 ? lotData.charges : null,
           remainingBags: lotData.originalBags,
         });
