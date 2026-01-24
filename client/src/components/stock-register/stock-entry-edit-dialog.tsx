@@ -91,7 +91,6 @@ interface StockEntryEditDialogProps {
 export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEditDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus);
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [lots, setLots] = useState(entry.lots.map(lot => ({
     ...lot,
@@ -296,7 +295,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       ...lot,
       charges: (lot.charges || []).filter(c => c.type && c.type.length > 0 && c.amount > 0)
     }));
-    updateMutation.mutate({ paymentStatus, remarks, lots: cleanedLots });
+    updateMutation.mutate({ paymentStatus: entry.paymentStatus, remarks, lots: cleanedLots });
   };
 
   return (
@@ -349,33 +348,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
               </div>
             </CardContent>
           </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{t("Payment Status", "भुगतान स्थिति")}</Label>
-              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                <SelectTrigger data-testid="edit-payment-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="due">{t("Due", "बाकी")}</SelectItem>
-                  <SelectItem value="paid">{t("Paid", "भुगतान हो गया")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>{t("Remarks", "टिप्पणी")}</Label>
-              <Textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder={t("Enter remarks...", "टिप्पणी दर्ज करें...")}
-                className="resize-none"
-                rows={2}
-                data-testid="edit-remarks"
-              />
-            </div>
-          </div>
 
           <div className="space-y-4">
             <h4 className="font-medium">{t("Lots", "लॉट")}</h4>
@@ -678,6 +650,97 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     )}
                   </div>
                 </CardContent>
+                
+                {/* Summary Row */}
+                <CardContent className="pt-0 border-t">
+                  {(() => {
+                    // Calculate summary values
+                    const actualBags = lot.bagBreakdowns
+                      .filter(bd => bd.size && bd.size !== "Wastage")
+                      .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
+                    
+                    // Use totalAmount if available, otherwise calculate from weight * price
+                    const totalPayable = lot.bagBreakdowns
+                      .filter(bd => bd.size && bd.size !== "Wastage")
+                      .reduce((sum, bd) => {
+                        // First try to use existing totalAmount from the breakdown
+                        const existingTotal = typeof (bd as any).totalAmount === 'string' 
+                          ? parseFloat((bd as any).totalAmount) || 0 
+                          : 0;
+                        if (existingTotal > 0) return sum + existingTotal;
+                        // Otherwise calculate from weight * price
+                        const weight = bd.weight || 0;
+                        const price = bd.pricePerKg || 0;
+                        return sum + (weight * price);
+                      }, 0);
+                    
+                    const coldStoreDue = lot.expectedColdCharges || 0;
+                    const hammali = lot.hammaliGradingCharges || 0;
+                    const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+                    const totalDeductions = coldStoreDue + hammali + dynamicCharges;
+                    
+                    // Handle adjustment - only apply sign when type is explicitly set
+                    const adjustment = lot.adjustedAmount || 0;
+                    let adjustedValue = 0;
+                    if (adjustment > 0 && lot.adjustedAmountType) {
+                      adjustedValue = lot.adjustedAmountType === "credit" ? adjustment : -adjustment;
+                    }
+                    
+                    const netPayable = totalPayable - totalDeductions + adjustedValue;
+                    
+                    const isPaid = entry.paymentStatus === "paid";
+                    
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-md">
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">{t("Actual Bags", "वास्तविक बोरी")}</p>
+                          <p className="font-mono font-semibold text-sm">{actualBags}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">{t("Total Payable", "कुल देय")}</p>
+                          <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">
+                            ₹{totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">{t("Deductions", "कटौती")}</p>
+                          <p className="font-mono font-semibold text-sm text-orange-600 dark:text-orange-400">
+                            ₹{totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">{t("Adjustment", "समायोजन")}</p>
+                          <p className={`font-mono font-semibold text-sm ${
+                            adjustedValue === 0 
+                              ? "text-muted-foreground" 
+                              : adjustedValue > 0 
+                                ? "text-green-600 dark:text-green-400" 
+                                : "text-red-600 dark:text-red-400"
+                          }`}>
+                            {adjustedValue > 0 ? "+" : adjustedValue < 0 ? "-" : ""}₹{Math.abs(adjustedValue).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground">{t("Net Payable", "शुद्ध देय")}</p>
+                          <p className="font-mono font-bold text-sm text-primary">
+                            ₹{netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-center flex items-center justify-center">
+                          {isPaid ? (
+                            <Badge className="bg-green-500 text-white">
+                              {t("Paid", "भुगतान")}
+                            </Badge>
+                          ) : (
+                            <Badge variant="destructive">
+                              {t("Dues", "बकाया")}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
               </Card>
             ))}
           </div>
@@ -764,18 +827,31 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="edit-cancel">
-            {t("Cancel", "रद्द करें")}
-          </Button>
-          <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="edit-save">
-            {updateMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            {t("Save Changes", "बदलाव सहेजें")}
-          </Button>
+        <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-2">
+            <Label>{t("Remarks", "टिप्पणी")}</Label>
+            <Textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder={t("Enter remarks...", "टिप्पणी दर्ज करें...")}
+              className="resize-none"
+              rows={2}
+              data-testid="edit-remarks"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="edit-cancel">
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="edit-save">
+              {updateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {t("Save Changes", "बदलाव सहेजें")}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
