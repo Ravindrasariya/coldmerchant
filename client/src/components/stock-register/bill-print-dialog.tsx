@@ -34,6 +34,12 @@ interface StockEntryWithLots {
     size: string | null;
     pricePerKg: string | null;
     coldStoreChargesPerBag: string | null;
+    expectedColdCharges: string | null;
+    hammaliGradingCharges: string | null;
+    charges: Array<{ type: string; amount: number }> | null;
+    adjustedAmount: string | null;
+    adjustedAmountType: string | null;
+    adjustedAmountRemark: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
@@ -73,6 +79,42 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
   };
 
   const grandTotal = calculateGrandTotal();
+
+  const calculateLotTotals = (lot: StockEntryWithLots["lots"][0]) => {
+    const totalPayable = lot.bagBreakdowns
+      .filter(bd => bd.size !== "Wastage")
+      .reduce((sum, bd) => {
+        if (bd.totalAmount) return sum + parseFloat(bd.totalAmount);
+        const weight = bd.weight ? parseFloat(bd.weight) : 0;
+        const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+        return sum + (weight * price);
+      }, 0);
+    
+    const coldStoreDue = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
+    const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
+    const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+    const totalDeductions = coldStoreDue + hammali + dynamicCharges;
+    
+    const adjustment = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
+    let adjustedValue = 0;
+    if (adjustment > 0 && lot.adjustedAmountType) {
+      adjustedValue = lot.adjustedAmountType === "credit" ? adjustment : -adjustment;
+    }
+    
+    const netPayable = totalPayable - totalDeductions + adjustedValue;
+    
+    return { totalPayable, coldStoreDue, hammali, dynamicCharges, totalDeductions, adjustment, adjustedValue, netPayable };
+  };
+
+  const overallTotals = entry.lots.reduce((acc, lot) => {
+    const lotTotals = calculateLotTotals(lot);
+    return {
+      totalPayable: acc.totalPayable + lotTotals.totalPayable,
+      totalDeductions: acc.totalDeductions + lotTotals.totalDeductions,
+      adjustedValue: acc.adjustedValue + lotTotals.adjustedValue,
+      netPayable: acc.netPayable + lotTotals.netPayable,
+    };
+  }, { totalPayable: 0, totalDeductions: 0, adjustedValue: 0, netPayable: 0 });
 
   const getSizeBilingual = (size: string) => {
     const sizeMap: Record<string, string> = {
@@ -138,6 +180,40 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         </div>
       ` : "";
 
+      const lotTotals = calculateLotTotals(lot);
+      const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
+      
+      const deductionsHtml = hasDeductions ? `
+        <div style="margin-top: 12px; padding: 12px; background: #fff7ed; border-radius: 4px; border-left: 3px solid #f97316;">
+          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 8px 0; font-weight: 600;">Deductions / कटौती</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+            ${lotTotals.coldStoreDue > 0 ? `<div><span style="color: #666;">Cold Store Due / कोल्ड स्टोर बकाया:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.coldStoreDue.toLocaleString("en-IN")}</div>` : ""}
+            ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN")}</div>` : ""}
+            ${lotTotals.dynamicCharges > 0 ? `<div><span style="color: #666;">Other Charges / अन्य शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.dynamicCharges.toLocaleString("en-IN")}</div>` : ""}
+            ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">Adjustment / समायोजन${lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN")}</div>` : ""}
+          </div>
+        </div>
+      ` : "";
+      
+      const lotSummaryHtml = `
+        <div style="margin-top: 12px; padding: 12px; background: #f0fdf4; border-radius: 4px; border-left: 3px solid #22c55e;">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 11px; text-align: center;">
+            <div>
+              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Total Payable / कुल देय</p>
+              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #15803d;">₹${lotTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+            </div>
+            <div>
+              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Deductions / कटौती</p>
+              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #ea580c;">₹${lotTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+            </div>
+            <div>
+              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Net Payable / शुद्ध देय</p>
+              <p style="font-family: monospace; font-weight: 700; margin: 0; color: #0d9488; font-size: 13px;">₹${lotTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+        </div>
+      `;
+
       return `
         <div style="border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
@@ -152,6 +228,8 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
             </div>
           </div>
           ${breakdownHtml}
+          ${deductionsHtml}
+          ${lotSummaryHtml}
           ${lotRemarksHtml}
         </div>
       `;
@@ -211,17 +289,27 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               ${lotsHtml}
             </div>
 
-            <!-- Totals -->
-            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <p style="margin: 0;"><span style="color: #666;">Total Bags / कुल बोरी:</span> <span style="font-family: monospace; font-weight: 600;">${totalRemainingBags}/${totalOriginalBags}</span></p>
-              </div>
-              ${grandTotal > 0 ? `
-                <div style="text-align: right;">
-                  <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0;">Grand Total / कुल राशि</p>
-                  <p style="font-size: 24px; font-weight: 700; font-family: monospace; margin: 0;">₹${grandTotal.toFixed(2)}</p>
+            <!-- Totals Summary -->
+            <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border: 1px solid #0ea5e9;">
+              <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 16px 0; font-weight: 700; letter-spacing: 0.05em;">Farmer Payment Summary / किसान भुगतान सारांश</h3>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+                <div>
+                  <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0;">${totalRemainingBags}/${totalOriginalBags}</p>
                 </div>
-              ` : ""}
+                <div>
+                  <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Payable / कुल देय</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Deductions / कटौती</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div style="background: #0d9488; padding: 8px; border-radius: 6px; margin: -8px;">
+                  <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">Net Due to Farmer / किसान को देय</p>
+                  <p style="font-family: monospace; font-weight: 700; font-size: 20px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                </div>
+              </div>
             </div>
 
             ${entry.remarks ? `
@@ -349,6 +437,65 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                     </div>
                   )}
 
+                  {(() => {
+                    const lotTotals = calculateLotTotals(lot);
+                    const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
+                    return (
+                      <>
+                        {hasDeductions && (
+                          <div className="mt-3 p-3 bg-orange-50 rounded border-l-4 border-orange-400">
+                            <p className="text-xs uppercase text-gray-600 font-semibold mb-2">Deductions / कटौती</p>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {lotTotals.coldStoreDue > 0 && (
+                                <>
+                                  <span className="text-gray-600">Cold Store Due / कोल्ड स्टोर बकाया:</span>
+                                  <span className="text-right font-mono">₹{lotTotals.coldStoreDue.toLocaleString("en-IN")}</span>
+                                </>
+                              )}
+                              {lotTotals.hammali > 0 && (
+                                <>
+                                  <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
+                                  <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN")}</span>
+                                </>
+                              )}
+                              {lotTotals.dynamicCharges > 0 && (
+                                <>
+                                  <span className="text-gray-600">Other Charges / अन्य शुल्क:</span>
+                                  <span className="text-right font-mono">₹{lotTotals.dynamicCharges.toLocaleString("en-IN")}</span>
+                                </>
+                              )}
+                              {lotTotals.adjustedValue !== 0 && (
+                                <>
+                                  <span className="text-gray-600">Adjustment / समायोजन{lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:</span>
+                                  <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                    {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN")}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="mt-3 p-3 bg-green-50 rounded border-l-4 border-green-500">
+                          <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                            <div>
+                              <p className="text-gray-600 mb-1">Total Payable / कुल देय</p>
+                              <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 mb-1">Deductions / कटौती</p>
+                              <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600 mb-1">Net Payable / शुद्ध देय</p>
+                              <p className="font-mono font-bold text-teal-700 text-sm">₹{lotTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+
                   {lot.remarks && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{lot.remarks}</span></p>
@@ -358,17 +505,25 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               ))}
             </div>
 
-            <div className="mt-6 pt-4 border-t border-gray-300">
-              <div className="flex justify-between items-center">
-                <div className="text-sm">
-                  <p><span className="text-gray-600">Total Bags / कुल बोरी:</span> <span className="font-mono font-semibold">{totalRemainingBags}/{totalOriginalBags}</span></p>
+            <div className="mt-6 p-4 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
+              <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-4">Farmer Payment Summary / किसान भुगतान सारांश</h3>
+              <div className="grid grid-cols-4 gap-4 text-center">
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
+                  <p className="font-mono font-semibold text-base">{totalRemainingBags}/{totalOriginalBags}</p>
                 </div>
-                {grandTotal > 0 && (
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600 uppercase">Grand Total / कुल राशि</p>
-                    <p className="text-2xl font-bold font-mono">₹{grandTotal.toFixed(2)}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
+                  <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
+                  <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                </div>
+                <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
+                  <p className="text-xs opacity-90 mb-1">Net Due to Farmer / किसान को देय</p>
+                  <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                </div>
               </div>
             </div>
 
