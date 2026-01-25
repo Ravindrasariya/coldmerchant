@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import React, { useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -94,19 +94,23 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     
     const coldStoreDue = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
-    const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+    const charges = lot.charges || [];
+    const dynamicCharges = charges.reduce((sum, c) => sum + (c.amount || 0), 0);
     const totalDeductions = coldStoreDue + hammali + dynamicCharges;
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
     const rate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
     
     let adjustment = principal;
+    let interestDays = 0;
+    let interest = 0;
     if (principal > 0 && rate > 0 && lot.adjustedAmountEffectiveDate) {
       const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
       const today = new Date();
-      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const years = days / 365;
+      interestDays = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const years = interestDays / 365;
       adjustment = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
+      interest = Math.round((adjustment - principal) * 100) / 100;
     }
     
     let adjustedValue = 0;
@@ -116,7 +120,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     
     const netPayable = totalPayable - totalDeductions + adjustedValue;
     
-    return { totalPayable, coldStoreDue, hammali, dynamicCharges, totalDeductions, adjustment, adjustedValue, netPayable };
+    return { totalPayable, coldStoreDue, hammali, charges, dynamicCharges, totalDeductions, principal, rate, interestDays, interest, adjustment, adjustedValue, netPayable };
   };
 
   const overallTotals = entry.lots.reduce((acc, lot) => {
@@ -196,14 +200,22 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
       const lotTotals = calculateLotTotals(lot);
       const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
       
+      const chargesHtml = lotTotals.charges.filter(c => c.amount && c.amount > 0).map(c => 
+        `<div><span style="color: #666;">${c.type || "Charge"}:</span></div><div style="text-align: right; font-family: monospace;">₹${(c.amount || 0).toLocaleString("en-IN")}</div>`
+      ).join("");
+      
+      const adjustmentLabel = lotTotals.rate > 0 && lotTotals.interestDays > 0 
+        ? `Adjustment / समायोजन (₹${lotTotals.principal.toLocaleString("en-IN")} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
+        : `Adjustment / समायोजन${lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}`;
+      
       const deductionsHtml = hasDeductions ? `
         <div style="margin-top: 12px; padding: 12px; background: #fff7ed; border-radius: 4px; border-left: 3px solid #f97316;">
           <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 8px 0; font-weight: 600;">Deductions / कटौती</p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
             ${lotTotals.coldStoreDue > 0 ? `<div><span style="color: #666;">Cold Store Due / कोल्ड स्टोर बकाया:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.coldStoreDue.toLocaleString("en-IN")}</div>` : ""}
             ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN")}</div>` : ""}
-            ${lotTotals.dynamicCharges > 0 ? `<div><span style="color: #666;">Other Charges / अन्य शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.dynamicCharges.toLocaleString("en-IN")}</div>` : ""}
-            ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">Adjustment / समायोजन${lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN")}</div>` : ""}
+            ${chargesHtml}
+            ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">${adjustmentLabel}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</div>` : ""}
           </div>
         </div>
       ` : "";
@@ -471,17 +483,22 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                                   <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN")}</span>
                                 </>
                               )}
-                              {lotTotals.dynamicCharges > 0 && (
-                                <>
-                                  <span className="text-gray-600">Other Charges / अन्य शुल्क:</span>
-                                  <span className="text-right font-mono">₹{lotTotals.dynamicCharges.toLocaleString("en-IN")}</span>
-                                </>
-                              )}
+                              {lotTotals.charges.filter(c => c.amount && c.amount > 0).map((c, i) => (
+                                <React.Fragment key={i}>
+                                  <span className="text-gray-600">{c.type || "Charge"}:</span>
+                                  <span className="text-right font-mono">₹{(c.amount || 0).toLocaleString("en-IN")}</span>
+                                </React.Fragment>
+                              ))}
                               {lotTotals.adjustedValue !== 0 && (
                                 <>
-                                  <span className="text-gray-600">Adjustment / समायोजन{lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:</span>
+                                  <span className="text-gray-600">
+                                    Adjustment / समायोजन
+                                    {lotTotals.rate > 0 && lotTotals.interestDays > 0 
+                                      ? ` (₹${lotTotals.principal.toLocaleString("en-IN")} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
+                                      : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
+                                  </span>
                                   <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                    {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN")}
+                                    {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                                   </span>
                                 </>
                               )}
