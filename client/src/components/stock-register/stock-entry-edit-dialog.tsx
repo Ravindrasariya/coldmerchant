@@ -434,9 +434,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           <div></div>
                         </div>
                         {lot.bagBreakdowns.map((bd, bdIndex) => {
-                          const total = (bd.weight || 0) * (bd.pricePerKg || 0);
                           const remaining = bd.remainingBags ?? bd.numberOfBags;
                           const netWeight = (bd.weight || 0) - (bd.numberOfBags || 0);
+                          const total = netWeight > 0 ? netWeight * (bd.pricePerKg || 0) : 0;
                           return (
                             <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-8 gap-2 p-2 bg-muted/30 rounded-md items-center">
                               <Select
