@@ -68,6 +68,8 @@ interface StockEntryWithLots {
     hammaliGradingCharges: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
+    adjustedAmountRate: string | null;
+    adjustedAmountEffectiveDate: string | null;
     adjustedAmountRemark: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
@@ -106,6 +108,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
     adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
     adjustedAmountType: lot.adjustedAmountType || null,
+    adjustedAmountRate: lot.adjustedAmountRate !== null ? parseFloat(lot.adjustedAmountRate) : null,
+    adjustedAmountEffectiveDate: lot.adjustedAmountEffectiveDate || null,
     adjustedAmountRemark: lot.adjustedAmountRemark || "",
     bagBreakdowns: lot.bagBreakdowns.map(bd => ({
       ...bd,
@@ -249,6 +253,35 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
             description: t(
               `Lot ${i + 1}: Breakdown total (${breakdownTotal}) must equal Original Bags (${lot.originalBags})`,
               `लॉट ${i + 1}: विवरण योग (${breakdownTotal}) मूल बोरी (${lot.originalBags}) के बराबर होना चाहिए`
+            ),
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+    }
+
+    // Validate adjustment: Amount and Effective Date required if Rate % is provided
+    for (let i = 0; i < lots.length; i++) {
+      const lot = lots[i];
+      if (lot.adjustedAmountRate && lot.adjustedAmountRate > 0) {
+        if (!lot.adjustedAmount || lot.adjustedAmount <= 0) {
+          toast({
+            title: t("Validation Error", "सत्यापन त्रुटि"),
+            description: t(
+              `Lot ${i + 1}: Amount is required when Rate % is provided`,
+              `लॉट ${i + 1}: जब दर % दिया जाए तो राशि आवश्यक है`
+            ),
+            variant: "destructive"
+          });
+          return;
+        }
+        if (!lot.adjustedAmountEffectiveDate) {
+          toast({
+            title: t("Validation Error", "सत्यापन त्रुटि"),
+            description: t(
+              `Lot ${i + 1}: Effective Date is required when Rate % is provided`,
+              `लॉट ${i + 1}: जब दर % दिया जाए तो प्रभावी तिथि आवश्यक है`
             ),
             variant: "destructive"
           });
@@ -493,24 +526,24 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 <CardContent className="pt-0 border-t">
                   <div className="p-3 bg-purple-50/50 dark:bg-purple-900/10 rounded-md">
                     <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
                       <div className="space-y-1">
-                        <Label className="text-xs">{t("Adjustment Type", "समायोजन प्रकार")}</Label>
+                        <Label className="text-xs">{t("Type", "प्रकार")}</Label>
                         <Select
                           value={lot.adjustedAmountType || ""}
                           onValueChange={(v) => handleLotFieldChange(lotIndex, "adjustedAmountType", v)}
                         >
                           <SelectTrigger className="h-8" data-testid={`edit-adjustment-type-${lotIndex}`}>
-                            <SelectValue placeholder={t("Select type", "प्रकार चुनें")} />
+                            <SelectValue placeholder={t("Select", "चुनें")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="debit">{t("Debit (Subtract)", "डेबिट (घटाएं)")}</SelectItem>
-                            <SelectItem value="credit">{t("Credit (Add)", "क्रेडिट (जोड़ें)")}</SelectItem>
+                            <SelectItem value="debit">{t("Debit (−)", "डेबिट")}</SelectItem>
+                            <SelectItem value="credit">{t("Credit (+)", "क्रेडिट")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">{t("Amount", "राशि")}</Label>
+                        <Label className="text-xs">{t("Amount (₹)", "राशि")}</Label>
                         <Input
                           type="text"
                           inputMode="decimal"
@@ -524,18 +557,83 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           data-testid={`edit-adjustment-amount-${lotIndex}`}
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("Rate %", "दर %")}</Label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          className="h-8"
+                          placeholder="0%"
+                          value={lot.adjustedAmountRate ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            const newRate = val === "" ? null : parseFloat(val);
+                            handleLotFieldChange(lotIndex, "adjustedAmountRate", newRate);
+                            if (newRate && newRate > 0 && !lot.adjustedAmountEffectiveDate) {
+                              handleLotFieldChange(lotIndex, "adjustedAmountEffectiveDate", new Date().toISOString().split('T')[0]);
+                            }
+                          }}
+                          data-testid={`edit-adjustment-rate-${lotIndex}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("Effective Date", "प्रभावी तिथि")}</Label>
+                        <Input
+                          type="date"
+                          className="h-8"
+                          value={lot.adjustedAmountEffectiveDate || ""}
+                          placeholder={t("Select date", "तिथि चुनें")}
+                          onChange={(e) => handleLotFieldChange(lotIndex, "adjustedAmountEffectiveDate", e.target.value || null)}
+                          data-testid={`edit-adjustment-date-${lotIndex}`}
+                        />
+                      </div>
                       <div className="space-y-1 md:col-span-2">
                         <Label className="text-xs">{t("Reason", "कारण")}</Label>
                         <Input
                           type="text"
                           className="h-8"
-                          placeholder={t("Enter reason for adjustment...", "समायोजन का कारण दर्ज करें...")}
+                          placeholder={t("Enter reason...", "कारण दर्ज करें...")}
                           value={lot.adjustedAmountRemark || ""}
                           onChange={(e) => handleLotFieldChange(lotIndex, "adjustedAmountRemark", e.target.value)}
                           data-testid={`edit-adjustment-remark-${lotIndex}`}
                         />
                       </div>
                     </div>
+                    {/* Show calculated final amount when rate and effective date are provided */}
+                    {lot.adjustedAmount && lot.adjustedAmount > 0 && lot.adjustedAmountRate && lot.adjustedAmountRate > 0 && lot.adjustedAmountEffectiveDate && (
+                      (() => {
+                        const principal = lot.adjustedAmount;
+                        const rate = lot.adjustedAmountRate;
+                        const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
+                        const today = new Date();
+                        const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+                        const years = days / 365;
+                        const finalAmount = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
+                        const interest = Math.round((finalAmount - principal) * 100) / 100;
+                        return (
+                          <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">{t("Principal", "मूलधन")}:</span>
+                                <span className="font-mono font-medium ml-1">₹{principal.toLocaleString("en-IN")}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">{t("Days", "दिन")}:</span>
+                                <span className="font-mono font-medium ml-1">{days}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">{t("Interest", "ब्याज")}:</span>
+                                <span className="font-mono font-medium ml-1 text-amber-700 dark:text-amber-400">₹{interest.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">{t("Final Amount", "अंतिम राशि")}:</span>
+                                <span className="font-mono font-bold ml-1 text-primary">₹{finalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
                   </div>
                 </CardContent>
                 

@@ -39,6 +39,8 @@ interface StockEntryWithLots {
     charges: Array<{ type: string; amount: number }> | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
+    adjustedAmountRate: string | null;
+    adjustedAmountEffectiveDate: string | null;
     adjustedAmountRemark: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
@@ -95,7 +97,18 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
     const totalDeductions = coldStoreDue + hammali + dynamicCharges;
     
-    const adjustment = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
+    const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
+    const rate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
+    
+    let adjustment = principal;
+    if (principal > 0 && rate > 0 && lot.adjustedAmountEffectiveDate) {
+      const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
+      const today = new Date();
+      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const years = days / 365;
+      adjustment = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
+    }
+    
     let adjustedValue = 0;
     if (adjustment > 0 && lot.adjustedAmountType) {
       adjustedValue = lot.adjustedAmountType === "credit" ? adjustment : -adjustment;
