@@ -534,56 +534,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   </div>
                 </CardContent>
                 
-                {/* Cold Store Charges Section - applies to all cut types */}
-                <CardContent className="pt-0 border-t">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-md">
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("Cold Store Due", "कोल्ड स्टोर बकाया")}</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="h-8"
-                        placeholder="₹0"
-                        value={lot.expectedColdCharges ?? ""}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          handleLotFieldChange(lotIndex, "expectedColdCharges", val === "" ? null : parseFloat(val));
-                        }}
-                        data-testid={`edit-coldstore-due-${lotIndex}`}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("Hammali/Grading", "हम्माली/ग्रेडिंग")}</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="h-8"
-                        placeholder="₹0"
-                        value={lot.hammaliGradingCharges ?? ""}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          handleLotFieldChange(lotIndex, "hammaliGradingCharges", val === "" ? null : parseFloat(val));
-                        }}
-                        data-testid={`edit-hammali-charge-${lotIndex}`}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
-                      <p className="font-medium mt-1">{lot.originalBags}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs">{t("Breakdown Total", "विवरण योग")}</Label>
-                      <p className={`font-medium mt-1 ${
-                        lot.bagBreakdowns.reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0) === lot.originalBags 
-                          ? "text-green-600 dark:text-green-400" 
-                          : "text-orange-600 dark:text-orange-400"
-                      }`}>
-                        {lot.bagBreakdowns.reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0)}/{lot.originalBags} {t("bags", "बोरी")}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-                
                 {/* Dynamic Charges Section */}
                 <CardContent className="pt-0 border-t">
                   <div className="space-y-3">
