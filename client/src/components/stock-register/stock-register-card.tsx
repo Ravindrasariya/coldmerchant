@@ -89,14 +89,11 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
       totalWeight += weight;
       totalBags += bd.numberOfBags;
       
-      if (bd.totalAmount) {
-        totalAmount = (totalAmount ?? 0) + parseFloat(bd.totalAmount);
-      } else {
-        const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-        if (netWeight > 0 && price > 0) {
-          totalAmount = (totalAmount ?? 0) + (netWeight * price);
-        }
+      // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
+      const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+      const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+      if (netWeight > 0 && price > 0) {
+        totalAmount = (totalAmount ?? 0) + (netWeight * price);
       }
     }
   });

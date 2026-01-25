@@ -77,9 +77,8 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     entry.lots.forEach(lot => {
       lot.bagBreakdowns.forEach(bd => {
         if (bd.size === "Wastage") return;
-        if (bd.totalAmount) {
-          total += parseFloat(bd.totalAmount);
-        } else if (bd.weight && bd.pricePerKg) {
+        // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
+        if (bd.weight && bd.pricePerKg) {
           const weight = parseFloat(bd.weight);
           const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
           total += netWeight * parseFloat(bd.pricePerKg);
@@ -92,10 +91,10 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
   const grandTotal = calculateGrandTotal();
 
   const calculateLotTotals = (lot: StockEntryWithLots["lots"][0]) => {
+    // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
     const totalPayable = lot.bagBreakdowns
       .filter(bd => bd.size !== "Wastage")
       .reduce((sum, bd) => {
-        if (bd.totalAmount) return sum + parseFloat(bd.totalAmount);
         const weight = bd.weight ? parseFloat(bd.weight) : 0;
         const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
@@ -165,7 +164,8 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-          const amount = bd.totalAmount ? parseFloat(bd.totalAmount) : netWeight * price;
+          // Always use netWeight * price
+          const amount = netWeight * price;
           return `
             <tr>
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd;">${getSizeBilingual(bd.size)}</td>
@@ -454,7 +454,8 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                           const weight = bd.weight ? parseFloat(bd.weight) : 0;
                           const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
                           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                          const amount = bd.totalAmount ? parseFloat(bd.totalAmount) : netWeight * price;
+                          // Always use netWeight * price
+                          const amount = netWeight * price;
                           return (
                             <tr key={bd.id || bdIndex} className="border-b border-gray-200">
                               <td className="py-2 px-3">{getSizeBilingual(bd.size)}</td>

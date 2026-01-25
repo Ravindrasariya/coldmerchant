@@ -712,16 +712,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       .filter(bd => bd.size && bd.size !== "Wastage")
                       .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
                     
-                    // Use totalAmount if available, otherwise calculate from netWeight * price
+                    // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
                     const totalPayable = lot.bagBreakdowns
                       .filter(bd => bd.size && bd.size !== "Wastage")
                       .reduce((sum, bd) => {
-                        // First try to use existing totalAmount from the breakdown
-                        const existingTotal = typeof (bd as any).totalAmount === 'string' 
-                          ? parseFloat((bd as any).totalAmount) || 0 
-                          : 0;
-                        if (existingTotal > 0) return sum + existingTotal;
-                        // Otherwise calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
                         const weight = bd.weight || 0;
                         const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
                         const price = bd.pricePerKg || 0;
