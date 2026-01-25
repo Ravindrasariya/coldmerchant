@@ -65,6 +65,12 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
 
   const totalOriginalBags = entry.lots.reduce((sum, lot) => sum + lot.originalBags, 0);
   const totalRemainingBags = entry.lots.reduce((sum, lot) => sum + lot.remainingBags, 0);
+  
+  const totalBagsExcludingWastage = entry.lots.reduce((sum, lot) => {
+    return sum + lot.bagBreakdowns
+      .filter(bd => bd.size !== "Wastage")
+      .reduce((bdSum, bd) => bdSum + (bd.numberOfBags || 0), 0);
+  }, 0);
 
   const calculateGrandTotal = () => {
     let total = 0;
@@ -320,7 +326,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0;">${totalRemainingBags}/${totalOriginalBags}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0;">${totalBagsExcludingWastage}</p>
                 </div>
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Payable / कुल देय</p>
@@ -540,7 +546,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               <div className="grid grid-cols-4 gap-4 text-center">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
-                  <p className="font-mono font-semibold text-base">{totalRemainingBags}/{totalOriginalBags}</p>
+                  <p className="font-mono font-semibold text-base">{totalBagsExcludingWastage}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
