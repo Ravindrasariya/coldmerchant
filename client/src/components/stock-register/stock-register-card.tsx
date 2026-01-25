@@ -82,26 +82,31 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   let totalWeight = 0;
   let totalAmount: number | null = null;
   
+  let totalBags = 0;
   lot.bagBreakdowns.forEach(bd => {
     if (bd.size !== "Wastage") {
       const weight = bd.weight ? parseFloat(bd.weight) : 0;
       totalWeight += weight;
+      totalBags += bd.numberOfBags;
       
       if (bd.totalAmount) {
         totalAmount = (totalAmount ?? 0) + parseFloat(bd.totalAmount);
       } else {
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        if (weight > 0 && price > 0) {
-          totalAmount = (totalAmount ?? 0) + (weight * price);
+        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+        if (netWeight > 0 && price > 0) {
+          totalAmount = (totalAmount ?? 0) + (netWeight * price);
         }
       }
     }
   });
   
+  const totalNetWeight = totalWeight - totalBags;
+  
   if (lot.cutType === "gate_cut" && lot.pricePerKg) {
     const price = parseFloat(lot.pricePerKg);
-    if (totalWeight > 0 && price > 0) {
-      totalAmount = totalWeight * price;
+    if (totalNetWeight > 0 && price > 0) {
+      totalAmount = totalNetWeight * price;
     }
   }
   
