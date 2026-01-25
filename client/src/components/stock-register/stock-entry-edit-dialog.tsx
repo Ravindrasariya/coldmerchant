@@ -732,11 +732,22 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
                     const totalDeductions = coldStoreDue + hammali + dynamicCharges;
                     
-                    // Handle adjustment - only apply sign when type is explicitly set
-                    const adjustment = lot.adjustedAmount || 0;
+                    // Handle adjustment - calculate compound interest if rate-based
+                    const principal = lot.adjustedAmount || 0;
+                    let finalAdjustment = principal;
+                    
+                    // Calculate compound interest if rate and effective date are provided
+                    if (principal > 0 && lot.adjustedAmountRate && lot.adjustedAmountRate > 0 && lot.adjustedAmountEffectiveDate) {
+                      const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
+                      const today = new Date();
+                      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+                      const years = days / 365;
+                      finalAdjustment = Math.round((principal * Math.pow(1 + lot.adjustedAmountRate / 100, years)) * 100) / 100;
+                    }
+                    
                     let adjustedValue = 0;
-                    if (adjustment > 0 && lot.adjustedAmountType) {
-                      adjustedValue = lot.adjustedAmountType === "credit" ? adjustment : -adjustment;
+                    if (finalAdjustment > 0 && lot.adjustedAmountType) {
+                      adjustedValue = lot.adjustedAmountType === "credit" ? finalAdjustment : -finalAdjustment;
                     }
                     
                     const netPayable = totalPayable - totalDeductions + adjustedValue;
