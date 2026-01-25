@@ -245,18 +245,9 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         </div>
       `;
 
-      const actualBreakdownLine = lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage")
-        .map(bd => {
-          const weight = bd.weight ? parseFloat(bd.weight) : 0;
-          const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-          const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-          return `${bd.size} - ${bd.numberOfBags}, ${weight > 0 ? weight.toFixed(0) + 'kg' : '—'}, ${netWeight > 0 ? netWeight.toFixed(0) + 'kg' : '—'}, ${price > 0 ? '₹' + price.toFixed(2) + '/kg' : '—'}`;
-        }).join(", ");
-
       return `
         <div style="border: 1px solid #ddd; border-radius: 6px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
             <div>
               <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0;">${lot.coldStoreName}</p>
               <p style="font-size: 11px; color: #666; margin: 0;">
@@ -267,7 +258,6 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               <p style="font-family: monospace; font-size: 13px; margin: 0;"><span style="font-weight: 600;">${lot.remainingBags}</span>/${lot.originalBags} bags / बोरी</p>
             </div>
           </div>
-          ${actualBreakdownLine ? `<p style="font-size: 11px; color: #666; margin: 0 0 12px 0;"><span style="color: #000; font-weight: 500;">Original:</span> ${lot.originalBags} bags &nbsp; <span style="color: #000; font-weight: 500;">Actual:</span> ${actualBreakdownLine}</p>` : ''}
           ${breakdownHtml}
           ${deductionsHtml}
           ${lotSummaryHtml}
@@ -429,19 +419,9 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
             <div className="space-y-4">
               <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">Lot Details / लॉट विवरण</h3>
               
-              {entry.lots.map((lot) => {
-                const actualBreakdownText = lot.bagBreakdowns
-                  .filter(bd => bd.size !== "Wastage")
-                  .map(bd => {
-                    const weight = bd.weight ? parseFloat(bd.weight) : 0;
-                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-                    const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                    return `${bd.size} - ${bd.numberOfBags}, ${weight > 0 ? weight.toFixed(0) + 'kg' : '—'}, ${netWeight > 0 ? netWeight.toFixed(0) + 'kg' : '—'}, ${price > 0 ? '₹' + price.toFixed(2) + '/kg' : '—'}`;
-                  }).join(", ");
-                
-                return (
+              {entry.lots.map((lot) => (
                 <div key={lot.id} className="border border-gray-300 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-3">
                     <div>
                       <p className="font-semibold">{lot.coldStoreName}</p>
                       <p className="text-xs text-gray-600">
@@ -452,12 +432,6 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                       <p className="font-mono"><span className="font-semibold">{lot.remainingBags}</span>/{lot.originalBags} bags / बोरी</p>
                     </div>
                   </div>
-                  
-                  {actualBreakdownText && (
-                    <p className="text-xs text-gray-600 mb-3">
-                      <span className="text-black font-medium">Original:</span> {lot.originalBags} bags &nbsp; <span className="text-black font-medium">Actual:</span> {actualBreakdownText}
-                    </p>
-                  )}
 
                   {lot.bagBreakdowns.length > 0 ? (
                     <table className="w-full text-sm mt-3 border-collapse">
@@ -564,8 +538,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                     </div>
                   )}
                 </div>
-              );
-              })}
+              ))}
             </div>
 
             <div className="mt-6 p-4 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">

@@ -918,15 +918,25 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                               {(() => {
                                 const sellableBreakdowns = lot.bagBreakdowns?.filter((bd: any) => bd.size !== "Wastage") || [];
                                 if (sellableBreakdowns.length > 0) {
-                                  return sellableBreakdowns.map((bd: any, idx: number) => (
-                                    <span key={idx}>
-                                      {idx > 0 && ", "}
-                                      <span className="font-medium">{bd.size}</span>
-                                      <span className="text-muted-foreground"> - </span>
-                                      <span className="font-semibold text-green-600 dark:text-green-400">{bd.remainingBags ?? bd.numberOfBags}</span>
-                                      <span className="text-muted-foreground">/{bd.numberOfBags}</span>
-                                    </span>
-                                  ));
+                                  return sellableBreakdowns.map((bd: any, idx: number) => {
+                                    const weight = bd.weight ? parseFloat(bd.weight) : 0;
+                                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+                                    const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+                                    return (
+                                      <span key={idx}>
+                                        {idx > 0 && ", "}
+                                        <span className="font-medium">{bd.size}</span>
+                                        <span className="text-muted-foreground"> - </span>
+                                        <span className="font-semibold text-green-600 dark:text-green-400">{bd.remainingBags ?? bd.numberOfBags}</span>
+                                        <span className="text-muted-foreground">/{bd.numberOfBags}</span>
+                                        {weight > 0 && (
+                                          <span className="text-muted-foreground">
+                                            , {weight.toFixed(0)}kg, {netWeight.toFixed(0)}kg, ₹{price.toFixed(2)}/kg
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  });
                                 } else {
                                   return (
                                     <>
