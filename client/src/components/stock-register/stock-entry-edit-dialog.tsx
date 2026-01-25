@@ -390,11 +390,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
                     {lot.bagBreakdowns.length > 0 && (
                       <div className="space-y-2">
-                        <div className="hidden md:grid md:grid-cols-7 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                        <div className="hidden md:grid md:grid-cols-8 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                           <div>{t("Size", "आकार")}</div>
                           <div>{t("# Bags", "बोरी")}</div>
                           <div>{t("Remaining", "शेष")}</div>
-                          <div>{t("Weight", "वजन")}</div>
+                          <div>{t("Total Wt", "कुल वजन")}</div>
+                          <div>{t("Net Wt", "शुद्ध वजन")}</div>
                           <div>{t("Price/kg", "मूल्य/किलो")}</div>
                           <div>{t("Total", "कुल")}</div>
                           <div></div>
@@ -402,8 +403,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         {lot.bagBreakdowns.map((bd, bdIndex) => {
                           const total = (bd.weight || 0) * (bd.pricePerKg || 0);
                           const remaining = bd.remainingBags ?? bd.numberOfBags;
+                          const netWeight = (bd.weight || 0) - (bd.numberOfBags || 0);
                           return (
-                            <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-7 gap-2 p-2 bg-muted/30 rounded-md items-center">
+                            <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-8 gap-2 p-2 bg-muted/30 rounded-md items-center">
                               <Select
                                 value={bd.size}
                                 onValueChange={(v) => handleBreakdownChange(lotIndex, bdIndex, "size", v)}
@@ -445,6 +447,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 }}
                                 data-testid={`edit-breakdown-weight-${lotIndex}-${bdIndex}`}
                               />
+                              <div className="font-mono text-sm text-muted-foreground">
+                                {bd.weight && bd.numberOfBags ? netWeight.toFixed(2) : "—"}
+                              </div>
                               <Input
                                 type="text"
                                 inputMode="decimal"
