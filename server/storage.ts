@@ -61,6 +61,7 @@ export interface IStorage {
   getMerchant(id: number): Promise<Merchant | undefined>;
   createMerchant(merchant: InsertMerchant): Promise<Merchant>;
   getAllMerchants(): Promise<Merchant[]>;
+  countMerchantsByCodePrefix(prefix: string): Promise<number>;
   updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined>;
   deleteMerchant(id: number): Promise<void>;
   
@@ -96,6 +97,7 @@ export interface IStorage {
   
   // Cash Entry operations
   getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]>;
+  countCashEntriesByCodePrefix(merchantId: number, prefix: string): Promise<number>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
@@ -124,6 +126,7 @@ export interface IStorage {
   
   // Buyer operations
   getBuyersByMerchant(merchantId: number): Promise<Buyer[]>;
+  countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
@@ -282,6 +285,12 @@ export class DatabaseStorage implements IStorage {
 
   async getAllMerchants(): Promise<Merchant[]> {
     return await db.select().from(merchants);
+  }
+
+  async countMerchantsByCodePrefix(prefix: string): Promise<number> {
+    const result = await db.select().from(merchants)
+      .where(sql`${merchants.merchantCode} LIKE ${prefix + '%'}`);
+    return result.length;
   }
 
   async updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined> {
@@ -706,6 +715,15 @@ export class DatabaseStorage implements IStorage {
     }));
     
     return result;
+  }
+
+  async countCashEntriesByCodePrefix(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select().from(cashEntries)
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        sql`${cashEntries.transactionCode} LIKE ${prefix + '%'}`
+      ));
+    return result.length;
   }
 
   async createCashEntry(entry: InsertCashEntry): Promise<CashEntry> {
@@ -1350,6 +1368,15 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(buyers)
       .where(eq(buyers.merchantId, merchantId))
       .orderBy(desc(buyers.dateAdded));
+  }
+
+  async countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select().from(buyers)
+      .where(and(
+        eq(buyers.merchantId, merchantId),
+        sql`${buyers.buyerCode} LIKE ${prefix + '%'}`
+      ));
+    return result.length;
   }
 
   async createBuyer(buyer: InsertBuyer): Promise<Buyer> {

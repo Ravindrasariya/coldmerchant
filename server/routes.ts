@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 import { z } from "zod";
+import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 
 // Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -530,7 +531,14 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Merchant name is required" });
       }
 
+      // Generate merchant code: MRYYYYMMDD{seq}
+      const dateStr = formatDateForCode(new Date());
+      const codePrefix = `MR${dateStr}`;
+      const existingCount = await storage.countMerchantsByCodePrefix(codePrefix);
+      const merchantCode = generateMerchantCode(dateStr, existingCount);
+
       const merchant = await storage.createMerchant({
+        merchantCode,
         name,
         contactNumber: contactNumber || null,
         address: address || null,
@@ -1464,9 +1472,16 @@ export async function registerRoutes(
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 
+      // Generate transaction code: TXYYYYMMDD{seq} - unique per merchant
+      const txDateStr = parseDateToCodeFormat(entryDate);
+      const txCodePrefix = `TX${txDateStr}`;
+      const existingTxCount = await storage.countCashEntriesByCodePrefix(merchantId, txCodePrefix);
+      const transactionCode = generateTransactionCode(txDateStr, existingTxCount);
+
       // Create the cash entry with FIFO allocation and optional cross-settlement
       const createdEntry = await storage.createCashEntryWithCrossSettlement({
         merchantId,
+        transactionCode,
         direction,
         receiptType: receiptType || null,
         revenueType: revenueType || null,
@@ -1716,9 +1731,17 @@ export async function registerRoutes(
       
       const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
 
+      // Generate buyer code: BYYYYYMMDD{seq} - unique per merchant
+      const effectiveDateAdded = dateAdded || new Date().toISOString().split('T')[0];
+      const dateStr = parseDateToCodeFormat(effectiveDateAdded);
+      const codePrefix = `BY${dateStr}`;
+      const existingCount = await storage.countBuyersByCodePrefix(merchantId, codePrefix);
+      const buyerCode = generateBuyerCode(dateStr, existingCount);
+
       const buyer = await storage.createBuyer({
         merchantId,
-        dateAdded: dateAdded || new Date().toISOString().split('T')[0],
+        buyerCode,
+        dateAdded: effectiveDateAdded,
         name,
         address,
         mandiCode: mandiCode || null,
