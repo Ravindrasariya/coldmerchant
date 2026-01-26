@@ -725,11 +725,23 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/transactions/transporters - Get unique transporter names for autocomplete
+  app.get("/api/transactions/transporters", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const transporters = await storage.getUniqueTransporterNames(merchantId);
+      res.json(transporters);
+    } catch (error) {
+      console.error("Error fetching transporters:", error);
+      res.status(500).json({ message: "Failed to fetch transporters" });
+    }
+  });
+
   // POST /api/transactions - Create a new transaction (Load a Truck)
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { partyName, partyAddress, vehicleNumber, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
+      const { transporterName, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -849,9 +861,12 @@ export async function registerRoutes(
           merchantId,
           transactionNumber,
           crop: transactionCrop,
+          transporterName: transporterName || null,
+          dateOfLoading: dateOfLoading || null,
           partyName: partyName || null,
           partyAddress: partyAddress || null,
           vehicleNumber: vehicleNumber || null,
+          buyerId: buyerId ? parseInt(buyerId) : null,
           advancePayment: advancePayment ? advancePayment.toString() : null,
           transportationCharges: transportationCharges ? transportationCharges.toString() : null,
           otherCharges: otherCharges ? otherCharges.toString() : null,

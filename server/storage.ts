@@ -94,6 +94,7 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction & { transactionNumber: number }, items: Omit<InsertTransactionItem, 'transactionId'>[]): Promise<Transaction & { items: TransactionItem[] }>;
   getNextTransactionNumber(merchantId: number, crop?: string): Promise<number>;
   getUnsoldInventory(merchantId: number): Promise<any[]>;
+  getUniqueTransporterNames(merchantId: number): Promise<string[]>;
   
   // Cash Entry operations
   getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]>;
@@ -593,6 +594,18 @@ export class DatabaseStorage implements IStorage {
     }
     
     return results.sort((a, b) => a.serialNumber - b.serialNumber);
+  }
+
+  async getUniqueTransporterNames(merchantId: number): Promise<string[]> {
+    const result = await db.selectDistinct({ transporterName: transactions.transporterName })
+      .from(transactions)
+      .where(and(
+        eq(transactions.merchantId, merchantId),
+        sql`${transactions.transporterName} IS NOT NULL AND ${transactions.transporterName} != ''`
+      ))
+      .orderBy(transactions.transporterName);
+    
+    return result.map(r => r.transporterName).filter((name): name is string => name !== null);
   }
 
   // Get single transaction by ID

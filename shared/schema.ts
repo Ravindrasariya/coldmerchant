@@ -123,9 +123,12 @@ export const transactions = pgTable("transactions", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
   crop: text("crop").default("potato"), // potato or onion - for separate transaction number sequences
+  transporterName: text("transporter_name"), // transporter/driver name for autocomplete history
+  dateOfLoading: text("date_of_loading"), // date when truck was loaded (YYYY-MM-DD format)
   partyName: text("party_name"),
   partyAddress: text("party_address"),
   vehicleNumber: text("vehicle_number"), // optional truck/vehicle number
+  buyerId: integer("buyer_id").references(() => buyers.id), // optional reference to buyer
   advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }), // advance given to driver/transporter
   amountReceived: decimal("amount_received", { precision: 12, scale: 2 }), // payment received from buyer
   transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
