@@ -2,7 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
+import { z } from "zod";
 
 // Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -1683,6 +1684,103 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting farmer:", error);
       res.status(500).json({ message: "Failed to delete farmer" });
+    }
+  });
+
+  // ===================== BUYER MANAGEMENT ROUTES =====================
+
+  // GET /api/buyers - Get all buyers for the authenticated merchant
+  app.get("/api/buyers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const buyerList = await storage.getBuyersByMerchant(merchantId);
+      res.json(buyerList);
+    } catch (error) {
+      console.error("Error fetching buyers:", error);
+      res.status(500).json({ message: "Failed to fetch buyers" });
+    }
+  });
+
+  // POST /api/buyers - Create a new buyer
+  app.post("/api/buyers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      
+      const validationResult = insertBuyerSchema.omit({ merchantId: true }).safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validationResult.error.flatten().fieldErrors 
+        });
+      }
+      
+      const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
+
+      const buyer = await storage.createBuyer({
+        merchantId,
+        dateAdded: dateAdded || new Date().toISOString().split('T')[0],
+        name,
+        address,
+        mandiCode: mandiCode || null,
+        contact: contact || null,
+        negativeFlag: negativeFlag ?? false,
+        isActive: isActive ?? true,
+      });
+      res.status(201).json(buyer);
+    } catch (error) {
+      console.error("Error creating buyer:", error);
+      res.status(500).json({ message: "Failed to create buyer" });
+    }
+  });
+
+  // PATCH /api/buyers/:id - Update a buyer
+  const updateBuyerSchema = insertBuyerSchema.omit({ merchantId: true }).partial();
+  
+  app.patch("/api/buyers/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      const validationResult = updateBuyerSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validationResult.error.flatten().fieldErrors 
+        });
+      }
+      
+      const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
+
+      const buyer = await storage.updateBuyer(id, merchantId, {
+        ...(dateAdded !== undefined && { dateAdded }),
+        ...(name !== undefined && { name }),
+        ...(address !== undefined && { address }),
+        ...(mandiCode !== undefined && { mandiCode }),
+        ...(contact !== undefined && { contact }),
+        ...(negativeFlag !== undefined && { negativeFlag }),
+        ...(isActive !== undefined && { isActive }),
+      });
+      
+      if (!buyer) {
+        return res.status(404).json({ message: "Buyer not found" });
+      }
+      res.json(buyer);
+    } catch (error) {
+      console.error("Error updating buyer:", error);
+      res.status(500).json({ message: "Failed to update buyer" });
+    }
+  });
+
+  // DELETE /api/buyers/:id - Delete a buyer
+  app.delete("/api/buyers/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      await storage.deleteBuyer(id, merchantId);
+      res.json({ message: "Buyer deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting buyer:", error);
+      res.status(500).json({ message: "Failed to delete buyer" });
     }
   });
 

@@ -244,6 +244,21 @@ export const cashFarmers = pgTable("cash_farmers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Buyers - buyer management with tracking for transactions
+export const buyers = pgTable("buyers", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  dateAdded: date("date_added").notNull(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  mandiCode: text("mandi_code"),
+  contact: text("contact"),
+  negativeFlag: boolean("negative_flag").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ===================== SEED MANAGEMENT TABLES =====================
 
 // Seed Stock Entries - supplier info for seed purchases
@@ -491,6 +506,13 @@ export const cashFarmersRelations = relations(cashFarmers, ({ one }) => ({
   }),
 }));
 
+export const buyersRelations = relations(buyers, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [buyers.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
 export const usersRelations = relations(users, ({ one }) => ({
   merchant: one(merchants, {
     fields: [users.merchantId],
@@ -653,6 +675,7 @@ export const insertColdStoreChargeAllocationSchema = createInsertSchema(coldStor
 export const insertCashSettingsSchema = createInsertSchema(cashSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Seed schemas
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
@@ -710,6 +733,9 @@ export type InsertParty = z.infer<typeof insertPartySchema>;
 
 export type CashFarmer = typeof cashFarmers.$inferSelect;
 export type InsertCashFarmer = z.infer<typeof insertCashFarmerSchema>;
+
+export type Buyer = typeof buyers.$inferSelect;
+export type InsertBuyer = z.infer<typeof insertBuyerSchema>;
 
 export type SeedStockEntry = typeof seedStockEntries.$inferSelect;
 export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;

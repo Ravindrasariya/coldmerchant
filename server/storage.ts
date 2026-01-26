@@ -2,7 +2,7 @@ import {
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
-  cashSettings, parties, cashFarmers,
+  cashSettings, parties, cashFarmers, buyers,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
   farmerSettlements,
@@ -19,6 +19,7 @@ import {
   type CashSettings, type InsertCashSettings,
   type Party, type InsertParty,
   type CashFarmer, type InsertCashFarmer,
+  type Buyer, type InsertBuyer,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
   type SeedStockEntryWithLots,
@@ -120,6 +121,12 @@ export interface IStorage {
   createCashFarmer(farmer: InsertCashFarmer): Promise<CashFarmer>;
   updateCashFarmer(id: number, merchantId: number, data: Partial<CashFarmer>): Promise<CashFarmer | undefined>;
   deleteCashFarmer(id: number, merchantId: number): Promise<void>;
+  
+  // Buyer operations
+  getBuyersByMerchant(merchantId: number): Promise<Buyer[]>;
+  createBuyer(buyer: InsertBuyer): Promise<Buyer>;
+  updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
+  deleteBuyer(id: number, merchantId: number): Promise<void>;
   
   // Seed Stock Entry operations
   getSeedEntriesByMerchant(merchantId: number): Promise<SeedStockEntryWithLots[]>;
@@ -1336,6 +1343,31 @@ export class DatabaseStorage implements IStorage {
   async deleteCashFarmer(id: number, merchantId: number): Promise<void> {
     await db.delete(cashFarmers)
       .where(and(eq(cashFarmers.id, id), eq(cashFarmers.merchantId, merchantId)));
+  }
+
+  // Buyer operations
+  async getBuyersByMerchant(merchantId: number): Promise<Buyer[]> {
+    return await db.select().from(buyers)
+      .where(eq(buyers.merchantId, merchantId))
+      .orderBy(desc(buyers.dateAdded));
+  }
+
+  async createBuyer(buyer: InsertBuyer): Promise<Buyer> {
+    const [created] = await db.insert(buyers).values(buyer).returning();
+    return created;
+  }
+
+  async updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined> {
+    const [updated] = await db.update(buyers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteBuyer(id: number, merchantId: number): Promise<void> {
+    await db.delete(buyers)
+      .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
   }
 
   // ===================== SEED STOCK ENTRY OPERATIONS =====================

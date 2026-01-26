@@ -70,6 +70,15 @@ Cold store dues are calculated as: `(chargesPerBag × originalBags) + hammaliGra
 - **Default Password**: New users created with password "password123" and mustChangePassword=true
 - **First Login**: Users with mustChangePassword flag are prompted to set a new password on first login
 
+### Buyer Management System
+- **Buyers Table**: Stores buyer information per merchant with fields: name, address, mandiCode, contact, negativeFlag, isActive
+- **API Routes**: Full CRUD operations at /api/buyers with Zod validation using insertBuyerSchema
+- **UI Pattern**: Editable table rows with localRows state management:
+  - `localRows = null`: Displaying server data (no edits)
+  - `localRows = [...]`: User has unsaved local edits
+- **Delete Preservation**: Delete operations preserve unsaved edits on other rows
+- **Accessible via**: User dropdown menu > "Buyers" link
+
 ### Cross-Module Farmer Settlement System
 - **Purpose**: Automatically offset payments between Raw Potato dues (merchant owes farmer) and Seed Transaction dues (farmer owes merchant)
 - **Farmer Identity Matching**: Uses composite key of normalized name (case-insensitive, trimmed) + optional village + optional contact

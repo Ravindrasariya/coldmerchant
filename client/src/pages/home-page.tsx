@@ -34,7 +34,8 @@ import {
   Wallet,
   Menu,
   Download,
-  Leaf
+  Leaf,
+  Users
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -202,6 +203,10 @@ export default function HomePage() {
                       {t("Admin Panel", "एडमिन पैनल")}
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => setLocation("/buyers")} data-testid="button-buyers">
+                    <Users className="h-4 w-4 mr-2" />
+                    {t("Buyers", "खरीदार")}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
                     <KeyRound className="h-4 w-4 mr-2" />
                     {t("Change Password", "पासवर्ड बदलें")}
