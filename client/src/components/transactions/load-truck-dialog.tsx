@@ -355,7 +355,14 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      // Only close dialog, don't reset form data - data persists until Save/Cancel
+      if (!newOpen) {
+        onOpenChange(false);
+      } else {
+        onOpenChange(true);
+      }
+    }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -528,12 +535,12 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                           </div>
 
                           {/* Lot Header */}
-                          <div className="hidden md:grid md:grid-cols-12 gap-1 px-2 py-1 bg-muted/50 rounded text-xs font-medium">
+                          <div className="hidden md:grid md:grid-cols-12 gap-1 px-2 py-1 bg-muted/50 rounded text-xs font-medium items-center">
                             <div className="col-span-5">{t("Lot", "लॉट")}</div>
-                            <div className="col-span-1">{t("Bags", "बोरी")}</div>
-                            <div className="col-span-2">{t("Total Wt", "कुल वजन")}</div>
-                            <div className="col-span-2">{t("Net Wt", "शुद्ध वजन")}</div>
-                            <div className="col-span-1">{t("Cost", "लागत")}</div>
+                            <div className="col-span-1 text-center">{t("Bags", "बोरी")}</div>
+                            <div className="col-span-2 text-center">{t("Total Weight", "कुल वजन")}</div>
+                            <div className="col-span-2 text-center">{t("Net Weight", "शुद्ध वजन")}</div>
+                            <div className="col-span-1 text-center">{t("Cost of Goods", "माल की लागत")}</div>
                             <div className="col-span-1"></div>
                           </div>
 
@@ -548,7 +555,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             return (
                               <div
                                 key={itemIndex}
-                                className="grid grid-cols-12 gap-1 items-end"
+                                className="grid grid-cols-12 gap-1 items-center"
                               >
                                 <div className="col-span-12 md:col-span-5">
                                   <Select
@@ -766,13 +773,13 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             </div>
                             <div>
                               <p className="text-lg font-bold">{summary.totalNetWeight.toFixed(1)}</p>
-                              <p className="text-muted-foreground">{t("Weight (Kg)", "वजन (किग्रा)")}</p>
+                              <p className="text-muted-foreground">{t("Net Weight (Kg)", "शुद्ध वजन (किग्रा)")}</p>
                             </div>
                             <div>
-                              <p className="text-lg font-bold">₹{summary.totalCostOfGoods.toFixed(0)}</p>
+                              <p className="text-lg font-bold">₹{(summary.totalCostOfGoods + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0)).toFixed(0)}</p>
                               <p className="text-muted-foreground flex items-center justify-center gap-1">
                                 <IndianRupee className="h-3 w-3" />
-                                {t("Cost", "लागत")}
+                                {t("Total Cost", "कुल लागत")}
                               </p>
                             </div>
                             <div>
