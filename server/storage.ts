@@ -571,6 +571,7 @@ export class DatabaseStorage implements IStorage {
             pricePerKg: breakdown.pricePerKg || lot.pricePerKg,
             remainingBags: availableBags,
             originalBags: breakdown.numberOfBags,
+            lotOriginalBags: lot.originalBags,
             totalWeight: lot.totalWeight || null,
           });
         }
@@ -591,6 +592,7 @@ export class DatabaseStorage implements IStorage {
             pricePerKg: lot.pricePerKg,
             remainingBags: lot.remainingBags,
             originalBags: lot.originalBags,
+            lotOriginalBags: lot.originalBags,
             totalWeight: lot.totalWeight || null,
           });
         }
