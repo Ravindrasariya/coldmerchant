@@ -1682,7 +1682,7 @@ export function CashManagementTab() {
                       <FormItem>
                         <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
                         <FormControl>
-                          <Textarea placeholder={t("Remarks", "टिप्पणी")} {...field} rows={2} data-testid="input-remarks" />
+                          <Input placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-remarks" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2007,7 +2007,7 @@ export function CashManagementTab() {
                       <FormItem>
                         <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
                         <FormControl>
-                          <Textarea placeholder={t("Remarks", "टिप्पणी")} {...field} rows={2} data-testid="input-outflow-remarks" />
+                          <Input placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-outflow-remarks" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
