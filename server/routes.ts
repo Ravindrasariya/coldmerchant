@@ -1508,9 +1508,9 @@ export async function registerRoutes(
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 
-      // Generate transaction code: TXYYYYMMDD{seq} - unique per merchant
+      // Generate cash flow code: CFYYYYMMDD{seq} - unique per merchant
       const txDateStr = parseDateToCodeFormat(entryDate);
-      const txCodePrefix = `TX${txDateStr}`;
+      const txCodePrefix = `CF${txDateStr}`;
       const existingTxCount = await storage.countCashEntriesByCodePrefix(merchantId, txCodePrefix);
       const transactionCode = generateTransactionCode(txDateStr, existingTxCount);
 

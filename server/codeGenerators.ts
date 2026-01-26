@@ -3,7 +3,7 @@
  * Format patterns:
  * - Merchant: MRYYYYMMDD{seq} - globally unique
  * - Buyer: BYYYYYMMDD{seq} - unique per merchant
- * - Transaction: TXYYYYMMDD{seq} - unique per merchant
+ * - Cash Flow: CFYYYYMMDD{seq} - unique per merchant
  */
 
 /**
@@ -35,12 +35,12 @@ export function generateBuyerCode(dateStr: string, existingCount: number): strin
 }
 
 /**
- * Generate transaction code: TXYYYYMMDD{seq}
+ * Generate cash flow code: CFYYYYMMDD{seq}
  * Unique per merchant - seq is based on all cash entries for that merchant created on that date
  */
 export function generateTransactionCode(dateStr: string, existingCount: number): string {
   const seq = existingCount + 1;
-  return `TX${dateStr}${seq}`;
+  return `CF${dateStr}${seq}`;
 }
 
 /**
