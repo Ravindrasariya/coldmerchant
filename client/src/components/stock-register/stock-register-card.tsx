@@ -112,18 +112,12 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const sellableBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
   const wastageBreakdowns = lot.bagBreakdowns.filter(bd => bd.size === "Wastage");
   
-  const coldStoreChargesPerBag = lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null;
-  const hammaliGradingCharges = lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : 0;
-  const expectedColdCharges = lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : 0;
-  
-  // Calculate dynamic cold store charges from charges array (Cold Charges, Ware House Charges)
+  // Calculate cold store charges from charges array (Cold Charges, Ware House Charges)
   const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
-  const dynamicColdCharges = (lot.charges || [])
+  const coldStoreTotalCharges = (lot.charges || [])
     .filter(c => c && coldStoreTypes.includes(c.type))
     .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
   
-  const perBagTotal = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : 0;
-  const coldStoreTotalCharges = perBagTotal + hammaliGradingCharges + expectedColdCharges + dynamicColdCharges;
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
   const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
   
@@ -139,9 +133,6 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     totalWeight,
     totalAmount,
     pricePerKg: lot.pricePerKg ? parseFloat(lot.pricePerKg) : null,
-    coldStoreChargesPerBag,
-    hammaliGradingCharges,
-    expectedColdCharges,
     coldStoreTotalCharges,
     coldStorePaid,
     coldStoreRemaining,
