@@ -24,6 +24,7 @@ import { type Buyer } from "@shared/schema";
 
 interface BuyerRow {
   id?: number;
+  buyerCode?: string;
   dateAdded: string;
   name: string;
   address: string;
@@ -54,6 +55,7 @@ function createEmptyRow(): BuyerRow {
 function buyerToRow(b: Buyer): BuyerRow {
   return {
     id: b.id,
+    buyerCode: b.buyerCode || undefined,
     dateAdded: b.dateAdded,
     name: b.name,
     address: b.address,
@@ -262,7 +264,8 @@ export default function BuyersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="hidden md:grid md:grid-cols-9 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
+                <div className="hidden md:grid md:grid-cols-10 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
+                  <div>{t("Buyer ID", "खरीदार आईडी")}</div>
                   <div>{t("Date Added", "जोड़ने की तारीख")}</div>
                   <div>{t("Name", "नाम")} *</div>
                   <div>{t("Address", "पता")} *</div>
@@ -277,9 +280,15 @@ export default function BuyersPage() {
                 {displayRows.map((row, index) => (
                   <div 
                     key={row.id || `new-${index}`} 
-                    className="grid grid-cols-2 md:grid-cols-9 gap-2 p-3 border rounded-lg bg-card"
+                    className="grid grid-cols-2 md:grid-cols-10 gap-2 p-3 border rounded-lg bg-card"
                     data-testid={`buyer-row-${index}`}
                   >
+                    <div className="space-y-1">
+                      <Label className="md:hidden text-xs text-muted-foreground">{t("Buyer ID", "खरीदार आईडी")}</Label>
+                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-xs font-mono text-muted-foreground">
+                        {row.buyerCode || (row.isNew ? t("Auto", "स्वतः") : '-')}
+                      </div>
+                    </div>
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Date Added", "जोड़ने की तारीख")}</Label>
                       <Input
