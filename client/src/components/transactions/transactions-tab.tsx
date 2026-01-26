@@ -30,6 +30,8 @@ interface TransactionItem {
   costOfGoods: string | null;
   revenue: string | null;
   crop?: string;
+  farmerName?: string;
+  farmerVillage?: string;
 }
 
 interface Transaction {
@@ -216,9 +218,9 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       const amountReceived = parseFloat(txn.amountReceived || "0");
       const dueAmount = Math.max(revenue - amountReceived, 0);
       
-      // Format items as "S#2 (48 - Large), S#3 (180 - Large)"
+      // Format items as "S#2 (48 - Large) - Ram Vilas (Kachnariya), S#3 (180 - Large) - Arun (Kachnariya)"
       const itemsDetail = txn.items.map(item => 
-        `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})`
+        `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})${item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}`
       ).join(", ");
       
       return [
@@ -672,7 +674,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                     variant="outline" 
                     className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
                   >
-                    S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"})
+                    S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"}){item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}
                   </Badge>
                 ))}
                 {transaction.items.length > 3 && (

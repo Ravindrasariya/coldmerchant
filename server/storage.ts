@@ -90,7 +90,7 @@ export interface IStorage {
   getEditHistory(stockEntryId: number, merchantId: number): Promise<(StockEntryEditHistory & { userName?: string })[]>;
   
   // Transaction operations
-  getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: TransactionItem[] })[]>;
+  getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: (TransactionItem & { farmerName?: string; farmerVillage?: string })[] })[]>;
   createTransaction(transaction: InsertTransaction & { transactionNumber: number }, items: Omit<InsertTransactionItem, 'transactionId'>[]): Promise<Transaction & { items: TransactionItem[] }>;
   getNextTransactionNumber(merchantId: number, crop?: string): Promise<number>;
   getUnsoldInventory(merchantId: number): Promise<any[]>;
@@ -462,7 +462,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Transaction operations
-  async getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: TransactionItem[] })[]> {
+  async getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: (TransactionItem & { farmerName?: string; farmerVillage?: string })[] })[]> {
     const txns = await db.select().from(transactions)
       .where(eq(transactions.merchantId, merchantId))
       .orderBy(desc(transactions.createdAt));
@@ -470,7 +470,20 @@ export class DatabaseStorage implements IStorage {
     const result = await Promise.all(txns.map(async (txn) => {
       const items = await db.select().from(transactionItems)
         .where(eq(transactionItems.transactionId, txn.id));
-      return { ...txn, items };
+      
+      // Enrich items with farmer name and village from stock entries (scoped by merchantId for tenant isolation)
+      const enrichedItems = await Promise.all(items.map(async (item) => {
+        const lot = await db.select().from(lots).where(and(eq(lots.id, item.lotId), eq(lots.merchantId, merchantId))).limit(1);
+        if (lot.length > 0) {
+          const entry = await db.select().from(stockEntries).where(and(eq(stockEntries.id, lot[0].stockEntryId), eq(stockEntries.merchantId, merchantId))).limit(1);
+          if (entry.length > 0) {
+            return { ...item, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
+          }
+        }
+        return { ...item, farmerName: undefined, farmerVillage: undefined };
+      }));
+      
+      return { ...txn, items: enrichedItems };
     }));
     
     return result;
