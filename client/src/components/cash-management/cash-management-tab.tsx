@@ -134,11 +134,23 @@ interface CashSettings {
   openingCashInAccount: string;
 }
 
+interface BankAccount {
+  id: number;
+  merchantId: number;
+  name: string;
+  accountType: string;
+  openingBalance: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const inwardFormSchema = z.object({
   receiptType: z.string().min(1, "Receipt type is required"),
   revenueType: z.string().min(1, "Revenue type is required"),
   partyName: z.string().optional(),
   seedFarmerName: z.string().optional(),
+  bankAccountId: z.coerce.number().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -157,11 +169,19 @@ const inwardFormSchema = z.object({
       path: ["seedFarmerName"],
     });
   }
+  if (data.receiptType === "account_received" && !data.bankAccountId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Bank account is required for account transfers",
+      path: ["bankAccountId"],
+    });
+  }
 });
 
 const outflowFormSchema = z.object({
   expenseType: z.string().min(1, "Expense type is required"),
   paymentMode: z.string().min(1, "Payment mode is required"),
+  bankAccountId: z.coerce.number().optional(),
   farmerName: z.string().optional(),
   coldStoreName: z.string().optional(),
   supplierName: z.string().optional(),
@@ -188,6 +208,13 @@ const outflowFormSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Supplier name is required",
       path: ["supplierName"],
+    });
+  }
+  if (data.paymentMode === "account_transfer" && !data.bankAccountId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Bank account is required for account transfers",
+      path: ["bankAccountId"],
     });
   }
 });
@@ -258,6 +285,11 @@ export function CashManagementTab() {
     queryKey: ["/api/cash/managed-farmers"],
   });
 
+  // Fetch bank accounts for account transfers
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+    queryKey: ["/api/bank-accounts"],
+  });
+
   // Fetch cash settings for opening balance
   const { data: cashSettings } = useQuery<CashSettings>({
     queryKey: ["/api/cash/settings", financialYear],
@@ -275,6 +307,7 @@ export function CashManagementTab() {
       revenueType: "raw_potato",
       partyName: "",
       seedFarmerName: "",
+      bankAccountId: undefined,
       amount: 0,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -315,14 +348,16 @@ export function CashManagementTab() {
     setOutflowCrossSettlementEnabled(true);
   }, [selectedOutflowFarmerName]);
   
-  // Watch revenue type for conditional rendering
+  // Watch revenue type and receipt type for conditional rendering
   const revenueType = inwardForm.watch("revenueType");
+  const receiptType = inwardForm.watch("receiptType");
 
   const outflowForm = useForm<OutflowFormValues>({
     resolver: zodResolver(outflowFormSchema),
     defaultValues: {
       expenseType: "",
       paymentMode: "cash",
+      bankAccountId: undefined,
       farmerName: "",
       coldStoreName: "",
       supplierName: "",
@@ -331,6 +366,9 @@ export function CashManagementTab() {
       remarks: "",
     },
   });
+
+  // Watch payment mode for conditional bank account dropdown
+  const paymentMode = outflowForm.watch("paymentMode");
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -456,6 +494,7 @@ export function CashManagementTab() {
         revenueType: values.revenueType,
         partyName: values.partyName,
         partyVillage: selectedParty?.address || null,
+        bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
@@ -501,6 +540,7 @@ export function CashManagementTab() {
         revenueType: values.revenueType,
         farmerName: values.seedFarmerName,
         farmerVillage: selectedSeedFarmer?.village || null,
+        bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
@@ -549,6 +589,7 @@ export function CashManagementTab() {
       direction: "outflow",
       expenseType: values.expenseType,
       paymentMode: values.paymentMode,
+      bankAccountId: values.paymentMode === "account_transfer" ? values.bankAccountId : null,
       farmerName: values.expenseType === "farmer" ? values.farmerName : null,
       farmerVillage: selectedFarmer?.address || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
@@ -1246,6 +1287,39 @@ export function CashManagementTab() {
                     )}
                   />
 
+                  {receiptType === "account_received" && bankAccounts.length > 0 && (
+                    <FormField
+                      control={inwardForm.control}
+                      name="bankAccountId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Bank Account", "बैंक खाता")} *</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-inward-bank-account">
+                                <SelectValue placeholder={t("Select account", "खाता चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {bankAccounts.filter(a => a.isActive).map((account) => (
+                                <SelectItem key={account.id} value={account.id.toString()}>
+                                  {account.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {receiptType === "account_received" && bankAccounts.length === 0 && (
+                    <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                      {t("No bank accounts configured. Add accounts in Settings.", "कोई बैंक खाता कॉन्फ़िगर नहीं है। सेटिंग्स में खाते जोड़ें।")}
+                    </div>
+                  )}
+
                   <FormField
                     control={inwardForm.control}
                     name="revenueType"
@@ -1724,6 +1798,39 @@ export function CashManagementTab() {
                       </FormItem>
                     )}
                   />
+
+                  {paymentMode === "account_transfer" && bankAccounts.length > 0 && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="bankAccountId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Bank Account", "बैंक खाता")} *</FormLabel>
+                          <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value?.toString()}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-outflow-bank-account">
+                                <SelectValue placeholder={t("Select account", "खाता चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {bankAccounts.filter(a => a.isActive).map((account) => (
+                                <SelectItem key={account.id} value={account.id.toString()}>
+                                  {account.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {paymentMode === "account_transfer" && bankAccounts.length === 0 && (
+                    <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
+                      {t("No bank accounts configured. Add accounts in Settings.", "कोई बैंक खाता कॉन्फ़िगर नहीं है। सेटिंग्स में खाते जोड़ें।")}
+                    </div>
+                  )}
 
                   <FormField
                     control={outflowForm.control}
