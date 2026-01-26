@@ -287,7 +287,7 @@ export default function AdminPage() {
                     <TableBody>
                       {merchants.map((merchant) => (
                         <TableRow key={merchant.id} data-testid={`row-merchant-${merchant.id}`}>
-                          <TableCell className="font-mono text-sm text-muted-foreground">{merchant.merchantCode || '-'}</TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground" data-testid={`text-merchant-code-${merchant.id}`}>{merchant.merchantCode || '-'}</TableCell>
                           <TableCell className="font-medium">{merchant.name}</TableCell>
                           <TableCell>
                             {merchant.contactNumber ? (

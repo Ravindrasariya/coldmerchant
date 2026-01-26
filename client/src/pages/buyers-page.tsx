@@ -285,7 +285,7 @@ export default function BuyersPage() {
                   >
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Buyer ID", "खरीदार आईडी")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-xs font-mono text-muted-foreground">
+                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-xs font-mono text-muted-foreground" data-testid={`text-buyer-code-${index}`}>
                         {row.buyerCode || (row.isNew ? t("Auto", "स्वतः") : '-')}
                       </div>
                     </div>
