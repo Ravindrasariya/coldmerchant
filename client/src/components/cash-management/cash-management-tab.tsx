@@ -1115,7 +1115,7 @@ export function CashManagementTab() {
         </div>
       </div>
       
-      {/* Summary Cards */}
+      {/* Summary Cards - Order: Cash Received, Cash Expense, Net Cash in Hand, Account Received, Account Expense, Net in Accounts */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card data-testid="card-cash-received">
           <CardContent className="p-3">
@@ -1124,6 +1124,28 @@ export function CashManagementTab() {
               <span className="text-xs font-medium">{t("Cash Received", "नकद प्राप्त")}</span>
             </div>
             <p className="text-lg font-bold text-green-600">₹{totalCashReceived.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-cash-expense">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-amber-600 mb-1">
+              <ArrowUpRight className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Cash Expense", "नकद खर्च")}</span>
+            </div>
+            <p className="text-lg font-bold text-amber-600">₹{totalCashExpense.toLocaleString()}</p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-net-cash">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 text-teal-600 mb-1">
+              <Wallet className="h-4 w-4" />
+              <span className="text-xs font-medium">{t("Net Cash in Hand", "हाथ में शुद्ध नकद")}</span>
+            </div>
+            <p className={`text-lg font-bold ${netCashInHand >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+              ₹{netCashInHand.toLocaleString()}
+            </p>
           </CardContent>
         </Card>
 
@@ -1153,16 +1175,6 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-cash-expense">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 text-amber-600 mb-1">
-              <ArrowUpRight className="h-4 w-4" />
-              <span className="text-xs font-medium">{t("Cash Expense", "नकद खर्च")}</span>
-            </div>
-            <p className="text-lg font-bold text-amber-600">₹{totalCashExpense.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-
         <Card data-testid="card-account-expense">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-orange-600 mb-1">
@@ -1189,23 +1201,11 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-net-cash">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 text-teal-600 mb-1">
-              <Wallet className="h-4 w-4" />
-              <span className="text-xs font-medium">{t("Net Cash in Hand", "हाथ में शुद्ध नकद")}</span>
-            </div>
-            <p className={`text-lg font-bold ${netCashInHand >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
-              ₹{netCashInHand.toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
-
         <Card data-testid="card-net-account">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-indigo-600 mb-1">
               <Building2 className="h-4 w-4" />
-              <span className="text-xs font-medium">{t("Net in Account", "खाते में शुद्ध")}</span>
+              <span className="text-xs font-medium">{t("Net in Accounts", "खातों में शुद्ध")}</span>
             </div>
             <p className={`text-lg font-bold ${netCashInAccount >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
               ₹{netCashInAccount.toLocaleString()}
