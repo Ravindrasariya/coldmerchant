@@ -15,7 +15,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   ArrowLeft,
   Plus, 
-  Trash2, 
   Save,
   Loader2,
   Users
@@ -118,26 +117,7 @@ export default function BuyersPage() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async ({ id, preserveLocalEdits }: { id: number; preserveLocalEdits: BuyerRow[] | null }) => {
-      await apiRequest("DELETE", `/api/buyers/${id}`);
-      return { id, preserveLocalEdits };
-    },
-    onSuccess: ({ id, preserveLocalEdits }) => {
-      if (preserveLocalEdits !== null) {
-        const remaining = preserveLocalEdits.filter(r => r.id !== id);
-        const hasOtherEdits = remaining.some(r => r.isNew || r.isEdited);
-        if (hasOtherEdits) {
-          setLocalRows(remaining.length > 0 ? remaining : [createEmptyRow()]);
-        } else {
-          setLocalRows(null);
-        }
-      } else {
-        setLocalRows(null);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-    },
-  });
+  // Delete functionality removed - buyers cannot be deleted once added
 
   const displayRows = useMemo(() => {
     if (localRows !== null) {
@@ -162,16 +142,7 @@ export default function BuyersPage() {
     setLocalRows([...currentRows, createEmptyRow()]);
   };
 
-  const handleDeleteRow = async (index: number) => {
-    const currentRows = localRows !== null ? [...localRows] : displayRows.map(r => ({ ...r }));
-    const row = currentRows[index];
-    if (row.id && !row.isNew) {
-      await deleteMutation.mutateAsync({ id: row.id, preserveLocalEdits: currentRows });
-    } else {
-      const newRows = currentRows.filter((_, i) => i !== index);
-      setLocalRows(newRows.length > 0 ? newRows : [createEmptyRow()]);
-    }
-  };
+  // Delete functionality removed - buyers cannot be deleted once added
 
   const handleSaveAll = async () => {
     const rowsToSave = displayRows;
@@ -190,7 +161,7 @@ export default function BuyersPage() {
     setLocalRows(null);
   };
 
-  const isSaving = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -264,7 +235,7 @@ export default function BuyersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="hidden md:grid md:grid-cols-10 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
+                <div className="hidden md:grid md:grid-cols-9 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
                   <div>{t("Buyer ID", "खरीदार आईडी")}</div>
                   <div>{t("Date Added", "जोड़ने की तारीख")}</div>
                   <div>{t("Name", "नाम")} *</div>
@@ -274,13 +245,12 @@ export default function BuyersPage() {
                   <div>{t("Negative", "नकारात्मक")}</div>
                   <div>{t("Active", "सक्रिय")}</div>
                   <div>{t("Overall Due", "कुल बकाया")}</div>
-                  <div></div>
                 </div>
                 
                 {displayRows.map((row, index) => (
                   <div 
                     key={row.id || `new-${index}`} 
-                    className="grid grid-cols-2 md:grid-cols-10 gap-2 p-3 border rounded-lg bg-card"
+                    className="grid grid-cols-2 md:grid-cols-9 gap-2 p-3 border rounded-lg bg-card"
                     data-testid={`buyer-row-${index}`}
                   >
                     <div className="space-y-1">
@@ -367,18 +337,6 @@ export default function BuyersPage() {
                       <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-sm font-mono">
                         ₹{row.overallDue.toLocaleString("en-IN")}
                       </div>
-                    </div>
-                    <div className="flex items-center justify-end">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteRow(index)}
-                        className="h-9 w-9 text-destructive hover:text-destructive"
-                        disabled={displayRows.length === 1 && !row.id}
-                        data-testid={`button-delete-${index}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 ))}
