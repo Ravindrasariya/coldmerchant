@@ -32,6 +32,7 @@ interface UnsoldInventoryItem {
   serialNumber: number;
   coldStoreName: string;
   farmerName: string;
+  farmerVillage: string;
   potatoType: string;
   quality: string;
   cutType: string;
@@ -39,11 +40,13 @@ interface UnsoldInventoryItem {
   pricePerKg: string | null;
   remainingBags: number;
   originalBags: number;
+  totalWeight: string | null;
 }
 
 interface LotItem {
   inventoryKey: string;
   bagsMoved: number;
+  totalWeight: number;
   netWeight: number;
 }
 
@@ -70,7 +73,7 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   buyerId: null,
   partyName: "",
   partyAddress: "",
-  items: [{ inventoryKey: "", bagsMoved: 0, netWeight: 0 }],
+  items: [{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0 }],
   advancePayment: 0,
   transportationCharges: 0,
   otherCharges: 0,
@@ -132,6 +135,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
         const invItem = findInventoryByKey(item.inventoryKey);
         const pricePerKg = invItem?.pricePerKg ? parseFloat(invItem.pricePerKg) : 0;
         const netWeight = Number(item.netWeight) || 0;
+        // Cost = Net Weight × Price per Kg
         const costOfGoods = netWeight * pricePerKg;
 
         totalBags += Number(item.bagsMoved) || 0;
@@ -152,6 +156,26 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
       };
     },
     [findInventoryByKey]
+  );
+
+  // Calculate proportionate total weight when lot is selected
+  const calculateProportionateTotalWeight = useCallback(
+    (inv: UnsoldInventoryItem, bagsMoved: number): number => {
+      if (!inv.totalWeight || inv.originalBags <= 0) return 0;
+      const totalWeightNum = parseFloat(inv.totalWeight);
+      // Proportionate weight = (bags selected / original bags) × total weight
+      return (bagsMoved / inv.originalBags) * totalWeightNum;
+    },
+    []
+  );
+
+  // Calculate net weight from total weight and bags
+  const calculateNetWeight = useCallback(
+    (totalWeight: number, bags: number): number => {
+      // Net Weight = Total Weight - # of bags (1kg deduction per bag for packing)
+      return Math.max(0, totalWeight - bags);
+    },
+    []
   );
 
   const grandTotals = useMemo(() => {
@@ -199,7 +223,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     setBuyerSections((prev) =>
       prev.map((s) =>
         s.id === sectionId
-          ? { ...s, items: [...s.items, { inventoryKey: "", bagsMoved: 0, netWeight: 0 }] }
+          ? { ...s, items: [...s.items, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0 }] }
           : s
       )
     );
@@ -245,6 +269,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
           .map((item) => ({
             inventoryKey: item.inventoryKey,
             bagsMoved: item.bagsMoved,
+            totalWeight: item.totalWeight,
             netWeight: item.netWeight,
           }));
 
@@ -503,11 +528,12 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                           </div>
 
                           {/* Lot Header */}
-                          <div className="hidden md:grid md:grid-cols-12 gap-2 px-2 py-1 bg-muted/50 rounded text-xs font-medium">
+                          <div className="hidden md:grid md:grid-cols-12 gap-1 px-2 py-1 bg-muted/50 rounded text-xs font-medium">
                             <div className="col-span-5">{t("Lot", "लॉट")}</div>
-                            <div className="col-span-2">{t("Bags", "बोरी")}</div>
-                            <div className="col-span-2">{t("Weight (Kg)", "वजन (किग्रा)")}</div>
-                            <div className="col-span-2">{t("Cost", "लागत")}</div>
+                            <div className="col-span-1">{t("Bags", "बोरी")}</div>
+                            <div className="col-span-2">{t("Total Wt", "कुल वजन")}</div>
+                            <div className="col-span-2">{t("Net Wt", "शुद्ध वजन")}</div>
+                            <div className="col-span-1">{t("Cost", "लागत")}</div>
                             <div className="col-span-1"></div>
                           </div>
 
@@ -516,32 +542,48 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             const pricePerKg = selectedInv?.pricePerKg
                               ? parseFloat(selectedInv.pricePerKg)
                               : 0;
+                            // Cost = Net Weight × Price per Kg
                             const itemCost = (Number(item.netWeight) || 0) * pricePerKg;
 
                             return (
                               <div
                                 key={itemIndex}
-                                className="grid grid-cols-12 gap-2 items-end"
+                                className="grid grid-cols-12 gap-1 items-end"
                               >
                                 <div className="col-span-12 md:col-span-5">
                                   <Select
                                     value={item.inventoryKey}
                                     onValueChange={(value) => {
                                       const inv = findInventoryByKey(value);
-                                      updateLotItem(section.id, itemIndex, {
-                                        inventoryKey: value,
-                                        bagsMoved: inv?.remainingBags || 0,
-                                      });
+                                      if (inv) {
+                                        const bags = inv.remainingBags || 0;
+                                        const proportionateTotalWeight = calculateProportionateTotalWeight(inv, bags);
+                                        const netWeight = calculateNetWeight(proportionateTotalWeight, bags);
+                                        updateLotItem(section.id, itemIndex, {
+                                          inventoryKey: value,
+                                          bagsMoved: bags,
+                                          totalWeight: Math.round(proportionateTotalWeight * 10) / 10,
+                                          netWeight: Math.round(netWeight * 10) / 10,
+                                        });
+                                      } else {
+                                        updateLotItem(section.id, itemIndex, {
+                                          inventoryKey: value,
+                                          bagsMoved: 0,
+                                          totalWeight: 0,
+                                          netWeight: 0,
+                                        });
+                                      }
                                     }}
                                   >
                                     <SelectTrigger
                                       data-testid={`select-lot-${sectionIndex}-${itemIndex}`}
+                                      className="h-auto min-h-9"
                                     >
                                       <SelectValue
                                         placeholder={t("Select lot...", "लॉट चुनें...")}
                                       />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="max-w-[400px]">
                                       {inventory
                                         .filter((inv) => {
                                           const key = getInventoryKey(inv);
@@ -553,10 +595,15 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                         .map((inv) => {
                                           const key = getInventoryKey(inv);
                                           return (
-                                            <SelectItem key={key} value={key}>
-                                              S#{inv.serialNumber} - {inv.coldStoreName} -{" "}
-                                              {inv.potatoType} - {inv.size || "Mixed"} (
-                                              {inv.remainingBags} {t("bags", "बोरी")})
+                                            <SelectItem key={key} value={key} className="py-2">
+                                              <div className="flex flex-col">
+                                                <span className="text-sm font-medium">
+                                                  S#{inv.serialNumber} - {inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("bags", "बोरी")}
+                                                </span>
+                                              </div>
                                             </SelectItem>
                                           );
                                         })}
@@ -564,37 +611,58 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                   </Select>
                                 </div>
 
-                                <div className="col-span-4 md:col-span-2">
+                                <div className="col-span-3 md:col-span-1">
                                   <Input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
                                     value={item.bagsMoved || ""}
-                                    onChange={(e) =>
-                                      updateLotItem(section.id, itemIndex, {
-                                        bagsMoved: Number(e.target.value) || 0,
-                                      })
-                                    }
-                                    max={selectedInv?.remainingBags || 999}
+                                    onChange={(e) => {
+                                      const bags = Number(e.target.value) || 0;
+                                      if (selectedInv) {
+                                        const proportionateTotalWeight = calculateProportionateTotalWeight(selectedInv, bags);
+                                        const netWeight = calculateNetWeight(proportionateTotalWeight, bags);
+                                        updateLotItem(section.id, itemIndex, {
+                                          bagsMoved: bags,
+                                          totalWeight: Math.round(proportionateTotalWeight * 10) / 10,
+                                          netWeight: Math.round(netWeight * 10) / 10,
+                                        });
+                                      } else {
+                                        updateLotItem(section.id, itemIndex, { bagsMoved: bags });
+                                      }
+                                    }}
+                                    className="text-center px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     data-testid={`input-bags-${sectionIndex}-${itemIndex}`}
                                   />
                                 </div>
 
-                                <div className="col-span-4 md:col-span-2">
+                                <div className="col-span-3 md:col-span-2">
                                   <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={item.netWeight || ""}
-                                    onChange={(e) =>
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={item.totalWeight || ""}
+                                    onChange={(e) => {
+                                      const totalWt = Number(e.target.value) || 0;
+                                      const bags = Number(item.bagsMoved) || 0;
+                                      const netWeight = calculateNetWeight(totalWt, bags);
                                       updateLotItem(section.id, itemIndex, {
-                                        netWeight: Number(e.target.value) || 0,
-                                      })
-                                    }
-                                    data-testid={`input-weight-${sectionIndex}-${itemIndex}`}
+                                        totalWeight: totalWt,
+                                        netWeight: Math.round(netWeight * 10) / 10,
+                                      });
+                                    }}
+                                    className="text-center px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    data-testid={`input-total-weight-${sectionIndex}-${itemIndex}`}
                                   />
                                 </div>
 
                                 <div className="col-span-3 md:col-span-2">
-                                  <div className="h-9 px-3 flex items-center bg-muted/50 rounded-md text-sm font-medium">
-                                    ₹{itemCost.toFixed(2)}
+                                  <div className="h-9 px-2 flex items-center justify-center bg-muted/50 rounded-md text-sm font-medium">
+                                    {(Number(item.netWeight) || 0).toFixed(1)}
+                                  </div>
+                                </div>
+
+                                <div className="col-span-2 md:col-span-1">
+                                  <div className="h-9 px-1 flex items-center justify-center bg-muted/50 rounded-md text-xs font-medium">
+                                    ₹{itemCost.toFixed(0)}
                                   </div>
                                 </div>
 
