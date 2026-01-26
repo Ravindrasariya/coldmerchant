@@ -2,7 +2,7 @@ import {
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
-  cashSettings, parties, cashFarmers, buyers,
+  cashSettings, bankAccounts, parties, cashFarmers, buyers,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
   farmerSettlements,
@@ -17,6 +17,7 @@ import {
   type CashEntryAllocation, type InsertCashEntryAllocation,
   type ColdStoreChargeAllocation, type InsertColdStoreChargeAllocation,
   type CashSettings, type InsertCashSettings,
+  type BankAccount, type InsertBankAccount,
   type Party, type InsertParty,
   type CashFarmer, type InsertCashFarmer,
   type Buyer, type InsertBuyer,
@@ -131,6 +132,12 @@ export interface IStorage {
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
+  
+  // Bank Account operations
+  getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
+  createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
+  updateBankAccount(id: number, merchantId: number, data: Partial<BankAccount>): Promise<BankAccount | undefined>;
+  deleteBankAccount(id: number, merchantId: number): Promise<void>;
   
   // Seed Stock Entry operations
   getSeedEntriesByMerchant(merchantId: number): Promise<SeedStockEntryWithLots[]>;
@@ -1429,6 +1436,32 @@ export class DatabaseStorage implements IStorage {
   async deleteBuyer(id: number, merchantId: number): Promise<void> {
     await db.delete(buyers)
       .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
+  }
+
+  // ===================== BANK ACCOUNT OPERATIONS =====================
+  
+  async getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]> {
+    return await db.select().from(bankAccounts)
+      .where(eq(bankAccounts.merchantId, merchantId))
+      .orderBy(desc(bankAccounts.createdAt));
+  }
+
+  async createBankAccount(account: InsertBankAccount): Promise<BankAccount> {
+    const [created] = await db.insert(bankAccounts).values(account).returning();
+    return created;
+  }
+
+  async updateBankAccount(id: number, merchantId: number, data: Partial<BankAccount>): Promise<BankAccount | undefined> {
+    const [updated] = await db.update(bankAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(bankAccounts.id, id), eq(bankAccounts.merchantId, merchantId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteBankAccount(id: number, merchantId: number): Promise<void> {
+    await db.delete(bankAccounts)
+      .where(and(eq(bankAccounts.id, id), eq(bankAccounts.merchantId, merchantId)));
   }
 
   // ===================== SEED STOCK ENTRY OPERATIONS =====================

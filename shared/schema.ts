@@ -180,6 +180,7 @@ export const cashEntries = pgTable("cash_entries", {
   revenueType: text("revenue_type"), // For inward: "raw_potato", "seed_sale"
   expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"
   paymentMode: text("payment_mode"), // For outflow: "cash", "account_transfer"
+  bankAccountId: integer("bank_account_id"), // Reference to bank account when using account_transfer or account_received
   partyName: text("party_name"), // For inward: buyer name from transactions
   partyVillage: text("party_village"), // For inward: buyer location
   farmerName: text("farmer_name"), // For farmer outflow or seed sale inward
@@ -221,6 +222,18 @@ export const cashSettings = pgTable("cash_settings", {
   financialYear: text("financial_year").notNull(), // e.g., "2024-25"
   openingCashInHand: decimal("opening_cash_in_hand", { precision: 12, scale: 2 }).default("0"),
   openingCashInAccount: decimal("opening_cash_in_account", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Bank Accounts - multiple accounts per merchant for tracking account transfers
+export const bankAccounts = pgTable("bank_accounts", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(), // Free text like "Bank X - Acct #1234"
+  accountType: text("account_type").notNull(), // "current", "savings", "limit"
+  openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -401,6 +414,7 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   cashEntryAllocations: many(cashEntryAllocations),
   coldStoreChargeAllocations: many(coldStoreChargeAllocations),
   cashSettings: many(cashSettings),
+  bankAccounts: many(bankAccounts),
   parties: many(parties),
   cashFarmers: many(cashFarmers),
   seedStockEntries: many(seedStockEntries),
@@ -494,6 +508,13 @@ export const seedTransactionItemsRelations = relations(seedTransactionItems, ({ 
 export const cashSettingsRelations = relations(cashSettings, ({ one }) => ({
   merchant: one(merchants, {
     fields: [cashSettings.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const bankAccountsRelations = relations(bankAccounts, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [bankAccounts.merchantId],
     references: [merchants.id],
   }),
 }));
@@ -679,6 +700,7 @@ export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: 
 export const insertCashEntryAllocationSchema = createInsertSchema(cashEntryAllocations).omit({ id: true, createdAt: true });
 export const insertColdStoreChargeAllocationSchema = createInsertSchema(coldStoreChargeAllocations).omit({ id: true, createdAt: true });
 export const insertCashSettingsSchema = createInsertSchema(cashSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true, updatedAt: true });
@@ -733,6 +755,9 @@ export type InsertColdStoreChargeAllocation = z.infer<typeof insertColdStoreChar
 
 export type CashSettings = typeof cashSettings.$inferSelect;
 export type InsertCashSettings = z.infer<typeof insertCashSettingsSchema>;
+
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
 
 export type Party = typeof parties.$inferSelect;
 export type InsertParty = z.infer<typeof insertPartySchema>;

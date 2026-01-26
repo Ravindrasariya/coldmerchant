@@ -1822,6 +1822,83 @@ export async function registerRoutes(
     }
   });
 
+  // ===================== BANK ACCOUNT ROUTES =====================
+
+  // GET /api/bank-accounts - Get all bank accounts for the authenticated merchant
+  app.get("/api/bank-accounts", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const accountList = await storage.getBankAccountsByMerchant(merchantId);
+      res.json(accountList);
+    } catch (error) {
+      console.error("Error fetching bank accounts:", error);
+      res.status(500).json({ message: "Failed to fetch bank accounts" });
+    }
+  });
+
+  // POST /api/bank-accounts - Create a new bank account
+  app.post("/api/bank-accounts", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, accountType, openingBalance } = req.body;
+      
+      if (!name || !accountType) {
+        return res.status(400).json({ message: "Name and account type are required" });
+      }
+      
+      const account = await storage.createBankAccount({
+        merchantId,
+        name,
+        accountType,
+        openingBalance: openingBalance || "0",
+        isActive: true
+      });
+      
+      res.status(201).json(account);
+    } catch (error) {
+      console.error("Error creating bank account:", error);
+      res.status(500).json({ message: "Failed to create bank account" });
+    }
+  });
+
+  // PATCH /api/bank-accounts/:id - Update a bank account
+  app.patch("/api/bank-accounts/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const { name, accountType, openingBalance, isActive } = req.body;
+      
+      const updated = await storage.updateBankAccount(id, merchantId, {
+        name,
+        accountType,
+        openingBalance,
+        isActive
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Bank account not found" });
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating bank account:", error);
+      res.status(500).json({ message: "Failed to update bank account" });
+    }
+  });
+
+  // DELETE /api/bank-accounts/:id - Delete a bank account
+  app.delete("/api/bank-accounts/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      await storage.deleteBankAccount(id, merchantId);
+      res.json({ message: "Bank account deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting bank account:", error);
+      res.status(500).json({ message: "Failed to delete bank account" });
+    }
+  });
+
   // ===================== SEED STOCK ENTRY ROUTES =====================
 
   // GET /api/seed-stock-entries - Get all seed stock entries for the authenticated merchant
