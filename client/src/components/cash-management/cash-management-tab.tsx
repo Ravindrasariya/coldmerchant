@@ -1420,7 +1420,7 @@ export function CashManagementTab() {
               <ArrowUpRight className="h-4 w-4" />
               {t("Expense", "खर्च")}
             </TabsTrigger>
-            <TabsTrigger value="transfer" className="flex items-center gap-2 data-[state=active]:bg-purple-600 data-[state=active]:text-white" data-testid="tab-transfer">
+            <TabsTrigger value="transfer" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white" data-testid="tab-transfer">
               <RefreshCw className="h-4 w-4" />
               {t("Transfer", "ट्रांसफर")}
             </TabsTrigger>
