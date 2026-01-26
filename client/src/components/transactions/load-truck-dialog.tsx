@@ -118,12 +118,41 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     [inventory]
   );
 
-  // Get all selected inventory keys across all buyers
-  const getAllSelectedKeys = useCallback(() => {
-    return buyerSections.flatMap((section) =>
-      section.items.map((item) => item.inventoryKey).filter((key) => key && key.length > 0)
-    );
+  // Calculate total bags allocated per inventory key across all buyers
+  const getAllocatedBagsPerLot = useCallback(() => {
+    const allocatedMap = new Map<string, number>();
+    buyerSections.forEach((section) => {
+      section.items.forEach((item) => {
+        if (item.inventoryKey && item.inventoryKey.length > 0) {
+          const currentAllocated = allocatedMap.get(item.inventoryKey) || 0;
+          allocatedMap.set(item.inventoryKey, currentAllocated + (Number(item.bagsMoved) || 0));
+        }
+      });
+    });
+    return allocatedMap;
   }, [buyerSections]);
+
+  // Get available bags for a specific lot (considering other allocations)
+  const getAvailableBagsForLot = useCallback(
+    (inventoryKey: string, excludeSectionId: string, excludeItemIndex: number): number => {
+      const inv = findInventoryByKey(inventoryKey);
+      if (!inv) return 0;
+      
+      let totalAllocated = 0;
+      buyerSections.forEach((section) => {
+        section.items.forEach((item, idx) => {
+          // Skip the current item being edited
+          if (section.id === excludeSectionId && idx === excludeItemIndex) return;
+          if (item.inventoryKey === inventoryKey) {
+            totalAllocated += Number(item.bagsMoved) || 0;
+          }
+        });
+      });
+      
+      return Math.max(0, inv.remainingBags - totalAllocated);
+    },
+    [buyerSections, findInventoryByKey]
+  );
 
   const calculateBuyerSummary = useCallback(
     (section: BuyerSection) => {
@@ -436,7 +465,6 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
             {buyerSections.map((section, sectionIndex) => {
               const summary = calculateBuyerSummary(section);
               const selectedBuyer = buyers.find((b) => b.id === section.buyerId);
-              const allSelectedKeys = getAllSelectedKeys();
 
               return (
                 <Card key={section.id}>
@@ -563,7 +591,9 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                     onValueChange={(value) => {
                                       const inv = findInventoryByKey(value);
                                       if (inv) {
-                                        const bags = inv.remainingBags || 0;
+                                        // Use available bags (considering other allocations)
+                                        const availableBags = getAvailableBagsForLot(value, section.id, itemIndex);
+                                        const bags = availableBags || 0;
                                         const proportionateTotalWeight = calculateProportionateTotalWeight(inv, bags);
                                         const netWeight = calculateNetWeight(proportionateTotalWeight, bags);
                                         updateLotItem(section.id, itemIndex, {
@@ -594,13 +624,18 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                       {inventory
                                         .filter((inv) => {
                                           const key = getInventoryKey(inv);
-                                          return (
-                                            !allSelectedKeys.includes(key) ||
-                                            key === item.inventoryKey
-                                          );
+                                          // Calculate available bags for this lot (excluding current item)
+                                          const availableBags = getAvailableBagsForLot(key, section.id, itemIndex);
+                                          // Show lot if: it's the currently selected one, OR there are available bags
+                                          return key === item.inventoryKey || availableBags > 0;
                                         })
                                         .map((inv) => {
                                           const key = getInventoryKey(inv);
+                                          // Show available bags (excluding current item's allocation)
+                                          const availableBags = getAvailableBagsForLot(key, section.id, itemIndex);
+                                          const displayBags = key === item.inventoryKey 
+                                            ? availableBags + (Number(item.bagsMoved) || 0) // Add back current item's bags for display
+                                            : availableBags;
                                           return (
                                             <SelectItem key={key} value={key} className="py-2">
                                               <div className="flex flex-col">
@@ -608,7 +643,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                                   S#{inv.serialNumber} - {inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
                                                 </span>
                                                 <span className="text-xs text-muted-foreground">
-                                                  {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("bags", "बोरी")}
+                                                  {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {displayBags} {t("bags available", "बोरी उपलब्ध")}
                                                 </span>
                                               </div>
                                             </SelectItem>
