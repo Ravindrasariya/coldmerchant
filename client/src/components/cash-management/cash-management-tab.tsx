@@ -370,6 +370,20 @@ export function CashManagementTab() {
   // Watch payment mode for conditional bank account dropdown
   const paymentMode = outflowForm.watch("paymentMode");
 
+  // Reset bankAccountId when receiptType changes (inward form)
+  useEffect(() => {
+    if (receiptType !== "account_received") {
+      inwardForm.setValue("bankAccountId", undefined);
+    }
+  }, [receiptType]);
+
+  // Reset bankAccountId when paymentMode changes (outflow form)
+  useEffect(() => {
+    if (paymentMode !== "account_transfer") {
+      outflowForm.setValue("bankAccountId", undefined);
+    }
+  }, [paymentMode]);
+
   const createEntryMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/cash/entries", data);
@@ -620,10 +634,50 @@ export function CashManagementTab() {
   
   // Include opening balance from settings
   const openingCashInHand = cashSettings ? parseFloat(cashSettings.openingCashInHand || "0") : 0;
-  const openingCashInAccount = cashSettings ? parseFloat(cashSettings.openingCashInAccount || "0") : 0;
+  const legacyOpeningCashInAccount = cashSettings ? parseFloat(cashSettings.openingCashInAccount || "0") : 0;
   
   const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense;
-  const netCashInAccount = openingCashInAccount + totalAccountReceived - totalAccountExpense;
+
+  // Calculate account-wise breakdown for entries that have bankAccountId
+  const accountWiseBreakdown = bankAccounts.map(account => {
+    const inward = entries
+      .filter(e => e.direction === "inward" && e.receiptType === "account_received" && e.bankAccountId === account.id)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    
+    const outflow = entries
+      .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === account.id)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    
+    const openingBalance = parseFloat(account.openingBalance || "0");
+    const net = openingBalance + inward - outflow;
+    
+    return {
+      id: account.id,
+      name: account.name,
+      accountType: account.accountType,
+      openingBalance,
+      inward,
+      outflow,
+      net
+    };
+  });
+
+  // Calculate unassigned account transactions (older entries without bankAccountId)
+  const unassignedAccountReceived = entries
+    .filter(e => e.direction === "inward" && e.receiptType === "account_received" && !e.bankAccountId)
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const unassignedAccountExpense = entries
+    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && !e.bankAccountId)
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+
+  // Unassigned net uses legacy opening balance (from cash settings) 
+  const unassignedAccountNet = legacyOpeningCashInAccount + unassignedAccountReceived - unassignedAccountExpense;
+
+  // Calculate total net in account (sum of all per-account nets + unassigned net, or legacy calculation if no accounts)
+  const netCashInAccount = bankAccounts.length > 0
+    ? accountWiseBreakdown.reduce((sum, a) => sum + a.net, 0) + unassignedAccountNet
+    : legacyOpeningCashInAccount + totalAccountReceived - totalAccountExpense;
 
   // Filter entries
   const filteredEntries = entries.filter(entry => {
@@ -1062,6 +1116,22 @@ export function CashManagementTab() {
               <span className="text-xs font-medium">{t("Account Received", "खाते में प्राप्त")}</span>
             </div>
             <p className="text-lg font-bold text-blue-600">₹{totalAccountReceived.toLocaleString()}</p>
+            {accountWiseBreakdown.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-blue-200 space-y-1">
+                {accountWiseBreakdown.filter(a => a.inward > 0).map(account => (
+                  <div key={account.id} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground truncate max-w-[100px]" title={account.name}>{account.name}</span>
+                    <span className="text-blue-600 font-medium">₹{account.inward.toLocaleString()}</span>
+                  </div>
+                ))}
+                {unassignedAccountReceived > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground italic">{t("Unassigned", "अनिर्दिष्ट")}</span>
+                    <span className="text-blue-600 font-medium">₹{unassignedAccountReceived.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1082,6 +1152,22 @@ export function CashManagementTab() {
               <span className="text-xs font-medium">{t("Account Expense", "खाता खर्च")}</span>
             </div>
             <p className="text-lg font-bold text-orange-600">₹{totalAccountExpense.toLocaleString()}</p>
+            {accountWiseBreakdown.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-orange-200 space-y-1">
+                {accountWiseBreakdown.filter(a => a.outflow > 0).map(account => (
+                  <div key={account.id} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground truncate max-w-[100px]" title={account.name}>{account.name}</span>
+                    <span className="text-orange-600 font-medium">₹{account.outflow.toLocaleString()}</span>
+                  </div>
+                ))}
+                {unassignedAccountExpense > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground italic">{t("Unassigned", "अनिर्दिष्ट")}</span>
+                    <span className="text-orange-600 font-medium">₹{unassignedAccountExpense.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1106,6 +1192,26 @@ export function CashManagementTab() {
             <p className={`text-lg font-bold ${netCashInAccount >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
               ₹{netCashInAccount.toLocaleString()}
             </p>
+            {accountWiseBreakdown.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-indigo-200 space-y-1">
+                {accountWiseBreakdown.map(account => (
+                  <div key={account.id} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground truncate max-w-[100px]" title={account.name}>{account.name}</span>
+                    <span className={`font-medium ${account.net >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      ₹{account.net.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+                {(unassignedAccountReceived > 0 || unassignedAccountExpense > 0 || legacyOpeningCashInAccount > 0) && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground italic">{t("Unassigned", "अनिर्दिष्ट")}</span>
+                    <span className={`font-medium ${unassignedAccountNet >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      ₹{unassignedAccountNet.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
