@@ -563,6 +563,7 @@ export class DatabaseStorage implements IStorage {
             serialNumber: entry?.serialNumber || 0,
             coldStoreName: lot.coldStoreName,
             farmerName: entry?.farmerName || "",
+            farmerVillage: entry?.village || "",
             potatoType: lot.potatoType,
             quality: lot.quality,
             cutType: lot.cutType,
@@ -570,6 +571,7 @@ export class DatabaseStorage implements IStorage {
             pricePerKg: breakdown.pricePerKg || lot.pricePerKg,
             remainingBags: availableBags,
             originalBags: breakdown.numberOfBags,
+            totalWeight: lot.totalWeight || null,
           });
         }
       } else {
@@ -581,6 +583,7 @@ export class DatabaseStorage implements IStorage {
             serialNumber: entry?.serialNumber || 0,
             coldStoreName: lot.coldStoreName,
             farmerName: entry?.farmerName || "",
+            farmerVillage: entry?.village || "",
             potatoType: lot.potatoType,
             quality: lot.quality,
             cutType: lot.cutType,
@@ -588,6 +591,7 @@ export class DatabaseStorage implements IStorage {
             pricePerKg: lot.pricePerKg,
             remainingBags: lot.remainingBags,
             originalBags: lot.originalBags,
+            totalWeight: lot.totalWeight || null,
           });
         }
       }
