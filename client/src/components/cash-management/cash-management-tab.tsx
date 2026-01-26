@@ -38,6 +38,7 @@ import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES } from "@shared/schema";
 interface CashEntry {
   id: number;
   merchantId: number;
+  transactionCode: string | null;
   direction: string;
   receiptType: string | null;
   revenueType: string | null;
@@ -253,10 +254,6 @@ export function CashManagementTab() {
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false);
   
-  // Download dialog state
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [downloadStartDate, setDownloadStartDate] = useState("");
-  const [downloadEndDate, setDownloadEndDate] = useState("");
   
   // View details dialog state
   const [viewDetailsEntry, setViewDetailsEntry] = useState<CashEntry | null>(null);
@@ -842,42 +839,40 @@ export function CashManagementTab() {
   };
 
   const handleDownloadCSV = () => {
-    if (!downloadStartDate || !downloadEndDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
-        variant: "destructive",
-      });
-      return;
-    }
+    // Use filteredEntries if filters are applied, otherwise use all entries
+    const entriesToDownload = hasActiveFilters ? filteredEntries : entries;
 
-    const startDate = new Date(downloadStartDate);
-    const endDate = new Date(downloadEndDate);
-    
-    if (startDate > endDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const filteredForDownload = entries.filter(entry => {
-      const entryDate = new Date(entry.entryDate);
-      return entryDate >= startDate && entryDate <= endDate;
-    });
-
-    if (filteredForDownload.length === 0) {
+    if (entriesToDownload.length === 0) {
       toast({
         title: t("No Data", "कोई डेटा नहीं"),
-        description: t("No entries found in the selected date range", "चयनित तिथि सीमा में कोई प्रविष्टि नहीं मिली"),
+        description: t("No entries to download", "डाउनलोड करने के लिए कोई प्रविष्टि नहीं"),
         variant: "destructive",
       });
       return;
     }
 
+    const getFromAccountLabel = (entry: CashEntry) => {
+      if (entry.direction !== "transfer") return "";
+      if (entry.fromAccountType === "cash_in_hand") return t("Cash in Hand", "हाथ में नकद");
+      if (entry.fromAccountType === "bank_account") {
+        const account = bankAccounts.find(a => a.id === entry.fromBankAccountId);
+        return account ? account.name : t("Bank Account", "बैंक खाता");
+      }
+      return "";
+    };
+
+    const getToAccountLabel = (entry: CashEntry) => {
+      if (entry.direction !== "transfer") return "";
+      if (entry.toAccountType === "cash_in_hand") return t("Cash in Hand", "हाथ में नकद");
+      if (entry.toAccountType === "bank_account") {
+        const account = bankAccounts.find(a => a.id === entry.toBankAccountId);
+        return account ? account.name : t("Bank Account", "बैंक खाता");
+      }
+      return "";
+    };
+
     const headers = [
+      t("Transaction Code", "लेनदेन कोड"),
       t("Date", "तिथि"),
       t("Direction", "दिशा"),
       t("Receipt Type", "रसीद प्रकार"),
@@ -890,15 +885,18 @@ export function CashManagementTab() {
       t("Farmer Village", "किसान का गाँव"),
       t("Cold Store", "शीत भंडार"),
       t("Supplier Name", "आपूर्तिकर्ता का नाम"),
+      t("From Account", "स्रोत खाता"),
+      t("To Account", "गंतव्य खाता"),
       t("Amount", "राशि"),
       t("Status", "स्थिति"),
       t("Remarks", "टिप्पणी"),
       t("Created At", "बनाया गया"),
     ];
 
-    const rows = filteredForDownload.map(entry => [
+    const rows = entriesToDownload.map(entry => [
+      entry.transactionCode || "",
       format(new Date(entry.entryDate), "dd/MM/yyyy"),
-      entry.direction === "inward" ? t("Inward", "आवक") : t("Outflow", "जावक"),
+      entry.direction === "inward" ? t("Inward", "आवक") : entry.direction === "transfer" ? t("Transfer", "ट्रांसफर") : t("Outflow", "जावक"),
       entry.receiptType ? getReceiptTypeLabel(entry.receiptType) : "",
       entry.revenueType ? getRevenueTypeLabel(entry.revenueType) : "",
       entry.expenseType ? getExpenseTypeLabel(entry.expenseType) : "",
@@ -909,6 +907,8 @@ export function CashManagementTab() {
       entry.farmerVillage || "",
       entry.coldStoreName || "",
       entry.supplierName || "",
+      getFromAccountLabel(entry),
+      getToAccountLabel(entry),
       entry.amount,
       entry.isReversed ? t("Reversed", "उलट दिया गया") : t("Active", "सक्रिय"),
       entry.remarks || "",
@@ -923,17 +923,16 @@ export function CashManagementTab() {
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `cash_entries_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    const today = format(new Date(), "yyyy-MM-dd");
+    link.download = `cash_entries_${hasActiveFilters ? "filtered_" : ""}${today}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
-
-    setDownloadDialogOpen(false);
-    setDownloadStartDate("");
-    setDownloadEndDate("");
     
     toast({
       title: t("Success", "सफल"),
-      description: t("CSV downloaded successfully", "CSV सफलतापूर्वक डाउनलोड हुई"),
+      description: hasActiveFilters 
+        ? t("Filtered entries downloaded successfully", "फ़िल्टर की गई प्रविष्टियाँ सफलतापूर्वक डाउनलोड हुई")
+        : t("All entries downloaded successfully", "सभी प्रविष्टियाँ सफलतापूर्वक डाउनलोड हुई"),
     });
   };
 
@@ -942,45 +941,6 @@ export function CashManagementTab() {
       {/* Settings Dialog */}
       <CashSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       
-      {/* Download Dialog */}
-      <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("Download Cash Entries", "नकद प्रविष्टियाँ डाउनलोड करें")}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="start-date">{t("Start Date", "आरंभ तिथि")}</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={downloadStartDate}
-                onChange={(e) => setDownloadStartDate(e.target.value)}
-                data-testid="input-download-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-date">{t("End Date", "समाप्ति तिथि")}</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={downloadEndDate}
-                onChange={(e) => setDownloadEndDate(e.target.value)}
-                data-testid="input-download-end-date"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDownloadDialogOpen(false)} data-testid="button-download-cancel">
-              {t("Cancel", "रद्द करें")}
-            </Button>
-            <Button onClick={handleDownloadCSV} data-testid="button-download-csv">
-              <Download className="h-4 w-4 mr-2" />
-              {t("Download CSV", "CSV डाउनलोड करें")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       {/* View Details Dialog */}
       <Dialog open={!!viewDetailsEntry} onOpenChange={(open) => !open && setViewDetailsEntry(null)}>
@@ -1143,15 +1103,6 @@ export function CashManagementTab() {
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setDownloadDialogOpen(true)}
-            title={t("Download", "डाउनलोड")}
-            data-testid="button-cash-download"
-          >
-            <Download className="h-5 w-5" />
-          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -2214,7 +2165,19 @@ export function CashManagementTab() {
       </div>
 
       <div className="w-full md:w-1/2 space-y-4">
-        <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadCSV}
+            title={t("Download CSV", "CSV डाउनलोड करें")}
+            data-testid="button-cash-download"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t("CSV", "CSV")}
+          </Button>
+        </div>
         
         <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
           {entriesLoading ? (
