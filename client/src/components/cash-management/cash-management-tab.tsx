@@ -1420,7 +1420,7 @@ export function CashManagementTab() {
               <ArrowUpRight className="h-4 w-4" />
               {t("Expense", "खर्च")}
             </TabsTrigger>
-            <TabsTrigger value="transfer" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white" data-testid="tab-transfer">
+            <TabsTrigger value="transfer" className="flex items-center gap-2 data-[state=active]:bg-purple-600 data-[state=active]:text-white" data-testid="tab-transfer">
               <RefreshCw className="h-4 w-4" />
               {t("Transfer", "ट्रांसफर")}
             </TabsTrigger>
@@ -2186,7 +2186,7 @@ export function CashManagementTab() {
                       <FormItem>
                         <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
                         <FormControl>
-                          <Textarea placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-transfer-remarks" />
+                          <Input placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-transfer-remarks" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2195,7 +2195,7 @@ export function CashManagementTab() {
 
                   <Button 
                     type="submit" 
-                    className="w-full"
+                    className="w-full bg-purple-600 text-white"
                     disabled={createEntryMutation.isPending}
                     data-testid="button-submit-transfer"
                   >
@@ -2311,7 +2311,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
     <Card 
       className={cn(
         isTransfer 
-          ? 'border-l-4 border-l-blue-500' 
+          ? 'border-l-4 border-l-purple-500' 
           : isInward 
             ? 'border-l-4 border-l-green-500' 
             : 'border-l-4 border-l-amber-500',
@@ -2324,7 +2324,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {isTransfer ? (
-              <RefreshCw className="h-4 w-4 text-blue-600 shrink-0" />
+              <RefreshCw className="h-4 w-4 text-purple-600 shrink-0" />
             ) : isInward ? (
               <ArrowDownLeft className="h-4 w-4 text-green-600 shrink-0" />
             ) : (
@@ -2344,7 +2344,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
                 isReversed 
                   ? "bg-gray-100 text-gray-500 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-600"
                   : isTransfer 
-                    ? "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-600"
+                    ? "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600"
                     : isInward 
                       ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600" 
                       : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
