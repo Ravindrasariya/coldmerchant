@@ -1396,16 +1396,16 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/cash/entries - Create a cash entry (inward or outflow)
+  // POST /api/cash/entries - Create a cash entry (inward, outflow, or transfer)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
 
       // Validate required fields
-      if (!direction || !["inward", "outflow"].includes(direction)) {
-        return res.status(400).json({ message: "Valid direction (inward/outflow) is required" });
+      if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
+        return res.status(400).json({ message: "Valid direction (inward/outflow/transfer) is required" });
       }
       // Amount can be 0 if cross-settlement is provided (the settlement is the main payment)
       const parsedAmount = parseFloat(amount);
@@ -1455,6 +1455,27 @@ export async function registerRoutes(
         if (expenseType === "supplier" && !supplierName) {
           return res.status(400).json({ message: "Supplier name is required when expense type is supplier" });
         }
+      } else if (direction === "transfer") {
+        if (!fromAccountType || !["cash_in_hand", "bank_account"].includes(fromAccountType)) {
+          return res.status(400).json({ message: "Valid from account type is required for transfers" });
+        }
+        if (!toAccountType || !["cash_in_hand", "bank_account"].includes(toAccountType)) {
+          return res.status(400).json({ message: "Valid to account type is required for transfers" });
+        }
+        if (fromAccountType === "bank_account" && !fromBankAccountId) {
+          return res.status(400).json({ message: "Source bank account is required for bank transfers" });
+        }
+        if (toAccountType === "bank_account" && !toBankAccountId) {
+          return res.status(400).json({ message: "Destination bank account is required for bank transfers" });
+        }
+        // Prevent same-to-same transfers
+        if (fromAccountType === toAccountType && fromAccountType === "cash_in_hand") {
+          return res.status(400).json({ message: "Cannot transfer from cash to cash" });
+        }
+        if (fromAccountType === "bank_account" && toAccountType === "bank_account" && 
+            fromBankAccountId === toBankAccountId) {
+          return res.status(400).json({ message: "Cannot transfer to the same bank account" });
+        }
       }
 
       // Validate cross-settlement if provided
@@ -1502,6 +1523,11 @@ export async function registerRoutes(
         revenueType: revenueType || null,
         expenseType: expenseType || null,
         paymentMode: paymentMode || null,
+        bankAccountId: bankAccountId || null,
+        fromAccountType: fromAccountType || null,
+        fromBankAccountId: fromBankAccountId || null,
+        toAccountType: toAccountType || null,
+        toBankAccountId: toBankAccountId || null,
         partyName: partyName || null,
         partyVillage: partyVillage || null,
         farmerName: farmerName || null,

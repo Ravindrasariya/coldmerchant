@@ -170,17 +170,21 @@ export const transactionEditHistory = pgTable("transaction_edit_history", {
   changeSet: jsonb("change_set").notNull(), // Array of { field, oldValue, newValue }
 });
 
-// Cash Entries - for Cash Management (inward and outflow)
+// Cash Entries - for Cash Management (inward, outflow, and transfer)
 export const cashEntries = pgTable("cash_entries", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionCode: text("transaction_code"), // Unique per merchant: format TBD based on transaction type
-  direction: text("direction").notNull(), // "inward" or "outflow"
+  direction: text("direction").notNull(), // "inward", "outflow", or "transfer"
   receiptType: text("receipt_type"), // For inward: "cash_received", "account_received"
   revenueType: text("revenue_type"), // For inward: "raw_potato", "seed_sale"
   expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"
   paymentMode: text("payment_mode"), // For outflow: "cash", "account_transfer"
   bankAccountId: integer("bank_account_id"), // Reference to bank account when using account_transfer or account_received
+  fromAccountType: text("from_account_type"), // For transfer: "cash_in_hand" or "bank_account"
+  fromBankAccountId: integer("from_bank_account_id"), // For transfer: source bank account id (if from bank)
+  toAccountType: text("to_account_type"), // For transfer: "cash_in_hand" or "bank_account"
+  toBankAccountId: integer("to_bank_account_id"), // For transfer: destination bank account id (if to bank)
   partyName: text("party_name"), // For inward: buyer name from transactions
   partyVillage: text("party_village"), // For inward: buyer location
   farmerName: text("farmer_name"), // For farmer outflow or seed sale inward

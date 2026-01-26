@@ -43,6 +43,11 @@ interface CashEntry {
   revenueType: string | null;
   expenseType: string | null;
   paymentMode: string | null;
+  bankAccountId: number | null;
+  fromAccountType: string | null;
+  fromBankAccountId: number | null;
+  toAccountType: string | null;
+  toBankAccountId: number | null;
   partyName: string | null;
   partyVillage: string | null;
   farmerName: string | null;
@@ -222,10 +227,28 @@ const outflowFormSchema = z.object({
 type InwardFormValues = z.infer<typeof inwardFormSchema>;
 type OutflowFormValues = z.infer<typeof outflowFormSchema>;
 
+const transferFormSchema = z.object({
+  fromAccountType: z.string().min(1, "From account is required"),
+  toAccountType: z.string().min(1, "To account is required"),
+  amount: z.coerce.number().min(1, "Amount must be greater than 0"),
+  entryDate: z.string().min(1, "Date is required"),
+  remarks: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.fromAccountType === data.toAccountType) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Cannot transfer to the same account",
+      path: ["toAccountType"],
+    });
+  }
+});
+
+type TransferFormValues = z.infer<typeof transferFormSchema>;
+
 export function CashManagementTab() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"inward" | "outflow">("inward");
+  const [activeTab, setActiveTab] = useState<"inward" | "outflow" | "transfer">("inward");
   
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -370,6 +393,21 @@ export function CashManagementTab() {
   // Watch payment mode for conditional bank account dropdown
   const paymentMode = outflowForm.watch("paymentMode");
 
+  const transferForm = useForm<TransferFormValues>({
+    resolver: zodResolver(transferFormSchema),
+    defaultValues: {
+      fromAccountType: "cash_in_hand",
+      toAccountType: "",
+      amount: 0,
+      entryDate: format(new Date(), "yyyy-MM-dd"),
+      remarks: "",
+    },
+  });
+
+  // Watch transfer form fields for conditional bank account dropdowns
+  const fromAccountType = transferForm.watch("fromAccountType");
+  const toAccountType = transferForm.watch("toAccountType");
+
   // Reset bankAccountId when receiptType changes (inward form)
   useEffect(() => {
     if (receiptType !== "account_received") {
@@ -413,13 +451,21 @@ export function CashManagementTab() {
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
         });
-      } else {
+      } else if (activeTab === "outflow") {
         outflowForm.reset({
           expenseType: "",
           paymentMode: "cash",
           farmerName: "",
           coldStoreName: "",
           supplierName: "",
+          amount: 0,
+          entryDate: format(new Date(), "yyyy-MM-dd"),
+          remarks: "",
+        });
+      } else if (activeTab === "transfer") {
+        transferForm.reset({
+          fromAccountType: "cash_in_hand",
+          toAccountType: "",
           amount: 0,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -612,6 +658,27 @@ export function CashManagementTab() {
       entryDate: values.entryDate,
       remarks: values.remarks || null,
       crossSettlement: crossSettlementData,
+    });
+  };
+
+  const onTransferSubmit = (values: TransferFormValues) => {
+    // Parse from account - can be "cash_in_hand" or "bank_{id}"
+    const isFromBank = values.fromAccountType.startsWith("bank_");
+    const fromBankId = isFromBank ? parseInt(values.fromAccountType.replace("bank_", "")) : null;
+    
+    // Parse to account - can be "cash_in_hand" or "bank_{id}"
+    const isToBank = values.toAccountType.startsWith("bank_");
+    const toBankId = isToBank ? parseInt(values.toAccountType.replace("bank_", "")) : null;
+    
+    createEntryMutation.mutate({
+      direction: "transfer",
+      fromAccountType: isFromBank ? "bank_account" : "cash_in_hand",
+      fromBankAccountId: fromBankId,
+      toAccountType: isToBank ? "bank_account" : "cash_in_hand",
+      toBankAccountId: toBankId,
+      amount: values.amount,
+      entryDate: values.entryDate,
+      remarks: values.remarks || null,
     });
   };
 
@@ -1343,15 +1410,19 @@ export function CashManagementTab() {
 
       <div className="flex flex-col md:flex-row gap-6 h-full">
         <div className="w-full md:w-1/2 space-y-4">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="inward" className="flex items-center gap-2" data-testid="tab-inward">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "inward" | "outflow" | "transfer")}>
+          <TabsList className="grid w-full grid-cols-3 bg-green-50 dark:bg-green-900/20">
+            <TabsTrigger value="inward" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white" data-testid="tab-inward">
               <ArrowDownLeft className="h-4 w-4" />
               {t("Inward Cash", "नकद आवक")}
             </TabsTrigger>
-            <TabsTrigger value="outflow" className="flex items-center gap-2" data-testid="tab-outflow">
+            <TabsTrigger value="outflow" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white" data-testid="tab-outflow">
               <ArrowUpRight className="h-4 w-4" />
               {t("Expense", "खर्च")}
+            </TabsTrigger>
+            <TabsTrigger value="transfer" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-white" data-testid="tab-transfer">
+              <RefreshCw className="h-4 w-4" />
+              {t("Transfer", "ट्रांसफर")}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -2008,6 +2079,136 @@ export function CashManagementTab() {
                 </form>
               </Form>
             </div>
+
+            <div className={activeTab === "transfer" ? "block" : "hidden"}>
+              <Form {...transferForm}>
+                <form onSubmit={transferForm.handleSubmit(onTransferSubmit)} className="space-y-4">
+                  <FormField
+                    control={transferForm.control}
+                    name="fromAccountType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("From Account", "किस खाते से")} *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-from-account-type">
+                              <SelectValue placeholder={t("Select source", "स्रोत चुनें")} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="cash_in_hand">
+                              <div className="flex items-center gap-2">
+                                <Banknote className="h-4 w-4" />
+                                {t("Cash in Hand", "हाथ में नकद")}
+                              </div>
+                            </SelectItem>
+                            {bankAccounts.filter(a => a.isActive).map((account) => (
+                              <SelectItem key={account.id} value={`bank_${account.id}`}>
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="h-4 w-4" />
+                                  {account.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={transferForm.control}
+                    name="toAccountType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("To Account", "किस खाते में")} *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-to-account-type">
+                              <SelectValue placeholder={t("Select destination", "गंतव्य चुनें")} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="cash_in_hand">
+                              <div className="flex items-center gap-2">
+                                <Banknote className="h-4 w-4" />
+                                {t("Cash in Hand", "हाथ में नकद")}
+                              </div>
+                            </SelectItem>
+                            {bankAccounts.filter(a => a.isActive).map((account) => (
+                              <SelectItem key={account.id} value={`bank_${account.id}`}>
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="h-4 w-4" />
+                                  {account.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={transferForm.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Amount", "राशि")} (₹) *</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="0" min="0" {...field} data-testid="input-transfer-amount" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={transferForm.control}
+                    name="entryDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Transfer Date", "ट्रांसफर तिथि")}</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-transfer-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={transferForm.control}
+                    name="remarks"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-transfer-remarks" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={createEntryMutation.isPending}
+                    data-testid="button-submit-transfer"
+                  >
+                    {createEntryMutation.isPending ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    {t("Record Transfer", "ट्रांसफर दर्ज करें")}
+                  </Button>
+                </form>
+              </Form>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -2042,6 +2243,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
   const { t } = useLanguage();
   const { toast } = useToast();
   const isInward = entry.direction === "inward";
+  const isTransfer = entry.direction === "transfer";
   const amount = parseFloat(entry.amount);
   const totalApplied = entry.allocations.reduce((sum, a) => sum + parseFloat(a.appliedAmount), 0);
   const isReversed = entry.isReversed === true;
@@ -2095,10 +2297,24 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
     }
   };
 
+  const getTransferLabel = () => {
+    const fromLabel = entry.fromAccountType === "cash_in_hand" 
+      ? t("Cash", "नकद") 
+      : t("Bank", "बैंक");
+    const toLabel = entry.toAccountType === "cash_in_hand" 
+      ? t("Cash", "नकद") 
+      : t("Bank", "बैंक");
+    return `${fromLabel} → ${toLabel}`;
+  };
+
   return (
     <Card 
       className={cn(
-        isInward ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500',
+        isTransfer 
+          ? 'border-l-4 border-l-blue-500' 
+          : isInward 
+            ? 'border-l-4 border-l-green-500' 
+            : 'border-l-4 border-l-amber-500',
         isReversed ? 'opacity-60 blur-[0.5px]' : 'hover-elevate cursor-pointer'
       )}
       onClick={onViewDetails}
@@ -2107,15 +2323,19 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       <CardContent className="p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {isInward ? (
+            {isTransfer ? (
+              <RefreshCw className="h-4 w-4 text-blue-600 shrink-0" />
+            ) : isInward ? (
               <ArrowDownLeft className="h-4 w-4 text-green-600 shrink-0" />
             ) : (
               <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
             )}
             <span className={cn("font-semibold truncate", isReversed && "line-through text-muted-foreground")} data-testid={`text-entry-name-${entry.id}`}>
-              {isInward 
-                ? (entry.partyName || entry.farmerName || t("Unknown", "अज्ञात"))
-                : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
+              {isTransfer 
+                ? getTransferLabel()
+                : isInward 
+                  ? (entry.partyName || entry.farmerName || t("Unknown", "अज्ञात"))
+                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 
@@ -2123,12 +2343,14 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
                 `shrink-0`,
                 isReversed 
                   ? "bg-gray-100 text-gray-500 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-600"
-                  : isInward 
-                    ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600" 
-                    : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
+                  : isTransfer 
+                    ? "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-600"
+                    : isInward 
+                      ? "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600" 
+                      : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
               )}
             >
-              {isInward ? t("Inflow", "आवक") : t("Outflow", "बहिर्वाह")}
+              {isTransfer ? t("Transfer", "ट्रांसफर") : isInward ? t("Inflow", "आवक") : t("Outflow", "बहिर्वाह")}
             </Badge>
             {isReversed && (
               <Badge 
