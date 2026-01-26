@@ -572,7 +572,8 @@ export class DatabaseStorage implements IStorage {
             remainingBags: availableBags,
             originalBags: breakdown.numberOfBags,
             lotOriginalBags: lot.originalBags,
-            totalWeight: lot.totalWeight || null,
+            totalWeight: breakdown.weight || lot.totalWeight || null,
+            breakdownWeight: breakdown.weight || null,
           });
         }
       } else {
@@ -594,6 +595,7 @@ export class DatabaseStorage implements IStorage {
             originalBags: lot.originalBags,
             lotOriginalBags: lot.originalBags,
             totalWeight: lot.totalWeight || null,
+            breakdownWeight: null,
           });
         }
       }

@@ -42,6 +42,7 @@ interface UnsoldInventoryItem {
   originalBags: number;
   lotOriginalBags: number;
   totalWeight: string | null;
+  breakdownWeight: string | null;
 }
 
 interface LotItem {
@@ -191,11 +192,18 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
   // Calculate proportionate total weight when lot is selected
   const calculateProportionateTotalWeight = useCallback(
     (inv: UnsoldInventoryItem, bagsMoved: number): number => {
-      if (!inv.totalWeight || inv.lotOriginalBags <= 0) return 0;
-      const totalWeightNum = parseFloat(inv.totalWeight);
-      // Proportionate weight = (bags selected / lot's original bags) × lot's total weight
-      // Use lotOriginalBags (total bags in the lot) not originalBags (breakdown bags)
-      return (bagsMoved / inv.lotOriginalBags) * totalWeightNum;
+      // For breakdown items: use breakdown weight and original breakdown bags
+      // For gate_cut items: use lot's total weight and lot's original bags
+      if (inv.breakdownWeight && inv.originalBags > 0) {
+        // Use breakdown weight for proportional calculation
+        const breakdownWeightNum = parseFloat(inv.breakdownWeight);
+        return (bagsMoved / inv.originalBags) * breakdownWeightNum;
+      } else if (inv.totalWeight && inv.lotOriginalBags > 0) {
+        // Fallback to lot's total weight
+        const totalWeightNum = parseFloat(inv.totalWeight);
+        return (bagsMoved / inv.lotOriginalBags) * totalWeightNum;
+      }
+      return 0;
     },
     []
   );
