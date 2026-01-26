@@ -54,6 +54,7 @@ interface StockEntryWithLots {
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
     expectedColdCharges: string | null;
+    charges: Array<{ type: string; amount: number | string }> | null;
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -114,8 +115,15 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const coldStoreChargesPerBag = lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null;
   const hammaliGradingCharges = lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : 0;
   const expectedColdCharges = lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : 0;
+  
+  // Calculate dynamic cold store charges from charges array (Cold Charges, Ware House Charges)
+  const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+  const dynamicColdCharges = (lot.charges || [])
+    .filter(c => c && coldStoreTypes.includes(c.type))
+    .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+  
   const perBagTotal = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : 0;
-  const coldStoreTotalCharges = perBagTotal + hammaliGradingCharges + expectedColdCharges;
+  const coldStoreTotalCharges = perBagTotal + hammaliGradingCharges + expectedColdCharges + dynamicColdCharges;
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
   const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
   
