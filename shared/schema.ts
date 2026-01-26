@@ -6,6 +6,7 @@ import { z } from "zod";
 // Merchants table - each merchant is isolated
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
+  merchantCode: text("merchant_code").unique(), // Format: MRYYYYMMDD{seq} - globally unique
   name: text("name").notNull(),
   contactNumber: text("contact_number"),
   address: text("address"),
@@ -170,6 +171,7 @@ export const transactionEditHistory = pgTable("transaction_edit_history", {
 export const cashEntries = pgTable("cash_entries", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  transactionCode: text("transaction_code"), // Unique per merchant: format TBD based on transaction type
   direction: text("direction").notNull(), // "inward" or "outflow"
   receiptType: text("receipt_type"), // For inward: "cash_received", "account_received"
   revenueType: text("revenue_type"), // For inward: "raw_potato", "seed_sale"
@@ -248,6 +250,7 @@ export const cashFarmers = pgTable("cash_farmers", {
 export const buyers = pgTable("buyers", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  buyerCode: text("buyer_code"), // Format: BYYYYYMMDD{seq} - unique per merchant
   dateAdded: date("date_added").notNull(),
   name: text("name").notNull(),
   address: text("address").notNull(),
