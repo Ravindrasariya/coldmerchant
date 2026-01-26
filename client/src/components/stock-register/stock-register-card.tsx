@@ -53,6 +53,7 @@ interface StockEntryWithLots {
     pricePerKg: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
+    expectedColdCharges: string | null;
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -112,8 +113,9 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   
   const coldStoreChargesPerBag = lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null;
   const hammaliGradingCharges = lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : 0;
+  const expectedColdCharges = lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : 0;
   const perBagTotal = coldStoreChargesPerBag !== null ? lot.originalBags * coldStoreChargesPerBag : 0;
-  const coldStoreTotalCharges = perBagTotal + hammaliGradingCharges;
+  const coldStoreTotalCharges = perBagTotal + hammaliGradingCharges + expectedColdCharges;
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
   const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
   
@@ -131,6 +133,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     pricePerKg: lot.pricePerKg ? parseFloat(lot.pricePerKg) : null,
     coldStoreChargesPerBag,
     hammaliGradingCharges,
+    expectedColdCharges,
     coldStoreTotalCharges,
     coldStorePaid,
     coldStoreRemaining,
