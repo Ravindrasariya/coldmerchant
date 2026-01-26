@@ -631,11 +631,11 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                         })
                                         .map((inv) => {
                                           const key = getInventoryKey(inv);
-                                          // Show available bags (excluding current item's allocation)
-                                          const availableBags = getAvailableBagsForLot(key, section.id, itemIndex);
+                                          // For selected lot: show original remaining bags (total available for this selection)
+                                          // For other lots: show remaining after other allocations
                                           const displayBags = key === item.inventoryKey 
-                                            ? availableBags + (Number(item.bagsMoved) || 0) // Add back current item's bags for display
-                                            : availableBags;
+                                            ? inv.remainingBags
+                                            : getAvailableBagsForLot(key, section.id, itemIndex);
                                           return (
                                             <SelectItem key={key} value={key} className="py-2">
                                               <div className="flex flex-col">
