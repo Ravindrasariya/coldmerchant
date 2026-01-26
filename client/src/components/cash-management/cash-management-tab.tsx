@@ -2169,13 +2169,12 @@ export function CashManagementTab() {
           <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={handleDownloadCSV}
             title={t("Download CSV", "CSV डाउनलोड करें")}
             data-testid="button-cash-download"
           >
-            <Download className="h-4 w-4 mr-2" />
-            {t("CSV", "CSV")}
+            <Download className="h-4 w-4" />
           </Button>
         </div>
         
