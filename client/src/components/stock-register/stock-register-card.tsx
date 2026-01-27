@@ -770,7 +770,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             const isColdStorePaid = coldStoreRemainingDue <= 0 && entryColdStoreTotalCharges > 0;
 
             return (
-              <Card key={entry.id} className="border-border/60 shadow-sm hover-elevate" data-testid={`card-entry-${entry.id}`}>
+              <Card key={entry.id} className="border border-gray-300 dark:border-gray-600 shadow-sm hover-elevate" data-testid={`card-entry-${entry.id}`}>
                 <CardHeader className="py-3 px-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -820,26 +820,26 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                       
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
                         {(entryTotalAmount > 0 || entryAdjustment !== 0) && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">{t("Farmer Total", "किसान कुल")}</span>{" "}
-                            <span className="font-medium">₹ {adjustedEntryTotal.toFixed(0)}</span>
-                            <span className="text-muted-foreground mx-1">|</span>
-                            <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
-                            <span className={`font-medium ${farmerRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              ₹ {farmerRemainingDue > 0 ? farmerRemainingDue.toFixed(0) : "0"}
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-muted-foreground whitespace-nowrap">{t("Farmer Total", "किसान कुल")}</span>
+                            <span className="font-medium whitespace-nowrap">₹ {adjustedEntryTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                            <span className="text-muted-foreground">|</span>
+                            <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
+                            <span className={`font-medium whitespace-nowrap ${farmerRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+                              ₹ {farmerRemainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </span>
-                          </div>
+                          </span>
                         )}
                         {entryColdStoreTotalCharges > 0 && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
-                            <span className="font-medium">₹ {entryColdStoreTotalCharges.toFixed(0)}</span>
-                            <span className="text-muted-foreground mx-1">|</span>
-                            <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
-                            <span className={`font-medium ${coldStoreRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              ₹ {coldStoreRemainingDue > 0 ? coldStoreRemainingDue.toFixed(0) : "0"}
+                          <span className="inline-flex items-center gap-1">
+                            <span className="text-muted-foreground whitespace-nowrap">{t("Cold Total", "कोल्ड कुल")}</span>
+                            <span className="font-medium whitespace-nowrap">₹ {entryColdStoreTotalCharges.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                            <span className="text-muted-foreground">|</span>
+                            <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
+                            <span className={`font-medium whitespace-nowrap ${coldStoreRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+                              ₹ {coldStoreRemainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </span>
-                          </div>
+                          </span>
                         )}
                       </div>
                     </div>
@@ -953,15 +953,15 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             </div>
                           </div>
                           {lotColdTotal > 0 && (
-                            <div className="flex flex-wrap items-center gap-x-1 text-[13px] mt-1">
-                              <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
-                              <span className="font-medium">₹ {lotColdTotal.toFixed(0)}</span>
-                              <span className="text-muted-foreground mx-1">|</span>
-                              <span className="text-muted-foreground">{t("Due", "बाकी")}</span>{" "}
-                              <span className={`font-medium ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                                ₹ {lotColdDue > 0 ? lotColdDue.toFixed(0) : "0"}
+                            <span className="inline-flex items-center gap-1 text-[13px] mt-1">
+                              <span className="text-muted-foreground whitespace-nowrap">{t("Cold Total", "कोल्ड कुल")}</span>
+                              <span className="font-medium whitespace-nowrap">₹ {lotColdTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                              <span className="text-muted-foreground">|</span>
+                              <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
+                              <span className={`font-medium whitespace-nowrap ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+                                ₹ {lotColdDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                               </span>
-                            </div>
+                            </span>
                           )}
                         </div>
                       );
