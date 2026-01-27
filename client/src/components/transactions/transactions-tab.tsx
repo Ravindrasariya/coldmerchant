@@ -662,7 +662,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
 
             <div className="flex flex-wrap gap-1.5 pt-1 border-t sm:border-0 mt-2 sm:mt-0">
               {transaction.items.slice(0, 3).map((item) => {
-                const parts = [item.bagsMoved.toString(), item.potatoType, item.coldStoreName || "FG", item.size || "Mixed"].filter(Boolean);
+                const parts = [item.bagsMoved.toString(), item.potatoType, item.size || "Mixed"].filter(Boolean);
                 const farmerInfo = item.farmerName ? ` ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : "";
                 return (
                   <Badge 
