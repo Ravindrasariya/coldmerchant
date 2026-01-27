@@ -612,11 +612,6 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 </span>
               )}
               <div className="flex items-center gap-2 ml-auto">
-                {bagTypes.map((type) => (
-                  <Badge key={type} variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600">
-                    {type}
-                  </Badge>
-                ))}
                 {transaction.vehicleNumber && (
                   <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
                     <Truck className="h-3 w-3 mr-1" />
@@ -666,15 +661,19 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
             </div>
 
             <div className="flex flex-wrap gap-1.5 pt-1 border-t sm:border-0 mt-2 sm:mt-0">
-              {transaction.items.slice(0, 3).map((item) => (
-                <Badge 
-                  key={item.id} 
-                  variant="outline" 
-                  className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
-                >
-                  S#{item.serialNumber} ({item.bagsMoved} - {item.coldStoreName || "FG"} - {item.size || "Mixed"}){item.farmerName ? ` - ${item.farmerName}` : ""}{item.farmerVillage ? ` (${item.farmerVillage})` : ""}
-                </Badge>
-              ))}
+              {transaction.items.slice(0, 3).map((item) => {
+                const parts = [item.bagsMoved.toString(), item.potatoType, item.coldStoreName || "FG", item.size || "Mixed"].filter(Boolean);
+                const farmerInfo = item.farmerName ? ` ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : "";
+                return (
+                  <Badge 
+                    key={item.id} 
+                    variant="outline" 
+                    className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
+                  >
+                    S#{item.serialNumber} ({parts.join("- ")}){farmerInfo}
+                  </Badge>
+                );
+              })}
               {transaction.items.length > 3 && (
                 <span className="text-[10px] text-muted-foreground">{t("and more", "और अधिक")}</span>
               )}
