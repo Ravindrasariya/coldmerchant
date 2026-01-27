@@ -574,11 +574,11 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
 
                           {/* Lot Header */}
                           <div className="hidden md:grid md:grid-cols-12 gap-1 px-2 py-1 bg-muted/50 rounded text-xs font-medium items-center">
-                            <div className="col-span-5">{t("Lot", "लॉट")}</div>
+                            <div className="col-span-4">{t("Lot", "लॉट")}</div>
                             <div className="col-span-1 text-center">{t("Bags", "बोरी")}</div>
                             <div className="col-span-2 text-center">{t("Total Weight", "कुल वजन")}</div>
                             <div className="col-span-2 text-center">{t("Net Weight", "शुद्ध वजन")}</div>
-                            <div className="col-span-1 text-center">{t("Cost of Goods", "माल की लागत")}</div>
+                            <div className="col-span-2 text-center">{t("Cost of Goods", "माल की लागत")}</div>
                             <div className="col-span-1"></div>
                           </div>
 
@@ -595,7 +595,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                 key={itemIndex}
                                 className="grid grid-cols-12 gap-1 items-center"
                               >
-                                <div className="col-span-12 md:col-span-5">
+                                <div className="col-span-12 md:col-span-4">
                                   <Select
                                     value={item.inventoryKey}
                                     onValueChange={(value) => {
@@ -712,8 +712,8 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                   </div>
                                 </div>
 
-                                <div className="col-span-2 md:col-span-1">
-                                  <div className="h-9 px-1 flex items-center justify-center bg-muted/50 rounded-md text-xs font-medium">
+                                <div className="col-span-3 md:col-span-2">
+                                  <div className="h-9 px-2 flex items-center justify-center bg-muted/50 rounded-md text-sm font-medium">
                                     ₹{itemCost.toFixed(0)}
                                   </div>
                                 </div>
