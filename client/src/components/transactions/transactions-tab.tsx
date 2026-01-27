@@ -200,7 +200,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     const headers = [
       t("Txn #", "लेनदेन #"),
       t("Date", "तिथि"),
-      t("Party Name", "पार्टी का नाम"),
+      t("Buyer Name", "खरीदार का नाम"),
       t("Vehicle #", "वाहन #"),
       t("Items (S# - Bags - Size)", "आइटम (क्रमांक - बैग - साइज)"),
       t("Total Bags", "कुल बैग"),

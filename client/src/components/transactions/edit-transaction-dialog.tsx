@@ -12,7 +12,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, ChevronUp, History, Save, Plus, Trash2, X } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ChevronDown, ChevronUp, History, Save, Plus, Trash2, X, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { type Buyer } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -98,7 +102,6 @@ interface TransactionWithHistory {
 
 const editTransactionSchema = z.object({
   partyName: z.string().optional(),
-  partyAddress: z.string().optional(),
   vehicleNumber: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
   amountReceived: z.coerce.number().optional(),
@@ -157,6 +160,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [newItemBags, setNewItemBags] = useState<number>(0);
   const [newItemWeight, setNewItemWeight] = useState<number>(0);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
+  const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
+
+  const { data: buyers = [] } = useQuery<Buyer[]>({
+    queryKey: ["/api/buyers"],
+    enabled: open,
+  });
 
   const { data: transaction, isLoading } = useQuery<TransactionWithHistory>({
     queryKey: ["/api/transactions", transactionId],
@@ -172,7 +181,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     resolver: zodResolver(editTransactionSchema),
     defaultValues: {
       partyName: "",
-      partyAddress: "",
       vehicleNumber: "",
       advancePayment: 0,
       amountReceived: 0,
@@ -185,7 +193,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (transaction) {
       form.reset({
         partyName: transaction.partyName || "",
-        partyAddress: transaction.partyAddress || "",
         vehicleNumber: transaction.vehicleNumber || "",
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
@@ -384,7 +391,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   const getFieldLabel = (field: string): string => {
     const labels: Record<string, string> = {
-      partyName: t("Party Name", "पार्टी का नाम"),
+      partyName: t("Buyer Name", "खरीदार का नाम"),
       vehicleNumber: t("Vehicle #", "वाहन नं"),
       advancePayment: t("Advance Payment", "अग्रिम भुगतान"),
       transportationCharges: t("Transportation", "परिवहन"),
@@ -501,7 +508,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               <div className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
                 <span>{t("Lot Details", "लॉट विवरण")}</span>
                 <span className="text-right">{t("Bags", "बोरी")}</span>
-                <span className="text-right">{t("Weight", "वजन")}</span>
+                <span className="text-right">{t("Net Weight", "शुद्ध वजन")}</span>
                 <span className="text-right">{t("Revenue", "राजस्व")}</span>
                 <span className="text-right">{t("P&L", "लाभ/हानि")}</span>
                 <span></span>
@@ -604,32 +611,61 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     control={form.control}
                     name="partyName"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Party Name", "पार्टी का नाम")}</FormLabel>
-                        <FormControl>
-                          <Input placeholder={t("Enter party name", "पार्टी का नाम दर्ज करें")} {...field} data-testid="input-party-name" />
-                        </FormControl>
+                      <FormItem className="flex flex-col">
+                        <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
+                        <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={buyerPopoverOpen}
+                                className={cn(
+                                  "justify-between font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                data-testid="select-buyer-name"
+                              >
+                                {field.value || t("Select buyer...", "खरीदार चुनें...")}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
+                              <CommandList>
+                                <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
+                                <CommandGroup>
+                                  {buyers.filter(b => b.isActive !== false).map((buyer) => (
+                                    <CommandItem
+                                      key={buyer.id}
+                                      value={buyer.name}
+                                      onSelect={() => {
+                                        field.onChange(buyer.name);
+                                        setBuyerPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          field.value === buyer.name ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {buyer.name}
+                                      {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="partyAddress"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Party Address", "पार्टी का पता")}</FormLabel>
-                        <FormControl>
-                          <Input placeholder={t("Enter party address", "पार्टी का पता दर्ज करें")} {...field} data-testid="input-party-address" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div>
                   <FormField
                     control={form.control}
                     name="vehicleNumber"
