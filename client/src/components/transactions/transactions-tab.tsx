@@ -586,7 +586,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   const bagTypes = Array.from(new Set(transaction.items.map(item => item.potatoType).filter(Boolean))) as string[];
 
   return (
-    <Card className="hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
+    <Card className="border border-gray-300 dark:border-gray-600 hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
       <CardContent className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-3">
@@ -597,6 +597,13 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 </div>
                 <span className="font-bold text-sm leading-tight whitespace-nowrap">
                   Tr No: {transaction.transactionNumber}
+                </span>
+                <span className="text-muted-foreground text-xs ml-1">
+                  {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </span>
               </div>
               {transaction.partyName && (
@@ -658,29 +665,19 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
               )}
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground pt-1 border-t sm:border-0 mt-2 sm:mt-0">
-              <span className="font-medium text-muted-foreground/80">
-                {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-              <span className="hidden sm:inline">|</span>
-              <div className="flex flex-wrap gap-1.5 mt-1 sm:mt-0">
-                {transaction.items.slice(0, 3).map((item) => (
-                  <Badge 
-                    key={item.id} 
-                    variant="outline" 
-                    className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
-                  >
-                    S#{item.serialNumber} ({item.bagsMoved} - {item.size || "Mixed"}){item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}
-                  </Badge>
-                ))}
-                {transaction.items.length > 3 && (
-                  <span className="text-[10px]">{t("and more", "और अधिक")}</span>
-                )}
-              </div>
+            <div className="flex flex-wrap gap-1.5 pt-1 border-t sm:border-0 mt-2 sm:mt-0">
+              {transaction.items.slice(0, 3).map((item) => (
+                <Badge 
+                  key={item.id} 
+                  variant="outline" 
+                  className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
+                >
+                  S#{item.serialNumber} ({item.bagsMoved} - {item.coldStoreName || "FG"} - {item.size || "Mixed"}){item.farmerName ? ` - ${item.farmerName}` : ""}{item.farmerVillage ? ` (${item.farmerVillage})` : ""}
+                </Badge>
+              ))}
+              {transaction.items.length > 3 && (
+                <span className="text-[10px] text-muted-foreground">{t("and more", "और अधिक")}</span>
+              )}
             </div>
           </div>
 
