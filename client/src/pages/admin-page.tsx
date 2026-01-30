@@ -352,6 +352,7 @@ export default function AdminPage() {
                   No merchants found. Add your first merchant to get started.
                 </div>
               ) : (
+                <>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -522,6 +523,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                 )}
+                </>
               )}
             </CardContent>
           </Card>
