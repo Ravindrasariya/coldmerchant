@@ -312,6 +312,7 @@ export const seedLots = pgTable("seed_lots", {
   originalBags: integer("original_bags").notNull(),
   potatoType: text("potato_type").notNull(), // Jyoti, Pukhraj, Lakar, CS1, CS3, Torus, LR
   bagType: text("bag_type").notNull(), // Wafer, Ration
+  brandName: text("brand_name"), // Brand name for seed
   size: text("size").notNull(), // Small, Medium, Large
   pricePerBag: decimal("price_per_bag", { precision: 10, scale: 2 }).notNull(),
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }),
@@ -914,6 +915,7 @@ export const seedLotFormSchema = z.object({
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
   potatoType: z.string().min(1, "Potato type is required"),
   bagType: z.string().min(1, "Bag type is required"),
+  brandName: z.string().optional(),
   size: z.string().min(1, "Size is required"),
   pricePerBag: z.coerce.number().min(0, "Price per bag must be positive"),
   coldStoreChargesPerBag: z.coerce.number().optional(),
@@ -942,6 +944,7 @@ export const seedLotUpdateSchema = z.object({
   remainingBags: z.coerce.number().min(0).optional(),
   potatoType: z.string().min(1).optional(),
   bagType: z.string().min(1).optional(),
+  brandName: z.string().optional(),
   size: z.string().min(1).optional(),
   pricePerBag: z.coerce.number().min(0).optional(),
   coldStoreChargesPerBag: z.coerce.number().optional(),
