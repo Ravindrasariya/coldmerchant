@@ -2,7 +2,7 @@ import {
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
-  cashSettings, bankAccounts, parties, cashFarmers, buyers,
+  cashSettings, bankAccounts, parties, cashFarmers, buyers, farmers,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
   farmerSettlements,
@@ -21,6 +21,7 @@ import {
   type Party, type InsertParty,
   type CashFarmer, type InsertCashFarmer,
   type Buyer, type InsertBuyer,
+  type Farmer, type InsertFarmer,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
   type SeedStockEntryWithLots,
@@ -135,6 +136,13 @@ export interface IStorage {
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
+  
+  // Farmer Ledger operations
+  getFarmersByMerchant(merchantId: number): Promise<Farmer[]>;
+  countFarmersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
+  createFarmer(farmer: InsertFarmer): Promise<Farmer>;
+  updateFarmer(id: number, merchantId: number, data: Partial<Farmer>): Promise<Farmer | undefined>;
+  getFarmerByCompositeKey(merchantId: number, name: string, contact: string | null, village: string | null): Promise<Farmer | undefined>;
   
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
@@ -1508,6 +1516,55 @@ export class DatabaseStorage implements IStorage {
   async deleteBuyer(id: number, merchantId: number): Promise<void> {
     await db.delete(buyers)
       .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
+  }
+
+  // ===================== FARMER LEDGER OPERATIONS =====================
+  
+  async getFarmersByMerchant(merchantId: number): Promise<Farmer[]> {
+    return await db.select().from(farmers)
+      .where(eq(farmers.merchantId, merchantId))
+      .orderBy(asc(farmers.isArchived), desc(farmers.dateAdded));
+  }
+
+  async countFarmersByCodePrefix(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select().from(farmers)
+      .where(and(
+        eq(farmers.merchantId, merchantId),
+        sql`${farmers.farmerCode} LIKE ${prefix + '%'}`
+      ));
+    return result.length;
+  }
+
+  async createFarmer(farmer: InsertFarmer): Promise<Farmer> {
+    const [created] = await db.insert(farmers).values(farmer).returning();
+    return created;
+  }
+
+  async updateFarmer(id: number, merchantId: number, data: Partial<Farmer>): Promise<Farmer | undefined> {
+    const [updated] = await db.update(farmers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(farmers.id, id), eq(farmers.merchantId, merchantId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getFarmerByCompositeKey(merchantId: number, name: string, contact: string | null, village: string | null): Promise<Farmer | undefined> {
+    const normalizedName = normalizeName(name);
+    const normalizedContact = contact ? normalizeName(contact) : null;
+    const normalizedVillage = village ? normalizeName(village) : null;
+    
+    const allFarmers = await db.select().from(farmers)
+      .where(eq(farmers.merchantId, merchantId));
+    
+    return allFarmers.find(f => {
+      const fName = normalizeName(f.name);
+      const fContact = f.contact ? normalizeName(f.contact) : null;
+      const fVillage = f.village ? normalizeName(f.village) : null;
+      
+      return fName === normalizedName && 
+             fContact === normalizedContact && 
+             fVillage === normalizedVillage;
+    });
   }
 
   // ===================== BANK ACCOUNT OPERATIONS =====================

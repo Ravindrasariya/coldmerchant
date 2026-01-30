@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 
@@ -1937,6 +1937,217 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting buyer:", error);
       res.status(500).json({ message: "Failed to delete buyer" });
+    }
+  });
+
+  // ===================== FARMER LEDGER ROUTES =====================
+
+  // Helper function to generate farmer code
+  function generateFarmerCode(dateStr: string, existingCount: number): string {
+    return `FM${dateStr}${existingCount + 1}`;
+  }
+
+  // GET /api/farmers - Get all farmers with calculated dues for the authenticated merchant
+  app.get("/api/farmers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const farmerList = await storage.getFarmersByMerchant(merchantId);
+      
+      // Get all stock entries for harvest dues calculation
+      const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
+      
+      // Get all seed transactions for seed dues calculation
+      const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
+      
+      // Calculate dues for each farmer
+      const farmersWithDues = farmerList.map(farmer => {
+        const normalizedFarmerName = farmer.name.trim().toLowerCase();
+        const normalizedFarmerContact = farmer.contact?.trim().toLowerCase() || null;
+        const normalizedFarmerVillage = farmer.village?.trim().toLowerCase() || null;
+        
+        // Calculate Harvest Due (totalDueToFarmer from stock entries where farmer matches)
+        let harvestDue = 0;
+        for (const entry of stockEntryList) {
+          const entryName = entry.farmerName?.trim().toLowerCase() || "";
+          const entryContact = entry.farmerContact?.trim().toLowerCase() || null;
+          const entryVillage = entry.village?.trim().toLowerCase() || null;
+          
+          if (entryName === normalizedFarmerName && 
+              entryContact === normalizedFarmerContact && 
+              entryVillage === normalizedFarmerVillage) {
+            harvestDue += parseFloat(entry.totalDueToFarmer || "0");
+          }
+        }
+        
+        // Calculate Seed Due (totalDueFromFarmer from seed transactions where farmer matches)
+        let seedDue = 0;
+        for (const txn of seedTransactionList) {
+          const txnName = txn.farmerName?.trim().toLowerCase() || "";
+          const txnContact = txn.farmerContact?.trim().toLowerCase() || null;
+          const txnVillage = txn.farmerVillage?.trim().toLowerCase() || null;
+          
+          if (txnName === normalizedFarmerName && 
+              txnContact === normalizedFarmerContact && 
+              txnVillage === normalizedFarmerVillage) {
+            seedDue += parseFloat(txn.totalDueFromFarmer || "0");
+          }
+        }
+        
+        const pyPayable = parseFloat(farmer.pyPayable || "0");
+        const pyReceivable = parseFloat(farmer.pyReceivable || "0");
+        
+        // Net Due = PY Receivables + Harvest Due - PY Payable - Seed Due
+        const netDue = pyReceivable + harvestDue - pyPayable - seedDue;
+        
+        return {
+          ...farmer,
+          harvestDue,
+          seedDue,
+          netDue,
+        };
+      });
+      
+      res.json(farmersWithDues);
+    } catch (error) {
+      console.error("Error fetching farmers:", error);
+      res.status(500).json({ message: "Failed to fetch farmers" });
+    }
+  });
+
+  // POST /api/farmers/sync - Sync farmers from stock entries and seed transactions
+  app.post("/api/farmers/sync", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      
+      // Get all existing farmers
+      const existingFarmers = await storage.getFarmersByMerchant(merchantId);
+      
+      // Get all stock entries
+      const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
+      
+      // Get all seed transactions  
+      const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
+      
+      // Collect unique farmers from stock entries
+      const farmerKeys = new Set<string>();
+      const farmerData: Array<{ name: string; contact: string | null; village: string | null }> = [];
+      
+      for (const entry of stockEntryList) {
+        if (entry.farmerName) {
+          const key = [
+            entry.farmerName.trim().toLowerCase(),
+            entry.farmerContact?.trim().toLowerCase() || "",
+            entry.village?.trim().toLowerCase() || ""
+          ].join("|");
+          
+          if (!farmerKeys.has(key)) {
+            farmerKeys.add(key);
+            farmerData.push({
+              name: entry.farmerName.trim(),
+              contact: entry.farmerContact?.trim() || null,
+              village: entry.village?.trim() || null,
+            });
+          }
+        }
+      }
+      
+      // Add farmers from seed transactions
+      for (const txn of seedTransactionList) {
+        if (txn.farmerName) {
+          const key = [
+            txn.farmerName.trim().toLowerCase(),
+            txn.farmerContact?.trim().toLowerCase() || "",
+            txn.farmerVillage?.trim().toLowerCase() || ""
+          ].join("|");
+          
+          if (!farmerKeys.has(key)) {
+            farmerKeys.add(key);
+            farmerData.push({
+              name: txn.farmerName.trim(),
+              contact: txn.farmerContact?.trim() || null,
+              village: txn.farmerVillage?.trim() || null,
+            });
+          }
+        }
+      }
+      
+      // Create farmers that don't exist yet
+      let createdCount = 0;
+      const today = new Date().toISOString().split('T')[0];
+      const dateStr = parseDateToCodeFormat(today);
+      
+      for (const data of farmerData) {
+        const existing = await storage.getFarmerByCompositeKey(
+          merchantId, 
+          data.name, 
+          data.contact, 
+          data.village
+        );
+        
+        if (!existing) {
+          const codePrefix = `FM${dateStr}`;
+          const existingCount = await storage.countFarmersByCodePrefix(merchantId, codePrefix);
+          const farmerCode = generateFarmerCode(dateStr, existingCount);
+          
+          await storage.createFarmer({
+            merchantId,
+            farmerCode,
+            dateAdded: today,
+            name: data.name,
+            contact: data.contact,
+            village: data.village,
+            pyPayable: "0",
+            pyReceivable: "0",
+            negativeFlag: false,
+            isArchived: false,
+          });
+          createdCount++;
+        }
+      }
+      
+      res.json({ 
+        message: `Synced farmers successfully. Created ${createdCount} new farmers.`,
+        createdCount,
+        totalFarmers: existingFarmers.length + createdCount 
+      });
+    } catch (error) {
+      console.error("Error syncing farmers:", error);
+      res.status(500).json({ message: "Failed to sync farmers" });
+    }
+  });
+
+  // PATCH /api/farmers/:id - Update a farmer (toggle negative flag, archive, PY balances)
+  const updateFarmerSchema = insertFarmerSchema.omit({ merchantId: true }).partial();
+  
+  app.patch("/api/farmers/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      const validationResult = updateFarmerSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: validationResult.error.flatten().fieldErrors 
+        });
+      }
+      
+      const { negativeFlag, isArchived, pyPayable, pyReceivable } = validationResult.data;
+
+      const farmer = await storage.updateFarmer(id, merchantId, {
+        ...(negativeFlag !== undefined && { negativeFlag }),
+        ...(isArchived !== undefined && { isArchived }),
+        ...(pyPayable !== undefined && { pyPayable }),
+        ...(pyReceivable !== undefined && { pyReceivable }),
+      });
+      
+      if (!farmer) {
+        return res.status(404).json({ message: "Farmer not found" });
+      }
+      res.json(farmer);
+    } catch (error) {
+      console.error("Error updating farmer:", error);
+      res.status(500).json({ message: "Failed to update farmer" });
     }
   });
 
