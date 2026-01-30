@@ -586,6 +586,81 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/admin/merchants/:id/status - Update merchant status (archive/active/inactive)
+  app.patch("/api/admin/merchants/:id/status", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status, adminPassword } = req.body;
+      
+      // Validate status
+      const validStatuses = ["active", "inactive", "archived"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status. Must be active, inactive, or archived" });
+      }
+      
+      // Verify admin password
+      const { comparePasswords } = await import("./auth");
+      const adminUser = await storage.getUser(req.user!.id);
+      if (!adminUser || !(await comparePasswords(adminPassword, adminUser.password))) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+      
+      // Update status
+      const updated = await storage.updateMerchantStatus(id, status);
+      if (!updated) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      
+      // Invalidate sessions for all users of this merchant if status is not active
+      if (status !== "active") {
+        await storage.invalidateMerchantSessions(id);
+      }
+      
+      res.json({ message: `Merchant status updated to ${status}`, merchant: updated });
+    } catch (error) {
+      console.error("Error updating merchant status:", error);
+      res.status(500).json({ message: "Failed to update merchant status" });
+    }
+  });
+
+  // POST /api/admin/merchants/:id/reset - Factory reset a merchant (requires dual password verification)
+  app.post("/api/admin/merchants/:id/reset", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { adminPassword, resetPassword } = req.body;
+      
+      // Verify admin password
+      const { comparePasswords } = await import("./auth");
+      const adminUser = await storage.getUser(req.user!.id);
+      if (!adminUser || !(await comparePasswords(adminPassword, adminUser.password))) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+      
+      // Verify special reset password from environment
+      const expectedResetPassword = process.env.RESET_PASSWORD;
+      if (!expectedResetPassword || resetPassword !== expectedResetPassword) {
+        return res.status(401).json({ message: "Invalid reset password" });
+      }
+      
+      // Verify merchant exists
+      const merchant = await storage.getMerchant(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      
+      // Invalidate all sessions first
+      await storage.invalidateMerchantSessions(id);
+      
+      // Perform factory reset
+      await storage.factoryResetMerchant(id);
+      
+      res.json({ message: "Merchant data has been reset successfully" });
+    } catch (error) {
+      console.error("Error resetting merchant:", error);
+      res.status(500).json({ message: "Failed to reset merchant" });
+    }
+  });
+
   // GET /api/admin/users - Get all users (admin only)
   app.get("/api/admin/users", requireSystemAdmin, async (req, res) => {
     try {

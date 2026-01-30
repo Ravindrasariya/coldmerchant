@@ -65,6 +65,9 @@ export interface IStorage {
   countMerchantsByCodePrefix(prefix: string): Promise<number>;
   updateMerchant(id: number, data: Partial<Merchant>): Promise<Merchant | undefined>;
   deleteMerchant(id: number): Promise<void>;
+  updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined>;
+  factoryResetMerchant(id: number): Promise<void>;
+  invalidateMerchantSessions(merchantId: number): Promise<void>;
   
   // Stock Entry operations
   getStockEntriesByMerchant(merchantId: number): Promise<any[]>;
@@ -311,6 +314,72 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMerchant(id: number): Promise<void> {
     await db.delete(merchants).where(eq(merchants.id, id));
+  }
+
+  async updateMerchantStatus(id: number, status: string): Promise<Merchant | undefined> {
+    const [updated] = await db.update(merchants)
+      .set({ status })
+      .where(eq(merchants.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async factoryResetMerchant(id: number): Promise<void> {
+    // Delete all merchant data in proper order (respecting foreign keys)
+    // First delete allocations and settlements
+    await db.delete(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, id));
+    await db.delete(cashEntryAllocations).where(eq(cashEntryAllocations.merchantId, id));
+    await db.delete(farmerSettlements).where(eq(farmerSettlements.merchantId, id));
+    
+    // Delete edit histories
+    await db.delete(stockEntryEditHistory).where(eq(stockEntryEditHistory.merchantId, id));
+    await db.delete(transactionEditHistory).where(eq(transactionEditHistory.merchantId, id));
+    await db.delete(seedStockEntryEditHistory).where(eq(seedStockEntryEditHistory.merchantId, id));
+    await db.delete(seedTransactionEditHistory).where(eq(seedTransactionEditHistory.merchantId, id));
+    
+    // Delete breakdowns
+    await db.delete(bagBreakdowns).where(eq(bagBreakdowns.merchantId, id));
+    
+    // Delete lots
+    await db.delete(lots).where(eq(lots.merchantId, id));
+    await db.delete(seedLots).where(eq(seedLots.merchantId, id));
+    
+    // Delete transaction items
+    await db.delete(transactionItems).where(eq(transactionItems.merchantId, id));
+    await db.delete(seedTransactionItems).where(eq(seedTransactionItems.merchantId, id));
+    
+    // Delete main entries
+    await db.delete(stockEntries).where(eq(stockEntries.merchantId, id));
+    await db.delete(seedStockEntries).where(eq(seedStockEntries.merchantId, id));
+    await db.delete(transactions).where(eq(transactions.merchantId, id));
+    await db.delete(seedTransactions).where(eq(seedTransactions.merchantId, id));
+    
+    // Delete cash and party data
+    await db.delete(cashEntries).where(eq(cashEntries.merchantId, id));
+    await db.delete(cashSettings).where(eq(cashSettings.merchantId, id));
+    await db.delete(bankAccounts).where(eq(bankAccounts.merchantId, id));
+    await db.delete(parties).where(eq(parties.merchantId, id));
+    await db.delete(cashFarmers).where(eq(cashFarmers.merchantId, id));
+    await db.delete(buyers).where(eq(buyers.merchantId, id));
+    
+    // Reset merchant serial numbers by updating them (if tracking exists in merchant record)
+    // The merchant record itself remains with status preserved
+  }
+
+  async invalidateMerchantSessions(merchantId: number): Promise<void> {
+    // Get all users for this merchant
+    const merchantUsers = await db.select({ id: users.id })
+      .from(users)
+      .where(eq(users.merchantId, merchantId));
+    
+    // Delete sessions for these users from the session store
+    // Sessions are stored in a PostgreSQL table, we can delete them directly
+    const userIds = merchantUsers.map(u => u.id);
+    if (userIds.length > 0) {
+      await pool.query(
+        `DELETE FROM session WHERE sess::jsonb -> 'passport' -> 'user' IN (${userIds.map(id => `'${id}'`).join(',')})`
+      );
+    }
   }
 
   // Stock Entry operations
