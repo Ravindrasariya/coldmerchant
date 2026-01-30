@@ -303,10 +303,30 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       if (i !== index) return item;
       const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
       const newCostOfGoods = newWeight * item.pricePerKg;
+      const newRevenue = newWeight * item.pricePerKg;
       return {
         ...item,
         netWeight: newWeight,
         costOfGoods: newCostOfGoods,
+        revenue: newRevenue,
+        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+      };
+    }));
+  };
+
+  const handlePriceChange = (index: number, newPrice: number) => {
+    setEditableItems(items => items.map((item, i) => {
+      if (i !== index) return item;
+      const newCostOfGoods = item.netWeight * newPrice;
+      const newRevenue = item.netWeight * newPrice;
+      const hasChanges = item.bagsMoved !== item.originalBags || 
+                        item.netWeight !== item.originalNetWeight ||
+                        newRevenue !== item.originalRevenue;
+      return {
+        ...item,
+        pricePerKg: newPrice,
+        costOfGoods: newCostOfGoods,
+        revenue: newRevenue,
         action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
       };
     }));
@@ -510,10 +530,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               )}
 
               {/* Header row */}
-              <div className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
+              <div className="grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
                 <span>{t("Lot Details", "लॉट विवरण")}</span>
                 <span className="text-right">{t("Bags", "बोरी")}</span>
                 <span className="text-right">{t("Net Weight", "शुद्ध वजन")}</span>
+                <span className="text-right">{t("Price/kg", "मूल्य/किग्रा")}</span>
                 <span className="text-right">{t("Revenue", "राजस्व")}</span>
                 <span className="text-right">{t("P&L", "लाभ/हानि")}</span>
                 <span></span>
@@ -524,7 +545,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 const itemCost = item.netWeight * item.pricePerKg;
                 const itemPL = item.revenue - itemCost;
                 return (
-                  <div key={item.id || `new-${index}`} className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 items-center text-sm py-1">
+                  <div key={item.id || `new-${index}`} className="grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
                     <span className="truncate text-xs">
                       S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
                     </span>
@@ -545,6 +566,16 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       className="h-8 text-right no-spinner"
                       placeholder="0"
                       data-testid={`input-item-weight-${index}`}
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.pricePerKg || ""}
+                      onChange={(e) => handlePriceChange(index, parseFloat(e.target.value) || 0)}
+                      className="h-8 text-right no-spinner"
+                      placeholder="0"
+                      data-testid={`input-item-price-${index}`}
                     />
                     <Input
                       type="number"
@@ -573,7 +604,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               })}
 
               {/* Totals row - aligned with inputs */}
-              <div className="grid grid-cols-[1fr,70px,80px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
+              <div className="grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
                 <span>{t("Total", "कुल")}</span>
                 <span className="text-right h-8 flex items-center justify-end">
                   {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)}
@@ -581,6 +612,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 <span className="text-right h-8 flex items-center justify-end">
                   {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)}
                 </span>
+                <span></span>
                 <span className="text-right h-8 flex items-center justify-end">
                   ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(0)}
                 </span>
