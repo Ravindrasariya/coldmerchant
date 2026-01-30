@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -91,6 +92,7 @@ interface TransactionWithHistory {
   transportationCharges: string | null;
   otherCharges: string | null;
   revenue: string | null;
+  remarks: string | null;
   totalBags: number;
   totalNetWeight: string | null;
   totalCostOfGoods: string | null;
@@ -107,6 +109,7 @@ const editTransactionSchema = z.object({
   amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
+  remarks: z.string().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -186,6 +189,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       amountReceived: 0,
       transportationCharges: 0,
       otherCharges: 0,
+      remarks: "",
     },
   });
 
@@ -198,6 +202,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
+        remarks: transaction.remarks || "",
       });
       setEditableItems(transaction.items.map(item => ({
         id: item.id,
@@ -670,7 +675,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     control={form.control}
                     name="vehicleNumber"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
                         <FormControl>
                           <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} data-testid="input-vehicle-number" />
@@ -754,6 +759,26 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0)}
                   transportationCharges={form.watch("transportationCharges") || 0}
                   otherCharges={form.watch("otherCharges") || 0}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="remarks"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder={t("Add any notes or remarks...", "कोई नोट या टिप्पणी जोड़ें...")} 
+                          className="resize-none" 
+                          rows={2}
+                          {...field} 
+                          data-testid="input-remarks" 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
 
                 <div className="flex justify-end gap-2 pt-4">

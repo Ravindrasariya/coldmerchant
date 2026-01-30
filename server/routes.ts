@@ -917,7 +917,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue } = req.body;
+      const { partyName, partyAddress, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -950,6 +950,9 @@ export async function registerRoutes(
       if (otherCharges !== undefined && !decimalEqual(otherCharges, existingTxn.otherCharges)) {
         changes.push({ field: "otherCharges", oldValue: existingTxn.otherCharges, newValue: otherCharges?.toString() || null });
       }
+      if (remarks !== undefined && (remarks || null) !== (existingTxn.remarks || null)) {
+        changes.push({ field: "remarks", oldValue: existingTxn.remarks, newValue: remarks || null });
+      }
       // Revenue is now calculated from item-level revenues, so we don't update it directly
       // Calculate new profit/loss using existing transaction revenue (aggregated from items)
       const existingRevenueNum = parseFloat(existingTxn.revenue || "0");
@@ -971,6 +974,7 @@ export async function registerRoutes(
         amountReceived: amountReceived ? amountReceived.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,
         otherCharges: otherCharges ? otherCharges.toString() : null,
+        remarks: remarks !== undefined ? (remarks || null) : existingTxn.remarks,
         profitLoss: newProfitLoss.toString(),
       });
       

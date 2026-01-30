@@ -134,6 +134,7 @@ export const transactions = pgTable("transactions", {
   transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
   otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),
   revenue: decimal("revenue", { precision: 12, scale: 2 }),
+  remarks: text("remarks"), // optional remarks/notes for the transaction
   totalBags: integer("total_bags").notNull(),
   totalNetWeight: decimal("total_net_weight", { precision: 12, scale: 2 }),
   totalCostOfGoods: decimal("total_cost_of_goods", { precision: 12, scale: 2 }),
