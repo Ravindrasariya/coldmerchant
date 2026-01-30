@@ -4,12 +4,15 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Merchants table - each merchant is isolated
+export const MERCHANT_STATUS = ["active", "inactive", "archived"] as const;
+
 export const merchants = pgTable("merchants", {
   id: serial("id").primaryKey(),
   merchantCode: text("merchant_code").unique(), // Format: MRYYYYMMDD{seq} - globally unique
   name: text("name").notNull(),
   contactNumber: text("contact_number"),
   address: text("address"),
+  status: text("status").default("active").notNull(), // active, inactive, archived
   createdAt: timestamp("created_at").defaultNow(),
 });
 
