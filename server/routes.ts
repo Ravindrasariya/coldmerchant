@@ -1340,6 +1340,19 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/seed-brands/search - Search brand names for autocomplete
+  app.get("/api/seed-brands/search", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const query = (req.query.q as string) || "";
+      const brands = await storage.searchSeedBrands(merchantId, query);
+      res.json(brands);
+    } catch (error) {
+      console.error("Error searching seed brands:", error);
+      res.status(500).json({ message: "Failed to search seed brands" });
+    }
+  });
+
   // GET /api/cash/cold-stores - Get cold stores with outstanding dues
   app.get("/api/cash/cold-stores", requireMerchant, async (req, res) => {
     try {

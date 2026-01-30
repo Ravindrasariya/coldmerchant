@@ -218,6 +218,9 @@ export interface IStorage {
   
   // Cold Store Lookup operations (for autocomplete in lot forms)
   searchColdStores(merchantId: number, query: string): Promise<string[]>;
+  
+  // Brand name lookup operations (for autocomplete in seed lot forms)
+  searchSeedBrands(merchantId: number, query: string): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2845,6 +2848,35 @@ export class DatabaseStorage implements IStorage {
     const results = Array.from(coldStoreSet)
       .filter(name => name.toLowerCase().includes(normalizedQuery))
       .sort((a, b) => a.localeCompare(b));
+
+    return results;
+  }
+
+  async searchSeedBrands(merchantId: number, query: string): Promise<string[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    // Get all brand names from seed lots for this merchant
+    const seedLotsData = await db.select({
+      brandName: seedLots.brandName,
+    })
+    .from(seedLots)
+    .where(eq(seedLots.merchantId, merchantId));
+
+    // Create a set to deduplicate brand names
+    const brandSet = new Set<string>();
+
+    for (const lot of seedLotsData) {
+      if (lot.brandName) {
+        brandSet.add(lot.brandName);
+      }
+    }
+
+    // Filter by query (if any) and sort alphabetically
+    let results = Array.from(brandSet).sort((a, b) => a.localeCompare(b));
+    
+    if (normalizedQuery) {
+      results = results.filter(name => name.toLowerCase().includes(normalizedQuery));
+    }
 
     return results;
   }
