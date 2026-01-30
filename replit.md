@@ -79,6 +79,19 @@ Cold store dues are calculated as: `(chargesPerBag × originalBags) + hammaliGra
 - **Delete Preservation**: Delete operations preserve unsaved edits on other rows
 - **Accessible via**: User dropdown menu > "Buyers" link
 
+### Farmer Ledger System
+- **Farmers Table**: Stores farmer records with unique ID (FMYYYYMMDD#), composite key (name + contact + village), PY balances, flags
+- **Composite Key Matching**: Farmers are identified by normalized (case-insensitive, trimmed) combination of name + phone + village
+- **Auto-Sync**: POST /api/farmers/sync generates farmer records from existing stock entries and seed transactions
+- **Due Calculations**:
+  - Harvest Due: Sum of totalDueToFarmer from matching stock entries
+  - Seed Due: Sum of totalDueFromFarmer from matching seed transactions
+  - Net Due = PY Receivable + Harvest Due - PY Payable - Seed Due
+- **PY Balances**: Previous year payable/receivable are editable inline with blur-based commits
+- **Negative Flag & Archive**: Toggle controls per farmer; archived farmers shown at bottom with toggle to show/hide
+- **Farmer IDs Never Reassigned**: Unique farmer codes (FMYYYYMMDD#) are permanent and never recycled
+- **Accessible via**: User dropdown menu > "Farmer Ledger" link
+
 ### Cross-Module Farmer Settlement System
 - **Purpose**: Automatically offset payments between Raw Potato dues (merchant owes farmer) and Seed Transaction dues (farmer owes merchant)
 - **Farmer Identity Matching**: Uses composite key of normalized name (case-insensitive, trimmed) + optional village + optional contact

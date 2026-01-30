@@ -35,7 +35,8 @@ import {
   Menu,
   Download,
   Leaf,
-  Users
+  Users,
+  Wheat
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -206,6 +207,10 @@ export default function HomePage() {
                   <DropdownMenuItem onClick={() => setLocation("/buyers")} data-testid="button-buyers">
                     <Users className="h-4 w-4 mr-2" />
                     {t("Buyers", "खरीदार")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation("/farmers")} data-testid="button-farmers">
+                    <Wheat className="h-4 w-4 mr-2" />
+                    {t("Farmer Ledger", "किसान खाता")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
                     <KeyRound className="h-4 w-4 mr-2" />
