@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
-  LogOut, Phone, MapPin, ArrowLeft 
+  LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle 
 } from "lucide-react";
 import type { Merchant, User } from "@shared/schema";
 
@@ -36,6 +36,16 @@ export default function AdminPage() {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithMerchant | null>(null);
   const [userForm, setUserForm] = useState({ username: "", name: "", mobileNumber: "", merchantId: "", canEdit: true });
+
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusDialogMerchant, setStatusDialogMerchant] = useState<MerchantWithUsers | null>(null);
+  const [statusDialogAction, setStatusDialogAction] = useState<"active" | "inactive" | "archived">("active");
+  const [statusPassword, setStatusPassword] = useState("");
+
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetDialogMerchant, setResetDialogMerchant] = useState<MerchantWithUsers | null>(null);
+  const [resetAdminPassword, setResetAdminPassword] = useState("");
+  const [resetSpecialPassword, setResetSpecialPassword] = useState("");
 
   useEffect(() => {
     if (!user?.isSystemAdmin) {
@@ -88,16 +98,43 @@ export default function AdminPage() {
     },
   });
 
-  const deleteMerchantMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/merchants/${id}`);
+  const updateMerchantStatusMutation = useMutation({
+    mutationFn: async ({ id, status, adminPassword }: { id: number; status: string; adminPassword: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/merchants/${id}/status`, { status, adminPassword });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      setStatusDialogOpen(false);
+      setStatusDialogMerchant(null);
+      setStatusPassword("");
+      const statusMessages: Record<string, string> = {
+        active: "Merchant activated successfully",
+        inactive: "Merchant deactivated. All users have been logged out.",
+        archived: "Merchant archived. All users have been logged out.",
+      };
+      toast({ title: statusMessages[variables.status] || "Status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const factoryResetMutation = useMutation({
+    mutationFn: async ({ id, adminPassword, resetPassword }: { id: number; adminPassword: string; resetPassword: string }) => {
+      const res = await apiRequest("POST", `/api/admin/merchants/${id}/reset`, { adminPassword, resetPassword });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
-      toast({ title: "Merchant deleted successfully" });
+      setResetDialogOpen(false);
+      setResetDialogMerchant(null);
+      setResetAdminPassword("");
+      setResetSpecialPassword("");
+      toast({ title: "Factory reset complete", description: "All merchant data has been deleted." });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to delete merchant", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to reset merchant", description: error.message, variant: "destructive" });
     },
   });
 
@@ -217,6 +254,48 @@ export default function AdminPage() {
     }
   };
 
+  const openStatusDialog = (merchant: MerchantWithUsers, action: "active" | "inactive" | "archived") => {
+    setStatusDialogMerchant(merchant);
+    setStatusDialogAction(action);
+    setStatusPassword("");
+    setStatusDialogOpen(true);
+  };
+
+  const openResetDialog = (merchant: MerchantWithUsers) => {
+    setResetDialogMerchant(merchant);
+    setResetAdminPassword("");
+    setResetSpecialPassword("");
+    setResetDialogOpen(true);
+  };
+
+  const handleStatusConfirm = () => {
+    if (!statusDialogMerchant || !statusPassword) return;
+    updateMerchantStatusMutation.mutate({
+      id: statusDialogMerchant.id,
+      status: statusDialogAction,
+      adminPassword: statusPassword,
+    });
+  };
+
+  const handleResetConfirm = () => {
+    if (!resetDialogMerchant || !resetAdminPassword || !resetSpecialPassword) return;
+    factoryResetMutation.mutate({
+      id: resetDialogMerchant.id,
+      adminPassword: resetAdminPassword,
+      resetPassword: resetSpecialPassword,
+    });
+  };
+
+  const sortedMerchants = [...merchants].sort((a, b) => {
+    const statusOrder: Record<string, number> = { active: 0, inactive: 1, archived: 2 };
+    const aOrder = statusOrder[a.status || "active"] || 0;
+    const bOrder = statusOrder[b.status || "active"] || 0;
+    return aOrder - bOrder;
+  });
+
+  const activeMerchants = sortedMerchants.filter(m => (m.status || "active") !== "archived");
+  const archivedMerchants = sortedMerchants.filter(m => m.status === "archived");
+
   return (
     <div className="container mx-auto py-6 px-4 max-w-6xl">
       <div className="flex items-center justify-between mb-6">
@@ -279,16 +358,25 @@ export default function AdminPage() {
                       <TableRow>
                         <TableHead>Merchant ID</TableHead>
                         <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Contact</TableHead>
                         <TableHead>Address</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {merchants.map((merchant) => (
+                      {activeMerchants.map((merchant) => (
                         <TableRow key={merchant.id} data-testid={`row-merchant-${merchant.id}`}>
                           <TableCell className="font-mono text-sm text-muted-foreground" data-testid={`text-merchant-code-${merchant.id}`}>{merchant.merchantCode || '-'}</TableCell>
                           <TableCell className="font-medium">{merchant.name}</TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={(merchant.status || "active") === "active" ? "default" : "secondary"}
+                              className={(merchant.status || "active") === "active" ? "bg-green-600" : "bg-yellow-600"}
+                            >
+                              {(merchant.status || "active") === "active" ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
                           <TableCell>
                             {merchant.contactNumber ? (
                               <div className="flex items-center gap-1">
@@ -310,11 +398,12 @@ export default function AdminPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => openMerchantDialog(merchant)}
+                                title="Edit"
                                 data-testid={`button-edit-merchant-${merchant.id}`}
                               >
                                 <Edit className="h-4 w-4" />
@@ -322,14 +411,30 @@ export default function AdminPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => {
-                                  if (confirm("Are you sure you want to delete this merchant?")) {
-                                    deleteMerchantMutation.mutate(merchant.id);
-                                  }
-                                }}
-                                data-testid={`button-delete-merchant-${merchant.id}`}
+                                onClick={() => openStatusDialog(merchant, (merchant.status || "active") === "active" ? "inactive" : "active")}
+                                title={(merchant.status || "active") === "active" ? "Deactivate" : "Activate"}
+                                data-testid={`button-toggle-status-${merchant.id}`}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Power className={`h-4 w-4 ${(merchant.status || "active") === "active" ? "text-green-600" : "text-yellow-600"}`} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openStatusDialog(merchant, "archived")}
+                                title="Archive"
+                                data-testid={`button-archive-merchant-${merchant.id}`}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openResetDialog(merchant)}
+                                title="Factory Reset"
+                                className="text-destructive"
+                                data-testid={`button-reset-merchant-${merchant.id}`}
+                              >
+                                <RotateCcw className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -338,6 +443,85 @@ export default function AdminPage() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {archivedMerchants.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold mb-4 text-muted-foreground flex items-center gap-2">
+                      <Archive className="h-5 w-5" />
+                      Archived Merchants
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Merchant ID</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Contact</TableHead>
+                            <TableHead>Address</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {archivedMerchants.map((merchant) => (
+                            <TableRow key={merchant.id} className="opacity-60" data-testid={`row-merchant-archived-${merchant.id}`}>
+                              <TableCell className="font-mono text-sm text-muted-foreground">{merchant.merchantCode || '-'}</TableCell>
+                              <TableCell className="font-medium">{merchant.name}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="bg-gray-500">
+                                  Archived
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {merchant.contactNumber ? (
+                                  <div className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3 text-muted-foreground" />
+                                    {merchant.contactNumber}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {merchant.address ? (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-muted-foreground" />
+                                    {merchant.address}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openStatusDialog(merchant, "active")}
+                                    title="Restore (Activate)"
+                                    data-testid={`button-restore-merchant-${merchant.id}`}
+                                  >
+                                    <Power className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openResetDialog(merchant)}
+                                    title="Factory Reset"
+                                    className="text-destructive"
+                                    data-testid={`button-reset-archived-merchant-${merchant.id}`}
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
               )}
             </CardContent>
           </Card>
@@ -606,6 +790,133 @@ export default function AdminPage() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               {editingUser ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className={`h-5 w-5 ${statusDialogAction === "archived" ? "text-destructive" : "text-yellow-600"}`} />
+              {statusDialogAction === "active" ? "Activate Merchant" : 
+               statusDialogAction === "inactive" ? "Deactivate Merchant" : "Archive Merchant"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className={`p-4 rounded-md ${statusDialogAction === "archived" ? "bg-destructive/10 border border-destructive/30" : "bg-yellow-500/10 border border-yellow-500/30"}`}>
+              <p className="text-sm font-medium mb-2">
+                {statusDialogAction === "active" 
+                  ? `Are you sure you want to activate "${statusDialogMerchant?.name}"?`
+                  : statusDialogAction === "inactive"
+                  ? `Are you sure you want to deactivate "${statusDialogMerchant?.name}"?`
+                  : `Are you sure you want to archive "${statusDialogMerchant?.name}"?`}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {statusDialogAction === "active" 
+                  ? "Users of this merchant will be able to login again."
+                  : "All users of this merchant will be logged out immediately and cannot login until reactivated. No data will be deleted."}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status-password">Enter your admin password to confirm</Label>
+              <Input
+                id="status-password"
+                type="password"
+                value={statusPassword}
+                onChange={(e) => setStatusPassword(e.target.value)}
+                placeholder="Admin password"
+                data-testid="input-status-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleStatusConfirm}
+              disabled={!statusPassword || updateMerchantStatusMutation.isPending}
+              variant={statusDialogAction === "archived" ? "destructive" : "default"}
+              data-testid="button-confirm-status"
+            >
+              {updateMerchantStatusMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Factory Reset Merchant
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-md bg-destructive/10 border border-destructive/30">
+              <p className="text-sm font-bold text-destructive mb-2">
+                WARNING: This action cannot be undone!
+              </p>
+              <p className="text-sm text-muted-foreground mb-2">
+                Are you sure you want to factory reset "{resetDialogMerchant?.name}"?
+              </p>
+              <p className="text-sm text-destructive">
+                This will permanently delete ALL data including:
+              </p>
+              <ul className="text-sm text-muted-foreground mt-1 ml-4 list-disc">
+                <li>All stock entries and lots</li>
+                <li>All transactions</li>
+                <li>All cash entries and payments</li>
+                <li>All seed stock and transactions</li>
+                <li>All parties, buyers, and farmers</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-admin-password">Admin Password</Label>
+              <Input
+                id="reset-admin-password"
+                type="password"
+                value={resetAdminPassword}
+                onChange={(e) => setResetAdminPassword(e.target.value)}
+                placeholder="Enter your admin password"
+                data-testid="input-reset-admin-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-special-password">Reset Password</Label>
+              <Input
+                id="reset-special-password"
+                type="password"
+                value={resetSpecialPassword}
+                onChange={(e) => setResetSpecialPassword(e.target.value)}
+                placeholder="Enter the special reset password"
+                data-testid="input-reset-special-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Contact system administrator if you don't know the reset password.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetConfirm}
+              disabled={!resetAdminPassword || !resetSpecialPassword || factoryResetMutation.isPending}
+              variant="destructive"
+              data-testid="button-confirm-reset"
+            >
+              {factoryResetMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Factory Reset
             </Button>
           </DialogFooter>
         </DialogContent>
