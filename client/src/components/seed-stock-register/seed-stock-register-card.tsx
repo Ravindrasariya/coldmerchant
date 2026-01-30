@@ -620,6 +620,11 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                             <Badge className="text-[11px] px-2 py-0.5 font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0">
                               {lot.bagType}
                             </Badge>
+                            {lot.brandName && (
+                              <Badge className="text-[11px] px-2 py-0.5 font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 border-0">
+                                {lot.brandName}
+                              </Badge>
+                            )}
                           </div>
                           
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
