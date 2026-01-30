@@ -286,6 +286,23 @@ export const buyers = pgTable("buyers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Farmers - farmer ledger for tracking dues across harvest and seed modules
+export const farmers = pgTable("farmers", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  farmerCode: text("farmer_code"), // Format: FMYYYYMMDD{seq} - unique per merchant, never reassigned
+  dateAdded: date("date_added").notNull(),
+  name: text("name").notNull(), // Composite key part 1
+  contact: text("contact"), // Composite key part 2 (phone number)
+  village: text("village"), // Composite key part 3
+  pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"), // Previous year payable (owed to farmer)
+  pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"), // Previous year receivable (owed by farmer)
+  negativeFlag: boolean("negative_flag").default(false),
+  isArchived: boolean("is_archived").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // ===================== SEED MANAGEMENT TABLES =====================
 
 // Seed Stock Entries - supplier info for seed purchases
@@ -549,6 +566,13 @@ export const buyersRelations = relations(buyers, ({ one }) => ({
   }),
 }));
 
+export const farmersRelations = relations(farmers, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [farmers.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
 export const usersRelations = relations(users, ({ one }) => ({
   merchant: one(merchants, {
     fields: [users.merchantId],
@@ -713,6 +737,7 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ i
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFarmerSchema = createInsertSchema(farmers).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Seed schemas
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
@@ -776,6 +801,9 @@ export type InsertCashFarmer = z.infer<typeof insertCashFarmerSchema>;
 
 export type Buyer = typeof buyers.$inferSelect;
 export type InsertBuyer = z.infer<typeof insertBuyerSchema>;
+
+export type Farmer = typeof farmers.$inferSelect;
+export type InsertFarmer = z.infer<typeof insertFarmerSchema>;
 
 export type SeedStockEntry = typeof seedStockEntries.$inferSelect;
 export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;
