@@ -19,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Trash2, Leaf } from "lucide-react";
-import { SeedStockEntryForm, SEED_POTATO_TYPES, SEED_BAG_TYPES, SEED_SIZE_OPTIONS } from "@shared/schema";
+import { SeedStockEntryForm, SEED_POTATO_TYPES, SEED_SIZE_OPTIONS } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
 
 interface SeedLotCardProps {
@@ -197,11 +197,11 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
             name={`seedLots.${lotIndex}.potatoType`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("Type of Potato", "आलू का प्रकार")} *</FormLabel>
+                <FormLabel>{t("Variety", "किस्म")} *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger data-testid={`select-seed-potato-type-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select type", "प्रकार चुनें")} />
+                      <SelectValue placeholder={t("Select variety", "किस्म चुनें")} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -222,21 +222,25 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
             name={`seedLots.${lotIndex}.bagType`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("Bag Type", "बोरी का प्रकार")} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-testid={`select-seed-bag-type-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select bag type", "बोरी का प्रकार चुनें")} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {SEED_BAG_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormLabel>{t("Potato Type", "आलू का प्रकार")} *</FormLabel>
+                <FormControl>
+                  <>
+                    <Input
+                      list={`bagTypeSuggestions-${lotIndex}`}
+                      placeholder={t("e.g. 50kg, Jute", "जैसे 50kg, Jute")}
+                      {...field}
+                      value={field.value || ""}
+                      data-testid={`input-seed-bag-type-${lotIndex}`}
+                    />
+                    <datalist id={`bagTypeSuggestions-${lotIndex}`}>
+                      <option value="50kg" />
+                      <option value="Jute" />
+                      <option value="Wafer" />
+                      <option value="Ration" />
+                      <option value="HDPE" />
+                    </datalist>
+                  </>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
