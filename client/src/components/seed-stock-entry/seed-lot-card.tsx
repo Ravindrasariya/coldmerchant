@@ -35,6 +35,7 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
   const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
   const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState(false);
   const [coldStoreQuery, setColdStoreQuery] = useState("");
+  const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const searchColdStores = useCallback(async (query: string) => {
@@ -91,6 +92,22 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
     setColdStoreSuggestions([]);
     setColdStoreQuery("");
   };
+
+  // Fetch brand suggestions on mount
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const response = await fetch("/api/seed-brands/search");
+        if (response.ok) {
+          const data = await response.json();
+          setBrandSuggestions(data);
+        }
+      } catch (error) {
+        console.error("Error fetching brand suggestions:", error);
+      }
+    };
+    fetchBrands();
+  }, []);
 
   return (
     <Card className="border-border">
@@ -238,6 +255,33 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
                       <option value="Wafer" />
                       <option value="Ration" />
                       <option value="HDPE" />
+                    </datalist>
+                  </>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name={`seedLots.${lotIndex}.brandName`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("Brand Name", "ब्रांड का नाम")}</FormLabel>
+                <FormControl>
+                  <>
+                    <Input
+                      list={`brandSuggestions-${lotIndex}`}
+                      placeholder={t("Enter brand name", "ब्रांड का नाम दर्ज करें")}
+                      {...field}
+                      value={field.value || ""}
+                      data-testid={`input-seed-brand-${lotIndex}`}
+                    />
+                    <datalist id={`brandSuggestions-${lotIndex}`}>
+                      {brandSuggestions.map((brand) => (
+                        <option key={brand} value={brand} />
+                      ))}
                     </datalist>
                   </>
                 </FormControl>
