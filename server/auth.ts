@@ -65,7 +65,20 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
-      done(null, user || null);
+      if (!user) {
+        return done(null, null);
+      }
+      
+      // Check if user's merchant is active (skip for system admins)
+      if (user.merchantId && !user.isSystemAdmin) {
+        const merchant = await storage.getMerchant(user.merchantId);
+        if (!merchant || merchant.status !== "active") {
+          // Merchant is inactive/archived, reject the session
+          return done(null, null);
+        }
+      }
+      
+      done(null, user);
     } catch (err) {
       done(err);
     }
@@ -76,6 +89,17 @@ export function setupAuth(app: Express) {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+
+      // Check if user's merchant is active (skip for system admins without merchant)
+      if (user.merchantId && !user.isSystemAdmin) {
+        const merchant = await storage.getMerchant(user.merchantId);
+        if (!merchant || merchant.status !== "active") {
+          const statusMessage = merchant?.status === "archived" 
+            ? "This merchant account has been archived. Please contact the administrator."
+            : "This merchant account is currently inactive. Please contact the administrator.";
+          return res.status(403).json({ message: statusMessage });
+        }
       }
 
       req.login(user, async (err) => {
