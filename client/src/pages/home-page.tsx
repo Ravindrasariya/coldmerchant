@@ -306,19 +306,12 @@ export default function HomePage() {
                     {t("Stock Entry", "स्टॉक एंट्री")}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {selectedCrop === "potato" 
-                      ? t("Record new potato purchases from farmers", "किसानों से नई आलू खरीद दर्ज करें")
-                      : t("Record new onion purchases from farmers", "किसानों से नई प्याज खरीद दर्ज करें")
-                    }
+                    {t("Record new purchases from farmers", "किसानों से नई खरीद दर्ज करें")}
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} />
                 </div>
               </div>
               <StockEntryForm 
                 onSuccess={() => setActiveTab("stock-register")} 
-                selectedCrop={selectedCrop}
               />
             </div>
           </div>
