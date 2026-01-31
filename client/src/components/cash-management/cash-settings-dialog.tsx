@@ -13,6 +13,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { Plus, Trash2, Edit2, Save, X, Wallet, Users, Tractor, Building2, RefreshCw, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Party, CashFarmer, CashSettings, BankAccount } from "@shared/schema";
+import { DISTRICTS, STATES } from "@shared/schema";
 
 interface CashSettingsDialogProps {
   open: boolean;
@@ -740,7 +741,8 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState({ name: "", contactNumber: "", address: "", pendingDueToBePaid: "" });
+  const emptyFormData = { name: "", contactNumber: "", village: "", tehsil: "", district: "", state: "", pendingDueToBePaid: "" };
+  const [formData, setFormData] = useState(emptyFormData);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -749,7 +751,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
       setShowAddForm(false);
-      setFormData({ name: "", contactNumber: "", address: "", pendingDueToBePaid: "" });
+      setFormData(emptyFormData);
       toast({ title: t("Farmer added", "किसान जोड़ा गया") });
     },
     onError: () => {
@@ -789,7 +791,10 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     setFormData({
       name: farmer.name,
       contactNumber: farmer.contactNumber || "",
-      address: farmer.address || "",
+      village: farmer.village || "",
+      tehsil: farmer.tehsil || "",
+      district: farmer.district || "",
+      state: farmer.state || "",
       pendingDueToBePaid: farmer.pendingDueToBePaid || "0",
     });
   };
@@ -833,7 +838,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">{t("Contact", "संपर्क")}</Label>
+                <Label className="text-xs">{t("Contact", "संपर्क")} *</Label>
                 <Input
                   value={formData.contactNumber}
                   onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
@@ -842,14 +847,23 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">{t("Address", "पता")}</Label>
+                <Label className="text-xs">{t("Village", "गाँव")} *</Label>
                 <Input
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder={t("Address", "पता")}
-                  data-testid="input-farmer-address"
+                  value={formData.village}
+                  onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                  placeholder={t("Village", "गाँव")}
+                  data-testid="input-farmer-village"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Tehsil", "तहसील")} *</Label>
+                <Input
+                  value={formData.tehsil}
+                  onChange={(e) => setFormData({ ...formData, tehsil: e.target.value })}
+                  placeholder={t("Tehsil", "तहसील")}
+                  data-testid="input-farmer-tehsil"
                 />
               </div>
               <div className="space-y-1">
@@ -859,8 +873,43 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                   value={formData.pendingDueToBePaid}
                   onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
                   placeholder="0"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   data-testid="input-farmer-pending-due"
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("District", "ज़िला")} *</Label>
+                <Select
+                  value={formData.district}
+                  onValueChange={(value) => setFormData({ ...formData, district: value })}
+                >
+                  <SelectTrigger data-testid="select-farmer-district">
+                    <SelectValue placeholder={t("Select district", "ज़िला चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DISTRICTS.map((district) => (
+                      <SelectItem key={district} value={district}>{district}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("State", "राज्य")} *</Label>
+                <Select
+                  value={formData.state}
+                  onValueChange={(value) => setFormData({ ...formData, state: value })}
+                >
+                  <SelectTrigger data-testid="select-farmer-state">
+                    <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATES.map((state) => (
+                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -869,7 +918,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 size="sm" 
                 onClick={() => {
                   setShowAddForm(false);
-                  setFormData({ name: "", contactNumber: "", address: "", pendingDueToBePaid: "" });
+                  setFormData(emptyFormData);
                 }}
               >
                 <X className="h-4 w-4 mr-1" />
@@ -878,7 +927,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
               <Button 
                 size="sm" 
                 onClick={() => createMutation.mutate(formData)}
-                disabled={!formData.name || createMutation.isPending}
+                disabled={!formData.name || !formData.contactNumber || !formData.village || !formData.tehsil || !formData.district || !formData.state || createMutation.isPending}
                 data-testid="button-save-farmer"
               >
                 {createMutation.isPending ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
@@ -912,18 +961,52 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         placeholder={t("Contact", "संपर्क")}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <Input
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        placeholder={t("Address", "पता")}
+                        value={formData.village}
+                        onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                        placeholder={t("Village", "गाँव")}
+                      />
+                      <Input
+                        value={formData.tehsil}
+                        onChange={(e) => setFormData({ ...formData, tehsil: e.target.value })}
+                        placeholder={t("Tehsil", "तहसील")}
                       />
                       <Input
                         type="number"
                         value={formData.pendingDueToBePaid}
                         onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
                         placeholder={t("Due to be Paid", "भुगतान करना है")}
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Select
+                        value={formData.district}
+                        onValueChange={(value) => setFormData({ ...formData, district: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("Select district", "ज़िला चुनें")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DISTRICTS.map((district) => (
+                            <SelectItem key={district} value={district}>{district}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={formData.state}
+                        onValueChange={(value) => setFormData({ ...formData, state: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATES.map((state) => (
+                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex gap-2 justify-end">
                       <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>
@@ -939,7 +1022,11 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                     <div>
                       <p className="font-medium">{farmer.name}</p>
                       {farmer.contactNumber && <p className="text-sm text-muted-foreground">{farmer.contactNumber}</p>}
-                      {farmer.address && <p className="text-sm text-muted-foreground">{farmer.address}</p>}
+                      {(farmer.village || farmer.tehsil || farmer.district || farmer.state) && (
+                        <p className="text-sm text-muted-foreground">
+                          {[farmer.village, farmer.tehsil, farmer.district, farmer.state].filter(Boolean).join(", ")}
+                        </p>
+                      )}
                       {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
                         <p className="text-sm text-red-600">{t("Due to Pay", "भुगतान करना है")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString()}</p>
                       )}

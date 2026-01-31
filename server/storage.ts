@@ -143,6 +143,7 @@ export interface IStorage {
   createFarmer(farmer: InsertFarmer): Promise<Farmer>;
   updateFarmer(id: number, merchantId: number, data: Partial<Farmer>): Promise<Farmer | undefined>;
   getFarmerByCompositeKey(merchantId: number, name: string, contact: string | null, village: string | null): Promise<Farmer | undefined>;
+  getFarmerByNameAndContact(merchantId: number, name: string, contact: string | null): Promise<Farmer | undefined>;
   
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
@@ -1564,6 +1565,21 @@ export class DatabaseStorage implements IStorage {
       return fName === normalizedName && 
              fContact === normalizedContact && 
              fVillage === normalizedVillage;
+    });
+  }
+
+  async getFarmerByNameAndContact(merchantId: number, name: string, contact: string | null): Promise<Farmer | undefined> {
+    const normalizedName = normalizeName(name);
+    const normalizedContact = contact ? normalizeName(contact) : null;
+    
+    const allFarmers = await db.select().from(farmers)
+      .where(eq(farmers.merchantId, merchantId));
+    
+    return allFarmers.find(f => {
+      const fName = normalizeName(f.name);
+      const fContact = f.contact ? normalizeName(f.contact) : null;
+      
+      return fName === normalizedName && fContact === normalizedContact;
     });
   }
 

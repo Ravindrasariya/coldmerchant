@@ -1780,7 +1780,7 @@ export async function registerRoutes(
   app.post("/api/cash/managed-farmers", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { name, contactNumber, address, pendingDueToBePaid } = req.body;
+      const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid } = req.body;
       
       if (!name) {
         return res.status(400).json({ message: "Farmer name is required" });
@@ -1790,7 +1790,10 @@ export async function registerRoutes(
         merchantId,
         name,
         contactNumber: contactNumber || null,
-        address: address || null,
+        village: village || null,
+        tehsil: tehsil || null,
+        district: district || null,
+        state: state || null,
         pendingDueToBePaid: pendingDueToBePaid?.toString() || "0",
       });
       res.status(201).json(farmer);
@@ -1804,12 +1807,15 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
-      const { name, contactNumber, address, pendingDueToBePaid } = req.body;
+      const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid } = req.body;
 
       const farmer = await storage.updateCashFarmer(id, merchantId, {
         ...(name && { name }),
         ...(contactNumber !== undefined && { contactNumber }),
-        ...(address !== undefined && { address }),
+        ...(village !== undefined && { village }),
+        ...(tehsil !== undefined && { tehsil }),
+        ...(district !== undefined && { district }),
+        ...(state !== undefined && { state }),
         ...(pendingDueToBePaid !== undefined && { pendingDueToBePaid: pendingDueToBePaid?.toString() }),
       });
       
@@ -1959,37 +1965,30 @@ export async function registerRoutes(
       // Get all seed transactions for seed dues calculation
       const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
       
-      // Calculate dues for each farmer
+      // Calculate dues for each farmer - match by name+contact only
       const farmersWithDues = farmerList.map(farmer => {
         const normalizedFarmerName = farmer.name.trim().toLowerCase();
         const normalizedFarmerContact = farmer.contact?.trim().toLowerCase() || null;
-        const normalizedFarmerVillage = farmer.village?.trim().toLowerCase() || null;
         
-        // Calculate Harvest Due (totalDueToFarmer from stock entries where farmer matches)
+        // Calculate Harvest Due (totalDueToFarmer from stock entries where farmer matches by name+contact)
         let harvestDue = 0;
         for (const entry of stockEntryList) {
           const entryName = entry.farmerName?.trim().toLowerCase() || "";
           const entryContact = entry.farmerContact?.trim().toLowerCase() || null;
-          const entryVillage = entry.village?.trim().toLowerCase() || null;
           
-          if (entryName === normalizedFarmerName && 
-              entryContact === normalizedFarmerContact && 
-              entryVillage === normalizedFarmerVillage) {
+          if (entryName === normalizedFarmerName && entryContact === normalizedFarmerContact) {
             harvestDue += parseFloat(entry.totalDueToFarmer || "0");
           }
         }
         
-        // Calculate Seed Due (totalDueFromFarmer from seed transactions where farmer matches)
+        // Calculate Seed Due (totalDueToFarmer from seed transactions where farmer matches by name+contact)
         let seedDue = 0;
         for (const txn of seedTransactionList) {
           const txnName = txn.farmerName?.trim().toLowerCase() || "";
           const txnContact = txn.farmerContact?.trim().toLowerCase() || null;
-          const txnVillage = txn.farmerVillage?.trim().toLowerCase() || null;
           
-          if (txnName === normalizedFarmerName && 
-              txnContact === normalizedFarmerContact && 
-              txnVillage === normalizedFarmerVillage) {
-            seedDue += parseFloat(txn.totalDueFromFarmer || "0");
+          if (txnName === normalizedFarmerName && txnContact === normalizedFarmerContact) {
+            seedDue += parseFloat(txn.totalDueToFarmer || "0");
           }
         }
         
@@ -2029,60 +2028,74 @@ export async function registerRoutes(
       const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
       
       // Collect unique farmers from stock entries
-      const farmerKeys = new Set<string>();
-      const farmerData: Array<{ name: string; contact: string | null; village: string | null }> = [];
+      // Use name+contact as composite key (not village) to prevent duplicates
+      // Key: normalized name + contact -> best known village value
+      const farmerMap = new Map<string, { name: string; contact: string | null; village: string | null; tehsil: string | null; district: string | null; state: string | null }>();
       
+      // Helper to create composite key from name+contact only
+      const makeKey = (name: string, contact: string | null) => {
+        return [
+          name.trim().toLowerCase(),
+          contact?.trim().toLowerCase() || ""
+        ].join("|");
+      };
+      
+      // Process stock entries first (has mandatory farmer fields)
       for (const entry of stockEntryList) {
         if (entry.farmerName) {
-          const key = [
-            entry.farmerName.trim().toLowerCase(),
-            entry.farmerContact?.trim().toLowerCase() || "",
-            entry.village?.trim().toLowerCase() || ""
-          ].join("|");
+          const key = makeKey(entry.farmerName, entry.farmerContact || null);
+          const existing = farmerMap.get(key);
           
-          if (!farmerKeys.has(key)) {
-            farmerKeys.add(key);
-            farmerData.push({
+          // Prefer entries with more complete data (village, tehsil, district, state)
+          if (!existing || (entry.village && !existing.village)) {
+            farmerMap.set(key, {
               name: entry.farmerName.trim(),
               contact: entry.farmerContact?.trim() || null,
-              village: entry.village?.trim() || null,
+              village: entry.village?.trim() || existing?.village || null,
+              tehsil: entry.tehsil?.trim() || existing?.tehsil || null,
+              district: entry.district || existing?.district || null,
+              state: entry.state || existing?.state || null,
             });
           }
         }
       }
       
-      // Add farmers from seed transactions
+      // Add farmers from seed transactions (only if not already present with better data)
       for (const txn of seedTransactionList) {
         if (txn.farmerName) {
-          const key = [
-            txn.farmerName.trim().toLowerCase(),
-            txn.farmerContact?.trim().toLowerCase() || "",
-            txn.farmerVillage?.trim().toLowerCase() || ""
-          ].join("|");
+          const key = makeKey(txn.farmerName, txn.farmerContact || null);
+          const existing = farmerMap.get(key);
           
-          if (!farmerKeys.has(key)) {
-            farmerKeys.add(key);
-            farmerData.push({
+          if (!existing) {
+            farmerMap.set(key, {
               name: txn.farmerName.trim(),
               contact: txn.farmerContact?.trim() || null,
-              village: txn.farmerVillage?.trim() || null,
+              village: txn.village?.trim() || null,
+              tehsil: txn.tehsil?.trim() || null,
+              district: txn.district || null,
+              state: txn.state || null,
+            });
+          } else if (txn.village && !existing.village) {
+            // Update with village if missing
+            farmerMap.set(key, {
+              ...existing,
+              village: txn.village?.trim() || null,
+              tehsil: txn.tehsil?.trim() || existing.tehsil || null,
+              district: txn.district || existing.district || null,
+              state: txn.state || existing.state || null,
             });
           }
         }
       }
       
-      // Create farmers that don't exist yet
+      // Create or update farmers
       let createdCount = 0;
       const today = new Date().toISOString().split('T')[0];
       const dateStr = parseDateToCodeFormat(today);
       
-      for (const data of farmerData) {
-        const existing = await storage.getFarmerByCompositeKey(
-          merchantId, 
-          data.name, 
-          data.contact, 
-          data.village
-        );
+      for (const data of Array.from(farmerMap.values())) {
+        // Match by name+contact only (ignore village for matching)
+        const existing = await storage.getFarmerByNameAndContact(merchantId, data.name, data.contact);
         
         if (!existing) {
           const codePrefix = `FM${dateStr}`;
@@ -2096,12 +2109,23 @@ export async function registerRoutes(
             name: data.name,
             contact: data.contact,
             village: data.village,
+            tehsil: data.tehsil,
+            district: data.district,
+            state: data.state,
             pyPayable: "0",
             pyReceivable: "0",
             negativeFlag: false,
             isArchived: false,
           });
           createdCount++;
+        } else if (data.village && !existing.village) {
+          // Update existing farmer with village data if missing
+          await storage.updateFarmer(existing.id, merchantId, {
+            village: data.village,
+            tehsil: data.tehsil || existing.tehsil,
+            district: data.district || existing.district,
+            state: data.state || existing.state,
+          });
         }
       }
       

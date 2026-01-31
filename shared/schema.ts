@@ -264,7 +264,10 @@ export const cashFarmers = pgTable("cash_farmers", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   name: text("name").notNull(),
   contactNumber: text("contact_number"),
-  address: text("address"),
+  village: text("village"),
+  tehsil: text("tehsil"),
+  district: text("district"),
+  state: text("state"),
   pendingDueToBePaid: decimal("pending_due_to_be_paid", { precision: 12, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -295,6 +298,9 @@ export const farmers = pgTable("farmers", {
   name: text("name").notNull(), // Composite key part 1
   contact: text("contact"), // Composite key part 2 (phone number)
   village: text("village"), // Composite key part 3
+  tehsil: text("tehsil"),
+  district: text("district"),
+  state: text("state"),
   pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"), // Previous year payable (owed to farmer)
   pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"), // Previous year receivable (owed by farmer)
   negativeFlag: boolean("negative_flag").default(false),
