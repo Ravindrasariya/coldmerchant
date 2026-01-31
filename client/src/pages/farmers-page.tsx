@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,7 +26,10 @@ interface FarmerWithDues extends Farmer {
   harvestDue: number;
   seedDue: number;
   netDue: number;
+  coldDue: number;
 }
+
+type SortOption = 'farmerId' | 'harvestDue' | 'seedDue';
 
 interface PyEditState {
   [farmerId: number]: {
@@ -41,6 +45,7 @@ export default function FarmersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [pyEdits, setPyEdits] = useState<PyEditState>({});
+  const [sortBy, setSortBy] = useState<SortOption>('farmerId');
 
   const { data: farmers = [], isLoading } = useQuery<FarmerWithDues[]>({
     queryKey: ["/api/farmers"],
@@ -127,8 +132,30 @@ export default function FarmersPage() {
     return result;
   }, [farmers, searchTerm, showArchived]);
 
-  const activeFarmers = filteredFarmers.filter(f => !f.isArchived);
-  const archivedFarmers = filteredFarmers.filter(f => f.isArchived);
+  const sortedFarmers = useMemo(() => {
+    const active = filteredFarmers.filter(f => !f.isArchived);
+    const archived = filteredFarmers.filter(f => f.isArchived);
+
+    const sortFn = (a: FarmerWithDues, b: FarmerWithDues) => {
+      switch (sortBy) {
+        case 'harvestDue':
+          return b.harvestDue - a.harvestDue;
+        case 'seedDue':
+          return b.seedDue - a.seedDue;
+        case 'farmerId':
+        default:
+          return (a.farmerCode || '').localeCompare(b.farmerCode || '');
+      }
+    };
+
+    active.sort(sortFn);
+    archived.sort(sortFn);
+
+    return { active, archived };
+  }, [filteredFarmers, sortBy]);
+
+  const activeFarmers = sortedFarmers.active;
+  const archivedFarmers = sortedFarmers.archived;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -167,9 +194,6 @@ export default function FarmersPage() {
             data-testid={`input-py-receivable-${farmer.id}`}
           />
         </td>
-        <td className="p-3 text-right font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
-          {formatCurrency(farmer.harvestDue)}
-        </td>
         <td className="p-3 text-right">
           <Input
             type="number"
@@ -182,6 +206,9 @@ export default function FarmersPage() {
             data-testid={`input-py-payable-${farmer.id}`}
           />
         </td>
+        <td className="p-3 text-right font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
+          {formatCurrency(farmer.harvestDue)}
+        </td>
         <td className="p-3 text-right font-medium text-red-600 dark:text-red-400" data-testid={`text-seed-due-${farmer.id}`}>
           {formatCurrency(farmer.seedDue)}
         </td>
@@ -189,6 +216,9 @@ export default function FarmersPage() {
           <span className={`font-bold ${farmer.netDue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {formatCurrency(farmer.netDue)}
           </span>
+        </td>
+        <td className="p-3 text-right font-medium text-blue-600 dark:text-blue-400" data-testid={`text-cold-due-${farmer.id}`}>
+          {formatCurrency(farmer.coldDue)}
         </td>
         <td className="p-3">
           <div className="flex items-center gap-2 justify-end">
@@ -251,6 +281,16 @@ export default function FarmersPage() {
                 className="w-64"
                 data-testid="input-search-farmers"
               />
+              <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
+                <SelectTrigger className="w-40" data-testid="select-sort-farmers">
+                  <SelectValue placeholder={t("Sort by", "क्रमबद्ध करें")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="farmerId">{t("Farmer ID", "किसान आईडी")}</SelectItem>
+                  <SelectItem value="harvestDue">{t("Harvest Due", "फसल बकाया")}</SelectItem>
+                  <SelectItem value="seedDue">{t("Seed Due", "बीज बकाया")}</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex items-center gap-2">
                 <Switch
                   checked={showArchived}
@@ -302,10 +342,11 @@ export default function FarmersPage() {
                       <th className="p-3 text-left text-sm font-medium">{t("Village", "गांव")}</th>
                       <th className="p-3 text-left text-sm font-medium">{t("Contact", "संपर्क")}</th>
                       <th className="p-3 text-right text-sm font-medium">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</th>
-                      <th className="p-3 text-right text-sm font-medium text-green-600 dark:text-green-400">{t("Harvest Due", "फसल बकाया")}</th>
                       <th className="p-3 text-right text-sm font-medium">{t("PY Payable", "पिछले वर्ष देय")}</th>
+                      <th className="p-3 text-right text-sm font-medium text-green-600 dark:text-green-400">{t("Harvest Due", "फसल बकाया")}</th>
                       <th className="p-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{t("Seed Due", "बीज बकाया")}</th>
                       <th className="p-3 text-right text-sm font-medium">{t("Net Due", "शुद्ध बकाया")}</th>
+                      <th className="p-3 text-right text-sm font-medium text-blue-600 dark:text-blue-400">{t("Cold Due", "कोल्ड बकाया")}</th>
                       <th className="p-3 text-right text-sm font-medium">{t("Actions", "कार्य")}</th>
                     </tr>
                   </thead>

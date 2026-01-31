@@ -1965,6 +1965,17 @@ export async function registerRoutes(
       // Get all seed transactions for seed dues calculation
       const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
       
+      // Get all lots for cold due calculation
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      
+      // Build a map of stockEntryId -> lots for cold charges calculation
+      const lotsByEntryId = new Map<number, typeof allLots>();
+      for (const lot of allLots) {
+        const existing = lotsByEntryId.get(lot.stockEntryId) || [];
+        existing.push(lot);
+        lotsByEntryId.set(lot.stockEntryId, existing);
+      }
+      
       // Calculate dues for each farmer - match by name+contact only
       const farmersWithDues = farmerList.map(farmer => {
         const normalizedFarmerName = farmer.name.trim().toLowerCase();
@@ -1972,12 +1983,21 @@ export async function registerRoutes(
         
         // Calculate Harvest Due (totalDueToFarmer from stock entries where farmer matches by name+contact)
         let harvestDue = 0;
+        // Calculate Cold Due (sum of expectedColdCharges from lots in matching stock entries)
+        let coldDue = 0;
+        
         for (const entry of stockEntryList) {
           const entryName = entry.farmerName?.trim().toLowerCase() || "";
           const entryContact = entry.farmerContact?.trim().toLowerCase() || null;
           
           if (entryName === normalizedFarmerName && entryContact === normalizedFarmerContact) {
             harvestDue += parseFloat(entry.totalDueToFarmer || "0");
+            
+            // Sum cold charges from lots in this entry
+            const entryLots = lotsByEntryId.get(entry.id) || [];
+            for (const lot of entryLots) {
+              coldDue += parseFloat(lot.expectedColdCharges || "0");
+            }
           }
         }
         
@@ -2003,6 +2023,7 @@ export async function registerRoutes(
           harvestDue,
           seedDue,
           netDue,
+          coldDue,
         };
       });
       

@@ -82,6 +82,7 @@ export interface IStorage {
   updateLot(id: number, merchantId: number, data: Partial<Lot>): Promise<Lot | undefined>;
   getLotsByStockEntry(stockEntryId: number, merchantId: number): Promise<Lot[]>;
   getLotById(id: number, merchantId: number): Promise<Lot | undefined>;
+  getAllLotsByMerchant(merchantId: number): Promise<Lot[]>;
   
   // Bag Breakdown operations
   createBagBreakdown(breakdown: InsertBagBreakdown): Promise<BagBreakdown>;
@@ -486,6 +487,10 @@ export class DatabaseStorage implements IStorage {
     const [lot] = await db.select().from(lots)
       .where(and(eq(lots.id, id), eq(lots.merchantId, merchantId)));
     return lot || undefined;
+  }
+
+  async getAllLotsByMerchant(merchantId: number): Promise<Lot[]> {
+    return await db.select().from(lots).where(eq(lots.merchantId, merchantId));
   }
 
   // Bag Breakdown operations
