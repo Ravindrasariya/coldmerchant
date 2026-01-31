@@ -90,6 +90,7 @@ export interface IStorage {
   deleteBagBreakdown(id: number, merchantId: number): Promise<void>;
   getBagBreakdownsByLot(lotId: number, merchantId: number): Promise<BagBreakdown[]>;
   getBagBreakdownById(id: number, merchantId: number): Promise<BagBreakdown | undefined>;
+  getAllBagBreakdownsByMerchant(merchantId: number): Promise<BagBreakdown[]>;
   
   // Edit History operations
   createEditHistory(stockEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<StockEntryEditHistory>;
@@ -521,6 +522,10 @@ export class DatabaseStorage implements IStorage {
     const [breakdown] = await db.select().from(bagBreakdowns)
       .where(and(eq(bagBreakdowns.id, id), eq(bagBreakdowns.merchantId, merchantId)));
     return breakdown || undefined;
+  }
+
+  async getAllBagBreakdownsByMerchant(merchantId: number): Promise<BagBreakdown[]> {
+    return await db.select().from(bagBreakdowns).where(eq(bagBreakdowns.merchantId, merchantId));
   }
 
   // Edit History operations

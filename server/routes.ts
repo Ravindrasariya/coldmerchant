@@ -1968,6 +1968,9 @@ export async function registerRoutes(
       // Get all lots for cold due calculation
       const allLots = await storage.getAllLotsByMerchant(merchantId);
       
+      // Get all bag breakdowns for harvest due calculation
+      const allBreakdowns = await storage.getAllBagBreakdownsByMerchant(merchantId);
+      
       // Build a map of stockEntryId -> lots for cold charges calculation
       const lotsByEntryId = new Map<number, typeof allLots>();
       for (const lot of allLots) {
@@ -1976,12 +1979,20 @@ export async function registerRoutes(
         lotsByEntryId.set(lot.stockEntryId, existing);
       }
       
+      // Build a map of lotId -> bag breakdowns for harvest due calculation
+      const breakdownsByLotId = new Map<number, typeof allBreakdowns>();
+      for (const breakdown of allBreakdowns) {
+        const existing = breakdownsByLotId.get(breakdown.lotId) || [];
+        existing.push(breakdown);
+        breakdownsByLotId.set(breakdown.lotId, existing);
+      }
+      
       // Calculate dues for each farmer - match by name+contact only
       const farmersWithDues = farmerList.map(farmer => {
         const normalizedFarmerName = farmer.name.trim().toLowerCase();
         const normalizedFarmerContact = farmer.contact?.trim().toLowerCase() || null;
         
-        // Calculate Harvest Due (totalDueToFarmer from stock entries where farmer matches by name+contact)
+        // Calculate Harvest Due (sum of bag breakdown amounts - amount paid, from stock entries with status due/partial)
         let harvestDue = 0;
         // Calculate Cold Due (sum of expectedColdCharges from lots in matching stock entries)
         let coldDue = 0;
@@ -1991,12 +2002,48 @@ export async function registerRoutes(
           const entryContact = entry.farmerContact?.trim().toLowerCase() || null;
           
           if (entryName === normalizedFarmerName && entryContact === normalizedFarmerContact) {
-            harvestDue += parseFloat(entry.totalDueToFarmer || "0");
-            
-            // Sum cold charges from lots in this entry
-            const entryLots = lotsByEntryId.get(entry.id) || [];
-            for (const lot of entryLots) {
-              coldDue += parseFloat(lot.expectedColdCharges || "0");
+            // Only calculate harvest due for entries with "due" or "partial" payment status
+            if (entry.paymentStatus === "due" || entry.paymentStatus === "partial") {
+              // Get lots for this entry
+              const entryLots = lotsByEntryId.get(entry.id) || [];
+              let entryTotalCost = 0;
+              let entryAdjustment = 0;
+              
+              for (const lot of entryLots) {
+                // Get breakdowns and sum total amounts
+                const lotBreakdowns = breakdownsByLotId.get(lot.id) || [];
+                if (lotBreakdowns.length > 0) {
+                  entryTotalCost += lotBreakdowns.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
+                } else if (lot.pricePerKg) {
+                  // Fallback: estimate from lot's pricePerKg and bags (approx 50kg per bag)
+                  entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+                }
+                
+                // Apply adjustment (debit subtracts, credit adds)
+                if (lot.adjustedAmount && lot.adjustedAmountType) {
+                  const adjustedAmount = parseFloat(lot.adjustedAmount);
+                  if (lot.adjustedAmountType === "debit") {
+                    entryAdjustment -= adjustedAmount;
+                  } else if (lot.adjustedAmountType === "credit") {
+                    entryAdjustment += adjustedAmount;
+                  }
+                }
+                
+                // Sum cold charges
+                coldDue += parseFloat(lot.expectedColdCharges || "0");
+              }
+              
+              // Calculate due by subtracting amount already paid
+              const amountPaid = parseFloat(entry.amountPaid || "0");
+              const adjustedTotal = entryTotalCost + entryAdjustment;
+              const entryDue = Math.max(0, adjustedTotal - amountPaid);
+              harvestDue += entryDue;
+            } else {
+              // For fully paid entries, still count cold charges
+              const entryLots = lotsByEntryId.get(entry.id) || [];
+              for (const lot of entryLots) {
+                coldDue += parseFloat(lot.expectedColdCharges || "0");
+              }
             }
           }
         }

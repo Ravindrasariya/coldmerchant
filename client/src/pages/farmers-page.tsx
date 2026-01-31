@@ -168,60 +168,60 @@ export default function FarmersPage() {
   const renderFarmerRow = (farmer: FarmerWithDues, isArchived: boolean) => {
     return (
       <tr key={farmer.id} className={`border-b hover-elevate ${isArchived ? 'opacity-60' : ''}`} data-testid={`row-farmer-${farmer.id}`}>
-        <td className="p-3 font-mono text-sm" data-testid={`text-farmer-code-${farmer.id}`}>{farmer.farmerCode}</td>
-        <td className="p-3" data-testid={`text-farmer-name-${farmer.id}`}>
-          <div className="flex items-center gap-2">
+        <td className="p-2 font-mono text-xs" data-testid={`text-farmer-code-${farmer.id}`}>{farmer.farmerCode}</td>
+        <td className="p-2 text-xs" data-testid={`text-farmer-name-${farmer.id}`}>
+          <div className="flex items-center gap-1">
             <span className="font-medium">{farmer.name}</span>
             {farmer.negativeFlag && (
-              <Badge variant="destructive" className="text-xs">
-                <Flag className="h-3 w-3 mr-1" />
+              <Badge variant="destructive" className="text-[10px] px-1 py-0">
+                <Flag className="h-2.5 w-2.5 mr-0.5" />
                 {t("Flagged", "चिह्नित")}
               </Badge>
             )}
           </div>
         </td>
-        <td className="p-3 text-muted-foreground" data-testid={`text-farmer-village-${farmer.id}`}>{farmer.village || "-"}</td>
-        <td className="p-3 text-muted-foreground" data-testid={`text-farmer-contact-${farmer.id}`}>{farmer.contact || "-"}</td>
-        <td className="p-3 text-right">
+        <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-village-${farmer.id}`}>{farmer.village || "-"}</td>
+        <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-contact-${farmer.id}`}>{farmer.contact || "-"}</td>
+        <td className="p-2 text-right">
           <Input
             type="number"
             value={getPyValue(farmer.id, 'pyReceivable', farmer.pyReceivable)}
             onChange={(e) => handlePyFieldChange(farmer.id, 'pyReceivable', e.target.value)}
             onBlur={() => handlePyFieldBlur(farmer.id, 'pyReceivable', farmer.pyReceivable || "0")}
-            className="w-28 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-24 h-7 text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             placeholder="0"
             disabled={isArchived}
             data-testid={`input-py-receivable-${farmer.id}`}
           />
         </td>
-        <td className="p-3 text-right">
+        <td className="p-2 text-right">
           <Input
             type="number"
             value={getPyValue(farmer.id, 'pyPayable', farmer.pyPayable)}
             onChange={(e) => handlePyFieldChange(farmer.id, 'pyPayable', e.target.value)}
             onBlur={() => handlePyFieldBlur(farmer.id, 'pyPayable', farmer.pyPayable || "0")}
-            className="w-28 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-24 h-7 text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             placeholder="0"
             disabled={isArchived}
             data-testid={`input-py-payable-${farmer.id}`}
           />
         </td>
-        <td className="p-3 text-right font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
+        <td className="p-2 text-right text-xs font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
           {formatCurrency(farmer.harvestDue)}
         </td>
-        <td className="p-3 text-right font-medium text-red-600 dark:text-red-400" data-testid={`text-seed-due-${farmer.id}`}>
+        <td className="p-2 text-right text-xs font-medium text-red-600 dark:text-red-400" data-testid={`text-seed-due-${farmer.id}`}>
           {formatCurrency(farmer.seedDue)}
         </td>
-        <td className="p-3 text-right" data-testid={`text-net-due-${farmer.id}`}>
+        <td className="p-2 text-right text-xs" data-testid={`text-net-due-${farmer.id}`}>
           <span className={`font-bold ${farmer.netDue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {formatCurrency(farmer.netDue)}
           </span>
         </td>
-        <td className="p-3 text-right font-medium text-blue-600 dark:text-blue-400" data-testid={`text-cold-due-${farmer.id}`}>
+        <td className="p-2 text-right text-xs font-medium text-blue-600 dark:text-blue-400" data-testid={`text-cold-due-${farmer.id}`}>
           {formatCurrency(farmer.coldDue)}
         </td>
-        <td className="p-3">
-          <div className="flex items-center gap-2 justify-end">
+        <td className="p-2">
+          <div className="flex items-center gap-1 justify-end">
             <Switch
               checked={farmer.negativeFlag ?? false}
               onCheckedChange={() => handleToggleNegativeFlag(farmer.id, farmer.negativeFlag ?? false)}
@@ -231,11 +231,12 @@ export default function FarmersPage() {
             <Button
               variant="ghost"
               size="icon"
+              className="h-7 w-7"
               onClick={() => handleToggleArchive(farmer.id, farmer.isArchived ?? false)}
               title={isArchived ? t("Unarchive", "पुनर्स्थापित करें") : t("Archive", "संग्रहित करें")}
               data-testid={`button-archive-${farmer.id}`}
             >
-              <Archive className={`h-4 w-4 ${isArchived ? 'text-muted-foreground' : 'text-destructive'}`} />
+              <Archive className={`h-3.5 w-3.5 ${isArchived ? 'text-muted-foreground' : 'text-destructive'}`} />
             </Button>
           </div>
         </td>
@@ -337,17 +338,17 @@ export default function FarmersPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="p-3 text-left text-sm font-medium">{t("Farmer ID", "किसान आईडी")}</th>
-                      <th className="p-3 text-left text-sm font-medium">{t("Name", "नाम")}</th>
-                      <th className="p-3 text-left text-sm font-medium">{t("Village", "गांव")}</th>
-                      <th className="p-3 text-left text-sm font-medium">{t("Contact", "संपर्क")}</th>
-                      <th className="p-3 text-right text-sm font-medium">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</th>
-                      <th className="p-3 text-right text-sm font-medium">{t("PY Payable", "पिछले वर्ष देय")}</th>
-                      <th className="p-3 text-right text-sm font-medium text-green-600 dark:text-green-400">{t("Harvest Due", "फसल बकाया")}</th>
-                      <th className="p-3 text-right text-sm font-medium text-red-600 dark:text-red-400">{t("Seed Due", "बीज बकाया")}</th>
-                      <th className="p-3 text-right text-sm font-medium">{t("Net Due", "शुद्ध बकाया")}</th>
-                      <th className="p-3 text-right text-sm font-medium text-blue-600 dark:text-blue-400">{t("Cold Due", "कोल्ड बकाया")}</th>
-                      <th className="p-3 text-right text-sm font-medium">{t("Actions", "कार्य")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Farmer ID", "किसान आईडी")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Name", "नाम")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Village", "गांव")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Contact", "संपर्क")}</th>
+                      <th className="p-2 text-right text-xs font-medium">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</th>
+                      <th className="p-2 text-right text-xs font-medium">{t("PY Payable", "पिछले वर्ष देय")}</th>
+                      <th className="p-2 text-right text-xs font-medium text-green-600 dark:text-green-400">{t("Harvest Due", "फसल बकाया")}</th>
+                      <th className="p-2 text-right text-xs font-medium text-red-600 dark:text-red-400">{t("Seed Due", "बीज बकाया")}</th>
+                      <th className="p-2 text-right text-xs font-medium">{t("Net Due", "शुद्ध बकाया")}</th>
+                      <th className="p-2 text-right text-xs font-medium text-blue-600 dark:text-blue-400">{t("Cold Due", "कोल्ड बकाया")}</th>
+                      <th className="p-2 text-right text-xs font-medium">{t("Actions", "कार्य")}</th>
                     </tr>
                   </thead>
                   <tbody>
