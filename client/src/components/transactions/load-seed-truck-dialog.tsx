@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { SEED_DISTRICTS, STATES } from "@shared/schema";
+
+interface Farmer {
+  id: number;
+  name: string;
+  contact: string | null;
+  village: string | null;
+  tehsil: string | null;
+  district: string | null;
+  state: string | null;
+}
 
 interface SeedLotOption {
   id: number;
@@ -53,11 +63,54 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [otherChargesRemarks, setOtherChargesRemarks] = useState("");
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
+  
+  const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
+  const farmerInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const { data: unsoldInventory } = useQuery<SeedLotOption[]>({
     queryKey: ["/api/seed-transactions/unsold-inventory"],
     enabled: open,
   });
+
+  const { data: farmers } = useQuery<Farmer[]>({
+    queryKey: ["/api/farmers"],
+    enabled: open,
+  });
+
+  const filteredFarmers = useMemo(() => {
+    if (!farmers || !farmerName.trim()) return [];
+    const searchTerm = farmerName.toLowerCase().trim();
+    return farmers.filter(f => 
+      f.name.toLowerCase().includes(searchTerm)
+    ).slice(0, 8);
+  }, [farmers, farmerName]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        farmerInputRef.current &&
+        !farmerInputRef.current.contains(event.target as Node)
+      ) {
+        setShowFarmerSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleFarmerSelect = (farmer: Farmer) => {
+    setFarmerName(farmer.name);
+    setFarmerContact(farmer.contact || "");
+    setVillage(farmer.village || "");
+    setTehsil(farmer.tehsil || "");
+    setDistrict(farmer.district || "");
+    setState(farmer.state || "");
+    setShowFarmerSuggestions(false);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -156,6 +209,33 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       return;
     }
 
+    if (!farmerContact.trim()) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Contact number is required", "संपर्क नंबर आवश्यक है"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!village.trim()) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Village is required", "गाँव आवश्यक है"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!tehsil.trim()) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Tehsil is required", "तहसील आवश्यक है"),
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!district) {
       toast({
         title: t("Error", "त्रुटि"),
@@ -227,17 +307,44 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
           <div className="space-y-4">
             <h3 className="font-medium text-sm text-muted-foreground">{t("Farmer Details", "किसान विवरण")}</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label>{t("Farmer Name", "किसान का नाम")} *</Label>
                 <Input
+                  ref={farmerInputRef}
                   value={farmerName}
-                  onChange={(e) => setFarmerName(e.target.value)}
+                  onChange={(e) => {
+                    setFarmerName(e.target.value);
+                    setShowFarmerSuggestions(true);
+                  }}
+                  onFocus={() => setShowFarmerSuggestions(true)}
                   placeholder={t("Enter name", "नाम दर्ज करें")}
                   data-testid="input-seed-farmer-name"
+                  autoComplete="off"
                 />
+                {showFarmerSuggestions && filteredFarmers.length > 0 && (
+                  <div 
+                    ref={suggestionsRef}
+                    className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                  >
+                    {filteredFarmers.map((farmer) => (
+                      <button
+                        key={farmer.id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
+                        onClick={() => handleFarmerSelect(farmer)}
+                      >
+                        <span className="font-medium">{farmer.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {farmer.contact && `${farmer.contact} `}
+                          {farmer.village && `| ${farmer.village}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
-                <Label>{t("Contact Number", "संपर्क नंबर")}</Label>
+                <Label>{t("Contact Number", "संपर्क नंबर")} *</Label>
                 <Input
                   value={farmerContact}
                   onChange={(e) => setFarmerContact(e.target.value)}
@@ -246,7 +353,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("Village", "गाँव")}</Label>
+                <Label>{t("Village", "गाँव")} *</Label>
                 <Input
                   value={village}
                   onChange={(e) => setVillage(e.target.value)}
@@ -255,7 +362,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("Tehsil", "तहसील")}</Label>
+                <Label>{t("Tehsil", "तहसील")} *</Label>
                 <Input
                   value={tehsil}
                   onChange={(e) => setTehsil(e.target.value)}
