@@ -679,21 +679,21 @@ export function CashManagementTab() {
     });
   };
 
-  // Calculate summary values
+  // Calculate summary values (exclude reversed entries from balance calculations)
   const totalCashReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "cash_received")
+    .filter(e => e.direction === "inward" && e.receiptType === "cash_received" && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const totalAccountReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "account_received")
+    .filter(e => e.direction === "inward" && e.receiptType === "account_received" && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const totalCashExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "cash")
+    .filter(e => e.direction === "outflow" && e.paymentMode === "cash" && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const totalAccountExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer")
+    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   // Include opening balance from settings
@@ -702,14 +702,14 @@ export function CashManagementTab() {
   
   const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense;
 
-  // Calculate account-wise breakdown for entries that have bankAccountId
+  // Calculate account-wise breakdown for entries that have bankAccountId (exclude reversed entries)
   const accountWiseBreakdown = bankAccounts.map(account => {
     const inward = entries
-      .filter(e => e.direction === "inward" && e.receiptType === "account_received" && e.bankAccountId === account.id)
+      .filter(e => e.direction === "inward" && e.receiptType === "account_received" && e.bankAccountId === account.id && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
     
     const outflow = entries
-      .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === account.id)
+      .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === account.id && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
     
     const openingBalance = parseFloat(account.openingBalance || "0");
@@ -726,13 +726,13 @@ export function CashManagementTab() {
     };
   });
 
-  // Calculate unassigned account transactions (older entries without bankAccountId)
+  // Calculate unassigned account transactions (older entries without bankAccountId, exclude reversed)
   const unassignedAccountReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "account_received" && !e.bankAccountId)
+    .filter(e => e.direction === "inward" && e.receiptType === "account_received" && !e.bankAccountId && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const unassignedAccountExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && !e.bankAccountId)
+    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && !e.bankAccountId && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
   // Unassigned net uses legacy opening balance (from cash settings) 
@@ -757,13 +757,13 @@ export function CashManagementTab() {
     return true;
   });
 
-  // Filtered summary
+  // Filtered summary (exclude reversed entries)
   const filteredInflow = filteredEntries
-    .filter(e => e.direction === "inward")
+    .filter(e => e.direction === "inward" && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const filteredOutflow = filteredEntries
-    .filter(e => e.direction === "outflow")
+    .filter(e => e.direction === "outflow" && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
   // Get unique values for filter dropdowns
