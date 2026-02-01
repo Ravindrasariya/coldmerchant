@@ -1971,6 +1971,20 @@ export async function registerRoutes(
       // Get all bag breakdowns for harvest due calculation
       const allBreakdowns = await storage.getAllBagBreakdownsByMerchant(merchantId);
       
+      // Get managed farmers (cash farmers) for receivables
+      const managedFarmerList = await storage.getCashFarmersByMerchant(merchantId);
+      
+      // Build a map of managed farmer receivables by name+contact key
+      const receivablesMap = new Map<string, number>();
+      for (const mf of managedFarmerList) {
+        const receivables = parseFloat(mf.pendingDueToBePaid || "0");
+        if (receivables > 0 && mf.name) {
+          const key = mf.name.trim().toLowerCase() + "|" + (mf.contactNumber?.trim().toLowerCase() || "");
+          const existing = receivablesMap.get(key) || 0;
+          receivablesMap.set(key, existing + receivables);
+        }
+      }
+      
       // Build a map of stockEntryId -> lots for cold charges calculation
       const lotsByEntryId = new Map<number, typeof allLots>();
       for (const lot of allLots) {
@@ -2121,8 +2135,13 @@ export async function registerRoutes(
         
         const pyReceivable = parseFloat(farmer.pyReceivable || "0");
         
-        // Net Due = PY Receivables + Harvest Due - Seed Due
-        const netDue = pyReceivable + harvestDue - seedDue;
+        // Get receivables from managed farmers (cash farmers with pendingDueToBePaid)
+        const farmerKey = normalizedFarmerName + "|" + (normalizedFarmerContact || "");
+        const receivables = receivablesMap.get(farmerKey) || 0;
+        
+        // Net Due = PY Receivables + Harvest Due - Seed Due - Receivables
+        // (Receivables are amounts farmer owes to merchant, so they offset what merchant owes to farmer)
+        const netDue = pyReceivable + harvestDue - seedDue - receivables;
         
         return {
           ...farmer,
@@ -2130,6 +2149,7 @@ export async function registerRoutes(
           seedDue,
           netDue,
           coldDue,
+          receivables,
         };
       });
       

@@ -112,7 +112,7 @@ export interface IStorage {
   getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
-  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number }[]>;
+  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]>;
   getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
@@ -1055,33 +1055,37 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number }[]> {
+  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]> {
     // Get all seed transactions for this merchant
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
+    
+    // Get all managed farmers (cash farmers) with receivables
+    const managedFarmers = await db.select().from(cashFarmers)
+      .where(eq(cashFarmers.merchantId, merchantId));
     
     // Note: seed_sale cash entries are already applied via FIFO to reduce totalDueToFarmer,
     // so we don't need to subtract them again here. Just use totalDueToFarmer directly.
     
     // Build farmer map from seed transactions (totalDueToFarmer is already reduced by FIFO payments)
-    const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number }>();
+    const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }>();
     
     for (const txn of txns) {
       const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
       
       if (dueToFarmer <= 0) continue; // Skip fully paid
       
-      // Use composite key (name + village) for consistency
-      const key = normalizeName(txn.farmerName) + "|" + normalizeName(txn.village || "");
+      // Use composite key (name + contact) for consistency with /api/farmers
+      const key = normalizeName(txn.farmerName) + "|" + normalizeName(txn.farmerContact || "");
       if (!normalizeName(txn.farmerName)) continue;
       
       const existing = farmerMap.get(key);
       if (existing) {
         existing.totalDue += dueToFarmer;
         existing.transactionCount += 1;
-        // Update contact if not already set
-        if (!existing.farmerContact && txn.farmerContact) {
-          existing.farmerContact = txn.farmerContact;
+        // Update village if not already set
+        if (!existing.village && txn.village) {
+          existing.village = txn.village;
         }
       } else {
         farmerMap.set(key, {
@@ -1090,6 +1094,38 @@ export class DatabaseStorage implements IStorage {
           village: txn.village || null,
           totalDue: dueToFarmer,
           transactionCount: 1,
+          receivables: 0,
+        });
+      }
+    }
+    
+    // Add receivables from managed farmers (cash farmers with pendingDueToBePaid)
+    for (const farmer of managedFarmers) {
+      const receivables = parseFloat(farmer.pendingDueToBePaid || "0");
+      if (receivables <= 0) continue;
+      
+      // Use composite key (name + contact) for consistency with /api/farmers
+      const key = normalizeName(farmer.name) + "|" + normalizeName(farmer.contactNumber || "");
+      if (!normalizeName(farmer.name)) continue;
+      
+      const existing = farmerMap.get(key);
+      if (existing) {
+        // Farmer already exists from seed transactions - add receivables
+        existing.receivables += receivables;
+        existing.totalDue += receivables;
+        // Update village if not already set
+        if (!existing.village && farmer.village) {
+          existing.village = farmer.village;
+        }
+      } else {
+        // New farmer entry only from receivables (no seed transactions)
+        farmerMap.set(key, {
+          displayName: farmer.name.trim(),
+          farmerContact: farmer.contactNumber || null,
+          village: farmer.village || null,
+          totalDue: receivables,
+          transactionCount: 0,
+          receivables: receivables,
         });
       }
     }
@@ -1103,6 +1139,7 @@ export class DatabaseStorage implements IStorage {
         village: data.village,
         totalDue: data.totalDue,
         transactionCount: data.transactionCount,
+        receivables: data.receivables,
       })).sort((a, b) => b.totalDue - a.totalDue);
   }
 

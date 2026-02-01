@@ -99,6 +99,7 @@ interface SeedFarmerWithDue {
   village: string | null;
   totalDue: number;
   transactionCount: number;
+  receivables: number;
 }
 
 interface SeedSupplierWithDue {
