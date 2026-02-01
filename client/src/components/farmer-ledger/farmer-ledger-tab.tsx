@@ -532,6 +532,8 @@ export function FarmerLedgerTab() {
                 </div>
               )}
             </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <Switch
                 checked={showArchived}
