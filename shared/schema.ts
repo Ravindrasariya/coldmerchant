@@ -247,10 +247,11 @@ export const bankAccounts = pgTable("bank_accounts", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Parties - buyer/party management with pending dues
+// Parties - buyer/party management with pending dues (linked to buyers for Buyer Ledger)
 export const parties = pgTable("parties", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  buyerId: integer("buyer_id").references(() => buyers.id), // links to buyer ledger for matching
   name: text("name").notNull(),
   contactNumber: text("contact_number"),
   address: text("address"),
@@ -571,6 +572,10 @@ export const partiesRelations = relations(parties, ({ one }) => ({
   merchant: one(merchants, {
     fields: [parties.merchantId],
     references: [merchants.id],
+  }),
+  buyer: one(buyers, {
+    fields: [parties.buyerId],
+    references: [buyers.id],
   }),
 }));
 

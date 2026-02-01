@@ -134,11 +134,13 @@ export interface IStorage {
   
   // Buyer operations
   getBuyersByMerchant(merchantId: number): Promise<Buyer[]>;
+  getBuyerByName(merchantId: number, name: string): Promise<Buyer | undefined>;
   countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
   updateBuyerWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
+  lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }>;
   
   // Farmer Ledger operations
   getFarmersByMerchant(merchantId: number): Promise<Farmer[]>;
@@ -1659,6 +1661,43 @@ export class DatabaseStorage implements IStorage {
   async deleteBuyer(id: number, merchantId: number): Promise<void> {
     await db.delete(buyers)
       .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
+  }
+
+  async getBuyerByName(merchantId: number, name: string): Promise<Buyer | undefined> {
+    const normalizedName = name.trim().toLowerCase();
+    const allBuyers = await db.select().from(buyers)
+      .where(eq(buyers.merchantId, merchantId));
+    return allBuyers.find(b => b.name.trim().toLowerCase() === normalizedName);
+  }
+
+  async lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }> {
+    // Check if buyer exists using name (case-insensitive)
+    const existingBuyer = await this.getBuyerByName(merchantId, buyerData.name);
+    
+    if (existingBuyer) {
+      return { buyerId: existingBuyer.id, isNew: false };
+    }
+    
+    // Create new buyer with ID format: BYYYYYMMDD#
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    const prefix = `BY${dateStr}`;
+    const count = await this.countBuyersByCodePrefix(merchantId, prefix);
+    const buyerCode = `${prefix}${count + 1}`;
+    
+    const newBuyer = await this.createBuyer({
+      merchantId,
+      buyerCode,
+      dateAdded: today.toISOString().split('T')[0],
+      name: buyerData.name,
+      contact: buyerData.contact || null,
+      address: buyerData.address || "",
+      mandiCode: buyerData.mandiCode || null,
+      negativeFlag: false,
+      isActive: true,
+    });
+    
+    return { buyerId: newBuyer.id, isNew: true };
   }
 
   // ===================== FARMER LEDGER OPERATIONS =====================

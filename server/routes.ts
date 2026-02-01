@@ -1727,8 +1727,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Party name is required" });
       }
 
+      // Lookup or create buyer in buyer ledger
+      const { buyerId } = await storage.lookupOrCreateBuyer(merchantId, {
+        name: name,
+        contact: contactNumber || null,
+        address: address || null,
+      });
+
       const party = await storage.createParty({
         merchantId,
+        buyerId,
         name,
         contactNumber: contactNumber || null,
         address: address || null,
