@@ -29,7 +29,7 @@ interface FarmerWithDues extends Farmer {
   receivables: number;
 }
 
-type SortOption = 'farmerId' | 'harvestDue' | 'seedDue' | 'coldDue';
+type SortOption = 'farmerId' | 'harvestDue' | 'seedDue' | 'coldDue' | 'pyReceivable' | 'netDue';
 type SortDirection = 'asc' | 'desc';
 
 export function FarmerLedgerTab() {
@@ -179,6 +179,14 @@ export function FarmerLedgerTab() {
           break;
         case 'coldDue':
           comparison = a.coldDue - b.coldDue;
+          break;
+        case 'pyReceivable':
+          const aPyReceivable = parseFloat(a.pyReceivable || "0") + (a.receivables || 0);
+          const bPyReceivable = parseFloat(b.pyReceivable || "0") + (b.receivables || 0);
+          comparison = aPyReceivable - bPyReceivable;
+          break;
+        case 'netDue':
+          comparison = a.netDue - b.netDue;
           break;
         case 'farmerId':
         default:
@@ -567,7 +575,17 @@ export function FarmerLedgerTab() {
                     <th className="p-2 text-left text-xs font-medium">{t("Name", "नाम")}</th>
                     <th className="p-2 text-left text-xs font-medium">{t("Village", "गांव")}</th>
                     <th className="p-2 text-left text-xs font-medium">{t("Contact", "संपर्क")}</th>
-                    <th className="p-2 text-right text-xs font-medium">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</th>
+                    <th className="p-2 text-right text-xs font-medium">
+                      <button
+                        type="button"
+                        className="flex items-center justify-end w-full hover-elevate px-1 py-0.5 rounded"
+                        onClick={() => handleSort('pyReceivable')}
+                        data-testid="sort-py-receivable"
+                      >
+                        {t("PY Receivable", "पिछले वर्ष प्राप्य")}
+                        {getSortIcon('pyReceivable')}
+                      </button>
+                    </th>
                     <th className="p-2 text-right text-xs font-medium">
                       <button
                         type="button"
@@ -590,7 +608,17 @@ export function FarmerLedgerTab() {
                         {getSortIcon('seedDue')}
                       </button>
                     </th>
-                    <th className="p-2 text-right text-xs font-medium">{t("Net Due", "शुद्ध बकाया")}</th>
+                    <th className="p-2 text-right text-xs font-medium">
+                      <button
+                        type="button"
+                        className="flex items-center justify-end w-full hover-elevate px-1 py-0.5 rounded"
+                        onClick={() => handleSort('netDue')}
+                        data-testid="sort-net-due"
+                      >
+                        {t("Net Due", "शुद्ध बकाया")}
+                        {getSortIcon('netDue')}
+                      </button>
+                    </th>
                     <th className="p-2 text-right text-xs font-medium">
                       <button
                         type="button"
