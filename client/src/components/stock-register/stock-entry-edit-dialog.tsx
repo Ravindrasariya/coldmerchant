@@ -115,12 +115,27 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     adjustedAmountRate: lot.adjustedAmountRate !== null ? parseFloat(lot.adjustedAmountRate) : null,
     adjustedAmountEffectiveDate: lot.adjustedAmountEffectiveDate || null,
     adjustedAmountRemark: lot.adjustedAmountRemark || "",
-    bagBreakdowns: lot.bagBreakdowns.map(bd => ({
-      ...bd,
-      remainingBags: bd.remainingBags ?? bd.numberOfBags,
-      weight: bd.weight ? parseFloat(bd.weight) : 0,
-      pricePerKg: bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0,
-    }))
+    bagBreakdowns: (() => {
+      // For gate cut with no breakdowns, auto-create one row from lot-level data
+      if (lot.cutType === "gate_cut" && lot.bagBreakdowns.length === 0) {
+        return [{
+          id: 0,
+          size: lot.size || "Large",
+          numberOfBags: lot.originalBags,
+          remainingBags: lot.remainingBags,
+          weight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : 0,
+          pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : 0,
+          totalAmount: null,
+        }];
+      }
+      return lot.bagBreakdowns.map(bd => ({
+        ...bd,
+        remainingBags: bd.remainingBags ?? bd.numberOfBags,
+        weight: bd.weight ? parseFloat(bd.weight) : 0,
+        pricePerKg: bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0,
+        totalAmount: bd.totalAmount ?? null,
+      }));
+    })()
   })));
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
@@ -330,13 +345,48 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     }
     
     // Clean up charges before saving - remove empty entries
-    const cleanedLots = lots.map(lot => ({
-      ...lot,
-      charges: (lot.charges || []).filter(c => {
-        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-        return c.type && c.type.length > 0 && amt > 0;
-      })
-    }));
+    // For gate_cut, sync lot-level fields from breakdowns (sum of weights, weighted avg price, first size)
+    const cleanedLots = lots.map(lot => {
+      const baseCleanedLot = {
+        ...lot,
+        charges: (lot.charges || []).filter(c => {
+          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+          return c.type && c.type.length > 0 && amt > 0;
+        })
+      };
+      
+      // For gate_cut with breakdowns, derive lot-level fields from breakdowns
+      if (lot.cutType === "gate_cut" && lot.bagBreakdowns.length > 0) {
+        // Include all non-wastage breakdowns that have meaningful data (weight or price)
+        const allBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
+        const completeBreakdowns = allBreakdowns.filter(bd => (bd.weight || 0) > 0 || (bd.pricePerKg || 0) > 0);
+        
+        // Only sync lot-level fields if we have meaningful complete data
+        const totalWeight = completeBreakdowns.reduce((sum, bd) => sum + (bd.weight || 0), 0);
+        const hasValidPrices = completeBreakdowns.some(bd => (bd.pricePerKg || 0) > 0);
+        
+        // Guard: Only sync if we have meaningful weight data AND at least one valid price
+        // This prevents incomplete rows from overwriting lot-level data
+        if (totalWeight <= 0 || !hasValidPrices) {
+          return baseCleanedLot;
+        }
+        
+        // Use weighted average for pricePerKg based on weight
+        const avgPrice = completeBreakdowns.reduce((sum, bd) => sum + (bd.weight || 0) * (bd.pricePerKg || 0), 0) / totalWeight;
+        
+        // Use first non-empty size, fallback to existing lot.size
+        const firstSize = completeBreakdowns.find(bd => bd.size)?.size || lot.size;
+        
+        return {
+          ...baseCleanedLot,
+          totalWeight: totalWeight,
+          pricePerKg: avgPrice,
+          size: firstSize || lot.size,
+        };
+      }
+      
+      return baseCleanedLot;
+    });
     updateMutation.mutate({ paymentStatus: entry.paymentStatus, remarks, lots: cleanedLots });
   };
 
@@ -418,57 +468,20 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-muted-foreground">{t("Bag Breakdown", "बोरी विवरण")}</p>
-                      {lot.cutType !== "gate_cut" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddBreakdown(lotIndex)}
-                          data-testid={`edit-add-breakdown-${lotIndex}`}
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          {t("Add Row", "पंक्ति जोड़ें")}
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAddBreakdown(lotIndex)}
+                        data-testid={`edit-add-breakdown-${lotIndex}`}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        {t("Add Row", "पंक्ति जोड़ें")}
+                      </Button>
                     </div>
 
-                    {/* Gate Cut: Show single row with lot-level size, totalWeight, pricePerKg */}
-                    {lot.cutType === "gate_cut" && (
-                      <div className="space-y-2">
-                        <div className="hidden md:grid md:grid-cols-7 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
-                          <div>{t("Size", "आकार")}</div>
-                          <div>{t("# Bags", "बोरी")}</div>
-                          <div>{t("Remaining", "शेष")}</div>
-                          <div>{t("Total Wt", "कुल वजन")}</div>
-                          <div>{t("Net Wt", "शुद्ध वजन")}</div>
-                          <div>{t("Price/kg", "मूल्य/किलो")}</div>
-                          <div>{t("Total", "कुल")}</div>
-                        </div>
-                        {(() => {
-                          const totalWt = lot.totalWeight || 0;
-                          const netWt = totalWt - lot.originalBags;
-                          const priceKg = lot.pricePerKg || 0;
-                          const total = netWt > 0 ? netWt * priceKg : 0;
-                          return (
-                            <div className="grid grid-cols-2 md:grid-cols-7 gap-2 p-2 bg-muted/30 rounded-md items-center">
-                              <div className="font-mono text-sm">{lot.size || "—"}</div>
-                              <div className="font-mono text-sm">{lot.originalBags}</div>
-                              <div className="font-mono text-sm font-medium">
-                                <span className="text-primary">{lot.remainingBags}</span>
-                                <span className="text-muted-foreground">/{lot.originalBags}</span>
-                              </div>
-                              <div className="font-mono text-sm">{totalWt > 0 ? totalWt.toFixed(2) : "—"}</div>
-                              <div className="font-mono text-sm text-muted-foreground">{netWt > 0 ? netWt.toFixed(2) : "—"}</div>
-                              <div className="font-mono text-sm">{priceKg > 0 ? `₹${priceKg}` : "—"}</div>
-                              <div className="font-mono text-sm font-medium text-primary">{total > 0 ? `₹${total.toFixed(2)}` : "—"}</div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-
-                    {/* Bilty Cut / Other: Show editable breakdown rows */}
-                    {lot.cutType !== "gate_cut" && lot.bagBreakdowns.length > 0 && (
+                    {/* Editable breakdown rows for all cut types */}
+                    {lot.bagBreakdowns.length > 0 && (
                       <div className="space-y-2">
                         <div className="hidden md:grid md:grid-cols-8 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                           <div>{t("Size", "आकार")}</div>
@@ -561,7 +574,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       </div>
                     )}
 
-                    {lot.cutType !== "gate_cut" && lot.bagBreakdowns.length === 0 && (
+                    {lot.bagBreakdowns.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         {t("No breakdown rows. Click \"Add Row\" to add breakdown details.", "कोई विवरण पंक्ति नहीं। विवरण जोड़ने के लिए \"पंक्ति जोड़ें\" पर क्लिक करें।")}
                       </p>
