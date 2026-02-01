@@ -40,6 +40,7 @@ export function FarmerLedgerTab() {
   const [showArchived, setShowArchived] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('farmerId');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [selectedYear, setSelectedYear] = useState<string>("all");
   
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
@@ -132,6 +133,15 @@ export function FarmerLedgerTab() {
     return Array.from(villages).sort();
   }, [farmers]);
 
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years: string[] = [];
+    for (let y = currentYear; y >= currentYear - 5; y--) {
+      years.push(y.toString());
+    }
+    return years;
+  }, []);
+
   const filteredNameSuggestions = useMemo(() => {
     if (!farmerNameSearch.trim()) return uniqueFarmersByName.slice(0, 10);
     const term = farmerNameSearch.toLowerCase();
@@ -146,6 +156,14 @@ export function FarmerLedgerTab() {
 
   const filteredFarmers = useMemo(() => {
     let result = farmers;
+    
+    if (selectedYear !== "all") {
+      result = result.filter(f => {
+        if (!f.farmerCode) return false;
+        const yearMatch = f.farmerCode.match(/FM(\d{4})/);
+        return yearMatch && yearMatch[1] === selectedYear;
+      });
+    }
     
     if (farmerNameSearch.trim()) {
       const term = farmerNameSearch.toLowerCase();
@@ -162,7 +180,7 @@ export function FarmerLedgerTab() {
     }
 
     return result;
-  }, [farmers, farmerNameSearch, villageSearch, showArchived]);
+  }, [farmers, farmerNameSearch, villageSearch, showArchived, selectedYear]);
 
   const sortedFarmers = useMemo(() => {
     const active = filteredFarmers.filter(f => !f.isArchived);
@@ -426,11 +444,19 @@ export function FarmerLedgerTab() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            {t("Farmer Ledger", "किसान खाता")}
-          </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              data-testid="select-year-filter"
+            >
+              <option value="all">{t("All Years", "सभी वर्ष")}</option>
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
             <div className="relative">
               <Input
                 ref={nameInputRef}
