@@ -122,9 +122,15 @@ export function FarmerLedgerTab() {
   });
 
   // Update farmer details with propagation mutation
+  // Using raw fetch instead of apiRequest to handle 409 merge conflicts before throwIfResNotOk intercepts them
   const updateDetailsMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; contact: string; village: string; tehsil: string; district: string; state: string } }) => {
-      const response = await apiRequest("PATCH", `/api/farmers/${id}/details`, data);
+      const response = await fetch(`/api/farmers/${id}/details`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
       const responseData = await response.json();
       if (!response.ok) {
         // Return full response data with status for proper error handling
