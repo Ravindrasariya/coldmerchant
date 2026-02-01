@@ -62,6 +62,13 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesRemarks, setOtherChargesRemarks] = useState("");
   
+  // Farmer adjustment fields
+  const [adjustmentType, setAdjustmentType] = useState("");
+  const [adjustmentAmount, setAdjustmentAmount] = useState("");
+  const [adjustmentRate, setAdjustmentRate] = useState("");
+  const [adjustmentEffectiveDate, setAdjustmentEffectiveDate] = useState("");
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+  
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
   
   const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
@@ -149,6 +156,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     setTransportCharges("");
     setOtherCharges("");
     setOtherChargesRemarks("");
+    setAdjustmentType("");
+    setAdjustmentAmount("");
+    setAdjustmentRate("");
+    setAdjustmentEffectiveDate("");
+    setAdjustmentReason("");
     setSelectedLots([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
   };
 
@@ -172,6 +184,26 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     return unsoldInventory?.find(lot => lot.id === lotId);
   };
 
+  // Calculate adjustment with compound interest
+  const calculatedAdjustment = useMemo(() => {
+    const principal = parseFloat(adjustmentAmount) || 0;
+    const rate = parseFloat(adjustmentRate) || 0;
+    
+    if (principal <= 0) return { finalAmount: 0, interest: 0, days: 0 };
+    
+    if (rate > 0 && adjustmentEffectiveDate) {
+      const effectiveDate = new Date(adjustmentEffectiveDate);
+      const today = new Date();
+      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const years = days / 365;
+      const finalAmount = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
+      const interest = Math.round((finalAmount - principal) * 100) / 100;
+      return { finalAmount, interest, days };
+    }
+    
+    return { finalAmount: principal, interest: 0, days: 0 };
+  }, [adjustmentAmount, adjustmentRate, adjustmentEffectiveDate]);
+
   const totals = useMemo(() => {
     let totalBags = 0;
     let totalCost = 0;
@@ -194,10 +226,17 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     const totalProfitLoss = totalRevenue - totalCost;
     const transport = parseFloat(transportCharges) || 0;
     const other = parseFloat(otherCharges) || 0;
-    const totalDue = totalRevenue + transport + other;
+    
+    // Apply adjustment to total due
+    let adjustmentValue = 0;
+    if (calculatedAdjustment.finalAmount > 0 && adjustmentType) {
+      adjustmentValue = adjustmentType === "credit" ? calculatedAdjustment.finalAmount : -calculatedAdjustment.finalAmount;
+    }
+    
+    const totalDue = totalRevenue + transport + other + adjustmentValue;
 
-    return { totalBags, totalCost, totalRevenue, totalProfitLoss, totalDue };
-  }, [selectedLots, transportCharges, otherCharges, unsoldInventory]);
+    return { totalBags, totalCost, totalRevenue, totalProfitLoss, totalDue, adjustmentValue };
+  }, [selectedLots, transportCharges, otherCharges, unsoldInventory, calculatedAdjustment, adjustmentType]);
 
   const handleSave = () => {
     if (!farmerName.trim()) {
@@ -287,6 +326,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       transportCharges: transportCharges || undefined,
       otherCharges: otherCharges || undefined,
       otherChargesRemarks: otherChargesRemarks || undefined,
+      adjustmentType: adjustmentType || undefined,
+      adjustmentAmount: adjustmentAmount || undefined,
+      adjustmentRate: adjustmentRate || undefined,
+      adjustmentEffectiveDate: adjustmentEffectiveDate || undefined,
+      adjustmentReason: adjustmentReason || undefined,
       items: validLots.map(lot => ({
         seedLotId: lot.seedLotId,
         bagsMoved: lot.bagsMoved,
@@ -502,37 +546,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
             })}
           </div>
 
-          {/* Totals Section */}
-          <Card className="bg-muted/30">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">{t("Total Bags", "कुल बैग")}</span>
-                  <div className="font-semibold text-lg">{totals.totalBags}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("Total Cost", "कुल लागत")}</span>
-                  <div className="font-semibold text-lg">₹{totals.totalCost.toLocaleString("en-IN")}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}</span>
-                  <div className="font-semibold text-lg text-green-600">₹{totals.totalRevenue.toLocaleString("en-IN")}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("P&L", "लाभ/हानि")}</span>
-                  <div className={`font-semibold text-lg ${totals.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    ₹{totals.totalProfitLoss.toLocaleString("en-IN")}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("Due to Farmer", "किसान को देय")}</span>
-                  <div className="font-semibold text-lg text-orange-600">₹{totals.totalDue.toLocaleString("en-IN")}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Extra Charges Section */}
+          {/* Additional Charges Section */}
           <div className="space-y-4">
             <h3 className="font-medium text-sm text-muted-foreground">{t("Additional Charges", "अतिरिक्त शुल्क")}</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -567,6 +581,116 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
               </div>
             </div>
           </div>
+
+          {/* Farmer Due Adjustment Section */}
+          <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-md border">
+            <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Type", "प्रकार")}</Label>
+                <Select value={adjustmentType} onValueChange={setAdjustmentType}>
+                  <SelectTrigger className="h-9" data-testid="select-seed-adjustment-type">
+                    <SelectValue placeholder={t("Select", "चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="debit">{t("Debit (−)", "डेबिट (−)")}</SelectItem>
+                    <SelectItem value="credit">{t("Credit (+)", "क्रेडिट (+)")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Amount (₹)", "राशि (₹)")}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  className="h-9"
+                  placeholder="0"
+                  value={adjustmentAmount}
+                  onChange={(e) => setAdjustmentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  data-testid="input-seed-adjustment-amount"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Rate %", "दर %")}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  className="h-9"
+                  placeholder="0%"
+                  value={adjustmentRate}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                    setAdjustmentRate(val);
+                    if (val && parseFloat(val) > 0 && !adjustmentEffectiveDate) {
+                      setAdjustmentEffectiveDate(new Date().toISOString().split('T')[0]);
+                    }
+                  }}
+                  data-testid="input-seed-adjustment-rate"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Effective Date", "प्रभावी तिथि")}</Label>
+                <Input
+                  type="date"
+                  className="h-9"
+                  value={adjustmentEffectiveDate}
+                  onChange={(e) => setAdjustmentEffectiveDate(e.target.value)}
+                  data-testid="input-seed-adjustment-date"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Reason", "कारण")}</Label>
+                <Input
+                  type="text"
+                  className="h-9"
+                  placeholder={t("Enter reason", "कारण दर्ज करें")}
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  data-testid="input-seed-adjustment-reason"
+                />
+              </div>
+            </div>
+            {/* Show calculated interest */}
+            {calculatedAdjustment.finalAmount > 0 && calculatedAdjustment.interest > 0 && (
+              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                <div className="text-xs text-amber-800 dark:text-amber-200">
+                  {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN")} | 
+                  {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN")} | 
+                  <span className="font-semibold"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Totals Section */}
+          <Card className="bg-muted/30">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{t("Total Bags", "कुल बैग")}</span>
+                  <div className="font-semibold text-lg">{totals.totalBags}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("Total Cost", "कुल लागत")}</span>
+                  <div className="font-semibold text-lg">₹{totals.totalCost.toLocaleString("en-IN")}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}</span>
+                  <div className="font-semibold text-lg text-green-600">₹{totals.totalRevenue.toLocaleString("en-IN")}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("P&L", "लाभ/हानि")}</span>
+                  <div className={`font-semibold text-lg ${totals.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    ₹{totals.totalProfitLoss.toLocaleString("en-IN")}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("Due to Farmer", "किसान को देय")}</span>
+                  <div className="font-semibold text-lg text-orange-600">₹{totals.totalDue.toLocaleString("en-IN")}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <DialogFooter>

@@ -75,6 +75,11 @@ interface SeedTransaction {
   transportCharges: string | null;
   otherCharges: string | null;
   otherChargesRemarks: string | null;
+  adjustmentType: string | null;
+  adjustmentAmount: string | null;
+  adjustmentRate: string | null;
+  adjustmentEffectiveDate: string | null;
+  adjustmentReason: string | null;
   totalBags: number;
   totalCost: string | null;
   totalRevenue: string | null;
@@ -114,6 +119,13 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
   const [transportCharges, setTransportCharges] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesRemarks, setOtherChargesRemarks] = useState("");
+  
+  // Farmer adjustment fields
+  const [adjustmentType, setAdjustmentType] = useState("");
+  const [adjustmentAmount, setAdjustmentAmount] = useState("");
+  const [adjustmentRate, setAdjustmentRate] = useState("");
+  const [adjustmentEffectiveDate, setAdjustmentEffectiveDate] = useState("");
+  const [adjustmentReason, setAdjustmentReason] = useState("");
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([]);
 
@@ -190,6 +202,11 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       setTransportCharges(transaction.transportCharges || "");
       setOtherCharges(transaction.otherCharges || "");
       setOtherChargesRemarks(transaction.otherChargesRemarks || "");
+      setAdjustmentType(transaction.adjustmentType || "");
+      setAdjustmentAmount(transaction.adjustmentAmount || "");
+      setAdjustmentRate(transaction.adjustmentRate || "");
+      setAdjustmentEffectiveDate(transaction.adjustmentEffectiveDate || "");
+      setAdjustmentReason(transaction.adjustmentReason || "");
       
       // Convert transaction items to lot selections
       const lots = transaction.items.map(item => ({
