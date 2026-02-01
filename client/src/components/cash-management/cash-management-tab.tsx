@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -360,6 +360,50 @@ export function CashManagementTab() {
       return res.json();
     },
   });
+
+  // Merge ledgerBuyers (transaction dues) with managedParties (receivables)
+  // Aggregate at party name level (case-insensitive)
+  const mergedPartiesForRawPotato = useMemo(() => {
+    const partyMap = new Map<string, { name: string; address: string | null; overallDue: number; receivables: number; isActive: boolean }>();
+    
+    // First add all buyers from ledger
+    ledgerBuyers.forEach(buyer => {
+      const normalizedName = buyer.name.trim().toLowerCase();
+      partyMap.set(normalizedName, {
+        name: buyer.name,
+        address: buyer.address,
+        overallDue: buyer.overallDue || 0,
+        receivables: 0,
+        isActive: buyer.isActive !== false,
+      });
+    });
+    
+    // Then merge managed parties (receivables)
+    managedParties.forEach(party => {
+      const normalizedName = party.name.trim().toLowerCase();
+      const pendingDues = parseFloat(party.pendingDues || "0");
+      
+      if (partyMap.has(normalizedName)) {
+        // Aggregate with existing buyer
+        const existing = partyMap.get(normalizedName)!;
+        existing.receivables += pendingDues;
+      } else if (pendingDues > 0) {
+        // Add as new entry if has pending dues
+        partyMap.set(normalizedName, {
+          name: party.name,
+          address: party.address,
+          overallDue: 0,
+          receivables: pendingDues,
+          isActive: true,
+        });
+      }
+    });
+    
+    // Return as array, filter to those with total due > 0
+    return Array.from(partyMap.values())
+      .filter(p => p.isActive && (p.overallDue > 0 || p.receivables > 0))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [ledgerBuyers, managedParties]);
 
   const inwardForm = useForm<InwardFormValues>({
     resolver: zodResolver(inwardFormSchema),
@@ -1542,22 +1586,27 @@ export function CashManagementTab() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {ledgerBuyers
-                                .filter(b => b.isActive !== false)
-                                .filter(b => b.overallDue > 0)
-                                .map((buyer) => (
-                                  <SelectItem key={buyer.id} value={buyer.name}>
+                              {mergedPartiesForRawPotato.map((party, idx) => {
+                                const totalDue = party.overallDue + party.receivables;
+                                return (
+                                  <SelectItem key={`party-${idx}`} value={party.name}>
                                     <div className="flex items-center justify-between gap-4">
-                                      <span>{buyer.name}</span>
-                                      {buyer.address && (
-                                        <span className="text-xs text-muted-foreground">({buyer.address})</span>
+                                      <span>{party.name}</span>
+                                      {party.address && (
+                                        <span className="text-xs text-muted-foreground">({party.address})</span>
                                       )}
                                       <Badge variant="secondary">
-                                        {t("Due", "बकाया")}: ₹{buyer.overallDue.toFixed(0)}
+                                        {t("Due", "बकाया")}: ₹{totalDue.toFixed(0)}
+                                        {party.receivables > 0 && (
+                                          <span className="ml-1 text-xs opacity-75">
+                                            (+₹{party.receivables.toFixed(0)} {t("receivable", "प्राप्य")})
+                                          </span>
+                                        )}
                                       </Badge>
                                     </div>
                                   </SelectItem>
-                                ))}
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
