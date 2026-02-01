@@ -2119,11 +2119,10 @@ export async function registerRoutes(
           }
         }
         
-        const pyPayable = parseFloat(farmer.pyPayable || "0");
         const pyReceivable = parseFloat(farmer.pyReceivable || "0");
         
-        // Net Due = PY Receivables + Harvest Due - PY Payable - Seed Due
-        const netDue = pyReceivable + harvestDue - pyPayable - seedDue;
+        // Net Due = PY Receivables + Harvest Due - Seed Due
+        const netDue = pyReceivable + harvestDue - seedDue;
         
         return {
           ...farmer,
@@ -2240,8 +2239,7 @@ export async function registerRoutes(
             tehsil: data.tehsil,
             district: data.district,
             state: data.state,
-            pyPayable: "0",
-            pyReceivable: "0",
+                        pyReceivable: "0",
             negativeFlag: false,
             isArchived: false,
           });
@@ -2284,12 +2282,11 @@ export async function registerRoutes(
         });
       }
       
-      const { negativeFlag, isArchived, pyPayable, pyReceivable } = validationResult.data;
+      const { negativeFlag, isArchived, pyReceivable } = validationResult.data;
 
       const farmer = await storage.updateFarmer(id, merchantId, {
         ...(negativeFlag !== undefined && { negativeFlag }),
         ...(isArchived !== undefined && { isArchived }),
-        ...(pyPayable !== undefined && { pyPayable }),
         ...(pyReceivable !== undefined && { pyReceivable }),
       });
       

@@ -31,12 +31,6 @@ interface FarmerWithDues extends Farmer {
 
 type SortOption = 'farmerId' | 'harvestDue' | 'seedDue';
 
-interface PyEditState {
-  [farmerId: number]: {
-    pyPayable?: string;
-    pyReceivable?: string;
-  };
-}
 
 export default function FarmersPage() {
   const [, setLocation] = useLocation();
@@ -44,7 +38,6 @@ export default function FarmersPage() {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [pyEdits, setPyEdits] = useState<PyEditState>({});
   const [sortBy, setSortBy] = useState<SortOption>('farmerId');
 
   const { data: farmers = [], isLoading } = useQuery<FarmerWithDues[]>({
@@ -78,38 +71,6 @@ export default function FarmersPage() {
 
   const handleToggleArchive = (id: number, currentValue: boolean) => {
     updateMutation.mutate({ id, data: { isArchived: !currentValue } });
-  };
-
-  const handlePyFieldChange = (farmerId: number, field: 'pyPayable' | 'pyReceivable', value: string) => {
-    setPyEdits(prev => ({
-      ...prev,
-      [farmerId]: {
-        ...prev[farmerId],
-        [field]: value,
-      }
-    }));
-  };
-
-  const handlePyFieldBlur = (farmerId: number, field: 'pyPayable' | 'pyReceivable', originalValue: string) => {
-    const editedValue = pyEdits[farmerId]?.[field];
-    if (editedValue !== undefined && editedValue !== originalValue) {
-      const numericValue = parseFloat(editedValue) || 0;
-      updateMutation.mutate({ id: farmerId, data: { [field]: numericValue.toString() } });
-    }
-    setPyEdits(prev => {
-      const newState = { ...prev };
-      if (newState[farmerId]) {
-        delete newState[farmerId][field];
-        if (Object.keys(newState[farmerId]).length === 0) {
-          delete newState[farmerId];
-        }
-      }
-      return newState;
-    });
-  };
-
-  const getPyValue = (farmerId: number, field: 'pyPayable' | 'pyReceivable', originalValue: string | null) => {
-    return pyEdits[farmerId]?.[field] ?? (originalValue || "0");
   };
 
   const filteredFarmers = useMemo(() => {
@@ -182,29 +143,8 @@ export default function FarmersPage() {
         </td>
         <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-village-${farmer.id}`}>{farmer.village || "-"}</td>
         <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-contact-${farmer.id}`}>{farmer.contact || "-"}</td>
-        <td className="p-2 text-right">
-          <Input
-            type="number"
-            value={getPyValue(farmer.id, 'pyReceivable', farmer.pyReceivable)}
-            onChange={(e) => handlePyFieldChange(farmer.id, 'pyReceivable', e.target.value)}
-            onBlur={() => handlePyFieldBlur(farmer.id, 'pyReceivable', farmer.pyReceivable || "0")}
-            className="w-24 h-7 text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            placeholder="0"
-            disabled={isArchived}
-            data-testid={`input-py-receivable-${farmer.id}`}
-          />
-        </td>
-        <td className="p-2 text-right">
-          <Input
-            type="number"
-            value={getPyValue(farmer.id, 'pyPayable', farmer.pyPayable)}
-            onChange={(e) => handlePyFieldChange(farmer.id, 'pyPayable', e.target.value)}
-            onBlur={() => handlePyFieldBlur(farmer.id, 'pyPayable', farmer.pyPayable || "0")}
-            className="w-24 h-7 text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            placeholder="0"
-            disabled={isArchived}
-            data-testid={`input-py-payable-${farmer.id}`}
-          />
+        <td className="p-2 text-right text-xs font-medium" data-testid={`text-py-receivable-${farmer.id}`}>
+          {formatCurrency(parseFloat(farmer.pyReceivable || "0"))}
         </td>
         <td className="p-2 text-right text-xs font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
           {formatCurrency(farmer.harvestDue)}
@@ -343,7 +283,6 @@ export default function FarmersPage() {
                       <th className="p-2 text-left text-xs font-medium">{t("Village", "गांव")}</th>
                       <th className="p-2 text-left text-xs font-medium">{t("Contact", "संपर्क")}</th>
                       <th className="p-2 text-right text-xs font-medium">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</th>
-                      <th className="p-2 text-right text-xs font-medium">{t("PY Payable", "पिछले वर्ष देय")}</th>
                       <th className="p-2 text-right text-xs font-medium text-green-600 dark:text-green-400">{t("Harvest Due", "फसल बकाया")}</th>
                       <th className="p-2 text-right text-xs font-medium text-red-600 dark:text-red-400">{t("Seed Due", "बीज बकाया")}</th>
                       <th className="p-2 text-right text-xs font-medium">{t("Net Due", "शुद्ध बकाया")}</th>
