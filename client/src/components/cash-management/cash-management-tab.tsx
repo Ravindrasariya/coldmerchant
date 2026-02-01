@@ -136,7 +136,8 @@ interface LedgerBuyer {
   contact: string | null;
   negativeFlag: boolean | null;
   isActive: boolean | null;
-  overallDue: number;
+  overallDue: number; // Total due including receivables from linked Cash Management parties
+  receivables: number; // Receivables breakdown from linked Cash Management parties
 }
 
 interface CrossSettlementEligibility {
@@ -374,7 +375,7 @@ export function CashManagementTab() {
         name: buyer.name,
         address: buyer.address,
         overallDue: buyer.overallDue || 0, // Already includes receivables from backend
-        receivables: (buyer as any).receivables || 0, // Receivables for display breakdown
+        receivables: buyer.receivables || 0, // Receivables for display breakdown
         isActive: buyer.isActive !== false,
       });
     });
@@ -1593,6 +1594,11 @@ export function CashManagementTab() {
                                       )}
                                       <Badge variant="secondary">
                                         {t("Due", "बकाया")}: ₹{party.overallDue.toFixed(0)}
+                                        {party.receivables > 0 && (
+                                          <span className="ml-1 text-xs opacity-75">
+                                            ({t("incl.", "शामिल")} ₹{party.receivables.toFixed(0)} {t("receivable", "प्राप्य")})
+                                          </span>
+                                        )}
                                       </Badge>
                                     </div>
                                   </SelectItem>
