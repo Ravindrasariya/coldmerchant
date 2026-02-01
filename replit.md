@@ -50,10 +50,16 @@ The system isolates data by merchant:
 - **Edit History**: Audit trail of all modifications to stock entries after initial creation
 
 ### Cold Store Dues Calculation
-Cold store dues are calculated as: `(chargesPerBag × originalBags) + hammaliGradingCharges + expectedColdCharges`
-- All three components contribute to the total dues owed to a cold store
+Cold store dues are calculated from the `charges` array on each lot:
+- Only charge types "Cold Charges" and "Ware House Charges" are included
 - FIFO allocation applies payments to oldest outstanding lots first
 - Dues are grouped by normalized cold store name (case-insensitive)
+
+### Supplier Payment FIFO
+When paying a supplier:
+- Payments are allocated to oldest seed stock entries first (by createdAt)
+- Each entry's due = total cost (bags × pricePerBag) - amountPaid
+- Payment updates amountPaid and paymentStatus on each seed stock entry
 
 ### Edit History System
 - All modifications to stock entries after initial creation are automatically recorded
