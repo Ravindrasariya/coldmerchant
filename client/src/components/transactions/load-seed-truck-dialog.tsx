@@ -583,18 +583,18 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
           </div>
 
           {/* Farmer Due Adjustment Section */}
-          <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-md border">
+          <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-md border" data-testid="section-seed-farmer-adjustment">
             <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">{t("Type", "प्रकार")}</Label>
                 <Select value={adjustmentType} onValueChange={setAdjustmentType}>
-                  <SelectTrigger className="h-9" data-testid="select-seed-adjustment-type">
+                  <SelectTrigger data-testid="select-seed-adjustment-type">
                     <SelectValue placeholder={t("Select", "चुनें")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="debit">{t("Debit (−)", "डेबिट (−)")}</SelectItem>
-                    <SelectItem value="credit">{t("Credit (+)", "क्रेडिट (+)")}</SelectItem>
+                    <SelectItem value="debit" data-testid="option-seed-adjustment-debit">{t("Debit (−)", "डेबिट (−)")}</SelectItem>
+                    <SelectItem value="credit" data-testid="option-seed-adjustment-credit">{t("Credit (+)", "क्रेडिट (+)")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -603,7 +603,6 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Input
                   type="text"
                   inputMode="decimal"
-                  className="h-9"
                   placeholder="0"
                   value={adjustmentAmount}
                   onChange={(e) => setAdjustmentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
@@ -615,7 +614,6 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Input
                   type="text"
                   inputMode="decimal"
-                  className="h-9"
                   placeholder="0%"
                   value={adjustmentRate}
                   onChange={(e) => {
@@ -632,7 +630,6 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Label className="text-xs">{t("Effective Date", "प्रभावी तिथि")}</Label>
                 <Input
                   type="date"
-                  className="h-9"
                   value={adjustmentEffectiveDate}
                   onChange={(e) => setAdjustmentEffectiveDate(e.target.value)}
                   data-testid="input-seed-adjustment-date"
@@ -642,7 +639,6 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Label className="text-xs">{t("Reason", "कारण")}</Label>
                 <Input
                   type="text"
-                  className="h-9"
                   placeholder={t("Enter reason", "कारण दर्ज करें")}
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
@@ -652,11 +648,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
             </div>
             {/* Show calculated interest */}
             {calculatedAdjustment.finalAmount > 0 && calculatedAdjustment.interest > 0 && (
-              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800" data-testid="text-seed-adjustment-interest">
                 <div className="text-xs text-amber-800 dark:text-amber-200">
                   {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN")} | 
                   {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN")} | 
-                  <span className="font-semibold"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN")}</span>
+                  <span className="font-semibold" data-testid="text-seed-adjustment-final"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN")}</span>
                 </div>
               </div>
             )}

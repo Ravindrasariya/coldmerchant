@@ -298,6 +298,26 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     return availableLots?.find(lot => lot.id === lotId);
   };
 
+  // Calculate adjustment with compound interest
+  const calculatedAdjustment = useMemo(() => {
+    const principal = parseFloat(adjustmentAmount) || 0;
+    const rate = parseFloat(adjustmentRate) || 0;
+    
+    if (principal <= 0) return { finalAmount: 0, interest: 0, days: 0 };
+    
+    if (rate > 0 && adjustmentEffectiveDate) {
+      const effectiveDate = new Date(adjustmentEffectiveDate);
+      const today = new Date();
+      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const years = days / 365;
+      const finalAmount = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
+      const interest = Math.round((finalAmount - principal) * 100) / 100;
+      return { finalAmount, interest, days };
+    }
+    
+    return { finalAmount: principal, interest: 0, days: 0 };
+  }, [adjustmentAmount, adjustmentRate, adjustmentEffectiveDate]);
+
   const totals = useMemo(() => {
     let totalBags = 0;
     let totalCost = 0;
@@ -320,10 +340,17 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     const totalProfitLoss = totalRevenue - totalCost;
     const transport = parseFloat(transportCharges) || 0;
     const other = parseFloat(otherCharges) || 0;
-    const totalDue = totalRevenue + transport + other;
+    
+    // Apply adjustment to total due
+    let adjustmentValue = 0;
+    if (calculatedAdjustment.finalAmount > 0 && adjustmentType) {
+      adjustmentValue = adjustmentType === "credit" ? calculatedAdjustment.finalAmount : -calculatedAdjustment.finalAmount;
+    }
+    
+    const totalDue = totalRevenue + transport + other + adjustmentValue;
 
-    return { totalBags, totalCost, totalRevenue, totalProfitLoss, totalDue };
-  }, [selectedLots, transportCharges, otherCharges, availableLots]);
+    return { totalBags, totalCost, totalRevenue, totalProfitLoss, totalDue, adjustmentValue };
+  }, [selectedLots, transportCharges, otherCharges, availableLots, calculatedAdjustment, adjustmentType]);
 
   const handleSave = () => {
     if (!farmerName.trim()) {
@@ -413,6 +440,11 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       transportCharges: transportCharges || undefined,
       otherCharges: otherCharges || undefined,
       otherChargesRemarks: otherChargesRemarks || undefined,
+      adjustmentType: adjustmentType || undefined,
+      adjustmentAmount: adjustmentAmount || undefined,
+      adjustmentRate: adjustmentRate || undefined,
+      adjustmentEffectiveDate: adjustmentEffectiveDate || undefined,
+      adjustmentReason: adjustmentReason || undefined,
       items: validLots.map(lot => ({
         seedLotId: lot.seedLotId,
         bagsMoved: lot.bagsMoved,
@@ -685,6 +717,82 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                 />
               </div>
             </div>
+          </div>
+
+          {/* Farmer Due Adjustment Section */}
+          <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-md border" data-testid="section-edit-seed-farmer-adjustment">
+            <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Type", "प्रकार")}</Label>
+                <Select value={adjustmentType} onValueChange={setAdjustmentType}>
+                  <SelectTrigger data-testid="select-edit-seed-adjustment-type">
+                    <SelectValue placeholder={t("Select", "चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="debit" data-testid="option-edit-seed-adjustment-debit">{t("Debit (−)", "डेबिट (−)")}</SelectItem>
+                    <SelectItem value="credit" data-testid="option-edit-seed-adjustment-credit">{t("Credit (+)", "क्रेडिट (+)")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Amount (₹)", "राशि (₹)")}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={adjustmentAmount}
+                  onChange={(e) => setAdjustmentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  data-testid="input-edit-seed-adjustment-amount"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Rate %", "दर %")}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0%"
+                  value={adjustmentRate}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                    setAdjustmentRate(val);
+                    if (val && parseFloat(val) > 0 && !adjustmentEffectiveDate) {
+                      setAdjustmentEffectiveDate(new Date().toISOString().split('T')[0]);
+                    }
+                  }}
+                  data-testid="input-edit-seed-adjustment-rate"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Effective Date", "प्रभावी तिथि")}</Label>
+                <Input
+                  type="date"
+                  value={adjustmentEffectiveDate}
+                  onChange={(e) => setAdjustmentEffectiveDate(e.target.value)}
+                  data-testid="input-edit-seed-adjustment-date"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Reason", "कारण")}</Label>
+                <Input
+                  type="text"
+                  placeholder={t("Enter reason", "कारण दर्ज करें")}
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  data-testid="input-edit-seed-adjustment-reason"
+                />
+              </div>
+            </div>
+            {/* Show calculated interest */}
+            {calculatedAdjustment.finalAmount > 0 && calculatedAdjustment.interest > 0 && (
+              <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800" data-testid="text-edit-seed-adjustment-interest">
+                <div className="text-xs text-amber-800 dark:text-amber-200">
+                  {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN")} | 
+                  {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN")} | 
+                  <span className="font-semibold" data-testid="text-edit-seed-adjustment-final"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN")}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Totals Summary */}
