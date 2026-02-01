@@ -84,6 +84,7 @@ Cold store dues are calculated as: `(chargesPerBag × originalBags) + hammaliGra
 - **Composite Key Matching**: Farmers are identified by normalized (case-insensitive, trimmed) combination of name + phone + village
 - **Auto-Sync**: POST /api/farmers/sync generates farmer records from existing stock entries and seed transactions
 - **Farmer Edit with Propagation**: PATCH /api/farmers/:id/details updates farmer and propagates changes to all linked stockEntries, seedTransactions, cashFarmers
+- **Seed Transaction Farmer Fields**: Read-only in edit dialog; managed via Farmer Ledger only. API returns linked farmer's current details when farmerId exists.
 - **Farmer Edit History**: All edits tracked in farmerEditHistory table with auto-incrementing serialNumber, sorted by date desc then serialNumber desc
 - **Farmer Merge**: When editing a farmer to match existing composite key, system offers to merge:
   - Keeps farmer with lower ID
