@@ -345,60 +345,64 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
           {bankAccounts.length > 0 && (
             <div className="space-y-2">
               {bankAccounts.map((account) => (
-                <div key={account.id} className="flex items-center gap-2 p-2 border rounded-md" data-testid={`row-bank-account-${account.id}`}>
+                <div key={account.id} className="p-2 border rounded-md" data-testid={`row-bank-account-${account.id}`}>
                   {editingId === account.id ? (
-                    <>
+                    <div className="space-y-2">
                       <Input
                         value={accountForm.name}
                         onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
                         placeholder={t("Account Name", "खाते का नाम")}
-                        className="flex-1"
                         data-testid={`input-edit-account-name-${account.id}`}
                       />
-                      <Select
-                        value={accountForm.accountType}
-                        onValueChange={(value) => setAccountForm({ ...accountForm, accountType: value })}
-                      >
-                        <SelectTrigger className="w-24" data-testid={`select-edit-account-type-${account.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="current">{t("Current", "चालू")}</SelectItem>
-                          <SelectItem value="savings">{t("Savings", "बचत")}</SelectItem>
-                          <SelectItem value="limit">{t("Limit", "लिमिट")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        value={accountForm.openingBalance}
-                        onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })}
-                        placeholder="0"
-                        className="w-28"
-                        data-testid={`input-edit-account-balance-${account.id}`}
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => updateAccountMutation.mutate({ id: account.id, data: accountForm })}
-                        disabled={updateAccountMutation.isPending}
-                        data-testid={`button-save-account-${account.id}`}
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEditingId(null)}
-                        data-testid={`button-cancel-edit-${account.id}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Select
+                          value={accountForm.accountType}
+                          onValueChange={(value) => setAccountForm({ ...accountForm, accountType: value })}
+                        >
+                          <SelectTrigger className="w-full sm:w-32" data-testid={`select-edit-account-type-${account.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="current">{t("Current", "चालू")}</SelectItem>
+                            <SelectItem value="savings">{t("Savings", "बचत")}</SelectItem>
+                            <SelectItem value="limit">{t("Limit", "लिमिट")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          value={accountForm.openingBalance}
+                          onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })}
+                          placeholder={t("Opening Balance", "प्रारंभिक शेष")}
+                          className="w-full sm:flex-1"
+                          data-testid={`input-edit-account-balance-${account.id}`}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingId(null)}
+                          data-testid={`button-cancel-edit-${account.id}`}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          {t("Cancel", "रद्द करें")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => updateAccountMutation.mutate({ id: account.id, data: accountForm })}
+                          disabled={updateAccountMutation.isPending}
+                          data-testid={`button-save-account-${account.id}`}
+                        >
+                          <Save className="h-4 w-4 mr-1" />
+                          {t("Save", "सहेजें")}
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      <span className="flex-1 font-medium text-sm" data-testid={`text-account-name-${account.id}`}>{account.name}</span>
-                      <span className="text-xs text-muted-foreground w-16" data-testid={`text-account-type-${account.id}`}>{getAccountTypeLabel(account.accountType)}</span>
-                      <span className="text-sm font-medium w-24 text-right" data-testid={`text-account-balance-${account.id}`}>₹{parseFloat(account.openingBalance || "0").toLocaleString()}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="flex-1 min-w-0 font-medium text-sm truncate" data-testid={`text-account-name-${account.id}`}>{account.name}</span>
+                      <span className="text-xs text-muted-foreground" data-testid={`text-account-type-${account.id}`}>{getAccountTypeLabel(account.accountType)}</span>
+                      <span className="text-sm font-medium" data-testid={`text-account-balance-${account.id}`}>₹{parseFloat(account.openingBalance || "0").toLocaleString()}</span>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -416,7 +420,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </>
+                    </div>
                   )}
                 </div>
               ))}
@@ -424,55 +428,59 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
           )}
 
           {showAddAccount ? (
-            <div className="flex items-center gap-2 p-2 border border-dashed rounded-md bg-muted/50">
+            <div className="p-2 border border-dashed rounded-md bg-muted/50 space-y-2">
               <Input
                 value={accountForm.name}
                 onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
                 placeholder={t("Account Name", "खाते का नाम")}
-                className="flex-1"
                 data-testid="input-new-account-name"
               />
-              <Select
-                value={accountForm.accountType}
-                onValueChange={(value) => setAccountForm({ ...accountForm, accountType: value })}
-              >
-                <SelectTrigger className="w-24" data-testid="select-new-account-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="current">{t("Current", "चालू")}</SelectItem>
-                  <SelectItem value="savings">{t("Savings", "बचत")}</SelectItem>
-                  <SelectItem value="limit">{t("Limit", "लिमिट")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                value={accountForm.openingBalance}
-                onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })}
-                placeholder="0"
-                className="w-28"
-                data-testid="input-new-account-balance"
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => createAccountMutation.mutate(accountForm)}
-                disabled={!accountForm.name || createAccountMutation.isPending}
-                data-testid="button-save-new-account"
-              >
-                {createAccountMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  setShowAddAccount(false);
-                  setAccountForm({ name: "", accountType: "current", openingBalance: "" });
-                }}
-                data-testid="button-cancel-new-account"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Select
+                  value={accountForm.accountType}
+                  onValueChange={(value) => setAccountForm({ ...accountForm, accountType: value })}
+                >
+                  <SelectTrigger className="w-full sm:w-32" data-testid="select-new-account-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">{t("Current", "चालू")}</SelectItem>
+                    <SelectItem value="savings">{t("Savings", "बचत")}</SelectItem>
+                    <SelectItem value="limit">{t("Limit", "लिमिट")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  value={accountForm.openingBalance}
+                  onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })}
+                  placeholder={t("Opening Balance", "प्रारंभिक शेष")}
+                  className="w-full sm:flex-1"
+                  data-testid="input-new-account-balance"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowAddAccount(false);
+                    setAccountForm({ name: "", accountType: "current", openingBalance: "" });
+                  }}
+                  data-testid="button-cancel-new-account"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  {t("Cancel", "रद्द करें")}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => createAccountMutation.mutate(accountForm)}
+                  disabled={!accountForm.name || createAccountMutation.isPending}
+                  data-testid="button-save-new-account"
+                >
+                  {createAccountMutation.isPending ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                  {t("Save", "सहेजें")}
+                </Button>
+              </div>
             </div>
           ) : (
             <Button
