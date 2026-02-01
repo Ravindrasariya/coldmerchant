@@ -200,10 +200,10 @@ export function FarmerLedgerTab() {
   const summary = useMemo(() => {
     const displayedFarmers = [...activeFarmers, ...(showArchived ? archivedFarmers : [])];
     return {
+      totalPyReceivable: displayedFarmers.reduce((sum, f) => sum + parseFloat(f.pyReceivable || "0") + (f.receivables || 0), 0),
       totalHarvestDue: displayedFarmers.reduce((sum, f) => sum + f.harvestDue, 0),
       totalSeedDue: displayedFarmers.reduce((sum, f) => sum + f.seedDue, 0),
       totalColdDue: displayedFarmers.reduce((sum, f) => sum + f.coldDue, 0),
-      totalReceivables: displayedFarmers.reduce((sum, f) => sum + (f.receivables || 0), 0),
       totalNetDue: displayedFarmers.reduce((sum, f) => sum + f.netDue, 0),
       count: displayedFarmers.length,
     };
@@ -251,6 +251,10 @@ export function FarmerLedgerTab() {
             <div class="summary-value">${summary.count}</div>
           </div>
           <div class="summary-item">
+            <div class="summary-label">Total PY Receivable</div>
+            <div class="summary-value">${formatCurrency(summary.totalPyReceivable)}</div>
+          </div>
+          <div class="summary-item">
             <div class="summary-label">Total Harvest Due</div>
             <div class="summary-value text-green">${formatCurrency(summary.totalHarvestDue)}</div>
           </div>
@@ -261,10 +265,6 @@ export function FarmerLedgerTab() {
           <div class="summary-item">
             <div class="summary-label">Total Cold Due</div>
             <div class="summary-value text-blue">${formatCurrency(summary.totalColdDue)}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Total Receivables</div>
-            <div class="summary-value text-orange">${formatCurrency(summary.totalReceivables)}</div>
           </div>
           <div class="summary-item">
             <div class="summary-label">Total Net Due</div>
@@ -281,7 +281,6 @@ export function FarmerLedgerTab() {
               <th class="text-right">PY Receivable</th>
               <th class="text-right">Harvest Due</th>
               <th class="text-right">Seed Due</th>
-              <th class="text-right">Receivables</th>
               <th class="text-right">Net Due</th>
               <th class="text-right">Cold Due</th>
             </tr>
@@ -293,10 +292,9 @@ export function FarmerLedgerTab() {
                 <td>${f.name}${f.negativeFlag ? ' (Flagged)' : ''}</td>
                 <td>${f.village || '-'}</td>
                 <td>${f.contact || '-'}</td>
-                <td class="text-right">${formatCurrency(parseFloat(f.pyReceivable || "0"))}</td>
+                <td class="text-right">${formatCurrency(parseFloat(f.pyReceivable || "0") + (f.receivables || 0))}</td>
                 <td class="text-right text-green">${formatCurrency(f.harvestDue)}</td>
                 <td class="text-right text-red">${formatCurrency(f.seedDue)}</td>
-                <td class="text-right text-orange">${formatCurrency(f.receivables || 0)}</td>
                 <td class="text-right ${f.netDue >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(f.netDue)}</td>
                 <td class="text-right text-blue">${formatCurrency(f.coldDue)}</td>
               </tr>
@@ -336,16 +334,13 @@ export function FarmerLedgerTab() {
         <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-village-${farmer.id}`}>{farmer.village || "-"}</td>
         <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-contact-${farmer.id}`}>{farmer.contact || "-"}</td>
         <td className="p-2 text-right text-xs font-medium" data-testid={`text-py-receivable-${farmer.id}`}>
-          {formatCurrency(parseFloat(farmer.pyReceivable || "0"))}
+          {formatCurrency(parseFloat(farmer.pyReceivable || "0") + (farmer.receivables || 0))}
         </td>
         <td className="p-2 text-right text-xs font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
           {formatCurrency(farmer.harvestDue)}
         </td>
         <td className="p-2 text-right text-xs font-medium text-red-600 dark:text-red-400" data-testid={`text-seed-due-${farmer.id}`}>
           {formatCurrency(farmer.seedDue)}
-        </td>
-        <td className="p-2 text-right text-xs font-medium text-orange-600 dark:text-orange-400" data-testid={`text-receivables-${farmer.id}`}>
-          {formatCurrency(farmer.receivables || 0)}
         </td>
         <td className="p-2 text-right text-xs" data-testid={`text-net-due-${farmer.id}`}>
           <span className={`font-bold ${farmer.netDue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -392,10 +387,14 @@ export function FarmerLedgerTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t("Farmers", "किसान")}</div>
           <div className="text-xl font-bold mt-1" data-testid="summary-farmer-count">{summary.count}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</div>
+          <div className="text-xl font-bold mt-1" data-testid="summary-py-receivable">{formatCurrency(summary.totalPyReceivable)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t("Harvest Due", "फसल बकाया")}</div>
@@ -408,10 +407,6 @@ export function FarmerLedgerTab() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t("Cold Due", "कोल्ड बकाया")}</div>
           <div className="text-xl font-bold mt-1 text-blue-600 dark:text-blue-400" data-testid="summary-cold-due">{formatCurrency(summary.totalColdDue)}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">{t("Receivables", "प्राप्य")}</div>
-          <div className="text-xl font-bold mt-1 text-orange-600 dark:text-orange-400" data-testid="summary-receivables">{formatCurrency(summary.totalReceivables)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t("Net Due", "शुद्ध बकाया")}</div>
@@ -595,7 +590,6 @@ export function FarmerLedgerTab() {
                         {getSortIcon('seedDue')}
                       </button>
                     </th>
-                    <th className="p-2 text-right text-xs font-medium text-orange-600 dark:text-orange-400">{t("Receivables", "प्राप्य")}</th>
                     <th className="p-2 text-right text-xs font-medium">{t("Net Due", "शुद्ध बकाया")}</th>
                     <th className="p-2 text-right text-xs font-medium">
                       <button
