@@ -17,8 +17,10 @@ import {
   Plus, 
   Save,
   Loader2,
-  Users
+  Users,
+  RefreshCw
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { type Buyer } from "@shared/schema";
 
 interface BuyerRow {
@@ -75,6 +77,7 @@ export default function BuyersPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [localRows, setLocalRows] = useState<BuyerRow[] | null>(null);
 
   const { data: buyers = [], isLoading, dataUpdatedAt } = useQuery<Buyer[]>({
@@ -123,6 +126,30 @@ export default function BuyersPage() {
       setLocalRows(null);
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/cash/managed-parties/sync", {});
+      return response.json();
+    },
+    onSuccess: (data: { partiesLinked: number; buyersCreated: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      toast({
+        title: t("Sync Complete", "सिंक पूर्ण"),
+        description: t(
+          `${data.partiesLinked} parties linked, ${data.buyersCreated} new buyers created`,
+          `${data.partiesLinked} पार्टियां लिंक, ${data.buyersCreated} नए खरीदार बनाए गए`
+        ),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t("Sync Failed", "सिंक विफल"),
+        description: t("Failed to sync parties with buyers", "पार्टियों को खरीदारों से सिंक करने में विफल"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -213,6 +240,20 @@ export default function BuyersPage() {
                   {t("Cancel", "रद्द करें")}
                 </Button>
               )}
+              <Button
+                onClick={() => syncMutation.mutate()}
+                variant="outline"
+                size="sm"
+                disabled={syncMutation.isPending}
+                data-testid="button-sync-parties"
+              >
+                {syncMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                )}
+                {t("Sync Parties", "पार्टी सिंक करें")}
+              </Button>
               <Button
                 onClick={handleAddRow}
                 variant="outline"
