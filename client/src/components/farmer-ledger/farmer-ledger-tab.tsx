@@ -113,12 +113,14 @@ export function FarmerLedgerTab() {
       : <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
-  const uniqueNames = useMemo(() => {
-    const names = new Set<string>();
+  const uniqueFarmersByName = useMemo(() => {
+    const seen = new Map<string, FarmerWithDues>();
     farmers.forEach(f => {
-      if (f.name) names.add(f.name);
+      if (f.name && !seen.has(f.name.toLowerCase())) {
+        seen.set(f.name.toLowerCase(), f);
+      }
     });
-    return Array.from(names).sort();
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [farmers]);
 
   const uniqueVillages = useMemo(() => {
@@ -130,10 +132,10 @@ export function FarmerLedgerTab() {
   }, [farmers]);
 
   const filteredNameSuggestions = useMemo(() => {
-    if (!farmerNameSearch.trim()) return uniqueNames.slice(0, 10);
+    if (!farmerNameSearch.trim()) return uniqueFarmersByName.slice(0, 10);
     const term = farmerNameSearch.toLowerCase();
-    return uniqueNames.filter(n => n.toLowerCase().includes(term)).slice(0, 10);
-  }, [farmerNameSearch, uniqueNames]);
+    return uniqueFarmersByName.filter(f => f.name.toLowerCase().includes(term)).slice(0, 10);
+  }, [farmerNameSearch, uniqueFarmersByName]);
 
   const filteredVillageSuggestions = useMemo(() => {
     if (!villageSearch.trim()) return uniqueVillages.slice(0, 10);
@@ -427,20 +429,23 @@ export function FarmerLedgerTab() {
               {showNameSuggestions && filteredNameSuggestions.length > 0 && (
                 <div 
                   ref={nameSuggestionsRef}
-                  className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                  className="absolute z-50 w-64 mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
                 >
-                  {filteredNameSuggestions.map((name, idx) => (
+                  {filteredNameSuggestions.map((farmer, idx) => (
                     <button
-                      key={name}
+                      key={farmer.id}
                       type="button"
                       className="w-full px-3 py-2 text-left text-sm hover-elevate"
                       onClick={() => {
-                        setFarmerNameSearch(name);
+                        setFarmerNameSearch(farmer.name);
                         setShowNameSuggestions(false);
                       }}
                       data-testid={`suggestion-name-${idx}`}
                     >
-                      {name}
+                      <div className="font-medium">{farmer.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {farmer.contact || '-'} | {farmer.village || '-'}
+                      </div>
                     </button>
                   ))}
                 </div>
