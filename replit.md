@@ -84,11 +84,11 @@ Cold store dues are calculated as: `(chargesPerBag × originalBags) + hammaliGra
 - **Composite Key Matching**: Farmers are identified by normalized (case-insensitive, trimmed) combination of name + phone + village
 - **Auto-Sync**: POST /api/farmers/sync generates farmer records from existing stock entries and seed transactions
 - **Due Calculations**:
+  - PY Receivable: Combined pyReceivable + receivables from managed cash farmers (pendingDueToBePaid)
   - Harvest Due: Sum of totalDueToFarmer from matching stock entries
   - Seed Due: Sum of totalDueFromFarmer from matching seed transactions
-  - Receivables: Sum of pendingDueToBePaid from managed cash farmers (amounts farmer owes merchant)
   - Net Due = PY Receivable + Harvest Due - Seed Due - Receivables
-- **Receivables Integration**: Managed farmers from Cash Settings with pendingDueToBePaid appear in Seed farmer dropdown and are tracked in Farmer Ledger
+- **Receivables Integration**: Managed farmers from Cash Settings with pendingDueToBePaid are combined into PY Receivable column and appear in Seed farmer dropdown
 - **PY Balances**: Previous year payable/receivable are editable inline with blur-based commits
 - **Negative Flag & Archive**: Toggle controls per farmer; archived farmers shown at bottom with toggle to show/hide
 - **Farmer IDs Never Reassigned**: Unique farmer codes (FMYYYYMMDD#) are permanent and never recycled
