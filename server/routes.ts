@@ -2907,15 +2907,16 @@ export async function registerRoutes(
   });
 
   // PATCH /api/seed-transactions/:id - Update a seed transaction
+  // Note: Farmer fields are now read-only - they are managed via Farmer Ledger
   app.patch("/api/seed-transactions/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
       const id = parseInt(req.params.id);
-      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, items } = req.body;
+      const { vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items } = req.body;
 
-      if (!farmerName || !district || !state || !items || items.length === 0) {
-        return res.status(400).json({ message: "Missing required fields" });
+      if (!items || items.length === 0) {
+        return res.status(400).json({ message: "At least one seed lot item is required" });
       }
 
       // Get existing transaction for change tracking
@@ -2973,16 +2974,11 @@ export async function registerRoutes(
       const otherTotal = parseFloat(otherCharges) || 0;
       const totalDueToFarmer = totalRevenue + transportTotal + otherTotal;
 
+      // Farmer fields are read-only and managed via Farmer Ledger - not updated here
       const transaction = await storage.updateSeedTransaction(
         id,
         merchantId,
         {
-          farmerName,
-          farmerContact: farmerContact || null,
-          village: village || null,
-          tehsil: tehsil || null,
-          district,
-          state,
           vehicleNumber: vehicleNumber || null,
           transportCharges: transportTotal.toString(),
           otherCharges: otherTotal.toString(),

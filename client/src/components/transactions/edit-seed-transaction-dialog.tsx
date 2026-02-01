@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,20 +11,9 @@ import { Plus, Trash2, Loader2, Package, IndianRupee, History, ChevronDown, Chev
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { SEED_DISTRICTS, STATES } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { format } from "date-fns";
-
-interface Farmer {
-  id: number;
-  name: string;
-  contact: string | null;
-  village: string | null;
-  tehsil: string | null;
-  district: string | null;
-  state: string | null;
-}
 
 interface SeedLotOption {
   id: number;
@@ -130,10 +119,6 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
-  
-  const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
-  const farmerInputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const { data: transaction, isLoading: isLoadingTransaction } = useQuery<SeedTransaction>({
     queryKey: ["/api/seed-transactions", transactionId],
@@ -149,45 +134,6 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     queryKey: ["/api/seed-transactions/unsold-inventory"],
     enabled: open,
   });
-
-  const { data: farmers } = useQuery<Farmer[]>({
-    queryKey: ["/api/farmers"],
-    enabled: open,
-  });
-
-  const filteredFarmers = useMemo(() => {
-    if (!farmers || !farmerName.trim()) return [];
-    const searchTerm = farmerName.toLowerCase().trim();
-    return farmers.filter(f => 
-      f.name.toLowerCase().includes(searchTerm)
-    ).slice(0, 8);
-  }, [farmers, farmerName]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(event.target as Node) &&
-        farmerInputRef.current &&
-        !farmerInputRef.current.contains(event.target as Node)
-      ) {
-        setShowFarmerSuggestions(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleFarmerSelect = (farmer: Farmer) => {
-    setFarmerName(farmer.name);
-    setFarmerContact(farmer.contact || "");
-    setVillage(farmer.village || "");
-    setTehsil(farmer.tehsil || "");
-    setDistrict(farmer.district || "");
-    setState(farmer.state || "");
-    setShowFarmerSuggestions(false);
-  };
 
   // Initialize form when transaction data loads
   useEffect(() => {
@@ -353,60 +299,6 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
   }, [selectedLots, transportCharges, otherCharges, availableLots, calculatedAdjustment, adjustmentType]);
 
   const handleSave = () => {
-    if (!farmerName.trim()) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Farmer name is required", "किसान का नाम आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!farmerContact.trim()) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Contact number is required", "संपर्क नंबर आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!village.trim()) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Village is required", "गाँव आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!tehsil.trim()) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Tehsil is required", "तहसील आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!district) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("District is required", "जिला आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!state) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("State is required", "राज्य आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
     const validLots = selectedLots.filter(lot => lot.seedLotId > 0 && lot.bagsMoved > 0);
     if (validLots.length === 0) {
       toast({
@@ -429,13 +321,8 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       }
     }
 
+    // Farmer details are read-only - they are managed via Farmer Ledger
     updateMutation.mutate({
-      farmerName,
-      farmerContact: farmerContact || undefined,
-      village: village || undefined,
-      tehsil: tehsil || undefined,
-      district,
-      state,
       vehicleNumber: vehicleNumber || undefined,
       transportCharges: transportCharges || undefined,
       otherCharges: otherCharges || undefined,
@@ -480,98 +367,66 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Farmer Info Section */}
+          {/* Farmer Info Section - Read Only (edit via Farmer Ledger) */}
           <div className="space-y-4">
-            <h3 className="font-medium text-sm text-muted-foreground">{t("Farmer Details", "किसान विवरण")}</h3>
+            <h3 className="font-medium text-sm text-muted-foreground">
+              {t("Farmer Details", "किसान विवरण")}
+              <span className="ml-2 text-xs text-muted-foreground/60">({t("Edit via Farmer Ledger", "किसान खाता बही द्वारा संपादित करें")})</span>
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="space-y-2 relative">
-                <Label>{t("Farmer Name", "किसान का नाम")} *</Label>
+              <div className="space-y-2">
+                <Label>{t("Farmer Name", "किसान का नाम")}</Label>
                 <Input
-                  ref={farmerInputRef}
                   value={farmerName}
-                  onChange={(e) => {
-                    setFarmerName(e.target.value);
-                    setShowFarmerSuggestions(true);
-                  }}
-                  onFocus={() => setShowFarmerSuggestions(true)}
-                  placeholder={t("Enter name", "नाम दर्ज करें")}
+                  disabled
+                  className="bg-muted"
                   data-testid="input-edit-seed-farmer-name"
-                  autoComplete="off"
                 />
-                {showFarmerSuggestions && filteredFarmers.length > 0 && (
-                  <div 
-                    ref={suggestionsRef}
-                    className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
-                  >
-                    {filteredFarmers.map((farmer) => (
-                      <button
-                        key={farmer.id}
-                        type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
-                        onClick={() => handleFarmerSelect(farmer)}
-                      >
-                        <span className="font-medium">{farmer.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {farmer.contact && `${farmer.contact} `}
-                          {farmer.village && `| ${farmer.village}`}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
               <div className="space-y-2">
-                <Label>{t("Contact Number", "संपर्क नंबर")} *</Label>
+                <Label>{t("Contact Number", "संपर्क नंबर")}</Label>
                 <Input
                   value={farmerContact}
-                  onChange={(e) => setFarmerContact(e.target.value)}
-                  placeholder={t("Enter number", "नंबर दर्ज करें")}
+                  disabled
+                  className="bg-muted"
                   data-testid="input-edit-seed-farmer-contact"
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("Village", "गाँव")} *</Label>
+                <Label>{t("Village", "गाँव")}</Label>
                 <Input
                   value={village}
-                  onChange={(e) => setVillage(e.target.value)}
-                  placeholder={t("Enter village", "गाँव दर्ज करें")}
+                  disabled
+                  className="bg-muted"
                   data-testid="input-edit-seed-village"
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("Tehsil", "तहसील")} *</Label>
+                <Label>{t("Tehsil", "तहसील")}</Label>
                 <Input
                   value={tehsil}
-                  onChange={(e) => setTehsil(e.target.value)}
-                  placeholder={t("Enter tehsil", "तहसील दर्ज करें")}
+                  disabled
+                  className="bg-muted"
                   data-testid="input-edit-seed-tehsil"
                 />
               </div>
               <div className="space-y-2">
-                <Label>{t("District", "जिला")} *</Label>
-                <Select value={district} onValueChange={setDistrict}>
-                  <SelectTrigger data-testid="select-edit-seed-district">
-                    <SelectValue placeholder={t("Select district", "जिला चुनें")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SEED_DISTRICTS.map(d => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>{t("District", "जिला")}</Label>
+                <Input
+                  value={district}
+                  disabled
+                  className="bg-muted"
+                  data-testid="input-edit-seed-district"
+                />
               </div>
               <div className="space-y-2">
-                <Label>{t("State", "राज्य")} *</Label>
-                <Select value={state} onValueChange={setState}>
-                  <SelectTrigger data-testid="select-edit-seed-state">
-                    <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATES.map(s => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>{t("State", "राज्य")}</Label>
+                <Input
+                  value={state}
+                  disabled
+                  className="bg-muted"
+                  data-testid="input-edit-seed-state"
+                />
               </div>
             </div>
             <div className="space-y-2">

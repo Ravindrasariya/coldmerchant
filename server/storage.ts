@@ -2203,7 +2203,27 @@ export class DatabaseStorage implements IStorage {
     const result = await Promise.all(txns.map(async (txn) => {
       const items = await db.select().from(seedTransactionItems)
         .where(eq(seedTransactionItems.seedTransactionId, txn.id));
-      return { ...txn, items };
+      
+      // If farmerId exists, get current farmer details from linked farmer record
+      let linkedFarmer = null;
+      if (txn.farmerId) {
+        const [farmer] = await db.select().from(farmers)
+          .where(and(eq(farmers.id, txn.farmerId), eq(farmers.merchantId, merchantId)));
+        linkedFarmer = farmer || null;
+      }
+      
+      // Return with current farmer details if linked, otherwise use stored values
+      return { 
+        ...txn, 
+        items,
+        // Use linked farmer's current details if available
+        farmerName: linkedFarmer?.name || txn.farmerName,
+        farmerContact: linkedFarmer?.contact || txn.farmerContact,
+        village: linkedFarmer?.village || txn.village,
+        tehsil: linkedFarmer?.tehsil || txn.tehsil,
+        district: linkedFarmer?.district || txn.district,
+        state: linkedFarmer?.state || txn.state,
+      };
     }));
 
     return result;
@@ -2218,7 +2238,26 @@ export class DatabaseStorage implements IStorage {
     const items = await db.select().from(seedTransactionItems)
       .where(eq(seedTransactionItems.seedTransactionId, txn.id));
     
-    return { ...txn, items };
+    // If farmerId exists, get current farmer details from linked farmer record
+    let linkedFarmer = null;
+    if (txn.farmerId) {
+      const [farmer] = await db.select().from(farmers)
+        .where(and(eq(farmers.id, txn.farmerId), eq(farmers.merchantId, merchantId)));
+      linkedFarmer = farmer || null;
+    }
+    
+    // Return with current farmer details if linked, otherwise use stored values
+    return { 
+      ...txn, 
+      items,
+      // Use linked farmer's current details if available
+      farmerName: linkedFarmer?.name || txn.farmerName,
+      farmerContact: linkedFarmer?.contact || txn.farmerContact,
+      village: linkedFarmer?.village || txn.village,
+      tehsil: linkedFarmer?.tehsil || txn.tehsil,
+      district: linkedFarmer?.district || txn.district,
+      state: linkedFarmer?.state || txn.state,
+    };
   }
 
   async updateSeedTransaction(
