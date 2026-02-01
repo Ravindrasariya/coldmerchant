@@ -17,9 +17,16 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Printer
+  Printer,
+  Pencil,
+  History,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
-import { type Farmer } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { type Farmer, type FarmerEditHistory } from "@shared/schema";
 
 interface FarmerWithDues extends Farmer {
   harvestDue: number;
@@ -48,6 +55,23 @@ export function FarmerLedgerTab() {
   const villageInputRef = useRef<HTMLInputElement>(null);
   const nameSuggestionsRef = useRef<HTMLDivElement>(null);
   const villageSuggestionsRef = useRef<HTMLDivElement>(null);
+  
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingFarmer, setEditingFarmer] = useState<FarmerWithDues | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    contact: "",
+    village: "",
+    tehsil: "",
+    district: "",
+    state: "",
+  });
+  
+  // Edit tracker state
+  const [showEditTracker, setShowEditTracker] = useState(false);
+  
+  const { toast } = useToast();
 
   const { data: farmers = [], isLoading } = useQuery<FarmerWithDues[]>({
     queryKey: ["/api/farmers"],
@@ -73,6 +97,82 @@ export function FarmerLedgerTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
     },
   });
+
+  // Edit history query
+  interface EditHistoryItem extends FarmerEditHistory {
+    farmerName?: string;
+    userName?: string;
+  }
+  const { data: editHistory = [] } = useQuery<EditHistoryItem[]>({
+    queryKey: ["/api/farmers/edit-history"],
+    enabled: !!user,
+  });
+
+  // Update farmer details with propagation mutation
+  const updateDetailsMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { name: string; contact: string; village: string; tehsil: string; district: string; state: string } }) => {
+      const response = await apiRequest("PATCH", `/api/farmers/${id}/details`, data);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw { status: response.status, ...errorData };
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/edit-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      setEditDialogOpen(false);
+      setEditingFarmer(null);
+      toast({
+        title: t("Farmer Updated", "किसान अपडेट किया गया"),
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      if (error.requiresMerge) {
+        toast({
+          title: t("Merge Required", "मर्ज आवश्यक"),
+          description: t("Another farmer with these details exists. Merge functionality coming soon.", "इन विवरणों के साथ एक अन्य किसान मौजूद है। मर्ज कार्यक्षमता जल्द आ रही है।"),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: error.message || t("Failed to update farmer", "किसान अपडेट करने में विफल"),
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const handleEditFarmer = (farmer: FarmerWithDues) => {
+    setEditingFarmer(farmer);
+    setEditForm({
+      name: farmer.name || "",
+      contact: farmer.contact || "",
+      village: farmer.village || "",
+      tehsil: farmer.tehsil || "",
+      district: farmer.district || "",
+      state: farmer.state || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingFarmer) return;
+    if (!editForm.name.trim()) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Farmer name is required", "किसान का नाम आवश्यक है"),
+        variant: "destructive",
+      });
+      return;
+    }
+    updateDetailsMutation.mutate({ id: editingFarmer.id, data: editForm });
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -345,6 +445,18 @@ export function FarmerLedgerTab() {
   const renderFarmerRow = (farmer: FarmerWithDues, isArchived: boolean) => {
     return (
       <tr key={farmer.id} className={`border-b hover-elevate ${isArchived ? 'opacity-60' : ''}`} data-testid={`row-farmer-${farmer.id}`}>
+        <td className="p-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => handleEditFarmer(farmer)}
+            title={t("Edit Farmer", "किसान संपादित करें")}
+            data-testid={`button-edit-farmer-${farmer.id}`}
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+        </td>
         <td className="p-2 font-mono text-xs" data-testid={`text-farmer-code-${farmer.id}`}>{farmer.farmerCode}</td>
         <td className="p-2 text-xs" data-testid={`text-farmer-name-${farmer.id}`}>
           <div className="flex items-center gap-1">
@@ -441,6 +553,63 @@ export function FarmerLedgerTab() {
           </div>
         </Card>
       </div>
+
+      {/* Edit Tracker Section */}
+      {editHistory.length > 0 && (
+        <Card>
+          <CardHeader className="py-3">
+            <button
+              type="button"
+              className="flex items-center justify-between w-full"
+              onClick={() => setShowEditTracker(!showEditTracker)}
+              data-testid="button-toggle-edit-tracker"
+            >
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-sm">{t("Edit Tracker", "संपादन ट्रैकर")}</span>
+                <Badge variant="secondary" className="text-xs">{editHistory.length}</Badge>
+              </div>
+              {showEditTracker ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </CardHeader>
+          {showEditTracker && (
+            <CardContent className="pt-0">
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-background">
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-2 text-left text-xs font-medium">{t("Sr#", "क्र.")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Date", "तारीख")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Farmer", "किसान")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Field", "फ़ील्ड")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Old Value", "पुराना मान")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("New Value", "नया मान")}</th>
+                      <th className="p-2 text-left text-xs font-medium">{t("Changed By", "द्वारा बदला गया")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editHistory.map((entry, idx) => (
+                      <tr key={entry.id} className="border-b hover-elevate" data-testid={`row-edit-history-${entry.id}`}>
+                        <td className="p-2 text-xs font-mono">{editHistory.length - idx}</td>
+                        <td className="p-2 text-xs">
+                          {entry.changedAt ? new Date(entry.changedAt).toLocaleString('en-IN', { 
+                            day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
+                          }) : '-'}
+                        </td>
+                        <td className="p-2 text-xs font-medium">{entry.farmerName || '-'}</td>
+                        <td className="p-2 text-xs capitalize">{entry.fieldName}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{entry.oldValue || '-'}</td>
+                        <td className="p-2 text-xs font-medium">{entry.newValue || '-'}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{entry.userName || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
@@ -589,6 +758,7 @@ export function FarmerLedgerTab() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/50">
+                    <th className="p-1.5 text-left text-xs font-medium w-8"></th>
                     <th className="p-2 text-left text-xs font-medium">
                       <button
                         type="button"
@@ -685,6 +855,104 @@ export function FarmerLedgerTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Farmer Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{t("Edit Farmer Details", "किसान विवरण संपादित करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="text-xs text-muted-foreground mb-2">
+              {t("Farmer ID", "किसान आईडी")}: <span className="font-mono font-medium">{editingFarmer?.farmerCode}</span>
+              <span className="ml-2 text-[10px]">({t("Cannot be changed", "बदला नहीं जा सकता")})</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">{t("Name", "नाम")} *</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder={t("Farmer name", "किसान का नाम")}
+                  data-testid="input-edit-farmer-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-contact">{t("Contact", "संपर्क")}</Label>
+                <Input
+                  id="edit-contact"
+                  value={editForm.contact}
+                  onChange={(e) => setEditForm(f => ({ ...f, contact: e.target.value }))}
+                  placeholder={t("Phone number", "फोन नंबर")}
+                  data-testid="input-edit-farmer-contact"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-village">{t("Village", "गांव")}</Label>
+                <Input
+                  id="edit-village"
+                  value={editForm.village}
+                  onChange={(e) => setEditForm(f => ({ ...f, village: e.target.value }))}
+                  placeholder={t("Village name", "गांव का नाम")}
+                  data-testid="input-edit-farmer-village"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-tehsil">{t("Tehsil", "तहसील")}</Label>
+                <Input
+                  id="edit-tehsil"
+                  value={editForm.tehsil}
+                  onChange={(e) => setEditForm(f => ({ ...f, tehsil: e.target.value }))}
+                  placeholder={t("Tehsil name", "तहसील का नाम")}
+                  data-testid="input-edit-farmer-tehsil"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-district">{t("District", "जिला")}</Label>
+                <Input
+                  id="edit-district"
+                  value={editForm.district}
+                  onChange={(e) => setEditForm(f => ({ ...f, district: e.target.value }))}
+                  placeholder={t("District name", "जिले का नाम")}
+                  data-testid="input-edit-farmer-district"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-state">{t("State", "राज्य")}</Label>
+                <Input
+                  id="edit-state"
+                  value={editForm.state}
+                  onChange={(e) => setEditForm(f => ({ ...f, state: e.target.value }))}
+                  placeholder={t("State name", "राज्य का नाम")}
+                  data-testid="input-edit-farmer-state"
+                />
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+              {t("Note: Changes will be propagated to all linked stock entries, seed transactions, and receivables.", 
+                 "नोट: परिवर्तन सभी संबंधित स्टॉक एंट्री, बीज लेनदेन और प्राप्य में प्रचारित किए जाएंगे।")}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={updateDetailsMutation.isPending}
+              data-testid="button-save-farmer-edit"
+            >
+              {updateDetailsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("Save Changes", "परिवर्तन सहेजें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
