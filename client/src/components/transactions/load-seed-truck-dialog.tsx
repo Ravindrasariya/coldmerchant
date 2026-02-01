@@ -72,7 +72,10 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
   
   const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
+  const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const farmerInputRef = useRef<HTMLInputElement>(null);
+  const contactInputRef = useRef<HTMLInputElement>(null);
+  const villageInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const { data: unsoldInventory } = useQuery<SeedLotOption[]>({
@@ -86,12 +89,31 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   });
 
   const filteredFarmers = useMemo(() => {
-    if (!farmers || !farmerName.trim()) return [];
-    const searchTerm = farmerName.toLowerCase().trim();
-    return farmers.filter(f => 
-      f.name.toLowerCase().includes(searchTerm)
-    ).slice(0, 8);
-  }, [farmers, farmerName]);
+    if (!farmers) return [];
+    
+    if (activeField === 'name' && farmerName.trim()) {
+      const searchTerm = farmerName.toLowerCase().trim();
+      return farmers.filter(f => 
+        f.name.toLowerCase().includes(searchTerm)
+      ).slice(0, 8);
+    }
+    
+    if (activeField === 'contact' && farmerContact.trim()) {
+      const searchTerm = farmerContact.toLowerCase().trim();
+      return farmers.filter(f => 
+        f.contact?.toLowerCase().includes(searchTerm)
+      ).slice(0, 8);
+    }
+    
+    if (activeField === 'village' && village.trim()) {
+      const searchTerm = village.toLowerCase().trim();
+      return farmers.filter(f => 
+        f.village?.toLowerCase().includes(searchTerm)
+      ).slice(0, 8);
+    }
+    
+    return [];
+  }, [farmers, farmerName, farmerContact, village, activeField]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -99,9 +121,14 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
         suggestionsRef.current &&
         !suggestionsRef.current.contains(event.target as Node) &&
         farmerInputRef.current &&
-        !farmerInputRef.current.contains(event.target as Node)
+        !farmerInputRef.current.contains(event.target as Node) &&
+        contactInputRef.current &&
+        !contactInputRef.current.contains(event.target as Node) &&
+        villageInputRef.current &&
+        !villageInputRef.current.contains(event.target as Node)
       ) {
         setShowFarmerSuggestions(false);
+        setActiveField(null);
       }
     };
 
@@ -358,14 +385,18 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                   value={farmerName}
                   onChange={(e) => {
                     setFarmerName(e.target.value);
+                    setActiveField('name');
                     setShowFarmerSuggestions(true);
                   }}
-                  onFocus={() => setShowFarmerSuggestions(true)}
+                  onFocus={() => {
+                    setActiveField('name');
+                    setShowFarmerSuggestions(true);
+                  }}
                   placeholder={t("Enter name", "नाम दर्ज करें")}
                   data-testid="input-seed-farmer-name"
                   autoComplete="off"
                 />
-                {showFarmerSuggestions && filteredFarmers.length > 0 && (
+                {showFarmerSuggestions && activeField === 'name' && filteredFarmers.length > 0 && (
                   <div 
                     ref={suggestionsRef}
                     className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
@@ -387,23 +418,85 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                   </div>
                 )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label>{t("Contact Number", "संपर्क नंबर")} *</Label>
                 <Input
+                  ref={contactInputRef}
                   value={farmerContact}
-                  onChange={(e) => setFarmerContact(e.target.value)}
+                  onChange={(e) => {
+                    setFarmerContact(e.target.value);
+                    setActiveField('contact');
+                    setShowFarmerSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setActiveField('contact');
+                    setShowFarmerSuggestions(true);
+                  }}
                   placeholder={t("Enter number", "नंबर दर्ज करें")}
+                  autoComplete="off"
                   data-testid="input-seed-farmer-contact"
                 />
+                {showFarmerSuggestions && activeField === 'contact' && filteredFarmers.length > 0 && (
+                  <div 
+                    ref={suggestionsRef}
+                    className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                  >
+                    {filteredFarmers.map((farmer) => (
+                      <button
+                        key={farmer.id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
+                        onClick={() => handleFarmerSelect(farmer)}
+                      >
+                        <span className="font-medium">{farmer.contact}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {farmer.name}
+                          {farmer.village && ` | ${farmer.village}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label>{t("Village", "गाँव")} *</Label>
                 <Input
+                  ref={villageInputRef}
                   value={village}
-                  onChange={(e) => setVillage(e.target.value)}
+                  onChange={(e) => {
+                    setVillage(e.target.value);
+                    setActiveField('village');
+                    setShowFarmerSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setActiveField('village');
+                    setShowFarmerSuggestions(true);
+                  }}
                   placeholder={t("Enter village", "गाँव दर्ज करें")}
+                  autoComplete="off"
                   data-testid="input-seed-village"
                 />
+                {showFarmerSuggestions && activeField === 'village' && filteredFarmers.length > 0 && (
+                  <div 
+                    ref={suggestionsRef}
+                    className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                  >
+                    {filteredFarmers.map((farmer) => (
+                      <button
+                        key={farmer.id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
+                        onClick={() => handleFarmerSelect(farmer)}
+                      >
+                        <span className="font-medium">{farmer.village}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {farmer.name}
+                          {farmer.contact && ` | ${farmer.contact}`}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>{t("Tehsil", "तहसील")} *</Label>

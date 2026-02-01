@@ -736,6 +736,16 @@ interface FarmersSectionProps {
   isLoading: boolean;
 }
 
+interface FarmerSuggestion {
+  id: number;
+  name: string;
+  contact: string;
+  village: string;
+  tehsil: string;
+  district: string;
+  state: string;
+}
+
 function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -743,6 +753,35 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const emptyFormData = { name: "", contactNumber: "", village: "", tehsil: "", district: "", state: "", pendingDueToBePaid: "" };
   const [formData, setFormData] = useState(emptyFormData);
+  const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const { data: farmerSuggestions = [] } = useQuery<FarmerSuggestion[]>({
+    queryKey: ["/api/farmers/suggestions"],
+  });
+
+  const getFilteredSuggestions = (field: 'name' | 'contact' | 'village', value: string) => {
+    if (!value || value.length < 2) return [];
+    const searchTerm = value.toLowerCase();
+    const fieldMap = { name: 'name', contact: 'contact', village: 'village' } as const;
+    return farmerSuggestions.filter(farmer => {
+      const fieldValue = farmer[fieldMap[field]];
+      return fieldValue?.toLowerCase().includes(searchTerm);
+    }).slice(0, 8);
+  };
+
+  const handleSelectFarmer = (farmer: FarmerSuggestion) => {
+    setFormData({
+      ...formData,
+      name: farmer.name,
+      contactNumber: farmer.contact,
+      village: farmer.village,
+      tehsil: farmer.tehsil,
+      district: farmer.district,
+      state: farmer.state,
+    });
+    setShowSuggestions(false);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -828,34 +867,128 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
         <Card>
           <CardContent className="pt-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
+              <div className="space-y-1 relative">
                 <Label className="text-xs">{t("Name", "नाम")} *</Label>
                 <Input
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setActiveField('name');
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setActiveField('name');
+                    setShowSuggestions(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   placeholder={t("Farmer name", "किसान का नाम")}
+                  autoComplete="off"
                   data-testid="input-farmer-name"
                 />
+                {showSuggestions && activeField === 'name' && getFilteredSuggestions('name', formData.name).length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {getFilteredSuggestions('name', formData.name).map((farmer, index) => (
+                      <div
+                        key={farmer.id}
+                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectFarmer(farmer);
+                        }}
+                        data-testid={`suggestion-farmer-name-${index}`}
+                      >
+                        <div className="font-medium text-sm">{farmer.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {farmer.contact && <span>{farmer.contact}</span>}
+                          {farmer.contact && farmer.village && <span> | </span>}
+                          {farmer.village && <span>{farmer.village}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 relative">
                 <Label className="text-xs">{t("Contact", "संपर्क")} *</Label>
                 <Input
                   value={formData.contactNumber}
-                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, contactNumber: e.target.value });
+                    setActiveField('contact');
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setActiveField('contact');
+                    setShowSuggestions(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   placeholder={t("Contact number", "संपर्क नंबर")}
+                  autoComplete="off"
                   data-testid="input-farmer-contact"
                 />
+                {showSuggestions && activeField === 'contact' && getFilteredSuggestions('contact', formData.contactNumber).length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {getFilteredSuggestions('contact', formData.contactNumber).map((farmer, index) => (
+                      <div
+                        key={farmer.id}
+                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectFarmer(farmer);
+                        }}
+                        data-testid={`suggestion-farmer-contact-${index}`}
+                      >
+                        <div className="font-medium text-sm">{farmer.contact}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {farmer.name}
+                          {farmer.village && <span> | {farmer.village}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
+              <div className="space-y-1 relative">
                 <Label className="text-xs">{t("Village", "गाँव")} *</Label>
                 <Input
                   value={formData.village}
-                  onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, village: e.target.value });
+                    setActiveField('village');
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setActiveField('village');
+                    setShowSuggestions(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   placeholder={t("Village", "गाँव")}
+                  autoComplete="off"
                   data-testid="input-farmer-village"
                 />
+                {showSuggestions && activeField === 'village' && getFilteredSuggestions('village', formData.village).length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {getFilteredSuggestions('village', formData.village).map((farmer, index) => (
+                      <div
+                        key={farmer.id}
+                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectFarmer(farmer);
+                        }}
+                        data-testid={`suggestion-farmer-village-${index}`}
+                      >
+                        <div className="font-medium text-sm">{farmer.village}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {farmer.name}
+                          {farmer.contact && <span> | {farmer.contact}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("Tehsil", "तहसील")} *</Label>

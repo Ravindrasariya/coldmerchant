@@ -2140,6 +2140,30 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/farmers/suggestions - Get farmer suggestions for auto-complete
+  app.get("/api/farmers/suggestions", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const farmerList = await storage.getFarmersByMerchant(merchantId);
+      
+      // Return only the fields needed for auto-suggest
+      const suggestions = farmerList.map(farmer => ({
+        id: farmer.id,
+        name: farmer.name,
+        contact: farmer.contact || "",
+        village: farmer.village || "",
+        tehsil: farmer.tehsil || "",
+        district: farmer.district || "",
+        state: farmer.state || "",
+      }));
+      
+      res.json(suggestions);
+    } catch (error) {
+      console.error("Error fetching farmer suggestions:", error);
+      res.status(500).json({ message: "Failed to fetch farmer suggestions" });
+    }
+  });
+
   // POST /api/farmers/sync - Sync farmers from stock entries and seed transactions
   app.post("/api/farmers/sync", requireMerchant, async (req, res) => {
     try {
