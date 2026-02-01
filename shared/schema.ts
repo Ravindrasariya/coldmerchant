@@ -311,6 +311,18 @@ export const farmers = pgTable("farmers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Farmer Edit History - tracks all modifications to farmer records
+export const farmerEditHistory = pgTable("farmer_edit_history", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  farmerId: integer("farmer_id").notNull().references(() => farmers.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changedBy: integer("changed_by").references(() => users.id), // userId who made the change
+  fieldName: text("field_name").notNull(), // name, contact, village, tehsil, district, state
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+});
+
 // ===================== SEED MANAGEMENT TABLES =====================
 
 // Seed Stock Entries - supplier info for seed purchases
@@ -747,6 +759,7 @@ export const insertPartySchema = createInsertSchema(parties).omit({ id: true, cr
 export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFarmerSchema = createInsertSchema(farmers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFarmerEditHistorySchema = createInsertSchema(farmerEditHistory).omit({ id: true, changedAt: true });
 
 // Seed schemas
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
@@ -813,6 +826,9 @@ export type InsertBuyer = z.infer<typeof insertBuyerSchema>;
 
 export type Farmer = typeof farmers.$inferSelect;
 export type InsertFarmer = z.infer<typeof insertFarmerSchema>;
+
+export type FarmerEditHistory = typeof farmerEditHistory.$inferSelect;
+export type InsertFarmerEditHistory = z.infer<typeof insertFarmerEditHistorySchema>;
 
 export type SeedStockEntry = typeof seedStockEntries.$inferSelect;
 export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;

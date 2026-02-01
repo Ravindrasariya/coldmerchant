@@ -2,7 +2,7 @@ import {
   users, merchants, stockEntries, lots, bagBreakdowns, stockEntryEditHistory,
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
-  cashSettings, bankAccounts, parties, cashFarmers, buyers, farmers,
+  cashSettings, bankAccounts, parties, cashFarmers, buyers, farmers, farmerEditHistory,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
   farmerSettlements,
@@ -21,7 +21,7 @@ import {
   type Party, type InsertParty,
   type CashFarmer, type InsertCashFarmer,
   type Buyer, type InsertBuyer,
-  type Farmer, type InsertFarmer,
+  type Farmer, type InsertFarmer, type FarmerEditHistory, type InsertFarmerEditHistory,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
   type SeedStockEntryWithLots,
@@ -147,6 +147,11 @@ export interface IStorage {
   getFarmerByCompositeKey(merchantId: number, name: string, contact: string | null, village: string | null): Promise<Farmer | undefined>;
   getFarmerByNameAndContact(merchantId: number, name: string, contact: string | null): Promise<Farmer | undefined>;
   lookupOrCreateFarmer(merchantId: number, farmerData: { name: string; contact?: string | null; village?: string | null; tehsil?: string | null; district?: string | null; state?: string | null }): Promise<{ farmerId: number; isNew: boolean }>;
+  
+  // Farmer Edit History operations
+  getFarmerEditHistory(merchantId: number): Promise<(FarmerEditHistory & { farmerName?: string; userName?: string })[]>;
+  createFarmerEditHistory(data: InsertFarmerEditHistory): Promise<FarmerEditHistory>;
+  updateFarmerWithPropagation(id: number, merchantId: number, userId: number | null, data: Partial<Farmer>): Promise<{ farmer: Farmer | undefined; changesLogged: number }>;
   
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
@@ -1668,6 +1673,168 @@ export class DatabaseStorage implements IStorage {
     });
     
     return { farmerId: newFarmer.id, isNew: true };
+  }
+
+  // ===================== FARMER EDIT HISTORY OPERATIONS =====================
+  
+  async getFarmerEditHistory(merchantId: number): Promise<(FarmerEditHistory & { farmerName?: string; userName?: string })[]> {
+    const history = await db.select({
+      history: farmerEditHistory,
+      farmerName: farmers.name,
+      userName: users.username,
+    })
+    .from(farmerEditHistory)
+    .leftJoin(farmers, eq(farmerEditHistory.farmerId, farmers.id))
+    .leftJoin(users, eq(farmerEditHistory.changedBy, users.id))
+    .where(eq(farmerEditHistory.merchantId, merchantId))
+    .orderBy(desc(farmerEditHistory.id));
+    
+    return history.map(h => ({
+      ...h.history,
+      farmerName: h.farmerName || undefined,
+      userName: h.userName || undefined,
+    }));
+  }
+
+  async createFarmerEditHistory(data: InsertFarmerEditHistory): Promise<FarmerEditHistory> {
+    const [created] = await db.insert(farmerEditHistory).values(data).returning();
+    return created;
+  }
+
+  async updateFarmerWithPropagation(id: number, merchantId: number, userId: number | null, data: Partial<Farmer>): Promise<{ farmer: Farmer | undefined; changesLogged: number }> {
+    // Get current farmer data first
+    const [currentFarmer] = await db.select().from(farmers)
+      .where(and(eq(farmers.id, id), eq(farmers.merchantId, merchantId)));
+    
+    if (!currentFarmer) {
+      return { farmer: undefined, changesLogged: 0 };
+    }
+    
+    // Track which fields changed
+    const changedFields: { fieldName: string; oldValue: string | null; newValue: string | null }[] = [];
+    const propagatableFields = ['name', 'contact', 'village', 'tehsil', 'district', 'state'] as const;
+    
+    for (const field of propagatableFields) {
+      if (data[field] !== undefined && data[field] !== currentFarmer[field]) {
+        changedFields.push({
+          fieldName: field,
+          oldValue: currentFarmer[field] || null,
+          newValue: data[field] || null,
+        });
+      }
+    }
+    
+    // Update the farmer record
+    const [updatedFarmer] = await db.update(farmers)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(farmers.id, id), eq(farmers.merchantId, merchantId)))
+      .returning();
+    
+    if (!updatedFarmer || changedFields.length === 0) {
+      return { farmer: updatedFarmer, changesLogged: 0 };
+    }
+    
+    // Log each changed field
+    for (const change of changedFields) {
+      await this.createFarmerEditHistory({
+        merchantId,
+        farmerId: id,
+        changedBy: userId,
+        fieldName: change.fieldName,
+        oldValue: change.oldValue,
+        newValue: change.newValue,
+      });
+    }
+    
+    // Propagate changes to linked records
+    // Update stock entries with this farmerId
+    for (const change of changedFields) {
+      if (change.fieldName === 'name') {
+        await db.update(stockEntries)
+          .set({ farmerName: change.newValue || '', updatedAt: new Date() })
+          .where(and(eq(stockEntries.farmerId, id), eq(stockEntries.merchantId, merchantId)));
+      } else if (change.fieldName === 'contact') {
+        await db.update(stockEntries)
+          .set({ farmerContact: change.newValue, updatedAt: new Date() })
+          .where(and(eq(stockEntries.farmerId, id), eq(stockEntries.merchantId, merchantId)));
+      } else if (change.fieldName === 'village') {
+        await db.update(stockEntries)
+          .set({ village: change.newValue, updatedAt: new Date() })
+          .where(and(eq(stockEntries.farmerId, id), eq(stockEntries.merchantId, merchantId)));
+      } else if (change.fieldName === 'tehsil') {
+        await db.update(stockEntries)
+          .set({ tehsil: change.newValue, updatedAt: new Date() })
+          .where(and(eq(stockEntries.farmerId, id), eq(stockEntries.merchantId, merchantId)));
+      } else if (change.fieldName === 'district') {
+        await db.update(stockEntries)
+          .set({ district: change.newValue || '', updatedAt: new Date() })
+          .where(and(eq(stockEntries.farmerId, id), eq(stockEntries.merchantId, merchantId)));
+      } else if (change.fieldName === 'state') {
+        await db.update(stockEntries)
+          .set({ state: change.newValue || '', updatedAt: new Date() })
+          .where(and(eq(stockEntries.farmerId, id), eq(stockEntries.merchantId, merchantId)));
+      }
+    }
+    
+    // Update seed transactions with this farmerId
+    for (const change of changedFields) {
+      if (change.fieldName === 'name') {
+        await db.update(seedTransactions)
+          .set({ farmerName: change.newValue || '' })
+          .where(and(eq(seedTransactions.farmerId, id), eq(seedTransactions.merchantId, merchantId)));
+      } else if (change.fieldName === 'contact') {
+        await db.update(seedTransactions)
+          .set({ farmerContact: change.newValue })
+          .where(and(eq(seedTransactions.farmerId, id), eq(seedTransactions.merchantId, merchantId)));
+      } else if (change.fieldName === 'village') {
+        await db.update(seedTransactions)
+          .set({ village: change.newValue })
+          .where(and(eq(seedTransactions.farmerId, id), eq(seedTransactions.merchantId, merchantId)));
+      } else if (change.fieldName === 'tehsil') {
+        await db.update(seedTransactions)
+          .set({ tehsil: change.newValue })
+          .where(and(eq(seedTransactions.farmerId, id), eq(seedTransactions.merchantId, merchantId)));
+      } else if (change.fieldName === 'district') {
+        await db.update(seedTransactions)
+          .set({ district: change.newValue || '' })
+          .where(and(eq(seedTransactions.farmerId, id), eq(seedTransactions.merchantId, merchantId)));
+      } else if (change.fieldName === 'state') {
+        await db.update(seedTransactions)
+          .set({ state: change.newValue || '' })
+          .where(and(eq(seedTransactions.farmerId, id), eq(seedTransactions.merchantId, merchantId)));
+      }
+    }
+    
+    // Update cash farmers with this farmerId
+    for (const change of changedFields) {
+      if (change.fieldName === 'name') {
+        await db.update(cashFarmers)
+          .set({ name: change.newValue || '', updatedAt: new Date() })
+          .where(and(eq(cashFarmers.farmerId, id), eq(cashFarmers.merchantId, merchantId)));
+      } else if (change.fieldName === 'contact') {
+        await db.update(cashFarmers)
+          .set({ contactNumber: change.newValue, updatedAt: new Date() })
+          .where(and(eq(cashFarmers.farmerId, id), eq(cashFarmers.merchantId, merchantId)));
+      } else if (change.fieldName === 'village') {
+        await db.update(cashFarmers)
+          .set({ village: change.newValue, updatedAt: new Date() })
+          .where(and(eq(cashFarmers.farmerId, id), eq(cashFarmers.merchantId, merchantId)));
+      } else if (change.fieldName === 'tehsil') {
+        await db.update(cashFarmers)
+          .set({ tehsil: change.newValue, updatedAt: new Date() })
+          .where(and(eq(cashFarmers.farmerId, id), eq(cashFarmers.merchantId, merchantId)));
+      } else if (change.fieldName === 'district') {
+        await db.update(cashFarmers)
+          .set({ district: change.newValue, updatedAt: new Date() })
+          .where(and(eq(cashFarmers.farmerId, id), eq(cashFarmers.merchantId, merchantId)));
+      } else if (change.fieldName === 'state') {
+        await db.update(cashFarmers)
+          .set({ state: change.newValue, updatedAt: new Date() })
+          .where(and(eq(cashFarmers.farmerId, id), eq(cashFarmers.merchantId, merchantId)));
+      }
+    }
+    
+    return { farmer: updatedFarmer, changesLogged: changedFields.length };
   }
 
   // ===================== BANK ACCOUNT OPERATIONS =====================

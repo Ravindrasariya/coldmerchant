@@ -2392,6 +2392,72 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/farmers/edit-history - Get farmer edit history
+  app.get("/api/farmers/edit-history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const history = await storage.getFarmerEditHistory(merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching farmer edit history:", error);
+      res.status(500).json({ message: "Failed to fetch farmer edit history" });
+    }
+  });
+
+  // PATCH /api/farmers/:id/details - Update farmer details with propagation to linked records
+  app.patch("/api/farmers/:id/details", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      const { name, contact, village, tehsil, district, state } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+
+      // Check if new details would match another existing farmer (merge detection)
+      const existingFarmer = await storage.getFarmerByCompositeKey(
+        merchantId,
+        name,
+        contact || null,
+        village || null
+      );
+
+      if (existingFarmer && existingFarmer.id !== id) {
+        // Return the existing farmer for merge confirmation
+        return res.status(409).json({ 
+          message: "Another farmer with these details already exists",
+          existingFarmer,
+          requiresMerge: true
+        });
+      }
+
+      // Update farmer with propagation
+      const result = await storage.updateFarmerWithPropagation(id, merchantId, userId, {
+        name: name.trim(),
+        contact: contact?.trim() || null,
+        village: village?.trim() || null,
+        tehsil: tehsil?.trim() || null,
+        district: district?.trim() || null,
+        state: state?.trim() || null,
+      });
+
+      if (!result.farmer) {
+        return res.status(404).json({ message: "Farmer not found" });
+      }
+
+      res.json({ 
+        farmer: result.farmer, 
+        changesLogged: result.changesLogged,
+        message: result.changesLogged > 0 ? `${result.changesLogged} field(s) updated and propagated` : 'No changes detected'
+      });
+    } catch (error) {
+      console.error("Error updating farmer details:", error);
+      res.status(500).json({ message: "Failed to update farmer details" });
+    }
+  });
+
   // ===================== BANK ACCOUNT ROUTES =====================
 
   // GET /api/bank-accounts - Get all bank accounts for the authenticated merchant
