@@ -125,11 +125,12 @@ export function FarmerLedgerTab() {
   const updateDetailsMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { name: string; contact: string; village: string; tehsil: string; district: string; state: string } }) => {
       const response = await apiRequest("PATCH", `/api/farmers/${id}/details`, data);
+      const responseData = await response.json();
       if (!response.ok) {
-        const errorData = await response.json();
-        throw { status: response.status, ...errorData };
+        // Return full response data with status for proper error handling
+        throw { status: response.status, data: responseData };
       }
-      return response.json();
+      return responseData;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
@@ -145,19 +146,21 @@ export function FarmerLedgerTab() {
       });
     },
     onError: (error: any) => {
-      if (error.requiresMerge && error.existingFarmer) {
+      // Check for merge conflict (409 status with requiresMerge flag)
+      const errorData = error.data || error;
+      if (error.status === 409 && errorData.requiresMerge && errorData.existingFarmer) {
         // Close edit dialog and show merge confirmation
         setEditDialogOpen(false);
         setMergingFarmer({
-          id: error.existingFarmer.id,
-          farmerCode: error.existingFarmer.farmerCode,
-          name: error.existingFarmer.name,
+          id: errorData.existingFarmer.id,
+          farmerCode: errorData.existingFarmer.farmerCode,
+          name: errorData.existingFarmer.name,
         });
         setMergeDialogOpen(true);
       } else {
         toast({
           title: t("Error", "त्रुटि"),
-          description: error.message || t("Failed to update farmer", "किसान अपडेट करने में विफल"),
+          description: errorData.message || t("Failed to update farmer", "किसान अपडेट करने में विफल"),
           variant: "destructive",
         });
       }
