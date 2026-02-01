@@ -41,6 +41,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
 import { CashManagementTab } from "@/components/cash-management/cash-management-tab";
+import { FarmerLedgerTab } from "@/components/farmer-ledger/farmer-ledger-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -169,6 +170,14 @@ export default function HomePage() {
                   <Leaf className="h-4 w-4" />
                   {t("Seed", "बीज")}
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="farmer-ledger" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-farmer-ledger"
+                >
+                  <Wheat className="h-4 w-4" />
+                  {t("Farmer Ledger", "किसान खाता")}
+                </TabsTrigger>
               </TabsList>
             </nav>
 
@@ -207,10 +216,6 @@ export default function HomePage() {
                   <DropdownMenuItem onClick={() => setLocation("/buyers")} data-testid="button-buyers">
                     <Users className="h-4 w-4 mr-2" />
                     {t("Buyers", "खरीदार")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setLocation("/farmers")} data-testid="button-farmers">
-                    <Wheat className="h-4 w-4 mr-2" />
-                    {t("Farmer Ledger", "किसान खाता")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
                     <KeyRound className="h-4 w-4 mr-2" />
@@ -293,6 +298,15 @@ export default function HomePage() {
                           <Leaf className="h-4 w-4" />
                           {t("Seed", "बीज")}
                         </TabsTrigger>
+                        <TabsTrigger 
+                          value="farmer-ledger" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-farmer-ledger-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Wheat className="h-4 w-4" />
+                          {t("Farmer Ledger", "किसान खाता")}
+                        </TabsTrigger>
                       </TabsList>
                     </nav>
                   </div>
@@ -369,6 +383,10 @@ export default function HomePage() {
               seedDownloadDialogOpen={seedDownloadDialogOpen}
               setSeedDownloadDialogOpen={setSeedDownloadDialogOpen}
             />
+          </div>
+
+          <div className={activeTab === "farmer-ledger" ? "block" : "hidden"}>
+            <FarmerLedgerTab />
           </div>
 
           <footer className="mt-8 pt-4 border-t flex flex-col items-center text-center gap-2 text-sm text-muted-foreground">
