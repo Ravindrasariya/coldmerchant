@@ -1462,6 +1462,71 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
+      // If this is a supplier payment, apply FIFO to seed stock entries
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "supplier" && entry.supplierName) {
+        let remainingAmount = parseFloat(entry.amount);
+        const normalizedSupplierName = normalizeName(entry.supplierName);
+        
+        // Get all seed stock entries for this merchant (FIFO order by createdAt)
+        const allSeedEntries = await tx.select().from(seedStockEntries)
+          .where(eq(seedStockEntries.merchantId, entry.merchantId))
+          .orderBy(asc(seedStockEntries.createdAt));
+        
+        // Get all seed lots to calculate total costs
+        const allSeedLots = await tx.select().from(seedLots)
+          .where(eq(seedLots.merchantId, entry.merchantId));
+        
+        // Filter to only those matching supplier name (case-insensitive, trimmed) with remaining due
+        const entriesWithDue = allSeedEntries.filter(se => {
+          if (normalizeName(se.supplierName) !== normalizedSupplierName) return false;
+          
+          // Calculate total cost for this entry from its lots
+          const entryLots = allSeedLots.filter(lot => lot.seedEntryId === se.id);
+          const totalCost = entryLots.reduce((sum, lot) => {
+            const bags = lot.originalBags || 0;
+            const pricePerBag = parseFloat(lot.pricePerBag || "0");
+            return sum + (bags * pricePerBag);
+          }, 0);
+          
+          const amountPaid = parseFloat(se.amountPaid || "0");
+          return totalCost > amountPaid;
+        });
+        
+        for (const seedEntry of entriesWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          // Calculate total cost for this entry from its lots
+          const entryLots = allSeedLots.filter(lot => lot.seedEntryId === seedEntry.id);
+          const totalCost = entryLots.reduce((sum, lot) => {
+            const bags = lot.originalBags || 0;
+            const pricePerBag = parseFloat(lot.pricePerBag || "0");
+            return sum + (bags * pricePerBag);
+          }, 0);
+          
+          const currentPaid = parseFloat(seedEntry.amountPaid || "0");
+          const due = totalCost - currentPaid;
+          
+          if (due <= 0) continue;
+          
+          // Calculate how much to apply to this seed stock entry
+          const toApply = Math.min(remainingAmount, due);
+          
+          // Update seed stock entry's amountPaid and paymentStatus
+          const newPaid = currentPaid + toApply;
+          const newDue = totalCost - newPaid;
+          const newStatus = newDue <= 0 ? "paid" : "partial";
+          
+          await tx.update(seedStockEntries)
+            .set({ 
+              amountPaid: newPaid.toString(),
+              paymentStatus: newStatus
+            })
+            .where(and(eq(seedStockEntries.id, seedEntry.id), eq(seedStockEntries.merchantId, entry.merchantId)));
+          
+          remainingAmount -= toApply;
+        }
+      }
+      
       return { ...createdEntry, allocations, coldStoreAllocations };
     });
   }
