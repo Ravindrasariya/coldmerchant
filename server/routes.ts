@@ -2007,21 +2007,63 @@ export async function registerRoutes(
               // Get lots for this entry
               const entryLots = lotsByEntryId.get(entry.id) || [];
               let entryTotalCost = 0;
+              let entryDeductions = 0;
               let entryAdjustment = 0;
               
               for (const lot of entryLots) {
-                // Get breakdowns and sum total amounts
+                // Get breakdowns and calculate total cost using netWeight * pricePerKg (matches edit dialog formula)
                 const lotBreakdowns = breakdownsByLotId.get(lot.id) || [];
-                if (lotBreakdowns.length > 0) {
-                  entryTotalCost += lotBreakdowns.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-                } else if (lot.pricePerKg) {
-                  // Fallback: estimate from lot's pricePerKg and bags (approx 50kg per bag)
+                for (const bd of lotBreakdowns) {
+                  if (bd.size !== "Wastage") {
+                    const weight = parseFloat(bd.weight || "0");
+                    const pricePerKg = parseFloat(bd.pricePerKg || "0");
+                    // Net Weight = Total Weight - Number of Bags (matches edit dialog)
+                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+                    if (netWeight > 0 && pricePerKg > 0) {
+                      entryTotalCost += netWeight * pricePerKg;
+                    }
+                  }
+                }
+                
+                // Fallback when no breakdowns exist
+                if (lotBreakdowns.length === 0 && lot.pricePerKg) {
+                  // Estimate from lot's pricePerKg and bags (approx 50kg per bag)
                   entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
                 }
                 
-                // Apply adjustment (debit subtracts, credit adds)
+                // Calculate deductions (matches edit dialog formula)
+                const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
+                const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
+                // Parse lot.charges JSON array to get dynamic charges
+                let dynamicCharges = 0;
+                if (lot.charges) {
+                  try {
+                    const chargesArray = typeof lot.charges === 'string' ? JSON.parse(lot.charges) : lot.charges;
+                    if (Array.isArray(chargesArray)) {
+                      dynamicCharges = chargesArray.reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+                    }
+                  } catch (e) {
+                    // ignore parse errors
+                  }
+                }
+                entryDeductions += expectedColdCharges + hammaliGradingCharges + dynamicCharges;
+                
+                // Apply adjustment with compound interest (matches edit dialog formula)
                 if (lot.adjustedAmount && lot.adjustedAmountType) {
-                  const adjustedAmount = parseFloat(lot.adjustedAmount);
+                  let adjustedAmount = parseFloat(lot.adjustedAmount);
+                  
+                  // Calculate compound interest if rate and effective date are provided
+                  const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
+                  const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
+                  
+                  if (adjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
+                    const effectiveDate = new Date(adjustedAmountEffectiveDate);
+                    const today = new Date();
+                    const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+                    const years = days / 365;
+                    adjustedAmount = Math.round((adjustedAmount * Math.pow(1 + adjustedAmountRate / 100, years)) * 100) / 100;
+                  }
+                  
                   if (lot.adjustedAmountType === "debit") {
                     entryAdjustment -= adjustedAmount;
                   } else if (lot.adjustedAmountType === "credit") {
@@ -2029,14 +2071,15 @@ export async function registerRoutes(
                   }
                 }
                 
-                // Sum cold charges
-                coldDue += parseFloat(lot.expectedColdCharges || "0");
+                // Sum cold charges for cold due calculation
+                coldDue += expectedColdCharges;
               }
               
-              // Calculate due by subtracting amount already paid
+              // Net Payable = Total Cost - Deductions + Adjustment (matches edit dialog formula)
+              const netPayable = entryTotalCost - entryDeductions + entryAdjustment;
+              // Harvest Due = Net Payable - Amount Paid
               const amountPaid = parseFloat(entry.amountPaid || "0");
-              const adjustedTotal = entryTotalCost + entryAdjustment;
-              const entryDue = Math.max(0, adjustedTotal - amountPaid);
+              const entryDue = Math.max(0, netPayable - amountPaid);
               harvestDue += entryDue;
             } else {
               // For fully paid entries, still count cold charges

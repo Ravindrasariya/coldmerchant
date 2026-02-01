@@ -121,8 +121,27 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
   const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
   
-  const adjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
+  const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
   const adjustedAmountType = lot.adjustedAmountType;
+  
+  // Calculate compound interest if rate and effective date are provided (matches edit dialog)
+  let finalAdjustment = rawAdjustedAmount;
+  const adjustedAmountRate = (lot as any).adjustedAmountRate ? parseFloat((lot as any).adjustedAmountRate) : 0;
+  const adjustedAmountEffectiveDate = (lot as any).adjustedAmountEffectiveDate;
+  
+  if (rawAdjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
+    const effectiveDate = new Date(adjustedAmountEffectiveDate);
+    const today = new Date();
+    const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const years = days / 365;
+    finalAdjustment = Math.round((rawAdjustedAmount * Math.pow(1 + adjustedAmountRate / 100, years)) * 100) / 100;
+  }
+  
+  // Calculate total deductions (matches edit dialog formula)
+  const expectedColdCharges = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
+  const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
+  const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+  const totalDeductions = expectedColdCharges + hammaliGradingCharges + dynamicCharges;
   
   return {
     originalBags: lot.originalBags,
@@ -136,8 +155,9 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     coldStoreTotalCharges,
     coldStorePaid,
     coldStoreRemaining,
-    adjustedAmount,
+    adjustedAmount: finalAdjustment,
     adjustedAmountType,
+    totalDeductions,
     sellableBreakdowns,
     wastageBreakdowns,
   };
@@ -283,6 +303,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     filteredEntries.forEach(entry => {
       let entryTotalAmount = 0;
       let entryAdjustment = 0;
+      let entryDeductions = 0;
       let entryColdStoreTotalCharges = 0;
       let entryColdStorePaid = 0;
 
@@ -300,14 +321,16 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             entryAdjustment += metrics.adjustedAmount;
           }
         }
+        entryDeductions += metrics.totalDeductions;
         entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
         entryColdStorePaid += metrics.coldStorePaid;
       });
 
-      const adjustedEntryTotal = entryTotalAmount + entryAdjustment;
-      farmerTotal += adjustedEntryTotal;
+      // Net Payable = Total Payable - Deductions + Adjustment (matches edit dialog formula)
+      const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
+      farmerTotal += netPayable;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      farmerDue += Math.max(adjustedEntryTotal - amountPaid, 0);
+      farmerDue += Math.max(netPayable - amountPaid, 0);
       
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
