@@ -2294,30 +2294,30 @@ export async function registerRoutes(
       const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
       
       // Collect unique farmers from stock entries
-      // Use name+contact as composite key (not village) to prevent duplicates
-      // Key: normalized name + contact -> best known village value
+      // Use full composite key: name + contact + village (case-insensitive, trimmed)
       const farmerMap = new Map<string, { name: string; contact: string | null; village: string | null; tehsil: string | null; district: string | null; state: string | null }>();
       
-      // Helper to create composite key from name+contact only
-      const makeKey = (name: string, contact: string | null) => {
+      // Helper to create composite key from name + contact + village
+      const makeKey = (name: string, contact: string | null, village: string | null) => {
         return [
           name.trim().toLowerCase(),
-          contact?.trim().toLowerCase() || ""
+          contact?.trim().toLowerCase() || "",
+          village?.trim().toLowerCase() || ""
         ].join("|");
       };
       
       // Process stock entries first (has mandatory farmer fields)
       for (const entry of stockEntryList) {
         if (entry.farmerName) {
-          const key = makeKey(entry.farmerName, entry.farmerContact || null);
+          const key = makeKey(entry.farmerName, entry.farmerContact || null, entry.village || null);
           const existing = farmerMap.get(key);
           
-          // Prefer entries with more complete data (village, tehsil, district, state)
-          if (!existing || (entry.village && !existing.village)) {
+          // Prefer entries with more complete data (tehsil, district, state)
+          if (!existing || (entry.tehsil && !existing.tehsil)) {
             farmerMap.set(key, {
               name: entry.farmerName.trim(),
               contact: entry.farmerContact?.trim() || null,
-              village: entry.village?.trim() || existing?.village || null,
+              village: entry.village?.trim() || null,
               tehsil: entry.tehsil?.trim() || existing?.tehsil || null,
               district: entry.district || existing?.district || null,
               state: entry.state || existing?.state || null,
@@ -2326,10 +2326,10 @@ export async function registerRoutes(
         }
       }
       
-      // Add farmers from seed transactions (only if not already present with better data)
+      // Add farmers from seed transactions (only if not already present)
       for (const txn of seedTransactionList) {
         if (txn.farmerName) {
-          const key = makeKey(txn.farmerName, txn.farmerContact || null);
+          const key = makeKey(txn.farmerName, txn.farmerContact || null, txn.village || null);
           const existing = farmerMap.get(key);
           
           if (!existing) {
@@ -2341,12 +2341,11 @@ export async function registerRoutes(
               district: txn.district || null,
               state: txn.state || null,
             });
-          } else if (txn.village && !existing.village) {
-            // Update with village if missing
+          } else if (txn.tehsil && !existing.tehsil) {
+            // Update with tehsil/district/state if missing
             farmerMap.set(key, {
               ...existing,
-              village: txn.village?.trim() || null,
-              tehsil: txn.tehsil?.trim() || existing.tehsil || null,
+              tehsil: txn.tehsil?.trim() || null,
               district: txn.district || existing.district || null,
               state: txn.state || existing.state || null,
             });
@@ -2360,12 +2359,12 @@ export async function registerRoutes(
       const today = new Date().toISOString().split('T')[0];
       const dateStr = parseDateToCodeFormat(today);
       
-      // Build a map of name+contact -> farmerId for linking
+      // Build a map of composite key (name+contact+village) -> farmerId for linking
       const farmerIdMap = new Map<string, number>();
       
       for (const data of Array.from(farmerMap.values())) {
-        // Match by name+contact only (ignore village for matching)
-        let existing = await storage.getFarmerByNameAndContact(merchantId, data.name, data.contact);
+        // Match by full composite key: name + contact + village
+        let existing = await storage.getFarmerByCompositeKey(merchantId, data.name, data.contact, data.village);
         
         if (!existing) {
           const codePrefix = `FM${dateStr}`;
@@ -2397,15 +2396,15 @@ export async function registerRoutes(
           });
         }
         
-        // Store farmerId for linking
-        const key = makeKey(data.name, data.contact);
+        // Store farmerId for linking using full composite key
+        const key = makeKey(data.name, data.contact, data.village);
         farmerIdMap.set(key, existing.id);
       }
       
       // Link farmerId to stock entries that don't have one
       for (const entry of stockEntryList) {
         if (!entry.farmerId && entry.farmerName) {
-          const key = makeKey(entry.farmerName, entry.farmerContact || null);
+          const key = makeKey(entry.farmerName, entry.farmerContact || null, entry.village || null);
           const farmerId = farmerIdMap.get(key);
           if (farmerId) {
             await storage.updateStockEntry(entry.id, merchantId, { farmerId });
@@ -2417,7 +2416,7 @@ export async function registerRoutes(
       // Link farmerId to seed transactions that don't have one
       for (const txn of seedTransactionList) {
         if (!txn.farmerId && txn.farmerName) {
-          const key = makeKey(txn.farmerName, txn.farmerContact || null);
+          const key = makeKey(txn.farmerName, txn.farmerContact || null, txn.village || null);
           const farmerId = farmerIdMap.get(key);
           if (farmerId) {
             await storage.updateSeedTransactionFarmerId(txn.id, merchantId, farmerId);
