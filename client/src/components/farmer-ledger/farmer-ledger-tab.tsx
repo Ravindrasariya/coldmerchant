@@ -588,9 +588,16 @@ export function FarmerLedgerTab() {
                     </tr>
                   </thead>
                   <tbody>
-                    {editHistory.map((entry, idx) => (
+                    {[...editHistory]
+                      .sort((a, b) => {
+                        const dateA = new Date(a.changedAt || 0).getTime();
+                        const dateB = new Date(b.changedAt || 0).getTime();
+                        if (dateB !== dateA) return dateB - dateA;
+                        return (b.serialNumber || 0) - (a.serialNumber || 0);
+                      })
+                      .map((entry) => (
                       <tr key={entry.id} className="border-b hover-elevate" data-testid={`row-edit-history-${entry.id}`}>
-                        <td className="p-2 text-xs font-mono">{editHistory.length - idx}</td>
+                        <td className="p-2 text-xs font-mono">{entry.serialNumber || '-'}</td>
                         <td className="p-2 text-xs">
                           {entry.changedAt ? new Date(entry.changedAt).toLocaleString('en-IN', { 
                             day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
