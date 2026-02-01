@@ -141,6 +141,7 @@ export interface IStorage {
   updateBuyerWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
   lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }>;
+  syncPartiesWithBuyers(merchantId: number): Promise<{ partiesLinked: number; buyersCreated: number }>;
   
   // Farmer Ledger operations
   getFarmersByMerchant(merchantId: number): Promise<Farmer[]>;
@@ -1698,6 +1699,39 @@ export class DatabaseStorage implements IStorage {
     });
     
     return { buyerId: newBuyer.id, isNew: true };
+  }
+
+  async syncPartiesWithBuyers(merchantId: number): Promise<{ partiesLinked: number; buyersCreated: number }> {
+    // Get all parties that don't have a buyerId linked
+    const unlinkedParties = await db.select().from(parties)
+      .where(and(
+        eq(parties.merchantId, merchantId),
+        isNull(parties.buyerId)
+      ));
+    
+    let partiesLinked = 0;
+    let buyersCreated = 0;
+    
+    for (const party of unlinkedParties) {
+      // Use lookupOrCreateBuyer to find or create a buyer
+      const { buyerId, isNew } = await this.lookupOrCreateBuyer(merchantId, {
+        name: party.name,
+        contact: party.contactNumber || null,
+        address: party.address || null,
+      });
+      
+      // Link the party to the buyer
+      await db.update(parties)
+        .set({ buyerId })
+        .where(eq(parties.id, party.id));
+      
+      partiesLinked++;
+      if (isNew) {
+        buyersCreated++;
+      }
+    }
+    
+    return { partiesLinked, buyersCreated };
   }
 
   // ===================== FARMER LEDGER OPERATIONS =====================

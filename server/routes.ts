@@ -1749,6 +1749,18 @@ export async function registerRoutes(
     }
   });
 
+  // Sync existing parties with buyer ledger
+  app.post("/api/cash/managed-parties/sync", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const result = await storage.syncPartiesWithBuyers(merchantId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error syncing parties with buyers:", error);
+      res.status(500).json({ message: "Failed to sync parties with buyers" });
+    }
+  });
+
   app.patch("/api/cash/managed-parties/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
