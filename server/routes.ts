@@ -1990,6 +1990,39 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/buyers/:id/details - Update buyer details with propagation to linked transactions
+  app.patch("/api/buyers/:id/details", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const { name, address, mandiCode, contact } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Buyer name is required" });
+      }
+
+      const result = await storage.updateBuyerWithPropagation(id, merchantId, {
+        name: name.trim(),
+        address: address?.trim() || null,
+        mandiCode: mandiCode?.trim() || null,
+        contact: contact?.trim() || null,
+      });
+
+      if (!result.buyer) {
+        return res.status(404).json({ message: "Buyer not found" });
+      }
+
+      res.json({
+        buyer: result.buyer,
+        transactionsUpdated: result.transactionsUpdated,
+        message: `Buyer updated. ${result.transactionsUpdated} transaction(s) updated.`
+      });
+    } catch (error) {
+      console.error("Error updating buyer with propagation:", error);
+      res.status(500).json({ message: "Failed to update buyer" });
+    }
+  });
+
   // ===================== FARMER LEDGER ROUTES =====================
 
   // Helper function to generate farmer code

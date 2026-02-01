@@ -100,20 +100,26 @@ export default function BuyersPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: { id: number } & Partial<BuyerRow>) => {
-      const response = await apiRequest("PATCH", `/api/buyers/${id}`, {
-        dateAdded: data.dateAdded,
+      const response = await apiRequest("PATCH", `/api/buyers/${id}/details`, {
         name: data.name,
         address: data.address,
         mandiCode: data.mandiCode || null,
         contact: data.contact || null,
-        negativeFlag: data.negativeFlag,
-        isActive: data.isActive,
       });
-      return response.json();
+      const result = await response.json();
+      
+      if (data.negativeFlag !== undefined || data.isActive !== undefined) {
+        await apiRequest("PATCH", `/api/buyers/${id}`, {
+          negativeFlag: data.negativeFlag,
+          isActive: data.isActive,
+        });
+      }
+      return result;
     },
     onSuccess: () => {
       setLocalRows(null);
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     },
   });
 

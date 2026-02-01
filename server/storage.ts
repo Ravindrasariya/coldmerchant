@@ -137,6 +137,7 @@ export interface IStorage {
   countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
+  updateBuyerWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
   
   // Farmer Ledger operations
@@ -1567,6 +1568,43 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)))
       .returning();
     return updated || undefined;
+  }
+
+  async updateBuyerWithPropagation(
+    id: number,
+    merchantId: number,
+    data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }
+  ): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }> {
+    const [updatedBuyer] = await db.update(buyers)
+      .set({ 
+        name: data.name,
+        address: data.address ?? undefined,
+        mandiCode: data.mandiCode ?? undefined,
+        contact: data.contact ?? undefined,
+        updatedAt: new Date() 
+      })
+      .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)))
+      .returning();
+
+    if (!updatedBuyer) {
+      return { buyer: undefined, transactionsUpdated: 0 };
+    }
+
+    const result = await db.update(transactions)
+      .set({
+        partyName: data.name,
+        partyAddress: data.address ?? undefined,
+      })
+      .where(and(
+        eq(transactions.merchantId, merchantId),
+        eq(transactions.buyerId, id)
+      ))
+      .returning({ id: transactions.id });
+
+    return { 
+      buyer: updatedBuyer, 
+      transactionsUpdated: result.length 
+    };
   }
 
   async deleteBuyer(id: number, merchantId: number): Promise<void> {
