@@ -52,7 +52,7 @@ interface StockEntryWithLots {
     place: string | null;
     coldStoreName: string | null;
     coldStoreLotNumber: string | null;
-    crop: string | null;
+    crop?: string;
     originalBags: number;
     remainingBags: number;
     potatoType: string | null;
@@ -62,7 +62,8 @@ interface StockEntryWithLots {
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
-    charges: Array<{ type: string; amount: number }> | null;
+    totalWeight: string | null;
+    charges: Array<{ type: string; amount: number | string }> | null;
     coldStoreChargesPerBag: string | null;
     expectedColdCharges: string | null;
     hammaliGradingCharges: string | null;
@@ -102,6 +103,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     crop: lot.crop || "potato",
     potatoType: lot.potatoType || "",
     harvestPotatoType: lot.harvestPotatoType || "",
+    size: lot.size || "",
+    pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : null,
+    totalWeight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : null,
     charges: lot.charges || [],
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
     expectedColdCharges: lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : null,
@@ -298,7 +302,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       for (let j = 0; j < charges.length; j++) {
         const charge = charges[j];
         // Check if charge has type but no valid amount
-        if (charge.type && charge.type.length > 0 && (!charge.amount || charge.amount <= 0)) {
+        const chargeAmount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : (charge.amount || 0);
+        if (charge.type && charge.type.length > 0 && (!chargeAmount || chargeAmount <= 0)) {
           toast({
             title: t("Validation Error", "सत्यापन त्रुटि"),
             description: t(
@@ -310,7 +315,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           return;
         }
         // Check if amount is provided but type is missing
-        if (charge.amount && charge.amount > 0 && (!charge.type || charge.type.length === 0)) {
+        if (chargeAmount && chargeAmount > 0 && (!charge.type || charge.type.length === 0)) {
           toast({
             title: t("Validation Error", "सत्यापन त्रुटि"),
             description: t(
@@ -327,7 +332,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     // Clean up charges before saving - remove empty entries
     const cleanedLots = lots.map(lot => ({
       ...lot,
-      charges: (lot.charges || []).filter(c => c.type && c.type.length > 0 && c.amount > 0)
+      charges: (lot.charges || []).filter(c => {
+        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+        return c.type && c.type.length > 0 && amt > 0;
+      })
     }));
     updateMutation.mutate({ paymentStatus: entry.paymentStatus, remarks, lots: cleanedLots });
   };
@@ -410,19 +418,57 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm text-muted-foreground">{t("Bag Breakdown", "बोरी विवरण")}</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddBreakdown(lotIndex)}
-                        data-testid={`edit-add-breakdown-${lotIndex}`}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        {t("Add Row", "पंक्ति जोड़ें")}
-                      </Button>
+                      {lot.cutType !== "gate_cut" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddBreakdown(lotIndex)}
+                          data-testid={`edit-add-breakdown-${lotIndex}`}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          {t("Add Row", "पंक्ति जोड़ें")}
+                        </Button>
+                      )}
                     </div>
 
-                    {lot.bagBreakdowns.length > 0 && (
+                    {/* Gate Cut: Show single row with lot-level size, totalWeight, pricePerKg */}
+                    {lot.cutType === "gate_cut" && (
+                      <div className="space-y-2">
+                        <div className="hidden md:grid md:grid-cols-7 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                          <div>{t("Size", "आकार")}</div>
+                          <div>{t("# Bags", "बोरी")}</div>
+                          <div>{t("Remaining", "शेष")}</div>
+                          <div>{t("Total Wt", "कुल वजन")}</div>
+                          <div>{t("Net Wt", "शुद्ध वजन")}</div>
+                          <div>{t("Price/kg", "मूल्य/किलो")}</div>
+                          <div>{t("Total", "कुल")}</div>
+                        </div>
+                        {(() => {
+                          const totalWt = lot.totalWeight || 0;
+                          const netWt = totalWt - lot.originalBags;
+                          const priceKg = lot.pricePerKg || 0;
+                          const total = netWt > 0 ? netWt * priceKg : 0;
+                          return (
+                            <div className="grid grid-cols-2 md:grid-cols-7 gap-2 p-2 bg-muted/30 rounded-md items-center">
+                              <div className="font-mono text-sm">{lot.size || "—"}</div>
+                              <div className="font-mono text-sm">{lot.originalBags}</div>
+                              <div className="font-mono text-sm font-medium">
+                                <span className="text-primary">{lot.remainingBags}</span>
+                                <span className="text-muted-foreground">/{lot.originalBags}</span>
+                              </div>
+                              <div className="font-mono text-sm">{totalWt > 0 ? totalWt.toFixed(2) : "—"}</div>
+                              <div className="font-mono text-sm text-muted-foreground">{netWt > 0 ? netWt.toFixed(2) : "—"}</div>
+                              <div className="font-mono text-sm">{priceKg > 0 ? `₹${priceKg}` : "—"}</div>
+                              <div className="font-mono text-sm font-medium text-primary">{total > 0 ? `₹${total.toFixed(2)}` : "—"}</div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Bilty Cut / Other: Show editable breakdown rows */}
+                    {lot.cutType !== "gate_cut" && lot.bagBreakdowns.length > 0 && (
                       <div className="space-y-2">
                         <div className="hidden md:grid md:grid-cols-8 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                           <div>{t("Size", "आकार")}</div>
@@ -515,7 +561,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       </div>
                     )}
 
-                    {lot.bagBreakdowns.length === 0 && (
+                    {lot.cutType !== "gate_cut" && lot.bagBreakdowns.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         {t("No breakdown rows. Click \"Add Row\" to add breakdown details.", "कोई विवरण पंक्ति नहीं। विवरण जोड़ने के लिए \"पंक्ति जोड़ें\" पर क्लिक करें।")}
                       </p>
@@ -725,7 +771,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     
                     const coldStoreDue = lot.expectedColdCharges || 0;
                     const hammali = lot.hammaliGradingCharges || 0;
-                    const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
+                    const dynamicCharges = (lot.charges || []).reduce((sum, c) => {
+                      const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                      return sum + amt;
+                    }, 0);
                     const totalDeductions = coldStoreDue + hammali + dynamicCharges;
                     
                     // Handle adjustment - calculate compound interest if rate-based

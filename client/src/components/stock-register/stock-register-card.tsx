@@ -41,16 +41,20 @@ interface StockEntryWithLots {
   crop?: string;
   lots: Array<{
     id: number;
-    coldStoreName: string;
+    place: string | null;
+    coldStoreName: string | null;
+    coldStoreLotNumber: string | null;
     crop?: string;
     originalBags: number;
     remainingBags: number;
-    potatoType: string;
+    potatoType: string | null;
+    harvestPotatoType: string | null;
     bagType: string;
     quality: string;
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
     expectedColdCharges: string | null;
@@ -58,6 +62,8 @@ interface StockEntryWithLots {
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
+    adjustedAmountRate: string | null;
+    adjustedAmountEffectiveDate: string | null;
     adjustedAmountRemark: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
@@ -84,29 +90,32 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   let totalWeight = 0;
   let totalAmount: number | null = null;
   
-  let totalBags = 0;
-  lot.bagBreakdowns.forEach(bd => {
-    if (bd.size !== "Wastage") {
-      const weight = bd.weight ? parseFloat(bd.weight) : 0;
-      totalWeight += weight;
-      totalBags += bd.numberOfBags;
-      
-      // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
-      const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-      const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-      if (netWeight > 0 && price > 0) {
-        totalAmount = (totalAmount ?? 0) + (netWeight * price);
+  // For gate_cut: use lot-level totalWeight, pricePerKg, and originalBags
+  if (lot.cutType === "gate_cut") {
+    const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+    const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+    const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+    totalWeight = lotTotalWeight;
+    if (netWeight > 0 && price > 0) {
+      totalAmount = netWeight * price;
+    }
+  } else {
+    // For bilty_cut: calculate from bagBreakdowns
+    let totalBags = 0;
+    lot.bagBreakdowns.forEach(bd => {
+      if (bd.size !== "Wastage") {
+        const weight = bd.weight ? parseFloat(bd.weight) : 0;
+        totalWeight += weight;
+        totalBags += bd.numberOfBags;
+        
+        // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
+        const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+        if (netWeight > 0 && price > 0) {
+          totalAmount = (totalAmount ?? 0) + (netWeight * price);
+        }
       }
-    }
-  });
-  
-  const totalNetWeight = totalWeight - totalBags;
-  
-  if (lot.cutType === "gate_cut" && lot.pricePerKg) {
-    const price = parseFloat(lot.pricePerKg);
-    if (totalNetWeight > 0 && price > 0) {
-      totalAmount = totalNetWeight * price;
-    }
+    });
   }
   
   const sellableBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
@@ -209,7 +218,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     const stores = new Set<string>();
     entries.forEach(entry => {
       entry.lots.forEach(lot => {
-        stores.add(lot.coldStoreName);
+        if (lot.coldStoreName) {
+          stores.add(lot.coldStoreName);
+        }
       });
     });
     return Array.from(stores);
@@ -448,8 +459,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           format(new Date(entry.purchaseDate), "dd/MM/yyyy"),
           entry.farmerName,
           entry.village || "-",
-          lot.coldStoreName,
-          lot.potatoType,
+          lot.coldStoreName || "-",
+          lot.potatoType || "-",
           lot.quality,
           cutTypeDisplay,
           metrics.originalBags.toString(),

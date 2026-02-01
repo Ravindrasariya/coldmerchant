@@ -24,19 +24,25 @@ interface StockEntryWithLots {
   remarks: string | null;
   lots: Array<{
     id: number;
-    coldStoreName: string;
+    place: string | null;
+    coldStoreName: string | null;
+    coldStoreLotNumber: string | null;
+    crop?: string;
     originalBags: number;
     remainingBags: number;
-    potatoType: string;
+    potatoType: string | null;
+    harvestPotatoType: string | null;
     bagType: string;
     quality: string;
     cutType: string;
     size: string | null;
     pricePerKg: string | null;
+    totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
     expectedColdCharges: string | null;
     hammaliGradingCharges: string | null;
-    charges: Array<{ type: string; amount: number }> | null;
+    charges: Array<{ type: string; amount: number | string }> | null;
+    coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
     adjustedAmountRate: string | null;
@@ -47,6 +53,7 @@ interface StockEntryWithLots {
       id: number;
       size: string;
       numberOfBags: number;
+      remainingBags: number | null;
       weight: string | null;
       pricePerKg: string | null;
       totalAmount: string | null;
@@ -104,7 +111,10 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     const coldStoreDue = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
     const charges = lot.charges || [];
-    const dynamicCharges = charges.reduce((sum, c) => sum + (c.amount || 0), 0);
+    const dynamicCharges = charges.reduce((sum, c) => {
+      const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+      return sum + amt;
+    }, 0);
     const totalDeductions = coldStoreDue + hammali + dynamicCharges;
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
@@ -211,9 +221,13 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
       const lotTotals = calculateLotTotals(lot);
       const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
       
-      const chargesHtml = lotTotals.charges.filter(c => c.amount && c.amount > 0).map(c => 
-        `<div><span style="color: #666;">${c.type || "Charge"}:</span></div><div style="text-align: right; font-family: monospace;">₹${(c.amount || 0).toLocaleString("en-IN")}</div>`
-      ).join("");
+      const chargesHtml = lotTotals.charges.filter(c => {
+        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+        return amt > 0;
+      }).map(c => {
+        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+        return `<div><span style="color: #666;">${c.type || "Charge"}:</span></div><div style="text-align: right; font-family: monospace;">₹${amt.toLocaleString("en-IN")}</div>`;
+      }).join("");
       
       const adjustmentLabel = lotTotals.rate > 0 && lotTotals.interestDays > 0 
         ? `Adjustment / समायोजन (₹${lotTotals.principal.toLocaleString("en-IN")} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
@@ -496,12 +510,18 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                                   <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN")}</span>
                                 </>
                               )}
-                              {lotTotals.charges.filter(c => c.amount && c.amount > 0).map((c, i) => (
+                              {lotTotals.charges.filter(c => {
+                                const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                                return amt > 0;
+                              }).map((c, i) => {
+                                const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                                return (
                                 <React.Fragment key={i}>
                                   <span className="text-gray-600">{c.type || "Charge"}:</span>
-                                  <span className="text-right font-mono">₹{(c.amount || 0).toLocaleString("en-IN")}</span>
+                                  <span className="text-right font-mono">₹{amt.toLocaleString("en-IN")}</span>
                                 </React.Fragment>
-                              ))}
+                                );
+                              })}
                               {lotTotals.adjustedValue !== 0 && (
                                 <>
                                   <span className="text-gray-600">
