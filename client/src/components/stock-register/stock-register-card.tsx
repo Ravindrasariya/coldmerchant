@@ -112,11 +112,13 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const sellableBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
   const wastageBreakdowns = lot.bagBreakdowns.filter(bd => bd.size === "Wastage");
   
-  // Calculate cold store charges from charges array (Cold Charges, Ware House Charges)
+  // Calculate cold store charges: expectedColdCharges field + Cold Charges/Ware House Charges from charges array
+  const expectedColdCharges = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
   const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
-  const coldStoreTotalCharges = (lot.charges || [])
+  const coldChargesFromArray = (lot.charges || [])
     .filter(c => c && coldStoreTypes.includes(c.type))
     .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+  const coldStoreTotalCharges = expectedColdCharges + coldChargesFromArray;
   
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
   const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
@@ -138,7 +140,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   }
   
   // Calculate total deductions (matches edit dialog formula)
-  const expectedColdCharges = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
+  // Note: expectedColdCharges is already calculated above for cold store total
   const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
   const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
   const totalDeductions = expectedColdCharges + hammaliGradingCharges + dynamicCharges;
