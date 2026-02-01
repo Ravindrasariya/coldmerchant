@@ -366,33 +366,30 @@ export function CashManagementTab() {
   const mergedPartiesForRawPotato = useMemo(() => {
     const partyMap = new Map<string, { name: string; address: string | null; overallDue: number; receivables: number; isActive: boolean }>();
     
-    // First add all buyers from ledger
+    // Add all buyers from ledger - backend already includes receivables in overallDue
+    // and provides separate receivables field for display purposes
     ledgerBuyers.forEach(buyer => {
       const normalizedName = buyer.name.trim().toLowerCase();
       partyMap.set(normalizedName, {
         name: buyer.name,
         address: buyer.address,
-        overallDue: buyer.overallDue || 0,
-        receivables: 0,
+        overallDue: buyer.overallDue || 0, // Already includes receivables from backend
+        receivables: (buyer as any).receivables || 0, // Receivables for display breakdown
         isActive: buyer.isActive !== false,
       });
     });
     
-    // Then merge managed parties (receivables)
+    // Add managed parties that don't have a linked buyer yet (edge case)
     managedParties.forEach(party => {
       const normalizedName = party.name.trim().toLowerCase();
       const pendingDues = parseFloat(party.pendingDues || "0");
       
-      if (partyMap.has(normalizedName)) {
-        // Aggregate with existing buyer
-        const existing = partyMap.get(normalizedName)!;
-        existing.receivables += pendingDues;
-      } else if (pendingDues > 0) {
-        // Add as new entry if has pending dues
+      if (!partyMap.has(normalizedName) && pendingDues > 0) {
+        // Add as new entry if not in ledger and has pending dues
         partyMap.set(normalizedName, {
           name: party.name,
           address: party.address,
-          overallDue: 0,
+          overallDue: pendingDues, // Treat receivables as due
           receivables: pendingDues,
           isActive: true,
         });
@@ -401,7 +398,7 @@ export function CashManagementTab() {
     
     // Return as array, filter to those with total due > 0
     return Array.from(partyMap.values())
-      .filter(p => p.isActive && (p.overallDue > 0 || p.receivables > 0))
+      .filter(p => p.isActive && p.overallDue > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [ledgerBuyers, managedParties]);
 
@@ -1587,7 +1584,6 @@ export function CashManagementTab() {
                             </FormControl>
                             <SelectContent>
                               {mergedPartiesForRawPotato.map((party, idx) => {
-                                const totalDue = party.overallDue + party.receivables;
                                 return (
                                   <SelectItem key={`party-${idx}`} value={party.name}>
                                     <div className="flex items-center justify-between gap-4">
@@ -1596,12 +1592,7 @@ export function CashManagementTab() {
                                         <span className="text-xs text-muted-foreground">({party.address})</span>
                                       )}
                                       <Badge variant="secondary">
-                                        {t("Due", "बकाया")}: ₹{totalDue.toFixed(0)}
-                                        {party.receivables > 0 && (
-                                          <span className="ml-1 text-xs opacity-75">
-                                            (+₹{party.receivables.toFixed(0)} {t("receivable", "प्राप्य")})
-                                          </span>
-                                        )}
+                                        {t("Due", "बकाया")}: ₹{party.overallDue.toFixed(0)}
                                       </Badge>
                                     </div>
                                   </SelectItem>

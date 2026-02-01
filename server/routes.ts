@@ -1911,17 +1911,17 @@ export async function registerRoutes(
           }
         }
         
-        // Add receivables from linked parties (pending dues to be paid)
+        // Add receivables from linked parties (pending dues)
         for (const party of partyList) {
           if (party.buyerId === buyer.id) {
-            const parsedDue = parseFloat(party.pendingDueToBePaid || "0");
+            const parsedDue = parseFloat(party.pendingDues || "0");
             receivables += isNaN(parsedDue) ? 0 : parsedDue;
           }
         }
         
         return {
           ...buyer,
-          overallDue: totalDue,
+          overallDue: totalDue + receivables, // Include receivables in overall due
           receivables: receivables,
         };
       });
