@@ -1865,12 +1865,34 @@ export async function registerRoutes(
 
   // ===================== BUYER MANAGEMENT ROUTES =====================
 
-  // GET /api/buyers - Get all buyers for the authenticated merchant
+  // GET /api/buyers - Get all buyers for the authenticated merchant with dues calculation
   app.get("/api/buyers", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
       const buyerList = await storage.getBuyersByMerchant(merchantId);
-      res.json(buyerList);
+      
+      // Get all transactions for this merchant to calculate buyer dues
+      const transactionList = await storage.getTransactionsByMerchant(merchantId);
+      
+      // Calculate dues for each buyer: revenue - amountReceived for all transactions with that buyerId
+      const buyersWithDues = buyerList.map(buyer => {
+        let totalDue = 0;
+        
+        for (const txn of transactionList) {
+          if (txn.buyerId === buyer.id) {
+            const revenue = parseFloat(txn.revenue || "0");
+            const amountReceived = parseFloat(txn.amountReceived || "0");
+            totalDue += Math.max(0, revenue - amountReceived);
+          }
+        }
+        
+        return {
+          ...buyer,
+          overallDue: totalDue,
+        };
+      });
+      
+      res.json(buyersWithDues);
     } catch (error) {
       console.error("Error fetching buyers:", error);
       res.status(500).json({ message: "Failed to fetch buyers" });

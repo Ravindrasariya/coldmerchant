@@ -62,7 +62,7 @@ function buyerToRow(b: Buyer): BuyerRow {
     contact: b.contact || "",
     negativeFlag: b.negativeFlag ?? false,
     isActive: b.isActive ?? true,
-    overallDue: 0,
+    overallDue: (b as any).overallDue ?? 0,
     isNew: false,
     isEdited: false,
   };
