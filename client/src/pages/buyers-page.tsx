@@ -32,6 +32,7 @@ interface BuyerRow {
   negativeFlag: boolean;
   isActive: boolean;
   overallDue: number;
+  receivables: number;
   isNew?: boolean;
   isEdited?: boolean;
 }
@@ -46,6 +47,7 @@ function createEmptyRow(): BuyerRow {
     negativeFlag: false,
     isActive: true,
     overallDue: 0,
+    receivables: 0,
     isNew: true,
     isEdited: false,
   };
@@ -63,6 +65,7 @@ function buyerToRow(b: Buyer): BuyerRow {
     negativeFlag: b.negativeFlag ?? false,
     isActive: b.isActive ?? true,
     overallDue: (b as any).overallDue ?? 0,
+    receivables: (b as any).receivables ?? 0,
     isNew: false,
     isEdited: false,
   };
@@ -241,7 +244,7 @@ export default function BuyersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="hidden md:grid md:grid-cols-9 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
+                <div className="hidden md:grid md:grid-cols-10 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
                   <div>{t("Buyer ID", "खरीदार आईडी")}</div>
                   <div>{t("Date Added", "जोड़ने की तारीख")}</div>
                   <div>{t("Name", "नाम")} *</div>
@@ -251,12 +254,13 @@ export default function BuyersPage() {
                   <div>{t("Negative", "नकारात्मक")}</div>
                   <div>{t("Active", "सक्रिय")}</div>
                   <div>{t("Overall Due", "कुल बकाया")}</div>
+                  <div>{t("Receivables", "प्राप्य")}</div>
                 </div>
                 
                 {displayRows.map((row, index) => (
                   <div 
                     key={row.id || `new-${index}`} 
-                    className="grid grid-cols-2 md:grid-cols-9 gap-2 p-3 border rounded-lg bg-card"
+                    className="grid grid-cols-2 md:grid-cols-10 gap-2 p-3 border rounded-lg bg-card"
                     data-testid={`buyer-row-${index}`}
                   >
                     <div className="space-y-1">
@@ -342,6 +346,12 @@ export default function BuyersPage() {
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Overall Due", "कुल बकाया")}</Label>
                       <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-sm font-mono">
                         ₹{row.overallDue.toLocaleString("en-IN")}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="md:hidden text-xs text-muted-foreground">{t("Receivables", "प्राप्य")}</Label>
+                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-sm font-mono text-orange-600 dark:text-orange-400">
+                        ₹{row.receivables.toLocaleString("en-IN")}
                       </div>
                     </div>
                   </div>

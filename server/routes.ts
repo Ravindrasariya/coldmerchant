@@ -1882,9 +1882,14 @@ export async function registerRoutes(
       // Get all transactions for this merchant to calculate buyer dues
       const transactionList = await storage.getTransactionsByMerchant(merchantId);
       
+      // Get all parties to include receivables from linked parties
+      const partyList = await storage.getPartiesByMerchant(merchantId);
+      
       // Calculate dues for each buyer: revenue - amountReceived for all transactions with that buyerId
+      // Plus receivables from linked parties (pendingDueToBePaid where buyerId matches)
       const buyersWithDues = buyerList.map(buyer => {
         let totalDue = 0;
+        let receivables = 0;
         
         for (const txn of transactionList) {
           if (txn.buyerId === buyer.id) {
@@ -1894,9 +1899,18 @@ export async function registerRoutes(
           }
         }
         
+        // Add receivables from linked parties (pending dues to be paid)
+        for (const party of partyList) {
+          if (party.buyerId === buyer.id) {
+            const parsedDue = parseFloat(party.pendingDueToBePaid || "0");
+            receivables += isNaN(parsedDue) ? 0 : parsedDue;
+          }
+        }
+        
         return {
           ...buyer,
           overallDue: totalDue,
+          receivables: receivables,
         };
       });
       
