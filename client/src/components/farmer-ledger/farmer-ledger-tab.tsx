@@ -21,7 +21,8 @@ import {
   Pencil,
   History,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  X
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -784,6 +785,22 @@ export function FarmerLedgerTab() {
                 </div>
               )}
             </div>
+            {(farmerNameSearch.trim() || villageSearch.trim() || selectedYear !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFarmerNameSearch("");
+                  setVillageSearch("");
+                  setSelectedYear("all");
+                }}
+                className="text-muted-foreground"
+                data-testid="button-clear-filters"
+              >
+                <X className="h-4 w-4 mr-1" />
+                {t("Clear Filters", "फ़िल्टर हटाएं")}
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2">
