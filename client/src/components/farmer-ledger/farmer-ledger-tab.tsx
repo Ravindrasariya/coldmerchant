@@ -71,6 +71,10 @@ export function FarmerLedgerTab() {
   // Edit tracker state
   const [showEditTracker, setShowEditTracker] = useState(false);
   
+  // Merge state
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [mergingFarmer, setMergingFarmer] = useState<{ id: number; farmerCode: string; name: string } | null>(null);
+  
   const { toast } = useToast();
 
   const { data: farmers = [], isLoading } = useQuery<FarmerWithDues[]>({
@@ -99,7 +103,16 @@ export function FarmerLedgerTab() {
   });
 
   // Edit history query
-  interface EditHistoryItem extends FarmerEditHistory {
+  interface EditHistoryItem {
+    id: number;
+    serialNumber: number;
+    merchantId: number;
+    farmerId: number;
+    changedAt: string | null;
+    changedBy: number | null;
+    fieldName: string;
+    oldValue: string | null;
+    newValue: string | null;
     farmerName?: string;
     userName?: string;
   }
@@ -132,12 +145,15 @@ export function FarmerLedgerTab() {
       });
     },
     onError: (error: any) => {
-      if (error.requiresMerge) {
-        toast({
-          title: t("Merge Required", "मर्ज आवश्यक"),
-          description: t("Another farmer with these details exists. Merge functionality coming soon.", "इन विवरणों के साथ एक अन्य किसान मौजूद है। मर्ज कार्यक्षमता जल्द आ रही है।"),
-          variant: "destructive",
+      if (error.requiresMerge && error.existingFarmer) {
+        // Close edit dialog and show merge confirmation
+        setEditDialogOpen(false);
+        setMergingFarmer({
+          id: error.existingFarmer.id,
+          farmerCode: error.existingFarmer.farmerCode,
+          name: error.existingFarmer.name,
         });
+        setMergeDialogOpen(true);
       } else {
         toast({
           title: t("Error", "त्रुटि"),
@@ -147,6 +163,47 @@ export function FarmerLedgerTab() {
       }
     },
   });
+
+  // Merge farmers mutation
+  const mergeMutation = useMutation({
+    mutationFn: async ({ sourceId, targetId }: { sourceId: number; targetId: number }) => {
+      const response = await apiRequest("POST", "/api/farmers/merge", { sourceId, targetId });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/edit-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      setMergeDialogOpen(false);
+      setMergingFarmer(null);
+      setEditingFarmer(null);
+      toast({
+        title: t("Farmers Merged", "किसान मर्ज किए गए"),
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message || t("Failed to merge farmers", "किसानों को मर्ज करने में विफल"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleConfirmMerge = () => {
+    if (!editingFarmer || !mergingFarmer) return;
+    mergeMutation.mutate({
+      sourceId: editingFarmer.id,
+      targetId: mergingFarmer.id,
+    });
+  };
 
   const handleEditFarmer = (farmer: FarmerWithDues) => {
     setEditingFarmer(farmer);
@@ -956,6 +1013,46 @@ export function FarmerLedgerTab() {
             >
               {updateDetailsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("Save Changes", "परिवर्तन सहेजें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge Confirmation Dialog */}
+      <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>{t("Merge Farmers", "किसान मर्ज करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm mb-4">
+              {t("A farmer with these details already exists:", "इन विवरणों के साथ एक किसान पहले से मौजूद है:")}
+            </p>
+            <div className="bg-muted/50 p-3 rounded mb-4">
+              <div className="text-sm font-medium">{mergingFarmer?.name}</div>
+              <div className="text-xs text-muted-foreground font-mono">{mergingFarmer?.farmerCode}</div>
+            </div>
+            <p className="text-sm mb-2">
+              {t("If you merge:", "यदि आप मर्ज करते हैं:")}
+            </p>
+            <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+              <li>{t("The farmer with the lower ID will be kept", "कम आईडी वाला किसान रखा जाएगा")}</li>
+              <li>{t("All linked stock entries and seed transactions will be transferred", "सभी संबंधित स्टॉक एंट्री और बीज लेनदेन स्थानांतरित किए जाएंगे")}</li>
+              <li>{t("PY balances will be combined", "पिछले वर्ष की शेष राशि संयोजित की जाएगी")}</li>
+              <li>{t("The other farmer record will be deleted", "दूसरा किसान रिकॉर्ड हटा दिया जाएगा")}</li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setMergeDialogOpen(false); setMergingFarmer(null); }}>
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button 
+              onClick={handleConfirmMerge} 
+              disabled={mergeMutation.isPending}
+              data-testid="button-confirm-merge"
+            >
+              {mergeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("Confirm Merge", "मर्ज की पुष्टि करें")}
             </Button>
           </DialogFooter>
         </DialogContent>

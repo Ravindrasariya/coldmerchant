@@ -150,8 +150,9 @@ export interface IStorage {
   
   // Farmer Edit History operations
   getFarmerEditHistory(merchantId: number): Promise<(FarmerEditHistory & { farmerName?: string; userName?: string })[]>;
-  createFarmerEditHistory(data: InsertFarmerEditHistory): Promise<FarmerEditHistory>;
+  createFarmerEditHistory(data: Omit<InsertFarmerEditHistory, 'serialNumber'>): Promise<FarmerEditHistory>;
   updateFarmerWithPropagation(id: number, merchantId: number, userId: number | null, data: Partial<Farmer>): Promise<{ farmer: Farmer | undefined; changesLogged: number }>;
+  mergeFarmers(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingFarmer: Farmer; mergedCount: number }>;
   
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
@@ -1696,8 +1697,17 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async createFarmerEditHistory(data: InsertFarmerEditHistory): Promise<FarmerEditHistory> {
-    const [created] = await db.insert(farmerEditHistory).values(data).returning();
+  async createFarmerEditHistory(data: Omit<InsertFarmerEditHistory, 'serialNumber'>): Promise<FarmerEditHistory> {
+    // Get next serial number for this merchant
+    const [result] = await db.select({ maxSerial: sql<number>`COALESCE(MAX(serial_number), 0)` })
+      .from(farmerEditHistory)
+      .where(eq(farmerEditHistory.merchantId, data.merchantId));
+    const nextSerial = (result?.maxSerial || 0) + 1;
+    
+    const [created] = await db.insert(farmerEditHistory).values({
+      ...data,
+      serialNumber: nextSerial,
+    }).returning();
     return created;
   }
 
@@ -1835,6 +1845,77 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { farmer: updatedFarmer, changesLogged: changedFields.length };
+  }
+
+  async mergeFarmers(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingFarmer: Farmer; mergedCount: number }> {
+    // Ensure sourceId < targetId (lower ID survives)
+    const [lowerId, higherId] = sourceId < targetId ? [sourceId, targetId] : [targetId, sourceId];
+    
+    // Get both farmers
+    const [survivingFarmer] = await db.select().from(farmers)
+      .where(and(eq(farmers.id, lowerId), eq(farmers.merchantId, merchantId)));
+    const [mergingFarmer] = await db.select().from(farmers)
+      .where(and(eq(farmers.id, higherId), eq(farmers.merchantId, merchantId)));
+    
+    if (!survivingFarmer || !mergingFarmer) {
+      throw new Error("One or both farmers not found");
+    }
+    
+    let mergedCount = 0;
+    
+    // Move all linked stock entries from merging farmer to surviving farmer
+    const stockResult = await db.update(stockEntries)
+      .set({ farmerId: lowerId, updatedAt: new Date() })
+      .where(and(eq(stockEntries.farmerId, higherId), eq(stockEntries.merchantId, merchantId)))
+      .returning();
+    mergedCount += stockResult.length;
+    
+    // Move all linked seed transactions from merging farmer to surviving farmer
+    const seedResult = await db.update(seedTransactions)
+      .set({ farmerId: lowerId })
+      .where(and(eq(seedTransactions.farmerId, higherId), eq(seedTransactions.merchantId, merchantId)))
+      .returning();
+    mergedCount += seedResult.length;
+    
+    // Move all linked cash farmers from merging farmer to surviving farmer
+    const cashResult = await db.update(cashFarmers)
+      .set({ farmerId: lowerId, updatedAt: new Date() })
+      .where(and(eq(cashFarmers.farmerId, higherId), eq(cashFarmers.merchantId, merchantId)))
+      .returning();
+    mergedCount += cashResult.length;
+    
+    // Aggregate PY balances
+    const newPyPayable = (parseFloat(survivingFarmer.pyPayable || "0") + parseFloat(mergingFarmer.pyPayable || "0")).toString();
+    const newPyReceivable = (parseFloat(survivingFarmer.pyReceivable || "0") + parseFloat(mergingFarmer.pyReceivable || "0")).toString();
+    
+    // Update surviving farmer with aggregated balances and better details
+    const [updatedSurvivor] = await db.update(farmers)
+      .set({
+        pyPayable: newPyPayable,
+        pyReceivable: newPyReceivable,
+        tehsil: survivingFarmer.tehsil || mergingFarmer.tehsil,
+        district: survivingFarmer.district || mergingFarmer.district,
+        state: survivingFarmer.state || mergingFarmer.state,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(farmers.id, lowerId), eq(farmers.merchantId, merchantId)))
+      .returning();
+    
+    // Log the merge in edit history
+    await this.createFarmerEditHistory({
+      merchantId,
+      farmerId: lowerId,
+      changedBy: userId,
+      fieldName: 'merge',
+      oldValue: `Merged with ${mergingFarmer.farmerCode} (${mergingFarmer.name})`,
+      newValue: `Aggregated ${mergedCount} linked records`,
+    });
+    
+    // Delete the merged farmer
+    await db.delete(farmers)
+      .where(and(eq(farmers.id, higherId), eq(farmers.merchantId, merchantId)));
+    
+    return { survivingFarmer: updatedSurvivor, mergedCount };
   }
 
   // ===================== BANK ACCOUNT OPERATIONS =====================

@@ -2458,6 +2458,29 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/farmers/merge - Merge two farmers, keeping the lower ID and aggregating balances
+  app.post("/api/farmers/merge", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const { sourceId, targetId } = req.body;
+
+      if (!sourceId || !targetId || sourceId === targetId) {
+        return res.status(400).json({ message: "Valid source and target farmer IDs required" });
+      }
+
+      const result = await storage.mergeFarmers(merchantId, userId, sourceId, targetId);
+      res.json({ 
+        survivingFarmer: result.survivingFarmer,
+        mergedCount: result.mergedCount,
+        message: `Farmers merged successfully. ${result.mergedCount} linked records transferred.`
+      });
+    } catch (error) {
+      console.error("Error merging farmers:", error);
+      res.status(500).json({ message: "Failed to merge farmers" });
+    }
+  });
+
   // ===================== BANK ACCOUNT ROUTES =====================
 
   // GET /api/bank-accounts - Get all bank accounts for the authenticated merchant

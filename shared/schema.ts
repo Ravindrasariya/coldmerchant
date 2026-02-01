@@ -314,6 +314,7 @@ export const farmers = pgTable("farmers", {
 // Farmer Edit History - tracks all modifications to farmer records
 export const farmerEditHistory = pgTable("farmer_edit_history", {
   id: serial("id").primaryKey(),
+  serialNumber: integer("serial_number").notNull(), // auto-incrementing per merchant
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   farmerId: integer("farmer_id").notNull().references(() => farmers.id),
   changedAt: timestamp("changed_at").defaultNow(),
