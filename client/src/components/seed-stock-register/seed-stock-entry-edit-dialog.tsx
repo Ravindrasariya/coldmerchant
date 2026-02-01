@@ -88,6 +88,8 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries", entry.id, "edit-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
