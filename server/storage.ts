@@ -183,6 +183,7 @@ export interface IStorage {
   getSeedTransactionById(id: number, merchantId: number): Promise<any | undefined>;
   createSeedTransaction(transaction: any, items: any[]): Promise<any>;
   updateSeedTransaction(id: number, merchantId: number, data: any, items: any[], userId?: number): Promise<any>;
+  updateSeedTransactionFarmerId(id: number, merchantId: number, farmerId: number): Promise<void>;
   getNextSeedTransactionNumber(merchantId: number): Promise<number>;
   getUnsoldSeedInventory(merchantId: number): Promise<any[]>;
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
@@ -2309,6 +2310,12 @@ export class DatabaseStorage implements IStorage {
     }
 
     return { ...updatedTxn, items: createdItems };
+  }
+
+  async updateSeedTransactionFarmerId(id: number, merchantId: number, farmerId: number): Promise<void> {
+    await db.update(seedTransactions)
+      .set({ farmerId })
+      .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
   }
 
   async createSeedTransaction(

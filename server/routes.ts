@@ -1996,14 +1996,22 @@ export async function registerRoutes(
       // Get managed farmers (cash farmers) for receivables
       const managedFarmerList = await storage.getCashFarmersByMerchant(merchantId);
       
-      // Build a map of managed farmer receivables by name+contact key
-      const receivablesMap = new Map<string, number>();
+      // Build maps for receivables - one by farmerId (primary) and one by composite key (fallback)
+      const receivablesByFarmerId = new Map<number, number>();
+      const receivablesByCompositeKey = new Map<string, number>();
       for (const mf of managedFarmerList) {
         const receivables = parseFloat(mf.pendingDueToBePaid || "0");
-        if (receivables > 0 && mf.name) {
-          const key = mf.name.trim().toLowerCase() + "|" + (mf.contactNumber?.trim().toLowerCase() || "");
-          const existing = receivablesMap.get(key) || 0;
-          receivablesMap.set(key, existing + receivables);
+        if (receivables > 0) {
+          if (mf.farmerId) {
+            // Use farmerId for matching (primary)
+            const existing = receivablesByFarmerId.get(mf.farmerId) || 0;
+            receivablesByFarmerId.set(mf.farmerId, existing + receivables);
+          } else if (mf.name) {
+            // Fallback to composite key for legacy data
+            const key = mf.name.trim().toLowerCase() + "|" + (mf.contactNumber?.trim().toLowerCase() || "");
+            const existing = receivablesByCompositeKey.get(key) || 0;
+            receivablesByCompositeKey.set(key, existing + receivables);
+          }
         }
       }
       
@@ -2023,7 +2031,7 @@ export async function registerRoutes(
         breakdownsByLotId.set(breakdown.lotId, existing);
       }
       
-      // Calculate dues for each farmer - match by name+contact only
+      // Calculate dues for each farmer - match by farmerId first, then fall back to composite key (name+contact)
       const farmersWithDues = farmerList.map(farmer => {
         const normalizedFarmerName = farmer.name.trim().toLowerCase();
         const normalizedFarmerContact = farmer.contact?.trim().toLowerCase() || null;
@@ -2034,10 +2042,13 @@ export async function registerRoutes(
         let coldDue = 0;
         
         for (const entry of stockEntryList) {
+          // Match by farmerId first (primary), then fall back to composite key (for legacy data)
+          const matchesByFarmerId = entry.farmerId === farmer.id;
           const entryName = entry.farmerName?.trim().toLowerCase() || "";
           const entryContact = entry.farmerContact?.trim().toLowerCase() || null;
+          const matchesByCompositeKey = !entry.farmerId && entryName === normalizedFarmerName && entryContact === normalizedFarmerContact;
           
-          if (entryName === normalizedFarmerName && entryContact === normalizedFarmerContact) {
+          if (matchesByFarmerId || matchesByCompositeKey) {
             // Only calculate harvest due for entries with "due" or "partial" payment status
             if (entry.paymentStatus === "due" || entry.paymentStatus === "partial") {
               // Get lots for this entry
@@ -2144,13 +2155,16 @@ export async function registerRoutes(
           }
         }
         
-        // Calculate Seed Due (totalDueToFarmer from seed transactions where farmer matches by name+contact)
+        // Calculate Seed Due (totalDueToFarmer from seed transactions where farmer matches by farmerId or composite key)
         let seedDue = 0;
         for (const txn of seedTransactionList) {
+          // Match by farmerId first (primary), then fall back to composite key (for legacy data)
+          const matchesByFarmerId = txn.farmerId === farmer.id;
           const txnName = txn.farmerName?.trim().toLowerCase() || "";
           const txnContact = txn.farmerContact?.trim().toLowerCase() || null;
+          const matchesByCompositeKey = !txn.farmerId && txnName === normalizedFarmerName && txnContact === normalizedFarmerContact;
           
-          if (txnName === normalizedFarmerName && txnContact === normalizedFarmerContact) {
+          if (matchesByFarmerId || matchesByCompositeKey) {
             seedDue += parseFloat(txn.totalDueToFarmer || "0");
           }
         }
@@ -2158,8 +2172,12 @@ export async function registerRoutes(
         const pyReceivable = parseFloat(farmer.pyReceivable || "0");
         
         // Get receivables from managed farmers (cash farmers with pendingDueToBePaid)
-        const farmerKey = normalizedFarmerName + "|" + (normalizedFarmerContact || "");
-        const receivables = receivablesMap.get(farmerKey) || 0;
+        // Match by farmerId first, then fall back to composite key
+        let receivables = receivablesByFarmerId.get(farmer.id) || 0;
+        if (receivables === 0) {
+          const farmerKey = normalizedFarmerName + "|" + (normalizedFarmerContact || "");
+          receivables = receivablesByCompositeKey.get(farmerKey) || 0;
+        }
         
         // Net Due = PY Receivables + Harvest Due - Seed Due - Receivables
         // (Receivables are amounts farmer owes to merchant, so they offset what merchant owes to farmer)
@@ -2283,19 +2301,23 @@ export async function registerRoutes(
       
       // Create or update farmers
       let createdCount = 0;
+      let linkedCount = 0;
       const today = new Date().toISOString().split('T')[0];
       const dateStr = parseDateToCodeFormat(today);
       
+      // Build a map of name+contact -> farmerId for linking
+      const farmerIdMap = new Map<string, number>();
+      
       for (const data of Array.from(farmerMap.values())) {
         // Match by name+contact only (ignore village for matching)
-        const existing = await storage.getFarmerByNameAndContact(merchantId, data.name, data.contact);
+        let existing = await storage.getFarmerByNameAndContact(merchantId, data.name, data.contact);
         
         if (!existing) {
           const codePrefix = `FM${dateStr}`;
           const existingCount = await storage.countFarmersByCodePrefix(merchantId, codePrefix);
           const farmerCode = generateFarmerCode(dateStr, existingCount);
           
-          await storage.createFarmer({
+          existing = await storage.createFarmer({
             merchantId,
             farmerCode,
             dateAdded: today,
@@ -2305,7 +2327,7 @@ export async function registerRoutes(
             tehsil: data.tehsil,
             district: data.district,
             state: data.state,
-                        pyReceivable: "0",
+            pyReceivable: "0",
             negativeFlag: false,
             isArchived: false,
           });
@@ -2319,11 +2341,40 @@ export async function registerRoutes(
             state: data.state || existing.state,
           });
         }
+        
+        // Store farmerId for linking
+        const key = makeKey(data.name, data.contact);
+        farmerIdMap.set(key, existing.id);
+      }
+      
+      // Link farmerId to stock entries that don't have one
+      for (const entry of stockEntryList) {
+        if (!entry.farmerId && entry.farmerName) {
+          const key = makeKey(entry.farmerName, entry.farmerContact || null);
+          const farmerId = farmerIdMap.get(key);
+          if (farmerId) {
+            await storage.updateStockEntry(entry.id, merchantId, { farmerId });
+            linkedCount++;
+          }
+        }
+      }
+      
+      // Link farmerId to seed transactions that don't have one
+      for (const txn of seedTransactionList) {
+        if (!txn.farmerId && txn.farmerName) {
+          const key = makeKey(txn.farmerName, txn.farmerContact || null);
+          const farmerId = farmerIdMap.get(key);
+          if (farmerId) {
+            await storage.updateSeedTransactionFarmerId(txn.id, merchantId, farmerId);
+            linkedCount++;
+          }
+        }
       }
       
       res.json({ 
-        message: `Synced farmers successfully. Created ${createdCount} new farmers.`,
+        message: `Synced farmers successfully. Created ${createdCount} new farmers, linked ${linkedCount} existing entries.`,
         createdCount,
+        linkedCount,
         totalFarmers: existingFarmers.length + createdCount 
       });
     } catch (error) {
