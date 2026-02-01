@@ -220,10 +220,20 @@ export function FarmerLedgerTab() {
 
   const handleSaveEdit = () => {
     if (!editingFarmer) return;
-    if (!editForm.name.trim()) {
+    
+    // Validate all required fields
+    const missingFields: string[] = [];
+    if (!editForm.name.trim()) missingFields.push(t("Name", "नाम"));
+    if (!editForm.contact.trim()) missingFields.push(t("Contact", "संपर्क"));
+    if (!editForm.village.trim()) missingFields.push(t("Village", "गांव"));
+    if (!editForm.tehsil.trim()) missingFields.push(t("Tehsil", "तहसील"));
+    if (!editForm.district.trim()) missingFields.push(t("District", "जिला"));
+    if (!editForm.state.trim()) missingFields.push(t("State", "राज्य"));
+    
+    if (missingFields.length > 0) {
       toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Farmer name is required", "किसान का नाम आवश्यक है"),
+        title: t("Required Fields Missing", "आवश्यक फ़ील्ड गायब हैं"),
+        description: `${t("Please fill:", "कृपया भरें:")} ${missingFields.join(", ")}`,
         variant: "destructive",
       });
       return;
@@ -933,7 +943,7 @@ export function FarmerLedgerTab() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">{t("Name", "नाम")} *</Label>
+                <Label htmlFor="edit-name">{t("Name", "नाम")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-name"
                   value={editForm.name}
@@ -943,7 +953,7 @@ export function FarmerLedgerTab() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-contact">{t("Contact", "संपर्क")}</Label>
+                <Label htmlFor="edit-contact">{t("Contact", "संपर्क")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-contact"
                   value={editForm.contact}
@@ -955,7 +965,7 @@ export function FarmerLedgerTab() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-village">{t("Village", "गांव")}</Label>
+                <Label htmlFor="edit-village">{t("Village", "गांव")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-village"
                   value={editForm.village}
@@ -965,7 +975,7 @@ export function FarmerLedgerTab() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-tehsil">{t("Tehsil", "तहसील")}</Label>
+                <Label htmlFor="edit-tehsil">{t("Tehsil", "तहसील")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-tehsil"
                   value={editForm.tehsil}
@@ -977,7 +987,7 @@ export function FarmerLedgerTab() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-district">{t("District", "जिला")}</Label>
+                <Label htmlFor="edit-district">{t("District", "जिला")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-district"
                   value={editForm.district}
@@ -987,7 +997,7 @@ export function FarmerLedgerTab() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-state">{t("State", "राज्य")}</Label>
+                <Label htmlFor="edit-state">{t("State", "राज्य")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-state"
                   value={editForm.state}
