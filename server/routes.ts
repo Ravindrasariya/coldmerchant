@@ -2031,22 +2031,27 @@ export async function registerRoutes(
                   entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
                 }
                 
-                // Calculate deductions (matches edit dialog formula)
-                const expectedColdCharges = parseFloat(lot.expectedColdCharges || "0");
+                // Calculate deductions (matches edit dialog formula): hammali/grading + all dynamic charges
                 const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
                 // Parse lot.charges JSON array to get dynamic charges
                 let dynamicCharges = 0;
+                let lotColdCharges = 0;
+                const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
                 if (lot.charges) {
                   try {
                     const chargesArray = typeof lot.charges === 'string' ? JSON.parse(lot.charges) : lot.charges;
                     if (Array.isArray(chargesArray)) {
                       dynamicCharges = chargesArray.reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+                      // Sum only Cold Charges and Ware House Charges for cold due
+                      lotColdCharges = chargesArray
+                        .filter((c: any) => c && coldStoreTypes.includes(c.type))
+                        .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
                     }
                   } catch (e) {
                     // ignore parse errors
                   }
                 }
-                entryDeductions += expectedColdCharges + hammaliGradingCharges + dynamicCharges;
+                entryDeductions += hammaliGradingCharges + dynamicCharges;
                 
                 // Apply adjustment with compound interest (matches edit dialog formula)
                 if (lot.adjustedAmount && lot.adjustedAmountType) {
@@ -2071,8 +2076,8 @@ export async function registerRoutes(
                   }
                 }
                 
-                // Sum cold charges for cold due calculation
-                coldDue += expectedColdCharges;
+                // Sum cold charges for cold due calculation (from Cold Charges/Ware House Charges in charges array)
+                coldDue += lotColdCharges;
               }
               
               // Net Payable = Total Cost - Deductions + Adjustment (matches edit dialog formula)
@@ -2082,10 +2087,22 @@ export async function registerRoutes(
               const entryDue = Math.max(0, netPayable - amountPaid);
               harvestDue += entryDue;
             } else {
-              // For fully paid entries, still count cold charges
+              // For fully paid entries, still count cold charges from charges array
               const entryLots = lotsByEntryId.get(entry.id) || [];
+              const coldStoreTypesElse = ["Cold Charges", "Ware House Charges"];
               for (const lot of entryLots) {
-                coldDue += parseFloat(lot.expectedColdCharges || "0");
+                if (lot.charges) {
+                  try {
+                    const chargesArray = typeof lot.charges === 'string' ? JSON.parse(lot.charges) : lot.charges;
+                    if (Array.isArray(chargesArray)) {
+                      coldDue += chargesArray
+                        .filter((c: any) => c && coldStoreTypesElse.includes(c.type))
+                        .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+                    }
+                  } catch (e) {
+                    // ignore parse errors
+                  }
+                }
               }
             }
           }
