@@ -32,7 +32,7 @@ import {
   type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, asc, sql, gt, ne } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, gt, ne, isNull } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -1863,26 +1863,151 @@ export class DatabaseStorage implements IStorage {
     
     let mergedCount = 0;
     
-    // Move all linked stock entries from merging farmer to surviving farmer
-    const stockResult = await db.update(stockEntries)
-      .set({ farmerId: lowerId, updatedAt: new Date() })
+    // Helper for normalized composite key matching
+    const normalizeForMatch = (val: string | null | undefined) => (val || "").trim().toLowerCase();
+    
+    // Move all linked stock entries from merging farmer to surviving farmer (by farmerId)
+    const stockByIdResult = await db.update(stockEntries)
+      .set({ 
+        farmerId: lowerId, 
+        farmerName: survivingFarmer.name,
+        farmerContact: survivingFarmer.contact,
+        village: survivingFarmer.village,
+        tehsil: survivingFarmer.tehsil || undefined,
+        district: survivingFarmer.district || undefined,
+        state: survivingFarmer.state || undefined,
+        updatedAt: new Date() 
+      })
       .where(and(eq(stockEntries.farmerId, higherId), eq(stockEntries.merchantId, merchantId)))
       .returning();
-    mergedCount += stockResult.length;
+    mergedCount += stockByIdResult.length;
     
-    // Move all linked seed transactions from merging farmer to surviving farmer
-    const seedResult = await db.update(seedTransactions)
-      .set({ farmerId: lowerId })
+    // ALSO update stock entries by composite key matching (for entries with null farmerId)
+    // Match by merging farmer's composite key (name + contact + village)
+    const allMerchantStockEntries = await db.select().from(stockEntries)
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        isNull(stockEntries.farmerId)
+      ));
+    
+    for (const entry of allMerchantStockEntries) {
+      const entryName = normalizeForMatch(entry.farmerName);
+      const entryContact = normalizeForMatch(entry.farmerContact);
+      const entryVillage = normalizeForMatch(entry.village);
+      
+      const mergingName = normalizeForMatch(mergingFarmer.name);
+      const mergingContact = normalizeForMatch(mergingFarmer.contact);
+      const mergingVillage = normalizeForMatch(mergingFarmer.village);
+      
+      // Check if this entry matches the merging farmer's composite key
+      if (entryName === mergingName && entryContact === mergingContact && entryVillage === mergingVillage) {
+        await db.update(stockEntries)
+          .set({
+            farmerId: lowerId,
+            farmerName: survivingFarmer.name,
+            farmerContact: survivingFarmer.contact,
+            village: survivingFarmer.village,
+            tehsil: survivingFarmer.tehsil || undefined,
+            district: survivingFarmer.district || undefined,
+            state: survivingFarmer.state || undefined,
+            updatedAt: new Date()
+          })
+          .where(eq(stockEntries.id, entry.id));
+        mergedCount++;
+      }
+    }
+    
+    // Move all linked seed transactions from merging farmer to surviving farmer (by farmerId)
+    const seedByIdResult = await db.update(seedTransactions)
+      .set({ 
+        farmerId: lowerId,
+        farmerName: survivingFarmer.name,
+        farmerContact: survivingFarmer.contact,
+        village: survivingFarmer.village
+      })
       .where(and(eq(seedTransactions.farmerId, higherId), eq(seedTransactions.merchantId, merchantId)))
       .returning();
-    mergedCount += seedResult.length;
+    mergedCount += seedByIdResult.length;
+    
+    // ALSO update seed transactions by composite key matching (for entries with null farmerId)
+    const allMerchantSeedTransactions = await db.select().from(seedTransactions)
+      .where(and(
+        eq(seedTransactions.merchantId, merchantId),
+        isNull(seedTransactions.farmerId)
+      ));
+    
+    for (const txn of allMerchantSeedTransactions) {
+      const txnName = normalizeForMatch(txn.farmerName);
+      const txnContact = normalizeForMatch(txn.farmerContact);
+      const txnVillage = normalizeForMatch(txn.village);
+      
+      const mergingName = normalizeForMatch(mergingFarmer.name);
+      const mergingContact = normalizeForMatch(mergingFarmer.contact);
+      const mergingVillage = normalizeForMatch(mergingFarmer.village);
+      
+      // Check if this transaction matches the merging farmer's composite key
+      if (txnName === mergingName && txnContact === mergingContact && txnVillage === mergingVillage) {
+        await db.update(seedTransactions)
+          .set({
+            farmerId: lowerId,
+            farmerName: survivingFarmer.name,
+            farmerContact: survivingFarmer.contact,
+            village: survivingFarmer.village
+          })
+          .where(eq(seedTransactions.id, txn.id));
+        mergedCount++;
+      }
+    }
     
     // Move all linked cash farmers from merging farmer to surviving farmer
     const cashResult = await db.update(cashFarmers)
-      .set({ farmerId: lowerId, updatedAt: new Date() })
+      .set({ 
+        farmerId: lowerId, 
+        name: survivingFarmer.name,
+        contactNumber: survivingFarmer.contact,
+        village: survivingFarmer.village,
+        tehsil: survivingFarmer.tehsil,
+        district: survivingFarmer.district,
+        state: survivingFarmer.state,
+        updatedAt: new Date() 
+      })
       .where(and(eq(cashFarmers.farmerId, higherId), eq(cashFarmers.merchantId, merchantId)))
       .returning();
     mergedCount += cashResult.length;
+    
+    // ALSO update cash farmers by composite key matching (for entries with null farmerId)
+    const allMerchantCashFarmers = await db.select().from(cashFarmers)
+      .where(and(
+        eq(cashFarmers.merchantId, merchantId),
+        isNull(cashFarmers.farmerId)
+      ));
+    
+    for (const cf of allMerchantCashFarmers) {
+      const cfName = normalizeForMatch(cf.name);
+      const cfContact = normalizeForMatch(cf.contactNumber);
+      const cfVillage = normalizeForMatch(cf.village);
+      
+      const mergingName = normalizeForMatch(mergingFarmer.name);
+      const mergingContact = normalizeForMatch(mergingFarmer.contact);
+      const mergingVillage = normalizeForMatch(mergingFarmer.village);
+      
+      // Check if this cash farmer matches the merging farmer's composite key
+      if (cfName === mergingName && cfContact === mergingContact && cfVillage === mergingVillage) {
+        await db.update(cashFarmers)
+          .set({
+            farmerId: lowerId,
+            name: survivingFarmer.name,
+            contactNumber: survivingFarmer.contact,
+            village: survivingFarmer.village,
+            tehsil: survivingFarmer.tehsil,
+            district: survivingFarmer.district,
+            state: survivingFarmer.state,
+            updatedAt: new Date()
+          })
+          .where(eq(cashFarmers.id, cf.id));
+        mergedCount++;
+      }
+    }
     
     // Aggregate PY balances
     const newPyPayable = (parseFloat(survivingFarmer.pyPayable || "0") + parseFloat(mergingFarmer.pyPayable || "0")).toString();
