@@ -762,6 +762,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             let totalRemaining = 0;
             let entryTotalAmount = 0;
             let entryAdjustment = 0;
+            let entryDeductions = 0;
             let entryColdStoreTotalCharges = 0;
             let entryColdStorePaid = 0;
             
@@ -780,12 +781,14 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                   entryAdjustment += metrics.adjustedAmount;
                 }
               }
+              entryDeductions += metrics.totalDeductions;
               entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
               entryColdStorePaid += metrics.coldStorePaid;
             });
             
             const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-            const adjustedEntryTotal = entryTotalAmount + entryAdjustment;
+            // Net Payable = Total Cost - Deductions + Adjustment (matches edit dialog formula)
+            const adjustedEntryTotal = entryTotalAmount - entryDeductions + entryAdjustment;
             const farmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
             const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
             
