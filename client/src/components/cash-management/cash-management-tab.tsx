@@ -435,6 +435,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       toast({
@@ -2230,6 +2231,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
