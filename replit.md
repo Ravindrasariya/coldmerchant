@@ -83,6 +83,8 @@ When paying a supplier:
   - `localRows = null`: Displaying server data (no edits)
   - `localRows = [...]`: User has unsaved local edits
 - **Delete Preservation**: Delete operations preserve unsaved edits on other rows
+- **Receivables Column**: Displays receivables from linked Cash Management parties (pendingDueToBePaid)
+- **Party-Buyer Linking**: When creating managed parties in Cash Management, buyers are auto-created/linked using lookupOrCreateBuyer function (case-insensitive name matching, auto-generates BYYYYYMMDD# codes for new buyers)
 - **Accessible via**: User dropdown menu > "Buyers" link
 
 ### Farmer Ledger System
