@@ -109,6 +109,36 @@ interface SeedSupplierWithDue {
   entryCount: number;
 }
 
+// Farmer Ledger data with comprehensive dues
+interface LedgerFarmer {
+  id: number;
+  name: string;
+  contact: string | null;
+  village: string | null;
+  tehsil: string | null;
+  district: string | null;
+  pyPayable: string | null;
+  pyReceivable: string | null;
+  harvestDue: number;
+  seedDue: number;
+  coldDue: number;
+  receivables: number;
+  negativeFlag: boolean | null;
+  isArchived: boolean | null;
+}
+
+// Buyer Ledger data with dues
+interface LedgerBuyer {
+  id: number;
+  name: string;
+  address: string | null;
+  mandiCode: string | null;
+  contact: string | null;
+  negativeFlag: boolean | null;
+  isActive: boolean | null;
+  overallDue: number;
+}
+
 interface CrossSettlementEligibility {
   hasSeedDues: boolean;
   seedDueAmount: number;
@@ -286,7 +316,7 @@ export function CashManagementTab() {
     queryKey: ["/api/cash/cold-stores"],
   });
 
-  // Fetch seed farmers with dues from seed transactions
+  // Fetch seed farmers with dues from seed transactions (legacy)
   const { data: seedFarmers = [] } = useQuery<SeedFarmerWithDue[]>({
     queryKey: ["/api/cash/seed-farmers"],
   });
@@ -294,6 +324,16 @@ export function CashManagementTab() {
   // Fetch seed suppliers with dues from seed stock entries
   const { data: seedSuppliers = [] } = useQuery<SeedSupplierWithDue[]>({
     queryKey: ["/api/cash/seed-suppliers"],
+  });
+
+  // Fetch Farmer Ledger data (comprehensive dues from all sources)
+  const { data: ledgerFarmers = [] } = useQuery<LedgerFarmer[]>({
+    queryKey: ["/api/farmers"],
+  });
+
+  // Fetch Buyer Ledger data (dues from transactions)
+  const { data: ledgerBuyers = [] } = useQuery<LedgerBuyer[]>({
+    queryKey: ["/api/buyers"],
   });
 
   // Fetch managed parties for dropdown
@@ -548,21 +588,21 @@ export function CashManagementTab() {
         });
         return;
       }
-      const selectedParty = mergedParties.find(p => p.name.toLowerCase() === values.partyName?.toLowerCase());
+      const selectedBuyer = ledgerBuyers.find(b => b.name.toLowerCase() === values.partyName?.toLowerCase());
       createEntryMutation.mutate({
         direction: "inward",
         receiptType: values.receiptType,
         revenueType: values.revenueType,
         partyName: values.partyName,
-        partyVillage: selectedParty?.address || null,
+        partyVillage: selectedBuyer?.address || null,
         bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
       });
     } else {
-      // Seed sale - use seed farmer with cross-settlement
-      const selectedSeedFarmer = seedFarmers.find(f => f.farmerName.toLowerCase() === values.seedFarmerName?.toLowerCase());
+      // Seed sale - use farmer ledger with cross-settlement
+      const selectedLedgerFarmer = ledgerFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
       
       // Calculate cross-settlement for seed_to_raw direction (receiving seed payment, offset raw potato dues)
       // Settlement amount = min(seedDue, rawPotatoDue) - automatic when enabled
@@ -600,7 +640,7 @@ export function CashManagementTab() {
         receiptType: values.receiptType,
         revenueType: values.revenueType,
         farmerName: values.seedFarmerName,
-        farmerVillage: selectedSeedFarmer?.village || null,
+        farmerVillage: selectedLedgerFarmer?.village || null,
         bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
         amount: values.amount,
         entryDate: values.entryDate,
@@ -1502,19 +1542,22 @@ export function CashManagementTab() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {mergedParties.map((party) => (
-                                <SelectItem key={party.name} value={party.name}>
-                                  <div className="flex items-center justify-between gap-4">
-                                    <span>{party.name}</span>
-                                    {party.address && (
-                                      <span className="text-xs text-muted-foreground">({party.address})</span>
-                                    )}
-                                    <Badge variant="secondary">
-                                      {t("Due", "बकाया")}: ₹{party.pendingDues.toFixed(0)}
-                                    </Badge>
-                                  </div>
-                                </SelectItem>
-                              ))}
+                              {ledgerBuyers
+                                .filter(b => b.isActive !== false)
+                                .filter(b => b.overallDue > 0)
+                                .map((buyer) => (
+                                  <SelectItem key={buyer.id} value={buyer.name}>
+                                    <div className="flex items-center justify-between gap-4">
+                                      <span>{buyer.name}</span>
+                                      {buyer.address && (
+                                        <span className="text-xs text-muted-foreground">({buyer.address})</span>
+                                      )}
+                                      <Badge variant="secondary">
+                                        {t("Due", "बकाया")}: ₹{buyer.overallDue.toFixed(0)}
+                                      </Badge>
+                                    </div>
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -1544,7 +1587,7 @@ export function CashManagementTab() {
                                     data-testid="select-seed-farmer"
                                   >
                                     {field.value
-                                      ? seedFarmers.find(f => f.farmerName === field.value)?.farmerName || field.value
+                                      ? ledgerFarmers.find(f => f.name === field.value)?.name || field.value
                                       : t("Select Farmer", "किसान चुनें")}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
@@ -1556,35 +1599,42 @@ export function CashManagementTab() {
                                   <CommandList>
                                     <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
                                     <CommandGroup>
-                                      {seedFarmers.map((farmer) => (
-                                        <CommandItem
-                                          key={farmer.farmerName}
-                                          value={`${farmer.farmerName} ${farmer.village || ""}`}
-                                          onSelect={() => {
-                                            field.onChange(farmer.farmerName);
-                                            setSelectedInwardSeedFarmerName(farmer.farmerName);
-                                            setSeedFarmerPopoverOpen(false);
-                                          }}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              field.value === farmer.farmerName ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          <div className="flex flex-col flex-1">
-                                            <span className="font-medium">{farmer.farmerName}</span>
-                                            <span className="text-xs text-muted-foreground">
-                                              {farmer.village || ""}
-                                              {farmer.village && farmer.farmerContact && " • "}
-                                              {farmer.farmerContact || ""}
-                                            </span>
-                                          </div>
-                                          <Badge variant="secondary" className="ml-2">
-                                            ₹{farmer.totalDue.toFixed(0)}
-                                          </Badge>
-                                        </CommandItem>
-                                      ))}
+                                      {ledgerFarmers
+                                        .filter(f => !f.isArchived)
+                                        .filter(f => f.seedDue > 0 || parseFloat(f.pyReceivable || "0") > 0)
+                                        .map((farmer) => {
+                                          const pyReceivable = parseFloat(farmer.pyReceivable || "0");
+                                          const totalDue = farmer.seedDue + pyReceivable;
+                                          return (
+                                            <CommandItem
+                                              key={farmer.id}
+                                              value={`${farmer.name} ${farmer.village || ""} ${farmer.contact || ""}`}
+                                              onSelect={() => {
+                                                field.onChange(farmer.name);
+                                                setSelectedInwardSeedFarmerName(farmer.name);
+                                                setSeedFarmerPopoverOpen(false);
+                                              }}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  field.value === farmer.name ? "opacity-100" : "opacity-0"
+                                                )}
+                                              />
+                                              <div className="flex flex-col flex-1">
+                                                <span className="font-medium">{farmer.name}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {farmer.village || ""}
+                                                  {farmer.village && farmer.contact && " • "}
+                                                  {farmer.contact || ""}
+                                                </span>
+                                              </div>
+                                              <Badge variant="secondary" className="ml-2">
+                                                ₹{totalDue.toFixed(0)}
+                                              </Badge>
+                                            </CommandItem>
+                                          );
+                                        })}
                                     </CommandGroup>
                                   </CommandList>
                                 </Command>
