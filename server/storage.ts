@@ -2771,16 +2771,32 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Apply standard FIFO logic for the remaining cash (after cross-settlement)
-      // Party payment FIFO
+      // Party/Buyer payment FIFO
       if (applyFIFO && entry.direction === "inward" && entry.revenueType === "raw_potato" && entry.partyName) {
         let remainingAmount = parseFloat(entry.amount);
         const normalizedPartyName = normalizeName(entry.partyName);
+        
+        // Try to find buyer by name to get buyerId for primary matching
+        const allBuyers = await tx.select().from(buyers)
+          .where(eq(buyers.merchantId, entry.merchantId));
+        
+        const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizedPartyName);
+        const matchedBuyerId = matchedBuyer?.id || null;
         
         const txns = await tx.select().from(transactions)
           .where(eq(transactions.merchantId, entry.merchantId))
           .orderBy(asc(transactions.createdAt));
         
+        // Filter using primary (buyerId) or fallback (partyName) matching
         const transactionsWithDue = txns.filter(txn => {
+          // Primary matching: by buyerId if available
+          if (matchedBuyerId && txn.buyerId === matchedBuyerId) {
+            const revenue = parseFloat(txn.revenue || "0");
+            const received = parseFloat(txn.amountReceived || "0");
+            return revenue > received;
+          }
+          
+          // Fallback matching: by partyName
           if (!txn.partyName) return false;
           if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
           const revenue = parseFloat(txn.revenue || "0");
@@ -2829,42 +2845,75 @@ export class DatabaseStorage implements IStorage {
           const normalizedFarmerName = normalizeName(entry.farmerName);
           const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
           
-          // Get seed transactions for this merchant (FIFO order by createdAt)
-          const allSeedTxns = await tx.select().from(seedTransactions)
-            .where(eq(seedTransactions.merchantId, entry.merchantId))
-            .orderBy(asc(seedTransactions.createdAt));
+          // Try to find farmer by composite key to get farmerId for primary matching
+          const allFarmers = await tx.select().from(farmers)
+            .where(eq(farmers.merchantId, entry.merchantId));
           
-          // Filter to only those matching farmer using composite identity (name + village)
-          const matchingSeedTxns = allSeedTxns.filter(txn => {
-            if (normalizeName(txn.farmerName) !== normalizedFarmerName) return false;
-            // If village is provided, check it matches
-            if (normalizedFarmerVillage && txn.village && normalizeName(txn.village) !== normalizedFarmerVillage) return false;
+          const matchedFarmer = allFarmers.find(f => {
+            if (normalizeName(f.name) !== normalizedFarmerName) return false;
+            if (normalizedFarmerVillage && f.village && normalizeName(f.village) !== normalizedFarmerVillage) return false;
             return true;
           });
           
-          // Filter to only those with remaining due
-          const seedTxnsWithDue = matchingSeedTxns.filter(txn => {
-            const totalDue = parseFloat(txn.totalDueToFarmer || "0");
-            return totalDue > 0;
-          });
+          const matchedFarmerId = matchedFarmer?.id || null;
           
-          for (const seedTxn of seedTxnsWithDue) {
-            if (remainingAmount <= 0) break;
+          // FIRST PREFERENCE: Reduce farmer's pyReceivable balance before FIFO
+          if (matchedFarmer && remainingAmount > 0) {
+            const currentPyReceivable = parseFloat(matchedFarmer.pyReceivable || "0");
+            if (currentPyReceivable > 0) {
+              const toApplyToPy = Math.min(remainingAmount, currentPyReceivable);
+              const newPyReceivable = currentPyReceivable - toApplyToPy;
+              
+              await tx.update(farmers)
+                .set({ pyReceivable: newPyReceivable.toString() })
+                .where(eq(farmers.id, matchedFarmer.id));
+              
+              remainingAmount -= toApplyToPy;
+            }
+          }
+          
+          // Then apply remaining amount to seed transactions in FIFO order
+          if (remainingAmount > 0) {
+            // Get seed transactions for this merchant (FIFO order by createdAt)
+            const allSeedTxns = await tx.select().from(seedTransactions)
+              .where(eq(seedTransactions.merchantId, entry.merchantId))
+              .orderBy(asc(seedTransactions.createdAt));
             
-            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+            // Filter using primary (farmerId) or fallback (composite key) matching
+            const matchingSeedTxns = allSeedTxns.filter(txn => {
+              // Primary matching: by farmerId if available
+              if (matchedFarmerId && txn.farmerId === matchedFarmerId) return true;
+              
+              // Fallback matching: by composite key (name + contact + village)
+              if (normalizeName(txn.farmerName) !== normalizedFarmerName) return false;
+              if (normalizedFarmerVillage && txn.village && normalizeName(txn.village) !== normalizedFarmerVillage) return false;
+              return true;
+            });
             
-            if (currentDue <= 0) continue;
+            // Filter to only those with remaining due
+            const seedTxnsWithDue = matchingSeedTxns.filter(txn => {
+              const totalDue = parseFloat(txn.totalDueToFarmer || "0");
+              return totalDue > 0;
+            });
             
-            // Calculate how much to apply to this seed transaction
-            const toApply = Math.min(remainingAmount, currentDue);
-            
-            // Update seed transaction's totalDueToFarmer (reduce by payment amount)
-            const newDue = currentDue - toApply;
-            await tx.update(seedTransactions)
-              .set({ totalDueToFarmer: newDue.toString() })
-              .where(eq(seedTransactions.id, seedTxn.id));
-            
-            remainingAmount -= toApply;
+            for (const seedTxn of seedTxnsWithDue) {
+              if (remainingAmount <= 0) break;
+              
+              const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+              
+              if (currentDue <= 0) continue;
+              
+              // Calculate how much to apply to this seed transaction
+              const toApply = Math.min(remainingAmount, currentDue);
+              
+              // Update seed transaction's totalDueToFarmer (reduce by payment amount)
+              const newDue = currentDue - toApply;
+              await tx.update(seedTransactions)
+                .set({ totalDueToFarmer: newDue.toString() })
+                .where(eq(seedTransactions.id, seedTxn.id));
+              
+              remainingAmount -= toApply;
+            }
           }
         }
       }
@@ -2881,6 +2930,18 @@ export class DatabaseStorage implements IStorage {
           const normalizedFarmerName = normalizeName(entry.farmerName);
           const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
           
+          // Try to find farmer by composite key to get farmerId for primary matching
+          const allFarmers = await tx.select().from(farmers)
+            .where(eq(farmers.merchantId, entry.merchantId));
+          
+          const matchedFarmer = allFarmers.find(f => {
+            if (normalizeName(f.name) !== normalizedFarmerName) return false;
+            if (normalizedFarmerVillage && f.village && normalizeName(f.village) !== normalizedFarmerVillage) return false;
+            return true;
+          });
+          
+          const matchedFarmerId = matchedFarmer?.id || null;
+          
           const allFarmerEntries = await tx.select().from(stockEntries)
             .where(and(
               eq(stockEntries.merchantId, entry.merchantId),
@@ -2888,10 +2949,13 @@ export class DatabaseStorage implements IStorage {
             ))
             .orderBy(asc(stockEntries.createdAt));
           
-          // Filter to only those matching farmer using composite key (name + village)
+          // Filter using primary (farmerId) or fallback (composite key) matching
           const farmerEntries = allFarmerEntries.filter(se => {
+            // Primary matching: by farmerId if available
+            if (matchedFarmerId && se.farmerId === matchedFarmerId) return true;
+            
+            // Fallback matching: by composite key (name + village)
             if (normalizeName(se.farmerName) !== normalizedFarmerName) return false;
-            // If village is provided, check it matches
             if (normalizedFarmerVillage && se.village && normalizeName(se.village) !== normalizedFarmerVillage) return false;
             return true;
           });
