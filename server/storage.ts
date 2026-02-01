@@ -146,6 +146,7 @@ export interface IStorage {
   updateFarmer(id: number, merchantId: number, data: Partial<Farmer>): Promise<Farmer | undefined>;
   getFarmerByCompositeKey(merchantId: number, name: string, contact: string | null, village: string | null): Promise<Farmer | undefined>;
   getFarmerByNameAndContact(merchantId: number, name: string, contact: string | null): Promise<Farmer | undefined>;
+  lookupOrCreateFarmer(merchantId: number, farmerData: { name: string; contact?: string | null; village?: string | null; tehsil?: string | null; district?: string | null; state?: string | null }): Promise<{ farmerId: number; isNew: boolean }>;
   
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
@@ -1628,6 +1629,45 @@ export class DatabaseStorage implements IStorage {
       
       return fName === normalizedName && fContact === normalizedContact;
     });
+  }
+
+  async lookupOrCreateFarmer(merchantId: number, farmerData: { name: string; contact?: string | null; village?: string | null; tehsil?: string | null; district?: string | null; state?: string | null }): Promise<{ farmerId: number; isNew: boolean }> {
+    // Check if farmer exists using composite key (name + contact + village)
+    const existingFarmer = await this.getFarmerByCompositeKey(
+      merchantId,
+      farmerData.name,
+      farmerData.contact || null,
+      farmerData.village || null
+    );
+    
+    if (existingFarmer) {
+      return { farmerId: existingFarmer.id, isNew: false };
+    }
+    
+    // Create new farmer
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    const prefix = `FM${dateStr}`;
+    const count = await this.countFarmersByCodePrefix(merchantId, prefix);
+    const farmerCode = `${prefix}${count + 1}`;
+    
+    const newFarmer = await this.createFarmer({
+      merchantId,
+      farmerCode,
+      dateAdded: today.toISOString().split('T')[0],
+      name: farmerData.name,
+      contact: farmerData.contact || null,
+      village: farmerData.village || null,
+      tehsil: farmerData.tehsil || null,
+      district: farmerData.district || null,
+      state: farmerData.state || null,
+      pyPayable: "0",
+      pyReceivable: "0",
+      negativeFlag: false,
+      isArchived: false,
+    });
+    
+    return { farmerId: newFarmer.id, isNew: true };
   }
 
   // ===================== BANK ACCOUNT OPERATIONS =====================

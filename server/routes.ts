@@ -86,11 +86,22 @@ export async function registerRoutes(
       // Determine crop from first lot (all lots in an entry should have the same crop)
       const entryCrop = data.lots?.[0]?.crop || "potato";
 
+      // Lookup or create farmer in farmer ledger
+      const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
+        name: data.farmerName,
+        contact: data.farmerContact || null,
+        village: data.village || null,
+        tehsil: data.tehsil || null,
+        district: data.district || null,
+        state: data.state || null,
+      });
+
       // Create stock entry
       const stockEntry = await storage.createStockEntry({
         merchantId,
         crop: entryCrop,
         purchaseDate: data.purchaseDate,
+        farmerId,
         farmerName: data.farmerName,
         farmerContact: data.farmerContact || null,
         village: data.village || null,
@@ -1786,8 +1797,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Farmer name is required" });
       }
 
+      // Lookup or create farmer in farmer ledger
+      const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
+        name: name,
+        contact: contactNumber || null,
+        village: village || null,
+        tehsil: tehsil || null,
+        district: district || null,
+        state: state || null,
+      });
+
       const farmer = await storage.createCashFarmer({
         merchantId,
+        farmerId,
         name,
         contactNumber: contactNumber || null,
         village: village || null,
@@ -2307,6 +2329,32 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error syncing farmers:", error);
       res.status(500).json({ message: "Failed to sync farmers" });
+    }
+  });
+
+  // POST /api/farmers/lookup-or-create - Find existing farmer or create new one based on composite key (name+contact+village)
+  app.post("/api/farmers/lookup-or-create", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, contact, village, tehsil, district, state } = req.body;
+      
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+      
+      const result = await storage.lookupOrCreateFarmer(merchantId, {
+        name: name.trim(),
+        contact: contact?.trim() || null,
+        village: village?.trim() || null,
+        tehsil: tehsil?.trim() || null,
+        district: district?.trim() || null,
+        state: state?.trim() || null,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error in farmer lookup/create:", error);
+      res.status(500).json({ message: "Failed to lookup or create farmer" });
     }
   });
 
@@ -2977,6 +3025,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Missing required fields" });
       }
 
+      // Lookup or create farmer in farmer ledger
+      const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
+        name: farmerName,
+        contact: farmerContact || null,
+        village: village || null,
+        tehsil: tehsil || null,
+        district: district || null,
+        state: state || null,
+      });
+
       // Calculate totals
       let totalBags = 0;
       let totalCost = 0;
@@ -3036,6 +3094,7 @@ export async function registerRoutes(
         {
           merchantId,
           transactionNumber,
+          farmerId,
           farmerName,
           farmerContact: farmerContact || null,
           village: village || null,

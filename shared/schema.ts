@@ -37,6 +37,7 @@ export const stockEntries = pgTable("stock_entries", {
   serialNumber: integer("serial_number").notNull(),
   crop: text("crop").default("potato"), // potato or onion - for separate serial number sequences
   purchaseDate: date("purchase_date").notNull(),
+  farmerId: integer("farmer_id").references(() => farmers.id), // links to farmer ledger for matching
   farmerName: text("farmer_name").notNull(),
   farmerContact: text("farmer_contact"),
   village: text("village"),
@@ -262,6 +263,7 @@ export const parties = pgTable("parties", {
 export const cashFarmers = pgTable("cash_farmers", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  farmerId: integer("farmer_id").references(() => farmers.id), // links to farmer ledger for matching
   name: text("name").notNull(),
   contactNumber: text("contact_number"),
   village: text("village"),
@@ -366,6 +368,7 @@ export const seedTransactions = pgTable("seed_transactions", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
+  farmerId: integer("farmer_id").references(() => farmers.id), // links to farmer ledger for matching
   farmerName: text("farmer_name").notNull(),
   farmerContact: text("farmer_contact"),
   village: text("village"),
