@@ -411,6 +411,11 @@ export const seedTransactions = pgTable("seed_transactions", {
   totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }), // revenue from sale
   totalProfitLoss: decimal("total_profit_loss", { precision: 12, scale: 2 }),
   totalDueToFarmer: decimal("total_due_to_farmer", { precision: 12, scale: 2 }), // Revenue + Transport + Other charges
+  adjustmentType: text("adjustment_type"), // "debit" or "credit"
+  adjustmentAmount: decimal("adjustment_amount", { precision: 12, scale: 2 }), // principal for interest calculation
+  adjustmentRate: decimal("adjustment_rate", { precision: 6, scale: 2 }), // annual rate % for compound interest
+  adjustmentEffectiveDate: date("adjustment_effective_date"), // effective date for interest calculation
+  adjustmentReason: text("adjustment_reason"), // reason for adjustment
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -3208,6 +3208,11 @@ export async function registerRoutes(
           totalRevenue: totalRevenue.toString(),
           totalProfitLoss: totalProfitLoss.toString(),
           totalDueToFarmer: totalDueToFarmer.toString(),
+          adjustmentType: adjustmentType || null,
+          adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
+          adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
+          adjustmentEffectiveDate: adjustmentEffectiveDate || null,
+          adjustmentReason: adjustmentReason || null,
         },
         processedItems
       );
@@ -3236,6 +3241,9 @@ export async function registerRoutes(
         { key: 'state', label: 'State' },
         { key: 'vehicleNumber', label: 'Vehicle Number' },
         { key: 'otherChargesRemarks', label: 'Other Charges Remarks' },
+        { key: 'adjustmentType', label: 'Adjustment Type' },
+        { key: 'adjustmentEffectiveDate', label: 'Adjustment Effective Date' },
+        { key: 'adjustmentReason', label: 'Adjustment Reason' },
       ];
 
       for (const { key, label } of textFieldsToTrack) {
@@ -3255,6 +3263,8 @@ export async function registerRoutes(
         { key: 'totalRevenue', label: 'Total Revenue' },
         { key: 'totalProfitLoss', label: 'Profit/Loss' },
         { key: 'totalDueToFarmer', label: 'Total Due' },
+        { key: 'adjustmentAmount', label: 'Adjustment Amount' },
+        { key: 'adjustmentRate', label: 'Adjustment Rate' },
       ];
 
       for (const { key, label } of numericFieldsToTrack) {
