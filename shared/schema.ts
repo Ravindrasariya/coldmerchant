@@ -469,24 +469,6 @@ export const farmerSettlements = pgTable("farmer_settlements", {
   settledAt: timestamp("settled_at").defaultNow(),
 });
 
-// Display Due Logs - FIFO-allocated display dues for UI/CSV (separate from raw dues to avoid circularity)
-export const displayDueLogs = pgTable("display_due_logs", {
-  id: serial("id").primaryKey(),
-  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  farmerId: integer("farmer_id").references(() => farmers.id),
-  entryType: text("entry_type").notNull(), // "stock_entry" or "seed_transaction"
-  entryId: integer("entry_id").notNull(), // ID of the stock entry or seed transaction
-  rawDue: decimal("raw_due", { precision: 12, scale: 2 }).notNull(), // Original calculated due amount
-  displayDue: decimal("display_due", { precision: 12, scale: 2 }).notNull(), // FIFO-allocated display due (may be 0 if fully offset)
-  netDueSnapshot: decimal("net_due_snapshot", { precision: 12, scale: 2 }).notNull(), // Farmer's Net Due at time of calculation
-  calculatedAt: timestamp("calculated_at").defaultNow(),
-});
-
-export const insertDisplayDueLogSchema = createInsertSchema(displayDueLogs).omit({
-  id: true,
-  calculatedAt: true,
-});
-
 // Relations
 export const merchantsRelations = relations(merchants, ({ many }) => ({
   users: many(users),
@@ -507,7 +489,6 @@ export const merchantsRelations = relations(merchants, ({ many }) => ({
   seedTransactions: many(seedTransactions),
   seedTransactionItems: many(seedTransactionItems),
   farmerSettlements: many(farmerSettlements),
-  displayDueLogs: many(displayDueLogs),
 }));
 
 // Seed Stock Entries Relations
@@ -897,9 +878,6 @@ export type InsertSeedTransactionEditHistory = z.infer<typeof insertSeedTransact
 
 export type FarmerSettlement = typeof farmerSettlements.$inferSelect;
 export type InsertFarmerSettlement = z.infer<typeof insertFarmerSettlementSchema>;
-
-export type DisplayDueLog = typeof displayDueLogs.$inferSelect;
-export type InsertDisplayDueLog = z.infer<typeof insertDisplayDueLogSchema>;
 
 // Change types for edit history
 export type FieldChange = {

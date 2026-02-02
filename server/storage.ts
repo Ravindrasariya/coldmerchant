@@ -6,7 +6,7 @@ import {
   buyerEditHistory,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
-  farmerSettlements, displayDueLogs,
+  farmerSettlements,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -31,8 +31,7 @@ import {
   type SeedTransaction, type InsertSeedTransaction,
   type SeedTransactionItem, type InsertSeedTransactionItem,
   type SeedTransactionWithItems,
-  type SeedTransactionEditHistory,
-  type DisplayDueLog, type InsertDisplayDueLog
+  type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, asc, sql, gt, ne, isNull } from "drizzle-orm";
@@ -256,13 +255,6 @@ export interface IStorage {
   
   // Brand name lookup operations (for autocomplete in seed lot forms)
   searchSeedBrands(merchantId: number, query: string): Promise<string[]>;
-  
-  // Display Due Log operations (for FIFO-allocated display dues)
-  getDisplayDueLogs(merchantId: number, entryType?: string): Promise<DisplayDueLog[]>;
-  getDisplayDueLogByEntry(merchantId: number, entryType: string, entryId: number): Promise<DisplayDueLog | undefined>;
-  upsertDisplayDueLog(log: InsertDisplayDueLog): Promise<DisplayDueLog>;
-  deleteDisplayDueLogsByFarmer(merchantId: number, farmerId: number): Promise<void>;
-  deleteAllDisplayDueLogs(merchantId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3758,59 +3750,6 @@ export class DatabaseStorage implements IStorage {
     }
 
     return results;
-  }
-
-  // Display Due Log operations
-  async getDisplayDueLogs(merchantId: number, entryType?: string): Promise<DisplayDueLog[]> {
-    if (entryType) {
-      return await db.select().from(displayDueLogs)
-        .where(and(eq(displayDueLogs.merchantId, merchantId), eq(displayDueLogs.entryType, entryType)));
-    }
-    return await db.select().from(displayDueLogs)
-      .where(eq(displayDueLogs.merchantId, merchantId));
-  }
-
-  async getDisplayDueLogByEntry(merchantId: number, entryType: string, entryId: number): Promise<DisplayDueLog | undefined> {
-    const [log] = await db.select().from(displayDueLogs)
-      .where(and(
-        eq(displayDueLogs.merchantId, merchantId),
-        eq(displayDueLogs.entryType, entryType),
-        eq(displayDueLogs.entryId, entryId)
-      ));
-    return log || undefined;
-  }
-
-  async upsertDisplayDueLog(log: InsertDisplayDueLog): Promise<DisplayDueLog> {
-    // Check if a log already exists for this entry
-    const existing = await this.getDisplayDueLogByEntry(log.merchantId, log.entryType, log.entryId);
-    if (existing) {
-      // Update existing log
-      const [updated] = await db.update(displayDueLogs)
-        .set({
-          farmerId: log.farmerId,
-          rawDue: log.rawDue,
-          displayDue: log.displayDue,
-          netDueSnapshot: log.netDueSnapshot,
-          calculatedAt: new Date()
-        })
-        .where(eq(displayDueLogs.id, existing.id))
-        .returning();
-      return updated;
-    } else {
-      // Insert new log
-      const [created] = await db.insert(displayDueLogs).values(log).returning();
-      return created;
-    }
-  }
-
-  async deleteDisplayDueLogsByFarmer(merchantId: number, farmerId: number): Promise<void> {
-    await db.delete(displayDueLogs)
-      .where(and(eq(displayDueLogs.merchantId, merchantId), eq(displayDueLogs.farmerId, farmerId)));
-  }
-
-  async deleteAllDisplayDueLogs(merchantId: number): Promise<void> {
-    await db.delete(displayDueLogs)
-      .where(eq(displayDueLogs.merchantId, merchantId));
   }
 }
 
