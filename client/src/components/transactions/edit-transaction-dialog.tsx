@@ -569,16 +569,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       placeholder="0"
                       data-testid={`input-item-weight-${index}`}
                     />
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.pricePerKg || ""}
-                      onChange={(e) => handlePriceChange(index, parseFloat(e.target.value) || 0)}
-                      className="h-8 text-right no-spinner"
-                      placeholder="0"
-                      data-testid={`input-item-price-${index}`}
-                    />
+                    <div 
+                      className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                      data-testid={`text-item-price-${index}`}
+                    >
+                      {item.pricePerKg || 0}
+                    </div>
                     <Input
                       type="number"
                       min="0"
