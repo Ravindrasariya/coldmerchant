@@ -600,7 +600,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                   <Receipt className="h-3.5 w-3.5 text-[#52a7ff]" />
                 </div>
                 <span className="font-bold text-sm leading-tight whitespace-nowrap">
-                  {transaction.uniqueId || `HTE${transaction.transactionNumber}`}
+                  Tr No: {transaction.transactionNumber}
                 </span>
                 <span className="text-muted-foreground text-xs ml-1">
                   {new Date(transaction.createdAt).toLocaleDateString("en-IN", {

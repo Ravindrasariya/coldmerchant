@@ -520,7 +520,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                       <div className="flex flex-wrap items-center gap-1.5 mb-2">
                         <div className="flex items-center gap-1" data-testid={`text-seed-serial-${entry.id}`}>
                           <Package className="h-4 w-4" style={{ color: '#52a7ff' }} />
-                          <span className="font-semibold text-base">{entry.uniqueId || `SSE${entry.serialNumber}`} -</span>
+                          <span className="font-semibold text-base">{t("Sr No:", "क्र.:")} {entry.serialNumber} -</span>
                         </div>
                         <span className="font-semibold text-base" data-testid={`text-supplier-${entry.id}`}>
                           {entry.supplierName}

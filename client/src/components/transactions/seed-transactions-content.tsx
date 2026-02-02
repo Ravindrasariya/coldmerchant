@@ -592,7 +592,7 @@ export function SeedTransactionsContent() {
                             <FileText className="h-3.5 w-3.5 text-[#52a7ff]" />
                           </div>
                           <span className="font-bold text-sm leading-tight whitespace-nowrap">
-                            {txn.uniqueId || `STE${txn.transactionNumber}`}
+                            Tr No: {txn.transactionNumber}
                           </span>
                         </div>
                         <span className="font-semibold text-sm leading-tight">
