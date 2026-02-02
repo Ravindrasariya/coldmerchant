@@ -99,7 +99,7 @@ export function CashSettingsDialog({ open, onOpenChange }: CashSettingsDialogPro
               </TabsTrigger>
               <TabsTrigger value="parties" className="flex items-center gap-2" data-testid="tab-parties">
                 <Users className="h-4 w-4" />
-                {t("Parties", "पार्टी")}
+                {t("Buyers", "खरीदार")}
               </TabsTrigger>
               <TabsTrigger value="farmers" className="flex items-center gap-2" data-testid="tab-farmers">
                 <Tractor className="h-4 w-4" />
@@ -520,10 +520,10 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
       setShowAddForm(false);
       setFormData({ name: "", contactNumber: "", address: "", pendingDues: "" });
-      toast({ title: t("Party added", "पार्टी जोड़ी गई") });
+      toast({ title: t("Buyer added", "खरीदार जोड़ा गया") });
     },
     onError: () => {
-      toast({ title: t("Failed to add party", "पार्टी जोड़ने में विफल"), variant: "destructive" });
+      toast({ title: t("Failed to add buyer", "खरीदार जोड़ने में विफल"), variant: "destructive" });
     },
   });
 
@@ -534,10 +534,10 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
       setEditingId(null);
-      toast({ title: t("Party updated", "पार्टी अपडेट की गई") });
+      toast({ title: t("Buyer updated", "खरीदार अपडेट किया गया") });
     },
     onError: () => {
-      toast({ title: t("Failed to update party", "पार्टी अपडेट करने में विफल"), variant: "destructive" });
+      toast({ title: t("Failed to update buyer", "खरीदार अपडेट करने में विफल"), variant: "destructive" });
     },
   });
 
@@ -547,10 +547,10 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
-      toast({ title: t("Party deleted", "पार्टी हटाई गई") });
+      toast({ title: t("Buyer deleted", "खरीदार हटाया गया") });
     },
     onError: () => {
-      toast({ title: t("Failed to delete party", "पार्टी हटाने में विफल"), variant: "destructive" });
+      toast({ title: t("Failed to delete buyer", "खरीदार हटाने में विफल"), variant: "destructive" });
     },
   });
 
@@ -577,7 +577,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="font-medium">{t("Manage Parties", "पार्टी प्रबंधित करें")}</h3>
+        <h3 className="font-medium">{t("Manage Buyers", "खरीदार प्रबंधित करें")}</h3>
         <Button 
           size="sm" 
           onClick={() => setShowAddForm(true)} 
@@ -585,7 +585,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
           data-testid="button-add-party"
         >
           <Plus className="h-4 w-4 mr-1" />
-          {t("Add Party", "पार्टी जोड़ें")}
+          {t("Add Buyer", "खरीदार जोड़ें")}
         </Button>
       </div>
 
@@ -598,7 +598,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder={t("Party name", "पार्टी का नाम")}
+                  placeholder={t("Buyer name", "खरीदार का नाम")}
                   data-testid="input-party-name"
                 />
               </div>
@@ -662,7 +662,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {parties.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            {t("No parties added yet", "अभी तक कोई पार्टी नहीं जोड़ी गई")}
+            {t("No buyers added yet", "अभी तक कोई खरीदार नहीं जोड़ा गया")}
           </div>
         ) : (
           parties.map((party) => (

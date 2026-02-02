@@ -1576,11 +1576,11 @@ export function CashManagementTab() {
                       name="partyName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("Party Name", "पार्टी का नाम")} *</FormLabel>
+                          <FormLabel>{t("Buyer Name", "खरीदार का नाम")} *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger data-testid="select-party-name">
-                                <SelectValue placeholder={t("Select Party", "पार्टी चुनें")} />
+                                <SelectValue placeholder={t("Select Buyer", "खरीदार चुनें")} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
