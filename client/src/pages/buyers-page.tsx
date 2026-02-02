@@ -343,101 +343,109 @@ export default function BuyersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="hidden md:grid gap-2 p-3 bg-muted/50 rounded-md font-medium text-sm" style={{ gridTemplateColumns: '40px 100px 1fr 1fr 80px 100px 70px 60px 100px 90px' }}>
-                  <div></div>
-                  <div 
-                    className="flex items-center gap-1 cursor-pointer select-none"
-                    onClick={() => handleSort('buyerCode')}
-                    data-testid="sort-buyer-id"
-                  >
-                    {t("Buyer ID", "खरीदार आईडी")}
-                    {sortColumn === 'buyerCode' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                    ) : (
-                      <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                    )}
+                {/* Desktop/Tablet table view with horizontal scroll */}
+                <div className="hidden md:block overflow-x-auto rounded-lg border bg-card">
+                  <div className="min-w-[850px]">
+                    {/* Header row */}
+                    <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-sm font-medium border-b" style={{ gridTemplateColumns: '36px 95px 1fr 1fr 65px 95px 55px 50px 80px 75px' }}>
+                      <div></div>
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer select-none text-xs"
+                        onClick={() => handleSort('buyerCode')}
+                        data-testid="sort-buyer-id"
+                      >
+                        {t("ID", "आईडी")}
+                        {sortColumn === 'buyerCode' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>{t("Name", "नाम")}</div>
+                      <div>{t("Address", "पता")}</div>
+                      <div className="text-xs">{t("Mandi", "मंडी")}</div>
+                      <div className="text-xs">{t("Contact", "संपर्क")}</div>
+                      <div className="text-xs">{t("Neg", "नकारात्मक")}</div>
+                      <div className="text-xs">{t("Act", "सक्रिय")}</div>
+                      <div 
+                        className="flex items-center gap-1 cursor-pointer select-none text-xs"
+                        onClick={() => handleSort('overallDue')}
+                        data-testid="sort-overall-due"
+                      >
+                        {t("Due", "बकाया")}
+                        {sortColumn === 'overallDue' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="text-xs">{t("Recv", "प्राप्य")}</div>
+                    </div>
+                    
+                    {/* Data rows */}
+                    {filteredBuyers.map((buyer, index) => (
+                      <div 
+                        key={buyer.id} 
+                        className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0"
+                        style={{ gridTemplateColumns: '36px 95px 1fr 1fr 65px 95px 55px 50px 80px 75px' }}
+                        data-testid={`buyer-row-${index}`}
+                      >
+                        <div className="flex items-center justify-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditClick(buyer)}
+                            data-testid={`button-edit-buyer-${index}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="text-[10px] font-mono text-muted-foreground truncate" data-testid={`text-buyer-code-${index}`}>
+                          {buyer.buyerCode || '-'}
+                        </div>
+                        <div className="text-sm truncate" data-testid={`text-name-${index}`}>
+                          {buyer.name}
+                        </div>
+                        <div className="text-sm truncate" data-testid={`text-address-${index}`}>
+                          {buyer.address}
+                        </div>
+                        <div className="text-xs truncate" data-testid={`text-mandi-code-${index}`}>
+                          {buyer.mandiCode || '-'}
+                        </div>
+                        <div className="text-xs truncate" data-testid={`text-contact-${index}`}>
+                          {buyer.contact || '-'}
+                        </div>
+                        <div className="flex items-center">
+                          {buyer.negativeFlag ? (
+                            <Badge variant="destructive" className="text-[10px] px-1">{t("Yes", "हाँ")}</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px] px-1">{t("No", "नहीं")}</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center">
+                          <Switch
+                            checked={buyer.isActive ?? true}
+                            onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })}
+                            data-testid={`switch-active-${index}`}
+                          />
+                        </div>
+                        <div className="text-xs font-mono">
+                          ₹{buyer.overallDue.toLocaleString("en-IN")}
+                        </div>
+                        <div className="text-xs font-mono text-orange-600 dark:text-orange-400">
+                          ₹{buyer.receivables.toLocaleString("en-IN")}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div>{t("Name", "नाम")}</div>
-                  <div>{t("Address", "पता")}</div>
-                  <div>{t("Mandi Code", "मंडी कोड")}</div>
-                  <div>{t("Contact", "संपर्क")}</div>
-                  <div>{t("Negative", "नकारात्मक")}</div>
-                  <div>{t("Active", "सक्रिय")}</div>
-                  <div 
-                    className="flex items-center gap-1 cursor-pointer select-none"
-                    onClick={() => handleSort('overallDue')}
-                    data-testid="sort-overall-due"
-                  >
-                    {t("Overall Due", "कुल बकाया")}
-                    {sortColumn === 'overallDue' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                    ) : (
-                      <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div>{t("Receivables", "प्राप्य")}</div>
                 </div>
                 
-                {filteredBuyers.map((buyer, index) => (
-                  <div 
-                    key={buyer.id} 
-                    className="hidden md:grid gap-2 p-3 border rounded-lg bg-card items-center"
-                    style={{ gridTemplateColumns: '40px 100px 1fr 1fr 80px 100px 70px 60px 100px 90px' }}
-                    data-testid={`buyer-row-${index}`}
-                  >
-                    <div className="flex items-center justify-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(buyer)}
-                        data-testid={`button-edit-buyer-${index}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="text-[11px] font-mono text-muted-foreground truncate" data-testid={`text-buyer-code-${index}`}>
-                      {buyer.buyerCode || '-'}
-                    </div>
-                    <div className="text-sm truncate" data-testid={`text-name-${index}`}>
-                      {buyer.name}
-                    </div>
-                    <div className="text-sm truncate" data-testid={`text-address-${index}`}>
-                      {buyer.address}
-                    </div>
-                    <div className="text-sm" data-testid={`text-mandi-code-${index}`}>
-                      {buyer.mandiCode || '-'}
-                    </div>
-                    <div className="text-sm" data-testid={`text-contact-${index}`}>
-                      {buyer.contact || '-'}
-                    </div>
-                    <div className="flex items-center">
-                      {buyer.negativeFlag ? (
-                        <Badge variant="destructive">{t("Yes", "हाँ")}</Badge>
-                      ) : (
-                        <Badge variant="secondary">{t("No", "नहीं")}</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center">
-                      <Switch
-                        checked={buyer.isActive ?? true}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })}
-                        data-testid={`switch-active-${index}`}
-                      />
-                    </div>
-                    <div className="text-sm font-mono">
-                      ₹{buyer.overallDue.toLocaleString("en-IN")}
-                    </div>
-                    <div className="text-sm font-mono text-orange-600 dark:text-orange-400">
-                      ₹{buyer.receivables.toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                ))}
-                
-                {/* Mobile view for buyers */}
+                {/* Mobile card view */}
                 {filteredBuyers.map((buyer, index) => (
                   <div 
                     key={`mobile-${buyer.id}`} 
-                    className="md:hidden p-3 border rounded-lg bg-card space-y-2"
+                    className="md:hidden p-4 border rounded-lg bg-card space-y-3"
+                    data-testid={`buyer-card-${index}`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono text-muted-foreground">{buyer.buyerCode || '-'}</span>
@@ -445,6 +453,7 @@ export default function BuyersPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEditClick(buyer)}
+                        data-testid={`button-edit-buyer-mobile-${index}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
