@@ -9,13 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -40,8 +33,7 @@ interface SeedStockEntryEditDialogProps {
 export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStockEntryEditDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [paymentStatus, setPaymentStatus] = useState(entry.paymentStatus || "due");
-  const [amountPaid, setAmountPaid] = useState(entry.amountPaid ? parseFloat(entry.amountPaid) : 0);
+  const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [seedLots, setSeedLots] = useState(entry.seedLots.map(lot => ({
@@ -77,7 +69,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { paymentStatus: string; amountPaid: number; remarks: string; seedLots: SeedLotUpdate[] }) => {
+    mutationFn: async (data: { remarks: string; seedLots: SeedLotUpdate[] }) => {
       const res = await apiRequest("PATCH", `/api/seed-stock-entries/${entry.id}`, data);
       return await res.json();
     },
@@ -113,8 +105,6 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
 
   const handleSave = () => {
     updateMutation.mutate({
-      paymentStatus,
-      amountPaid,
       remarks,
       seedLots: seedLots.map(lot => ({
         id: lot.id,
@@ -176,49 +166,6 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                     <span className="font-medium">{entry.supplierContact}</span>
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-base">{t("Payment Details", "भुगतान विवरण")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{t("Payment Status", "भुगतान स्थिति")}</Label>
-                  <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                    <SelectTrigger data-testid="select-seed-payment-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="due">{t("Due", "बाकी")}</SelectItem>
-                      <SelectItem value="paid">{t("Paid", "भुगतान हो गया")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("Amount Paid", "भुगतान राशि")}</Label>
-                  <Input
-                    type="number"
-                    value={amountPaid}
-                    onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
-                    data-testid="input-seed-amount-paid"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">{t("Total Value", "कुल मूल्य")}:</span>{" "}
-                  <span className="font-medium">₹{totalValue.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t("Remaining Due", "बाकी राशि")}:</span>{" "}
-                  <span className={`font-medium ${remainingDue > 0 ? "text-orange-600" : "text-green-600"}`}>
-                    ₹{remainingDue.toLocaleString()}
-                  </span>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -326,6 +273,46 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
               </Card>
             ))}
           </div>
+
+          {/* Payment Summary - read-only based on cash expenses */}
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                {t("Payment Summary", "भुगतान सारांश")}
+                {(() => {
+                  const status = remainingDue <= 0 ? "paid" : amountPaid > 0 ? "partial" : "due";
+                  if (status === "paid") {
+                    return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-0">{t("Paid", "भुगतान हो गया")}</Badge>;
+                  } else if (status === "partial") {
+                    return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 border-0">{t("Partial Paid", "आंशिक भुगतान")}</Badge>;
+                  } else {
+                    return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-0">{t("Due", "बाकी")}</Badge>;
+                  }
+                })()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">{t("Total Value", "कुल मूल्य")}</span>
+                  <div className="font-semibold text-lg">₹{totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">{t("Amount Paid", "भुगतान राशि")}</span>
+                  <div className="font-semibold text-lg text-green-600 dark:text-green-400">₹{amountPaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">{t("Remaining Due", "बाकी राशि")}</span>
+                  <div className={`font-semibold text-lg ${remainingDue > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                    ₹{remainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                {t("Amount paid is updated from Cash Management expenses to this supplier.", "भुगतान राशि इस आपूर्तिकर्ता को किए गए खर्चों से अपडेट होती है।")}
+              </p>
+            </CardContent>
+          </Card>
 
           <div className="space-y-2">
             <Label>{t("Remarks", "टिप्पणी")}</Label>
