@@ -343,7 +343,7 @@ export default function BuyersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="hidden md:grid gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm" style={{ gridTemplateColumns: '40px 100px 2fr 2fr 80px 100px 70px 60px 100px 90px' }}>
+                <div className="hidden md:grid gap-2 p-3 bg-muted/50 rounded-md font-medium text-sm" style={{ gridTemplateColumns: '40px 100px 1fr 1fr 80px 100px 70px 60px 100px 90px' }}>
                   <div></div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -381,10 +381,11 @@ export default function BuyersPage() {
                 {filteredBuyers.map((buyer, index) => (
                   <div 
                     key={buyer.id} 
-                    className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-card buyer-row-grid"
+                    className="hidden md:grid gap-2 p-3 border rounded-lg bg-card items-center"
+                    style={{ gridTemplateColumns: '40px 100px 1fr 1fr 80px 100px 70px 60px 100px 90px' }}
                     data-testid={`buyer-row-${index}`}
                   >
-                    <div className="flex items-center">
+                    <div className="flex items-center justify-center">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -394,64 +395,79 @@ export default function BuyersPage() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Buyer ID", "खरीदार आईडी")}</Label>
-                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/50 rounded-md text-[11px] font-mono text-muted-foreground break-all" data-testid={`text-buyer-code-${index}`}>
-                        {buyer.buyerCode || '-'}
-                      </div>
+                    <div className="text-[11px] font-mono text-muted-foreground truncate" data-testid={`text-buyer-code-${index}`}>
+                      {buyer.buyerCode || '-'}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Name", "नाम")}</Label>
-                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs break-words" data-testid={`text-name-${index}`}>
-                        {buyer.name}
-                      </div>
+                    <div className="text-sm truncate" data-testid={`text-name-${index}`}>
+                      {buyer.name}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Address", "पता")}</Label>
-                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs break-words" data-testid={`text-address-${index}`}>
-                        {buyer.address}
-                      </div>
+                    <div className="text-sm truncate" data-testid={`text-address-${index}`}>
+                      {buyer.address}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Mandi Code", "मंडी कोड")}</Label>
-                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs" data-testid={`text-mandi-code-${index}`}>
-                        {buyer.mandiCode || '-'}
-                      </div>
+                    <div className="text-sm" data-testid={`text-mandi-code-${index}`}>
+                      {buyer.mandiCode || '-'}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Contact", "संपर्क")}</Label>
-                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs" data-testid={`text-contact-${index}`}>
-                        {buyer.contact || '-'}
-                      </div>
+                    <div className="text-sm" data-testid={`text-contact-${index}`}>
+                      {buyer.contact || '-'}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Negative", "नकारात्मक")}</Label>
-                      <div className="h-9 flex items-center">
-                        {buyer.negativeFlag ? (
-                          <Badge variant="destructive">{t("Yes", "हाँ")}</Badge>
-                        ) : (
-                          <Badge variant="secondary">{t("No", "नहीं")}</Badge>
-                        )}
-                      </div>
+                    <div className="flex items-center">
+                      {buyer.negativeFlag ? (
+                        <Badge variant="destructive">{t("Yes", "हाँ")}</Badge>
+                      ) : (
+                        <Badge variant="secondary">{t("No", "नहीं")}</Badge>
+                      )}
                     </div>
-                    <div className="space-y-1 flex items-center">
-                      <Label className="md:hidden text-xs text-muted-foreground mr-2">{t("Active", "सक्रिय")}</Label>
+                    <div className="flex items-center">
                       <Switch
                         checked={buyer.isActive ?? true}
                         onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })}
                         data-testid={`switch-active-${index}`}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Overall Due", "कुल बकाया")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-sm font-mono">
-                        ₹{buyer.overallDue.toLocaleString("en-IN")}
-                      </div>
+                    <div className="text-sm font-mono">
+                      ₹{buyer.overallDue.toLocaleString("en-IN")}
                     </div>
-                    <div className="space-y-1">
-                      <Label className="md:hidden text-xs text-muted-foreground">{t("Receivables", "प्राप्य")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-sm font-mono text-orange-600 dark:text-orange-400">
-                        ₹{buyer.receivables.toLocaleString("en-IN")}
+                    <div className="text-sm font-mono text-orange-600 dark:text-orange-400">
+                      ₹{buyer.receivables.toLocaleString("en-IN")}
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Mobile view for buyers */}
+                {filteredBuyers.map((buyer, index) => (
+                  <div 
+                    key={`mobile-${buyer.id}`} 
+                    className="md:hidden p-3 border rounded-lg bg-card space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-muted-foreground">{buyer.buyerCode || '-'}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditClick(buyer)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="font-medium">{buyer.name}</div>
+                    <div className="text-sm text-muted-foreground">{buyer.address}</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {buyer.mandiCode && <span>{t("Mandi", "मंडी")}: {buyer.mandiCode}</span>}
+                      {buyer.contact && <span>{t("Contact", "संपर्क")}: {buyer.contact}</span>}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="flex items-center gap-2">
+                        {buyer.negativeFlag ? (
+                          <Badge variant="destructive">{t("Negative", "नकारात्मक")}</Badge>
+                        ) : null}
+                        <Switch
+                          checked={buyer.isActive ?? true}
+                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN")}</div>
+                        <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN")}</div>
                       </div>
                     </div>
                   </div>
