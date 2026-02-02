@@ -554,12 +554,20 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
-                        {entryTotalAmount > 0 && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">{t("Supplier Total", "आपूर्तिकर्ता कुल")}</span>{" "}
-                            <span className="font-medium">₹ {entryTotalAmount.toFixed(0)}</span>
-                          </div>
-                        )}
+                        {entryTotalAmount > 0 && (() => {
+                          const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+                          const supplierDue = Math.max(entryTotalAmount - amountPaid, 0);
+                          return (
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">{t("Supplier:", "आपूर्तिकर्ता:")}</span>{" "}
+                              <span className="font-medium">{t("Total", "कुल")} ₹{entryTotalAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                              <span className="text-muted-foreground">|</span>
+                              <span className={`font-medium ${supplierDue > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                {t("Due", "बकाया")} ₹{supplierDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {entryColdStoreTotal > 0 && (
                           <div className="flex items-center gap-1">
                             <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
