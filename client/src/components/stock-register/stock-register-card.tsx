@@ -375,7 +375,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
     const filteredForDownload = (entries || []).filter(entry => {
       const entryDate = new Date(entry.purchaseDate);
-      return entryDate >= startDate && entryDate <= endDate;
+      if (entryDate < startDate || entryDate > endDate) return false;
+      // Filter by selected crop (potato or onion)
+      const hasCropMatch = entry.lots.some(lot => (lot.crop || "potato") === selectedCrop);
+      return hasCropMatch;
     });
 
     if (filteredForDownload.length === 0) {

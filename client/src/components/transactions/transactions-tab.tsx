@@ -185,7 +185,10 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
 
     const filteredForDownload = (transactions || []).filter(txn => {
       const txnDate = new Date(txn.createdAt);
-      return txnDate >= startDate && txnDate <= endDate;
+      if (txnDate < startDate || txnDate > endDate) return false;
+      // Filter by selected crop (potato or onion)
+      const txnCrop = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
+      return txnCrop === selectedCrop;
     });
 
     if (filteredForDownload.length === 0) {
