@@ -404,8 +404,13 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Small", "छोटा"),
       t("Remaining Bags", "बचे बैग"),
       t("Farmer Total ₹", "किसान कुल ₹"),
+      t("Cold Charges ₹", "कोल्ड शुल्क ₹"),
+      t("Hammali/Grading ₹", "हम्माली/ग्रेडिंग ₹"),
+      t("Other Charges ₹", "अन्य शुल्क ₹"),
+      t("Total Deductions ₹", "कुल कटौती ₹"),
       t("Interest ₹", "ब्याज ₹"),
       t("Net Payable ₹", "शुद्ध देय ₹"),
+      t("Paid ₹", "भुगतान ₹"),
       t("Farmer Due ₹", "किसान बकाया ₹"),
       t("Cold Total ₹", "कोल्ड कुल ₹"),
       t("Cold Due ₹", "कोल्ड बकाया ₹"),
@@ -438,6 +443,15 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           .filter(bd => bd.size === "Small")
           .reduce((sum, bd) => sum + bd.numberOfBags, 0);
         
+        // Deduction breakdown (matching edit dialog formula)
+        const coldCharges = parseFloat(lot.expectedColdCharges || "0");
+        const hammaliGrading = parseFloat(lot.hammaliGradingCharges || "0");
+        const otherCharges = (lot.charges || []).reduce((sum: number, c: { type: string; amount: number | string }) => {
+          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : c.amount;
+          return sum + (isNaN(amt) ? 0 : amt);
+        }, 0);
+        const totalDeductions = coldCharges + hammaliGrading + otherCharges;
+        
         // Calculate dynamic interest (interest-only formula)
         let lotInterest = 0;
         const principal = parseFloat(lot.adjustedAmount || "0");
@@ -455,9 +469,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const adjustmentType = lot.adjustedAmountType;
         const signedInterest = adjustmentType === "credit" ? lotInterest : -lotInterest;
         
-        // Farmer total and net payable
+        // Farmer total and net payable (matching edit dialog: Total - Deductions + Adjustment)
         const lotFarmerTotal = metrics.totalAmount ?? 0;
-        const lotNetPayable = lotFarmerTotal + signedInterest;
+        const lotNetPayable = lotFarmerTotal - totalDeductions + signedInterest;
         
         // Farmer due per lot (prorated payment, based on net payable)
         const lotPaidRatio = entryFarmerTotal > 0 ? lotFarmerTotal / entryFarmerTotal : 0;
@@ -488,8 +502,13 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           smallBags.toString(),
           metrics.remainingToSell.toString(),
           lotFarmerTotal.toFixed(0),
+          coldCharges.toFixed(0),
+          hammaliGrading.toFixed(0),
+          otherCharges.toFixed(0),
+          totalDeductions.toFixed(0),
           lotInterest > 0 ? lotInterest.toFixed(0) : "0",
           lotNetPayable.toFixed(0),
+          lotFarmerPaid.toFixed(0),
           lotFarmerDue.toFixed(0),
           coldTotal.toFixed(0),
           coldDue.toFixed(0),
