@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/hooks/use-language";
-import { Plus, Trash2, Edit2, Save, X, Wallet, Users, Tractor, Building2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Edit2, Save, X, Wallet, Users, Tractor, Building2, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Party, CashFarmer, CashSettings, BankAccount } from "@shared/schema";
 import { DISTRICTS, STATES } from "@shared/schema";
@@ -24,7 +23,6 @@ export function CashSettingsDialog({ open, onOpenChange }: CashSettingsDialogPro
   const { t } = useLanguage();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("opening");
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   
   const currentYear = new Date().getFullYear();
   const financialYear = `${currentYear}-${(currentYear + 1).toString().slice(-2)}`;
@@ -52,35 +50,6 @@ export function CashSettingsDialog({ open, onOpenChange }: CashSettingsDialogPro
   const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts"],
     enabled: open,
-  });
-
-  const resetMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/season/reset");
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Reset failed");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
-      toast({ 
-        title: t("Season Reset Complete", "सीज़न रीसेट पूरा हुआ"),
-        description: t("Stock register has been cleared for the new season.", "नई सीज़न के लिए स्टॉक रजिस्टर साफ़ कर दिया गया है।")
-      });
-      setShowResetConfirm(false);
-    },
-    onError: (error: Error) => {
-      toast({ 
-        title: t("Reset Failed", "रीसेट विफल"),
-        description: error.message,
-        variant: "destructive" 
-      });
-    },
   });
 
   return (
@@ -124,70 +93,8 @@ export function CashSettingsDialog({ open, onOpenChange }: CashSettingsDialogPro
               <FarmersSection farmers={farmers} isLoading={farmersLoading} />
             </TabsContent>
           </Tabs>
-
-          <div className="mt-6 pt-6 border-t border-destructive/30">
-            <div className="flex items-start gap-3 p-3 bg-destructive/10 rounded-md mb-4">
-              <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">
-                {t(
-                  "Warning: Use this option only when starting a new season. This will clear all stock entries but keep transaction history.",
-                  "चेतावनी: इस विकल्प का उपयोग केवल नई सीज़न शुरू करते समय करें। यह सभी स्टॉक एंट्री साफ़ कर देगा लेकिन लेनदेन इतिहास रखेगा।"
-                )}
-              </p>
-            </div>
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={() => setShowResetConfirm(true)}
-              data-testid="button-reset-season"
-            >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              {t("Reset for Next Season", "अगली सीज़न के लिए रीसेट करें")}
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              {t("Confirm Season Reset", "सीज़न रीसेट की पुष्टि करें")}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-left space-y-2">
-              <p>
-                {t(
-                  "Warning: This action should only be used when starting a new potato season.",
-                  "चेतावनी: इस क्रिया का उपयोग केवल नई आलू सीज़न शुरू करते समय करें।"
-                )}
-              </p>
-              <p>
-                {t(
-                  "This will permanently delete all stock entries (Raw Potato and Seed) from the stock register. Transaction history will NOT be affected.",
-                  "यह स्टॉक रजिस्टर से सभी स्टॉक एंट्री (कच्चा आलू और बीज) स्थायी रूप से हटा देगा। लेनदेन इतिहास प्रभावित नहीं होगा।"
-                )}
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-reset-cancel">
-              {t("Close", "बंद करें")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => resetMutation.mutate()}
-              disabled={resetMutation.isPending}
-              data-testid="button-reset-confirm"
-            >
-              {resetMutation.isPending ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              {t("Yes, Reset Season", "हाँ, सीज़न रीसेट करें")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

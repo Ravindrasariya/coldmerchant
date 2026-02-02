@@ -191,6 +191,8 @@ interface StockRegisterCardProps {
 export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose, selectedCrop = "potato" }: StockRegisterCardProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const currentYear = new Date().getFullYear();
+  const [filterYear, setFilterYear] = useState<string>(currentYear.toString());
   const [filterSerial, setFilterSerial] = useState<string>("");
   const [filterFarmer, setFilterFarmer] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
@@ -214,6 +216,18 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const { data: entries, isLoading, error } = useQuery<StockEntryWithLots[]>({
     queryKey: ["/api/stock-entries"],
   });
+
+  const availableYears = useMemo(() => {
+    if (!entries) return [currentYear];
+    const years = new Set<number>();
+    entries.forEach(entry => {
+      const year = new Date(entry.purchaseDate).getFullYear();
+      years.add(year);
+    });
+    // Always include current year
+    years.add(currentYear);
+    return Array.from(years).sort((a, b) => b - a); // Descending order
+  }, [entries, currentYear]);
 
   const coldStores = useMemo(() => {
     if (!entries) return [];
@@ -257,6 +271,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     if (!entries) return [];
     
     return entries.filter((entry) => {
+      // Filter by year
+      if (filterYear) {
+        const entryYear = new Date(entry.purchaseDate).getFullYear();
+        if (entryYear.toString() !== filterYear) return false;
+      }
+
       // Filter by crop - entry must have at least one lot with matching crop
       const hasCropMatch = entry.lots.some(lot => (lot.crop || "potato") === selectedCrop);
       if (!hasCropMatch) return false;
@@ -290,9 +310,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
       return true;
     });
-  }, [entries, selectedCrop, filterSerial, filterFarmer, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, selectedCrop, filterYear, filterSerial, filterFarmer, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const clearFilters = () => {
+    setFilterYear(currentYear.toString());
     setFilterSerial("");
     setFilterFarmer("");
     setFilterPaymentStatus("");
@@ -301,7 +322,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     setFilterColdStore("");
   };
 
-  const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
+  // Year filter is not included in hasActiveFilters since it always has a value (current year by default)
+  const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString());
 
   // Compute summary totals from filtered entries
   const summaryTotals = useMemo(() => {
@@ -620,6 +642,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-3">
             <Filter className="h-4 w-4 text-muted-foreground" />
+
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger className="w-[90px]" data-testid="filter-year">
+                <SelectValue placeholder={t("Year", "वर्ष")} />
+              </SelectTrigger>
+              <SelectContent>
+                {availableYears.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Select value={filterSerial} onValueChange={setFilterSerial}>
               <SelectTrigger className="w-[100px]" data-testid="filter-serial">

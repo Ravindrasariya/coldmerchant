@@ -473,11 +473,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSerialNumber(merchantId: number, crop: string = "potato"): Promise<number> {
+    const currentYear = new Date().getFullYear();
     const [result] = await db.select({ maxSerial: stockEntries.serialNumber })
       .from(stockEntries)
       .where(and(
         eq(stockEntries.merchantId, merchantId),
-        eq(stockEntries.crop, crop)
+        eq(stockEntries.crop, crop),
+        sql`EXTRACT(YEAR FROM ${stockEntries.purchaseDate}) = ${currentYear}`
       ))
       .orderBy(desc(stockEntries.serialNumber))
       .limit(1);
@@ -653,11 +655,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextTransactionNumber(merchantId: number, crop: string = "potato"): Promise<number> {
+    const currentYear = new Date().getFullYear();
     const [result] = await db.select()
       .from(transactions)
       .where(and(
         eq(transactions.merchantId, merchantId),
-        eq(transactions.crop, crop)
+        eq(transactions.crop, crop),
+        sql`EXTRACT(YEAR FROM ${transactions.createdAt}) = ${currentYear}`
       ))
       .orderBy(desc(transactions.transactionNumber))
       .limit(1);
@@ -2314,9 +2318,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSeedSerialNumber(merchantId: number): Promise<number> {
+    const currentYear = new Date().getFullYear();
     const [result] = await db.select({ maxSerial: seedStockEntries.serialNumber })
       .from(seedStockEntries)
-      .where(eq(seedStockEntries.merchantId, merchantId))
+      .where(and(
+        eq(seedStockEntries.merchantId, merchantId),
+        sql`EXTRACT(YEAR FROM ${seedStockEntries.purchaseDate}) = ${currentYear}`
+      ))
       .orderBy(desc(seedStockEntries.serialNumber))
       .limit(1);
     
@@ -2542,9 +2550,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSeedTransactionNumber(merchantId: number): Promise<number> {
+    const currentYear = new Date().getFullYear();
     const [result] = await db.select({ maxNum: seedTransactions.transactionNumber })
       .from(seedTransactions)
-      .where(eq(seedTransactions.merchantId, merchantId))
+      .where(and(
+        eq(seedTransactions.merchantId, merchantId),
+        sql`EXTRACT(YEAR FROM ${seedTransactions.createdAt}) = ${currentYear}`
+      ))
       .orderBy(desc(seedTransactions.transactionNumber))
       .limit(1);
     
