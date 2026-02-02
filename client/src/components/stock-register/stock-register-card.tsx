@@ -204,15 +204,13 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [editEntry, setEditEntry] = useState<StockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
   
-  // Download dialog state
+  // Download dialog state (simplified - now uses filtered entries directly)
   const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
   const isDownloadDialogOpen = downloadDialogOpen || internalDownloadDialogOpen;
   const handleDownloadDialogClose = () => {
     setInternalDownloadDialogOpen(false);
     onDownloadDialogClose?.();
   };
-  const [downloadStartDate, setDownloadStartDate] = useState("");
-  const [downloadEndDate, setDownloadEndDate] = useState("");
 
   const { data: entries, isLoading, error } = useQuery<StockEntryWithLots[]>({
     queryKey: ["/api/stock-entries"],
@@ -375,43 +373,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   }, [filteredEntries]);
 
   const handleDownloadCSV = () => {
-    if (!downloadStartDate || !downloadEndDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const startDate = new Date(downloadStartDate);
-    const endDate = new Date(downloadEndDate);
-    
-    if (startDate > endDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const filteredForDownload = (entries || []).filter(entry => {
-      const entryDate = new Date(entry.purchaseDate);
-      if (entryDate < startDate || entryDate > endDate) return false;
-      // Filter by selected crop (potato or onion)
-      const hasCropMatch = entry.lots.some(lot => (lot.crop || "potato") === selectedCrop);
-      return hasCropMatch;
-    });
-
-    if (filteredForDownload.length === 0) {
+    // Use already-filtered entries based on applied filters
+    if (filteredEntries.length === 0) {
       toast({
         title: t("No Data", "कोई डेटा नहीं"),
-        description: t("No entries found in the selected date range", "चयनित तिथि सीमा में कोई प्रविष्टि नहीं मिली"),
+        description: t("No entries match the current filters", "वर्तमान फ़िल्टर से कोई प्रविष्टि नहीं मिली"),
         variant: "destructive",
       });
       return;
     }
+
+    const filteredForDownload = filteredEntries;
 
     const headers = [
       t("Serial #", "क्रमांक"),
@@ -573,13 +545,23 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `stock_entries_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    
+    // Generate descriptive filename based on applied filters
+    const parts = [selectedCrop === "potato" ? "potato" : "onion", "stock_entries"];
+    if (filterYear) parts.push(filterYear);
+    if (filterSerial) parts.push(`sr${filterSerial}`);
+    if (filterFarmer) parts.push(filterFarmer.replace(/\s+/g, "_"));
+    if (filterColdStore) parts.push(filterColdStore.replace(/\s+/g, "_"));
+    if (filterQuality) parts.push(filterQuality);
+    if (filterPaymentStatus) parts.push(filterPaymentStatus);
+    if (filterUnsold) parts.push("unsold");
+    parts.push(format(new Date(), "yyyyMMdd"));
+    link.download = `${parts.join("_")}.csv`;
+    
     link.click();
     URL.revokeObjectURL(link.href);
 
     handleDownloadDialogClose();
-    setDownloadStartDate("");
-    setDownloadEndDate("");
     
     toast({
       title: t("Success", "सफल"),
@@ -599,39 +581,33 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
   return (
     <div className="space-y-4">
-      {/* Download Dialog */}
+      {/* Download Dialog - Shows confirmation based on current filters */}
       <Dialog open={isDownloadDialogOpen} onOpenChange={(open) => !open && handleDownloadDialogClose()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("Download Stock Entries", "स्टॉक प्रविष्टियाँ डाउनलोड करें")}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock-start-date">{t("Start Date", "आरंभ तिथि")}</Label>
-              <Input
-                id="stock-start-date"
-                type="date"
-                value={downloadStartDate}
-                onChange={(e) => setDownloadStartDate(e.target.value)}
-                data-testid="input-stock-download-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-end-date">{t("End Date", "समाप्ति तिथि")}</Label>
-              <Input
-                id="stock-end-date"
-                type="date"
-                value={downloadEndDate}
-                onChange={(e) => setDownloadEndDate(e.target.value)}
-                data-testid="input-stock-download-end-date"
-              />
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-muted-foreground">
+              {t("Download will include entries based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर प्रविष्टियाँ शामिल होंगी:")}
+            </p>
+            <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज")}</p>
+              <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
+              {filterSerial && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerial}</p>}
+              {filterFarmer && <p><strong>{t("Farmer:", "किसान:")}</strong> {filterFarmer}</p>}
+              {filterColdStore && <p><strong>{t("Cold Store:", "कोल्ड स्टोर:")}</strong> {filterColdStore}</p>}
+              {filterQuality && <p><strong>{t("Quality:", "गुणवत्ता:")}</strong> {filterQuality}</p>}
+              {filterPaymentStatus && <p><strong>{t("Payment Status:", "भुगतान स्थिति:")}</strong> {filterPaymentStatus}</p>}
+              {filterUnsold && <p><strong>{t("Filter:", "फ़िल्टर:")}</strong> {t("Unsold Only", "केवल बिकाउ")}</p>}
+              <p className="pt-2 font-medium">{t("Total entries:", "कुल प्रविष्टियाँ:")} {filteredEntries.length}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={handleDownloadDialogClose} data-testid="button-stock-download-cancel">
               {t("Cancel", "रद्द करें")}
             </Button>
-            <Button onClick={handleDownloadCSV} data-testid="button-stock-download-csv">
+            <Button onClick={handleDownloadCSV} disabled={filteredEntries.length === 0} data-testid="button-stock-download-csv">
               <Download className="h-4 w-4 mr-2" />
               {t("Download CSV", "CSV डाउनलोड करें")}
             </Button>

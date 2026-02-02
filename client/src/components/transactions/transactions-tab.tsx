@@ -69,10 +69,8 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
   
-  // Download dialog state
+  // Download dialog state (uses filtered transactions directly)
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
-  const [downloadStartDate, setDownloadStartDate] = useState("");
-  const [downloadEndDate, setDownloadEndDate] = useState("");
   
   // Filter states
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
@@ -163,43 +161,17 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   };
 
   const handleDownloadCSV = () => {
-    if (!downloadStartDate || !downloadEndDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const startDate = new Date(downloadStartDate);
-    const endDate = new Date(downloadEndDate);
-    
-    if (startDate > endDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const filteredForDownload = (transactions || []).filter(txn => {
-      const txnDate = new Date(txn.createdAt);
-      if (txnDate < startDate || txnDate > endDate) return false;
-      // Filter by selected crop (potato or onion)
-      const txnCrop = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
-      return txnCrop === selectedCrop;
-    });
-
-    if (filteredForDownload.length === 0) {
+    // Use already-filtered transactions based on applied filters
+    if (filteredTransactions.length === 0) {
       toast({
         title: t("No Data", "कोई डेटा नहीं"),
-        description: t("No transactions found in the selected date range", "चयनित तिथि सीमा में कोई लेनदेन नहीं मिला"),
+        description: t("No transactions match the current filters", "वर्तमान फ़िल्टर से कोई लेनदेन नहीं मिला"),
         variant: "destructive",
       });
       return;
     }
+
+    const filteredForDownload = filteredTransactions;
 
     const headers = [
       t("Txn #", "लेनदेन #"),
@@ -250,13 +222,21 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `transactions_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    
+    // Generate descriptive filename based on applied filters
+    const parts = [selectedCrop === "potato" ? "potato" : "onion", "transactions"];
+    if (filterYear) parts.push(filterYear);
+    if (filterTxnNumber) parts.push(`txn${filterTxnNumber}`);
+    if (filterSerialNumber) parts.push(`sr${filterSerialNumber}`);
+    if (filterParty !== "all") parts.push(filterParty.replace(/\s+/g, "_"));
+    if (filterPaymentDue !== "all") parts.push(filterPaymentDue);
+    parts.push(format(new Date(), "yyyyMMdd"));
+    link.download = `${parts.join("_")}.csv`;
+    
     link.click();
     URL.revokeObjectURL(link.href);
 
     setDownloadDialogOpen(false);
-    setDownloadStartDate("");
-    setDownloadEndDate("");
     
     toast({
       title: t("Success", "सफल"),
@@ -279,39 +259,31 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
 
   return (
     <div className="space-y-6">
-      {/* Download Dialog */}
+      {/* Download Dialog - Shows confirmation based on current filters */}
       <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("Download Transactions", "लेनदेन डाउनलोड करें")}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="txn-start-date">{t("Start Date", "आरंभ तिथि")}</Label>
-              <Input
-                id="txn-start-date"
-                type="date"
-                value={downloadStartDate}
-                onChange={(e) => setDownloadStartDate(e.target.value)}
-                data-testid="input-txn-download-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="txn-end-date">{t("End Date", "समाप्ति तिथि")}</Label>
-              <Input
-                id="txn-end-date"
-                type="date"
-                value={downloadEndDate}
-                onChange={(e) => setDownloadEndDate(e.target.value)}
-                data-testid="input-txn-download-end-date"
-              />
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-muted-foreground">
+              {t("Download will include transactions based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर लेनदेन शामिल होंगे:")}
+            </p>
+            <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज")}</p>
+              <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
+              {filterTxnNumber && <p><strong>{t("Txn #:", "लेनदेन #:")}</strong> {filterTxnNumber}</p>}
+              {filterSerialNumber && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerialNumber}</p>}
+              {filterParty !== "all" && <p><strong>{t("Party:", "पार्टी:")}</strong> {filterParty}</p>}
+              {filterPaymentDue !== "all" && <p><strong>{t("Status:", "स्थिति:")}</strong> {filterPaymentDue === "due" ? t("Due", "बकाया") : t("Paid", "भुगतान किया")}</p>}
+              <p className="pt-2 font-medium">{t("Total transactions:", "कुल लेनदेन:")} {filteredTransactions.length}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDownloadDialogOpen(false)} data-testid="button-txn-download-cancel">
               {t("Cancel", "रद्द करें")}
             </Button>
-            <Button onClick={handleDownloadCSV} data-testid="button-txn-download-csv">
+            <Button onClick={handleDownloadCSV} disabled={filteredTransactions.length === 0} data-testid="button-txn-download-csv">
               <Download className="h-4 w-4 mr-2" />
               {t("Download CSV", "CSV डाउनलोड करें")}
             </Button>

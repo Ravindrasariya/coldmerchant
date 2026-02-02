@@ -68,8 +68,6 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
   
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
-  const [downloadStartDate, setDownloadStartDate] = useState("");
-  const [downloadEndDate, setDownloadEndDate] = useState("");
   const [editEntry, setEditEntry] = useState<SeedStockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<SeedStockEntryWithLots | null>(null);
   
@@ -178,40 +176,17 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   }, [filteredEntries]);
 
   const handleDownloadCSV = () => {
-    if (!downloadStartDate || !downloadEndDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Please select both start and end dates", "कृपया आरंभ और समाप्ति दोनों तिथियाँ चुनें"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const startDate = new Date(downloadStartDate);
-    const endDate = new Date(downloadEndDate);
-    
-    if (startDate > endDate) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Start date cannot be after end date", "आरंभ तिथि समाप्ति तिथि के बाद नहीं हो सकती"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const filteredForDownload = (entries || []).filter(entry => {
-      const entryDate = new Date(entry.purchaseDate);
-      return entryDate >= startDate && entryDate <= endDate;
-    });
-
-    if (filteredForDownload.length === 0) {
+    // Use already-filtered entries based on applied filters
+    if (filteredEntries.length === 0) {
       toast({
         title: t("No Data", "कोई डेटा नहीं"),
-        description: t("No entries found in the selected date range", "चयनित तिथि सीमा में कोई प्रविष्टि नहीं मिली"),
+        description: t("No entries match the current filters", "वर्तमान फ़िल्टर से कोई प्रविष्टि नहीं मिली"),
         variant: "destructive",
       });
       return;
     }
+
+    const filteredForDownload = filteredEntries;
 
     const headers = [
       t("Serial #", "क्रमांक"),
@@ -272,13 +247,21 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `seed_stock_entries_${downloadStartDate}_to_${downloadEndDate}.csv`;
+    
+    // Generate descriptive filename based on applied filters
+    const parts = ["seed_stock_entries"];
+    if (filterSerial) parts.push(`sr${filterSerial}`);
+    if (filterSupplier) parts.push(filterSupplier.replace(/\s+/g, "_"));
+    if (filterPotatoType) parts.push(filterPotatoType.replace(/\s+/g, "_"));
+    if (filterColdStore) parts.push(filterColdStore.replace(/\s+/g, "_"));
+    if (filterUnsold) parts.push("unsold");
+    parts.push(format(new Date(), "yyyyMMdd"));
+    link.download = `${parts.join("_")}.csv`;
+    
     link.click();
     URL.revokeObjectURL(link.href);
 
     setDownloadDialogOpen(false);
-    setDownloadStartDate("");
-    setDownloadEndDate("");
     
     toast({
       title: t("Success", "सफल"),
@@ -298,38 +281,33 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
 
   return (
     <div className="space-y-4">
+      {/* Download Dialog - Shows confirmation based on current filters */}
       <Dialog open={downloadDialogOpen} onOpenChange={setDownloadDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("Download Seed Stock Entries", "बीज स्टॉक प्रविष्टियाँ डाउनलोड करें")}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="seed-start-date">{t("Start Date", "आरंभ तिथि")}</Label>
-              <Input
-                id="seed-start-date"
-                type="date"
-                value={downloadStartDate}
-                onChange={(e) => setDownloadStartDate(e.target.value)}
-                data-testid="input-seed-download-start-date"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="seed-end-date">{t("End Date", "समाप्ति तिथि")}</Label>
-              <Input
-                id="seed-end-date"
-                type="date"
-                value={downloadEndDate}
-                onChange={(e) => setDownloadEndDate(e.target.value)}
-                data-testid="input-seed-download-end-date"
-              />
+          <div className="space-y-3 py-4">
+            <p className="text-sm text-muted-foreground">
+              {t("Download will include entries based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर प्रविष्टियाँ शामिल होंगी:")}
+            </p>
+            <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+              {filterSerial && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerial}</p>}
+              {filterSupplier && <p><strong>{t("Supplier:", "आपूर्तिकर्ता:")}</strong> {filterSupplier}</p>}
+              {filterPotatoType && <p><strong>{t("Potato Type:", "आलू का प्रकार:")}</strong> {filterPotatoType}</p>}
+              {filterColdStore && <p><strong>{t("Cold Store:", "कोल्ड स्टोर:")}</strong> {filterColdStore}</p>}
+              {filterUnsold && <p><strong>{t("Filter:", "फ़िल्टर:")}</strong> {t("Unsold Only", "केवल बिकाउ")}</p>}
+              {!filterSerial && !filterSupplier && !filterPotatoType && !filterColdStore && !filterUnsold && (
+                <p>{t("No filters applied - All entries", "कोई फ़िल्टर नहीं - सभी प्रविष्टियाँ")}</p>
+              )}
+              <p className="pt-2 font-medium">{t("Total entries:", "कुल प्रविष्टियाँ:")} {filteredEntries.length}</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDownloadDialogOpen(false)}>
               {t("Cancel", "रद्द करें")}
             </Button>
-            <Button onClick={handleDownloadCSV} data-testid="button-confirm-seed-download">
+            <Button onClick={handleDownloadCSV} disabled={filteredEntries.length === 0} data-testid="button-confirm-seed-download">
               <Download className="h-4 w-4 mr-2" />
               {t("Download", "डाउनलोड")}
             </Button>
