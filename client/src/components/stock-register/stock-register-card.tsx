@@ -404,6 +404,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Small", "छोटा"),
       t("Remaining Bags", "बचे बैग"),
       t("Farmer Total ₹", "किसान कुल ₹"),
+      t("Interest ₹", "ब्याज ₹"),
+      t("Net Payable ₹", "शुद्ध देय ₹"),
       t("Farmer Due ₹", "किसान बकाया ₹"),
       t("Cold Total ₹", "कोल्ड कुल ₹"),
       t("Cold Due ₹", "कोल्ड बकाया ₹"),
@@ -436,24 +438,38 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           .filter(bd => bd.size === "Small")
           .reduce((sum, bd) => sum + bd.numberOfBags, 0);
         
-        // Lot adjustment
-        let lotAdjustment = 0;
-        if (metrics.adjustedAmount > 0 && metrics.adjustedAmountType) {
-          lotAdjustment = metrics.adjustedAmountType === "debit" ? -metrics.adjustedAmount : metrics.adjustedAmount;
+        // Calculate dynamic interest (interest-only formula)
+        let lotInterest = 0;
+        const principal = parseFloat(lot.adjustedAmount || "0");
+        const rate = parseFloat(lot.adjustedAmountRate || "0");
+        const effectiveDate = lot.adjustedAmountEffectiveDate;
+        if (principal > 0 && rate > 0 && effectiveDate) {
+          const startDate = new Date(effectiveDate);
+          const today = new Date();
+          const days = Math.max(0, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+          const years = days / 365;
+          lotInterest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
         }
         
-        // Farmer due per lot (prorated by totalAmount, then apply adjustment)
+        // Apply interest based on adjustment type
+        const adjustmentType = lot.adjustedAmountType;
+        const signedInterest = adjustmentType === "credit" ? lotInterest : -lotInterest;
+        
+        // Farmer total and net payable
         const lotFarmerTotal = metrics.totalAmount ?? 0;
+        const lotNetPayable = lotFarmerTotal + signedInterest;
+        
+        // Farmer due per lot (prorated payment, based on net payable)
         const lotPaidRatio = entryFarmerTotal > 0 ? lotFarmerTotal / entryFarmerTotal : 0;
         const lotFarmerPaid = entryAmountPaid * lotPaidRatio;
-        const lotFarmerDue = Math.max(lotFarmerTotal + lotAdjustment - lotFarmerPaid, 0);
+        const lotFarmerDue = Math.max(lotNetPayable - lotFarmerPaid, 0);
         
         // Cold store charges (already includes hammali/grading)
         const coldTotal = metrics.coldStoreTotalCharges;
         const coldDue = metrics.coldStoreRemaining;
         
-        // Cut type display
-        const cutTypeDisplay = lot.cutType === "gate_cut" ? t("Gate Cut", "गेट कट") : t("Pile Cut", "ढेर कट");
+        // Cut type display - Bilty Cut for non-gate_cut
+        const cutTypeDisplay = lot.cutType === "gate_cut" ? t("Gate Cut", "गेट कट") : t("Bilty Cut", "बिल्टी कट");
         
         rows.push([
           entry.serialNumber.toString(),
@@ -472,6 +488,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           smallBags.toString(),
           metrics.remainingToSell.toString(),
           lotFarmerTotal.toFixed(0),
+          lotInterest > 0 ? lotInterest.toFixed(0) : "0",
+          lotNetPayable.toFixed(0),
           lotFarmerDue.toFixed(0),
           coldTotal.toFixed(0),
           coldDue.toFixed(0),
