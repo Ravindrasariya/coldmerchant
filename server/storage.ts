@@ -1605,7 +1605,7 @@ export class DatabaseStorage implements IStorage {
   async getBuyersByMerchant(merchantId: number): Promise<Buyer[]> {
     return await db.select().from(buyers)
       .where(eq(buyers.merchantId, merchantId))
-      .orderBy(desc(buyers.dateAdded));
+      .orderBy(buyers.id);
   }
 
   async getBuyerById(id: number, merchantId: number): Promise<Buyer | undefined> {
