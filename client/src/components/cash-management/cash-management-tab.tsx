@@ -140,15 +140,6 @@ interface LedgerBuyer {
   receivables: number; // Receivables breakdown from linked Cash Management parties
 }
 
-interface CrossSettlementEligibility {
-  hasSeedDues: boolean;
-  seedDueAmount: number;
-  seedTransactionIds: number[];
-  hasRawPotatoDues: boolean;
-  rawPotatoDueAmount: number;
-  rawPotatoEntryIds: number[];
-}
-
 interface ManagedParty {
   id: number;
   name: string;
@@ -420,37 +411,6 @@ export function CashManagementTab() {
   // State for seed farmer searchable popover
   const [seedFarmerPopoverOpen, setSeedFarmerPopoverOpen] = useState(false);
   
-  // State for cross-settlement (separate toggles per form)
-  const [outflowCrossSettlementEnabled, setOutflowCrossSettlementEnabled] = useState(true);
-  const [inwardCrossSettlementEnabled, setInwardCrossSettlementEnabled] = useState(true);
-  const [selectedOutflowFarmerName, setSelectedOutflowFarmerName] = useState("");
-  const [selectedInwardSeedFarmerName, setSelectedInwardSeedFarmerName] = useState("");
-  
-  // Query for cross-settlement eligibility (for farmer payments)
-  const { data: farmerCrossSettlement } = useQuery<CrossSettlementEligibility>({
-    queryKey: ["/api/cash/cross-settlement-check", selectedOutflowFarmerName],
-    queryFn: () => fetch(`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedOutflowFarmerName)}`, { credentials: "include" }).then(res => res.json()),
-    enabled: !!selectedOutflowFarmerName,
-  });
-  
-  // Query for cross-settlement eligibility (for seed sale inward payments)
-  const { data: seedFarmerCrossSettlement } = useQuery<CrossSettlementEligibility>({
-    queryKey: ["/api/cash/cross-settlement-check", selectedInwardSeedFarmerName],
-    queryFn: () => fetch(`/api/cash/cross-settlement-check?farmerName=${encodeURIComponent(selectedInwardSeedFarmerName)}`, { credentials: "include" }).then(res => res.json()),
-    enabled: !!selectedInwardSeedFarmerName,
-  });
-  
-  // Reset cross-settlement state when farmer name changes
-  useEffect(() => {
-    // Reset inward cross-settlement enabled when farmer changes
-    setInwardCrossSettlementEnabled(true);
-  }, [selectedInwardSeedFarmerName]);
-  
-  useEffect(() => {
-    // Reset outflow cross-settlement enabled when farmer changes
-    setOutflowCrossSettlementEnabled(true);
-  }, [selectedOutflowFarmerName]);
-  
   // Watch revenue type and receipt type for conditional rendering
   const revenueType = inwardForm.watch("revenueType");
   const receiptType = inwardForm.watch("receiptType");
@@ -643,36 +603,14 @@ export function CashManagementTab() {
         remarks: values.remarks || null,
       });
     } else {
-      // Seed sale - use farmer ledger with cross-settlement
+      // Seed sale - use farmer ledger (farmers with negative Net Due - they owe us)
       const selectedLedgerFarmer = ledgerFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
       
-      // Calculate cross-settlement for seed_to_raw direction (receiving seed payment, offset raw potato dues)
-      // Settlement amount = min(seedDue, rawPotatoDue) - automatic when enabled
-      let crossSettlementData = undefined;
-      const isCrossSettlementEligible = inwardCrossSettlementEnabled && 
-          seedFarmerCrossSettlement?.hasRawPotatoDues && seedFarmerCrossSettlement?.hasSeedDues;
-      
-      if (isCrossSettlementEligible) {
-        // Auto-calculate: min of seed dues and raw potato dues
-        const settlementAmount = Math.min(
-          seedFarmerCrossSettlement.seedDueAmount,
-          seedFarmerCrossSettlement.rawPotatoDueAmount
-        );
-        if (settlementAmount > 0) {
-          crossSettlementData = {
-            settledAmount: settlementAmount,
-            direction: 'seed_to_raw' as const,
-            seedTransactionIds: seedFarmerCrossSettlement.seedTransactionIds,
-            rawPotatoEntryIds: seedFarmerCrossSettlement.rawPotatoEntryIds,
-          };
-        }
-      }
-      
-      // Validate: amount must be > 0 if no cross-settlement
-      if (values.amount === 0 && !crossSettlementData) {
+      // Validate: amount must be > 0
+      if (values.amount === 0) {
         inwardForm.setError("amount", { 
           type: "manual", 
-          message: t("Amount must be greater than 0 (or enable cross-settlement)", "राशि 0 से अधिक होनी चाहिए (या क्रॉस-सेटलमेंट सक्षम करें)") 
+          message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
         });
         return;
       }
@@ -687,7 +625,6 @@ export function CashManagementTab() {
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
-        crossSettlement: crossSettlementData,
       });
     }
   };
@@ -697,33 +634,11 @@ export function CashManagementTab() {
       ? mergedFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
-    // Calculate cross-settlement for raw_to_seed direction (paying farmer, offset seed dues)
-    // Settlement amount = min(rawPotatoDue, seedDue) - automatic when enabled
-    let crossSettlementData = undefined;
-    const isCrossSettlementEligible = outflowCrossSettlementEnabled && values.expenseType === "farmer" && 
-        farmerCrossSettlement?.hasSeedDues && farmerCrossSettlement?.hasRawPotatoDues;
-    
-    if (isCrossSettlementEligible) {
-      // Auto-calculate: min of seed dues and raw potato dues
-      const settlementAmount = Math.min(
-        farmerCrossSettlement.seedDueAmount, 
-        farmerCrossSettlement.rawPotatoDueAmount
-      );
-      if (settlementAmount > 0) {
-        crossSettlementData = {
-          settledAmount: settlementAmount,
-          direction: 'raw_to_seed' as const,
-          seedTransactionIds: farmerCrossSettlement.seedTransactionIds,
-          rawPotatoEntryIds: farmerCrossSettlement.rawPotatoEntryIds,
-        };
-      }
-    }
-    
-    // Validate: amount must be > 0 if no cross-settlement
-    if (values.amount === 0 && !crossSettlementData) {
+    // Validate: amount must be > 0
+    if (values.amount === 0) {
       outflowForm.setError("amount", { 
         type: "manual", 
-        message: t("Amount must be greater than 0 (or enable cross-settlement)", "राशि 0 से अधिक होनी चाहिए (या क्रॉस-सेटलमेंट सक्षम करें)") 
+        message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
       });
       return;
     }
@@ -740,7 +655,6 @@ export function CashManagementTab() {
       amount: values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
-      crossSettlement: crossSettlementData,
     });
   };
 
@@ -1647,17 +1561,24 @@ export function CashManagementTab() {
                                     <CommandGroup>
                                       {ledgerFarmers
                                         .filter(f => !f.isArchived)
-                                        .filter(f => f.seedDue > 0 || parseFloat(f.pyReceivable || "0") > 0)
+                                        .filter(f => {
+                                          // Show farmers with negative Net Due (they owe us)
+                                          // Net Due = pyReceivable + harvestDue - seedDue - receivables
+                                          const pyReceivable = parseFloat(f.pyReceivable || "0");
+                                          const netDue = pyReceivable + f.harvestDue - f.seedDue - (f.receivables || 0);
+                                          return netDue < 0;
+                                        })
                                         .map((farmer) => {
+                                          // Show absolute Net Due (positive value since they owe us)
                                           const pyReceivable = parseFloat(farmer.pyReceivable || "0");
-                                          const totalDue = farmer.seedDue + pyReceivable;
+                                          const netDue = pyReceivable + farmer.harvestDue - farmer.seedDue - (farmer.receivables || 0);
+                                          const amountOwedToUs = Math.abs(netDue);
                                           return (
                                             <CommandItem
                                               key={farmer.id}
                                               value={`${farmer.name} ${farmer.village || ""} ${farmer.contact || ""}`}
                                               onSelect={() => {
                                                 field.onChange(farmer.name);
-                                                setSelectedInwardSeedFarmerName(farmer.name);
                                                 setSeedFarmerPopoverOpen(false);
                                               }}
                                             >
@@ -1676,7 +1597,7 @@ export function CashManagementTab() {
                                                 </span>
                                               </div>
                                               <Badge variant="secondary" className="ml-2">
-                                                ₹{totalDue.toFixed(0)}
+                                                {t("Due", "बकाया")}: ₹{amountOwedToUs.toFixed(0)}
                                               </Badge>
                                             </CommandItem>
                                           );
@@ -1691,47 +1612,6 @@ export function CashManagementTab() {
                         )}
                       />
                       
-                      {/* Cross-settlement preview for seed sale payment */}
-                      {seedFarmerCrossSettlement?.hasRawPotatoDues && seedFarmerCrossSettlement?.hasSeedDues && (
-                        <Card className="border-secondary bg-secondary/50">
-                          <CardContent className="p-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 text-foreground font-medium text-sm mb-1">
-                                  <RefreshCw className="h-4 w-4" />
-                                  {t("Cross-Settlement", "क्रॉस-सेटलमेंट")}
-                                  {inwardCrossSettlementEnabled && (
-                                    <Badge variant="default" className="text-xs">
-                                      ₹{Math.min(seedFarmerCrossSettlement.seedDueAmount, seedFarmerCrossSettlement.rawPotatoDueAmount).toFixed(0)}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {inwardCrossSettlementEnabled ? t(
-                                    `Auto-settling ₹${Math.min(seedFarmerCrossSettlement.seedDueAmount, seedFarmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} (min of seed dues ₹${seedFarmerCrossSettlement.seedDueAmount.toFixed(0)} and raw dues ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(0)}). Any amount above is additional cash.`,
-                                    `₹${Math.min(seedFarmerCrossSettlement.seedDueAmount, seedFarmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} स्वतः सेटल। नीचे की राशि अतिरिक्त नकद है।`
-                                  ) : t(
-                                    `Farmer owes ₹${seedFarmerCrossSettlement.seedDueAmount.toFixed(0)} for seeds. You owe farmer ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} for raw potatoes.`,
-                                    `किसान पर ₹${seedFarmerCrossSettlement.seedDueAmount.toFixed(0)} बीज का बकाया है। आप पर किसान का ₹${seedFarmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} कच्चे का बकाया है।`
-                                  )}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant={inwardCrossSettlementEnabled ? "default" : "outline"}
-                                size="sm"
-                                className="text-xs shrink-0"
-                                onClick={() => setInwardCrossSettlementEnabled(!inwardCrossSettlementEnabled)}
-                                data-testid="button-toggle-cross-settlement-inward"
-                              >
-                                {inwardCrossSettlementEnabled 
-                                  ? t("Enabled", "सक्षम") 
-                                  : t("Disabled", "अक्षम")}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
                     </>
                   )}
 
@@ -1741,21 +1621,11 @@ export function CashManagementTab() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          {(revenueType === "seed_sale" && inwardCrossSettlementEnabled && 
-                            seedFarmerCrossSettlement?.hasSeedDues && seedFarmerCrossSettlement?.hasRawPotatoDues)
-                            ? t("Additional Cash Amount", "अतिरिक्त नकद राशि")
-                            : t("Amount", "राशि")} (₹) {!(revenueType === "seed_sale" && inwardCrossSettlementEnabled && 
-                            seedFarmerCrossSettlement?.hasSeedDues && seedFarmerCrossSettlement?.hasRawPotatoDues) && "*"}
+                          {t("Amount", "राशि")} (₹) *
                         </FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0" min="0" {...field} data-testid="input-amount" />
                         </FormControl>
-                        {(revenueType === "seed_sale" && inwardCrossSettlementEnabled && 
-                          seedFarmerCrossSettlement?.hasSeedDues && seedFarmerCrossSettlement?.hasRawPotatoDues) && (
-                          <p className="text-xs text-muted-foreground">
-                            {t("Enter 0 if only settling via cross-settlement", "यदि केवल क्रॉस-सेटलमेंट करना है तो 0 डालें")}
-                          </p>
-                        )}
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1842,10 +1712,7 @@ export function CashManagementTab() {
                           <FormItem>
                             <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
                             <Select 
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                                setSelectedOutflowFarmerName(value);
-                              }} 
+                              onValueChange={field.onChange} 
                               value={field.value}
                             >
                               <FormControl>
@@ -1854,23 +1721,34 @@ export function CashManagementTab() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {mergedFarmers.map((farmer) => (
-                                  <SelectItem key={farmer.name} value={farmer.name}>
-                                    <div className="flex items-center justify-between gap-4">
-                                      <span>{farmer.name}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {farmer.address || ""}
-                                        {farmer.address && farmer.contact && " • "}
-                                        {farmer.contact || ""}
-                                      </span>
-                                      {farmer.pendingDues > 0 && (
-                                        <Badge variant="secondary">
-                                          {t("Due", "बकाया")}: ₹{farmer.pendingDues.toFixed(0)}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </SelectItem>
-                                ))}
+                                {ledgerFarmers
+                                  .filter(f => !f.isArchived)
+                                  .filter(f => {
+                                    // Show farmers with positive Net Due (we owe them)
+                                    // Net Due = pyReceivable + harvestDue - seedDue - receivables
+                                    const pyReceivable = parseFloat(f.pyReceivable || "0");
+                                    const netDue = pyReceivable + f.harvestDue - f.seedDue - (f.receivables || 0);
+                                    return netDue > 0;
+                                  })
+                                  .map((farmer) => {
+                                    const pyReceivable = parseFloat(farmer.pyReceivable || "0");
+                                    const netDue = pyReceivable + farmer.harvestDue - farmer.seedDue - (farmer.receivables || 0);
+                                    return (
+                                      <SelectItem key={farmer.name} value={farmer.name}>
+                                        <div className="flex items-center justify-between gap-4">
+                                          <span>{farmer.name}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {farmer.village || ""}
+                                            {farmer.village && farmer.contact && " • "}
+                                            {farmer.contact || ""}
+                                          </span>
+                                          <Badge variant="secondary">
+                                            {t("Due", "बकाया")}: ₹{netDue.toFixed(0)}
+                                          </Badge>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -1878,47 +1756,6 @@ export function CashManagementTab() {
                         )}
                       />
                       
-                      {/* Cross-settlement preview for farmer payment */}
-                      {farmerCrossSettlement?.hasSeedDues && farmerCrossSettlement?.hasRawPotatoDues && (
-                        <Card className="border-secondary bg-secondary/50">
-                          <CardContent className="p-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 text-foreground font-medium text-sm mb-1">
-                                  <RefreshCw className="h-4 w-4" />
-                                  {t("Cross-Settlement", "क्रॉस-सेटलमेंट")}
-                                  {outflowCrossSettlementEnabled && (
-                                    <Badge variant="default" className="text-xs">
-                                      ₹{Math.min(farmerCrossSettlement.seedDueAmount, farmerCrossSettlement.rawPotatoDueAmount).toFixed(0)}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {outflowCrossSettlementEnabled ? t(
-                                    `Auto-settling ₹${Math.min(farmerCrossSettlement.seedDueAmount, farmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} (min of seed dues ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} and raw dues ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)}). Any amount above is additional cash.`,
-                                    `₹${Math.min(farmerCrossSettlement.seedDueAmount, farmerCrossSettlement.rawPotatoDueAmount).toFixed(0)} स्वतः सेटल (बीज बकाया ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} और कच्चे बकाया ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} का न्यूनतम)। नीचे की राशि अतिरिक्त नकद है।`
-                                  ) : t(
-                                    `Farmer owes ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} for seeds. You owe farmer ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} for raw potatoes.`,
-                                    `किसान पर ₹${farmerCrossSettlement.seedDueAmount.toFixed(0)} बीज का बकाया है। आप पर किसान का ₹${farmerCrossSettlement.rawPotatoDueAmount.toFixed(0)} कच्चे का बकाया है।`
-                                  )}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant={outflowCrossSettlementEnabled ? "default" : "outline"}
-                                size="sm"
-                                className="text-xs shrink-0"
-                                onClick={() => setOutflowCrossSettlementEnabled(!outflowCrossSettlementEnabled)}
-                                data-testid="button-toggle-cross-settlement"
-                              >
-                                {outflowCrossSettlementEnabled 
-                                  ? t("Enabled", "सक्षम") 
-                                  : t("Disabled", "अक्षम")}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
                     </>
                   )}
 
@@ -2066,21 +1903,11 @@ export function CashManagementTab() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          {(expenseType === "farmer" && outflowCrossSettlementEnabled && 
-                            farmerCrossSettlement?.hasSeedDues && farmerCrossSettlement?.hasRawPotatoDues)
-                            ? t("Additional Cash Amount", "अतिरिक्त नकद राशि")
-                            : t("Amount", "राशि")} (₹) {!(expenseType === "farmer" && outflowCrossSettlementEnabled && 
-                            farmerCrossSettlement?.hasSeedDues && farmerCrossSettlement?.hasRawPotatoDues) && "*"}
+                          {t("Amount", "राशि")} (₹) *
                         </FormLabel>
                         <FormControl>
                           <Input type="number" placeholder="0" min="0" {...field} data-testid="input-outflow-amount" />
                         </FormControl>
-                        {(expenseType === "farmer" && outflowCrossSettlementEnabled && 
-                          farmerCrossSettlement?.hasSeedDues && farmerCrossSettlement?.hasRawPotatoDues) && (
-                          <p className="text-xs text-muted-foreground">
-                            {t("Enter 0 if only settling via cross-settlement", "यदि केवल क्रॉस-सेटलमेंट करना है तो 0 डालें")}
-                          </p>
-                        )}
                         <FormMessage />
                       </FormItem>
                     )}
