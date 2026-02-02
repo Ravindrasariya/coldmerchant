@@ -647,6 +647,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                       return (
                         <div
                           key={buyer.id}
+                          data-testid={`suggestion-buyer-${buyer.id}`}
                           className={`px-3 py-2 cursor-pointer hover-elevate text-sm ${isAlreadyAdded ? 'opacity-50' : ''}`}
                           onMouseDown={(e) => {
                             e.preventDefault();
