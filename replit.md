@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
 The system isolates data by merchant:
 - **Merchants**: Top-level tenant entity with name, contact, address
 - **Users**: Linked to merchants with role-based access (isSystemAdmin, canEdit, mustChangePassword flags)
-- **Stock Entries**: Per-merchant with auto-incrementing serial numbers
+- **Stock Entries**: Per-merchant with auto-incrementing serial numbers and globally unique IDs (HSE+YYYYMMDD+sequence)
 - **Lots**: Child of stock entries, tracks inventory with flexible field structure:
   - **Place**: Farm Gate or Cold Store (determines conditional field display)
   - **Crop**: Potato or Onion (determines variety/type field visibility)
@@ -48,6 +48,16 @@ The system isolates data by merchant:
   - **Expected Cold Charges**: Total amount that feeds into cold store dues
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
 - **Edit History**: Audit trail of all modifications to stock entries after initial creation
+
+### Globally Unique ID System
+All four record types have globally unique IDs with date-based patterns:
+- **Stock Entries (Harvest)**: HSE + YYYYMMDD + sequence (e.g., HSE202602011, HSE202602012)
+- **Transactions (Harvest)**: HTE + YYYYMMDD + sequence (e.g., HTE202602021)
+- **Seed Stock Entries**: SSE + YYYYMMDD + sequence (e.g., SSE202602011)
+- **Seed Transactions**: STE + YYYYMMDD + sequence (e.g., STE202602011)
+- Date is derived from purchaseDate for stock entries, createdAt for transactions
+- Unique constraint enforced at database level for data integrity
+- Serial numbers reset yearly while uniqueIds remain globally unique
 
 ### Cold Store Dues Calculation
 Cold store dues are calculated from the `charges` array on each lot:
