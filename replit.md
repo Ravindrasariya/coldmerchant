@@ -49,14 +49,16 @@ The system isolates data by merchant:
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
 - **Edit History**: Audit trail of all modifications to stock entries after initial creation
 
-### Globally Unique ID System
-All four record types have globally unique IDs with date-based patterns:
-- **Stock Entries (Harvest)**: HSE + YYYYMMDD + sequence (e.g., HSE202602011, HSE202602012)
+### Globally Unique ID System (Backend Only)
+All four record types have globally unique IDs for backend matching purposes (not displayed to users):
+- **Stock Entries (Harvest)**: HSE + YYYYMMDD + sequence (e.g., HSE202602011)
 - **Transactions (Harvest)**: HTE + YYYYMMDD + sequence (e.g., HTE202602021)
 - **Seed Stock Entries**: SSE + YYYYMMDD + sequence (e.g., SSE202602011)
 - **Seed Transactions**: STE + YYYYMMDD + sequence (e.g., STE202602011)
 - Date is derived from purchaseDate for stock entries, createdAt for transactions
 - Unique constraint enforced at database level for data integrity
+- **User-facing IDs**: Serial numbers (Sr No:) and Transaction numbers (Tr No:) are displayed to users
+- **Separate counters**: Potato, Onion, and Seed each have their own serial/transaction number sequences
 - Serial numbers reset yearly while uniqueIds remain globally unique
 
 ### Cold Store Dues Calculation
