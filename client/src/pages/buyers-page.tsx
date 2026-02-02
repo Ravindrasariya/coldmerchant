@@ -250,7 +250,7 @@ export default function BuyersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="hidden md:grid md:grid-cols-10 gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm">
+                <div className="hidden md:grid gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm" style={{ gridTemplateColumns: '40px 100px 2fr 2fr 80px 100px 70px 60px 100px 90px' }}>
                   <div></div>
                   <div>{t("Buyer ID", "खरीदार आईडी")}</div>
                   <div>{t("Name", "नाम")}</div>
@@ -266,7 +266,7 @@ export default function BuyersPage() {
                 {buyers.map((buyer, index) => (
                   <div 
                     key={buyer.id} 
-                    className="grid grid-cols-2 md:grid-cols-10 gap-2 p-3 border rounded-lg bg-card"
+                    className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-card buyer-row-grid"
                     data-testid={`buyer-row-${index}`}
                   >
                     <div className="flex items-center">

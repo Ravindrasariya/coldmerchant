@@ -307,3 +307,10 @@ input[type="number"] {
     -moz-appearance: textfield;
   }
 }
+
+/* Buyer Management table row grid */
+@media (min-width: 768px) {
+  .buyer-row-grid {
+    grid-template-columns: 40px 100px 2fr 2fr 80px 100px 70px 60px 100px 90px;
+  }
+}
