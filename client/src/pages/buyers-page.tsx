@@ -23,7 +23,11 @@ import {
   Pencil,
   History,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { type Buyer, type BuyerEditHistory } from "@shared/schema";
@@ -48,6 +52,14 @@ export default function BuyersPage() {
   // Add new buyer dialog state
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", address: "", mandiCode: "", contact: "", negativeFlag: false });
+
+  // Filter state
+  const [yearFilter, setYearFilter] = useState<string>("all");
+  const [nameFilter, setNameFilter] = useState("");
+  
+  // Sorting state: null = no sort, 'asc' = ascending, 'desc' = descending
+  const [sortColumn, setSortColumn] = useState<'buyerCode' | 'overallDue' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const { data: buyers = [], isLoading } = useQuery<BuyerWithDues[]>({
     queryKey: ["/api/buyers"],
@@ -187,6 +199,64 @@ export default function BuyersPage() {
     return fieldMap[field] || field;
   };
 
+  // Generate year options from buyer codes (format: BYYYYYMMDD#)
+  const yearOptions = Array.from(new Set(
+    buyers
+      .map(b => b.buyerCode?.substring(2, 6))
+      .filter(Boolean)
+  )).sort().reverse();
+
+  // Toggle sort for a column
+  const handleSort = (column: 'buyerCode' | 'overallDue') => {
+    if (sortColumn === column) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortColumn(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Filter and sort buyers
+  const filteredBuyers = buyers
+    .filter(buyer => {
+      // Year filter - exclude buyers without buyerCode when specific year selected
+      if (yearFilter !== "all") {
+        if (!buyer.buyerCode) return false;
+        const buyerYear = buyer.buyerCode.substring(2, 6);
+        if (buyerYear !== yearFilter) return false;
+      }
+      // Name filter
+      if (nameFilter.trim()) {
+        const searchLower = nameFilter.toLowerCase().trim();
+        if (!buyer.name.toLowerCase().includes(searchLower)) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (!sortColumn) return 0;
+      
+      if (sortColumn === 'buyerCode') {
+        const aCode = a.buyerCode || '';
+        const bCode = b.buyerCode || '';
+        return sortDirection === 'asc' 
+          ? aCode.localeCompare(bCode)
+          : bCode.localeCompare(aCode);
+      }
+      
+      if (sortColumn === 'overallDue') {
+        return sortDirection === 'asc'
+          ? a.overallDue - b.overallDue
+          : b.overallDue - a.overallDue;
+      }
+      
+      return 0;
+    });
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -212,35 +282,58 @@ export default function BuyersPage() {
 
       <main className="container py-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              {t("Buyer Management", "खरीदार प्रबंधन")}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => syncMutation.mutate()}
-                variant="outline"
-                size="sm"
-                disabled={syncMutation.isPending}
-                data-testid="button-sync-parties"
-              >
-                {syncMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                )}
-                {t("Sync Parties", "पार्टी सिंक करें")}
-              </Button>
-              <Button
-                onClick={() => setAddDialogOpen(true)}
-                variant="outline"
-                size="sm"
-                data-testid="button-add-buyer"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                {t("Add Buyer", "खरीदार जोड़ें")}
-              </Button>
+          <CardHeader className="flex flex-col gap-4">
+            <div className="flex flex-row items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                {t("Buyer Management", "खरीदार प्रबंधन")}
+              </CardTitle>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={yearFilter} onValueChange={setYearFilter}>
+                  <SelectTrigger className="w-[90px]" data-testid="select-year-filter">
+                    <SelectValue placeholder={t("Year", "वर्ष")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("All Years", "सभी वर्ष")}</SelectItem>
+                    {yearOptions.map(year => (
+                      <SelectItem key={year} value={year!}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t("Search name...", "नाम खोजें...")}
+                    value={nameFilter}
+                    onChange={(e) => setNameFilter(e.target.value)}
+                    className="pl-8 w-[160px]"
+                    data-testid="input-name-filter"
+                  />
+                </div>
+                <Button
+                  onClick={() => syncMutation.mutate()}
+                  variant="outline"
+                  size="sm"
+                  disabled={syncMutation.isPending}
+                  data-testid="button-sync-parties"
+                >
+                  {syncMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                  )}
+                  {t("Sync Parties", "पार्टी सिंक करें")}
+                </Button>
+                <Button
+                  onClick={() => setAddDialogOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-add-buyer"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  {t("Add Buyer", "खरीदार जोड़ें")}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -252,18 +345,40 @@ export default function BuyersPage() {
               <div className="space-y-4">
                 <div className="hidden md:grid gap-2 px-2 py-2 bg-muted/50 rounded-md font-medium text-sm" style={{ gridTemplateColumns: '40px 100px 2fr 2fr 80px 100px 70px 60px 100px 90px' }}>
                   <div></div>
-                  <div>{t("Buyer ID", "खरीदार आईडी")}</div>
+                  <div 
+                    className="flex items-center gap-1 cursor-pointer select-none"
+                    onClick={() => handleSort('buyerCode')}
+                    data-testid="sort-buyer-id"
+                  >
+                    {t("Buyer ID", "खरीदार आईडी")}
+                    {sortColumn === 'buyerCode' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
                   <div>{t("Name", "नाम")}</div>
                   <div>{t("Address", "पता")}</div>
                   <div>{t("Mandi Code", "मंडी कोड")}</div>
                   <div>{t("Contact", "संपर्क")}</div>
                   <div>{t("Negative", "नकारात्मक")}</div>
                   <div>{t("Active", "सक्रिय")}</div>
-                  <div>{t("Overall Due", "कुल बकाया")}</div>
+                  <div 
+                    className="flex items-center gap-1 cursor-pointer select-none"
+                    onClick={() => handleSort('overallDue')}
+                    data-testid="sort-overall-due"
+                  >
+                    {t("Overall Due", "कुल बकाया")}
+                    {sortColumn === 'overallDue' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
                   <div>{t("Receivables", "प्राप्य")}</div>
                 </div>
                 
-                {buyers.map((buyer, index) => (
+                {filteredBuyers.map((buyer, index) => (
                   <div 
                     key={buyer.id} 
                     className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-card buyer-row-grid"
