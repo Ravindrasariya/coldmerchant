@@ -19,6 +19,23 @@ import { LoadSeedTruckDialog } from "./load-seed-truck-dialog";
 import { EditSeedTransactionDialog } from "./edit-seed-transaction-dialog";
 import { SeedSalesReceiptDialog } from "./seed-sales-receipt";
 
+interface LedgerFarmer {
+  id: number;
+  name: string;
+  contact: string | null;
+  village: string | null;
+  tehsil: string | null;
+  district: string | null;
+  pyPayable: string | null;
+  pyReceivable: string | null;
+  harvestDue: number;
+  seedDue: number;
+  coldDue: number;
+  receivables: number;
+  negativeFlag: boolean | null;
+  isArchived: boolean | null;
+}
+
 interface SeedTransactionItem {
   id: number;
   seedLotId: number;
@@ -84,6 +101,37 @@ export function SeedTransactionsContent() {
   const { data: transactions, isLoading } = useQuery<SeedTransaction[]>({
     queryKey: ["/api/seed-transactions"],
   });
+
+  // Fetch ledger farmers for Net Due calculation
+  const { data: ledgerFarmers = [] } = useQuery<LedgerFarmer[]>({
+    queryKey: ["/api/farmers/ledger"],
+  });
+
+  // Helper to get Net Due for a farmer by name, village, contact composite key
+  const getFarmerNetDue = useMemo(() => {
+    return (farmerName: string, village?: string | null, contact?: string | null) => {
+      const normalizedName = farmerName.toLowerCase().trim();
+      const normalizedVillage = village?.toLowerCase().trim() || "";
+      const normalizedContact = contact?.replace(/\s/g, "") || "";
+      
+      const farmer = ledgerFarmers.find(f => {
+        const fName = f.name.toLowerCase().trim();
+        const fVillage = f.village?.toLowerCase().trim() || "";
+        const fContact = f.contact?.replace(/\s/g, "") || "";
+        
+        // Match by name + village + contact composite key
+        return fName === normalizedName && 
+               fVillage === normalizedVillage && 
+               fContact === normalizedContact;
+      }) || ledgerFarmers.find(f => f.name.toLowerCase().trim() === normalizedName);
+      
+      if (!farmer) return null;
+      
+      const pyReceivable = parseFloat(farmer.pyReceivable || "0");
+      const netDue = pyReceivable + farmer.harvestDue - farmer.seedDue - (farmer.receivables || 0);
+      return netDue;
+    };
+  }, [ledgerFarmers]);
 
   // Get unique years for dropdown
   const availableYears = useMemo(() => {
@@ -180,6 +228,28 @@ export function SeedTransactionsContent() {
     return baseDue + dynamicAdjustment;
   };
 
+  // Helper function to get display due for seed transaction based on Net Due
+  // If Net Due < 0 (farmer owes us): Show min(|Net Due|, rawDue)
+  // If Net Due >= 0: Show 0 (their seed dues are offset by what we owe them)
+  const getDisplayDueForSeed = (txn: SeedTransaction): number => {
+    const rawDue = getTotalDueWithAdjustment(txn);
+    if (rawDue <= 0) return 0;
+    
+    const farmerNetDue = getFarmerNetDue(txn.farmerName, txn.village, txn.farmerContact);
+    
+    if (farmerNetDue === null) {
+      return rawDue; // No ledger data, show raw due
+    }
+    
+    if (farmerNetDue < 0) {
+      // Farmer owes us - show up to their net position
+      return Math.min(Math.abs(farmerNetDue), rawDue);
+    } else {
+      // We owe farmer or net zero - seed dues are offset
+      return 0;
+    }
+  };
+
   const summary = useMemo(() => {
     let totalBags = 0;
     let totalRevenue = 0;
@@ -192,11 +262,11 @@ export function SeedTransactionsContent() {
       totalRevenue += parseFloat(txn.totalRevenue || "0");
       totalCost += parseFloat(txn.totalCost || "0");
       totalProfitLoss += parseFloat(txn.totalProfitLoss || "0");
-      totalDue += getTotalDueWithAdjustment(txn);
+      totalDue += getDisplayDueForSeed(txn);
     });
 
     return { totalBags, totalRevenue, totalCost, totalProfitLoss, totalDue, count: filteredTransactions.length };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, getFarmerNetDue]);
 
   const handleDownloadCSV = () => {
     if (!downloadStartDate || !downloadEndDate) {
@@ -570,7 +640,7 @@ export function SeedTransactionsContent() {
             const profitLoss = parseFloat(txn.totalProfitLoss || "0");
             const revenue = parseFloat(txn.totalRevenue || "0");
             const cost = parseFloat(txn.totalCost || "0");
-            const dueAmount = getTotalDueWithAdjustment(txn);
+            const displayDue = getDisplayDueForSeed(txn);
             const dynamicAdjustment = calculateDynamicAdjustment(txn);
             const transportCharges = parseFloat(txn.transportCharges || "0");
             const otherCharges = parseFloat(txn.otherCharges || "0");
@@ -611,7 +681,7 @@ export function SeedTransactionsContent() {
                             </Badge>
                           )}
                           {/* Due badge */}
-                          {dueAmount > 0 && (
+                          {displayDue > 0 && (
                             <Badge variant="destructive" className="text-xs">
                               {t("Due", "बकाया")}
                             </Badge>
@@ -647,10 +717,10 @@ export function SeedTransactionsContent() {
                             <span className="font-medium ml-1">₹{extraCharges.toLocaleString("en-IN")}</span>
                           </span>
                         )}
-                        {dueAmount > 0 ? (
+                        {displayDue > 0 ? (
                           <div className="col-span-2 sm:col-span-1">
                             <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                              {t("Due", "बकाया")}: ₹{dueAmount.toLocaleString("en-IN")}
+                              {t("Due", "बकाया")}: ₹{displayDue.toLocaleString("en-IN")}
                             </Badge>
                           </div>
                         ) : revenue > 0 && (

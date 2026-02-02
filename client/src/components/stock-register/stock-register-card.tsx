@@ -25,6 +25,23 @@ import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
 import { useLanguage } from "@/hooks/use-language";
 
+interface LedgerFarmer {
+  id: number;
+  name: string;
+  contact: string | null;
+  village: string | null;
+  tehsil: string | null;
+  district: string | null;
+  pyPayable: string | null;
+  pyReceivable: string | null;
+  harvestDue: number;
+  seedDue: number;
+  coldDue: number;
+  receivables: number;
+  negativeFlag: boolean | null;
+  isArchived: boolean | null;
+}
+
 interface StockEntryWithLots {
   id: number;
   serialNumber: number;
@@ -215,6 +232,37 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     queryKey: ["/api/stock-entries"],
   });
 
+  // Fetch ledger farmers for Net Due calculation
+  const { data: ledgerFarmers = [] } = useQuery<LedgerFarmer[]>({
+    queryKey: ["/api/farmers/ledger"],
+  });
+
+  // Helper to get Net Due for a farmer by name, village, contact composite key
+  const getFarmerNetDue = useMemo(() => {
+    return (farmerName: string, village?: string | null, contact?: string | null) => {
+      const normalizedName = farmerName.toLowerCase().trim();
+      const normalizedVillage = village?.toLowerCase().trim() || "";
+      const normalizedContact = contact?.replace(/\s/g, "") || "";
+      
+      const farmer = ledgerFarmers.find(f => {
+        const fName = f.name.toLowerCase().trim();
+        const fVillage = f.village?.toLowerCase().trim() || "";
+        const fContact = f.contact?.replace(/\s/g, "") || "";
+        
+        // Match by name + village + contact composite key
+        return fName === normalizedName && 
+               fVillage === normalizedVillage && 
+               fContact === normalizedContact;
+      }) || ledgerFarmers.find(f => f.name.toLowerCase().trim() === normalizedName);
+      
+      if (!farmer) return null;
+      
+      const pyReceivable = parseFloat(farmer.pyReceivable || "0");
+      const netDue = pyReceivable + farmer.harvestDue - farmer.seedDue - (farmer.receivables || 0);
+      return netDue;
+    };
+  }, [ledgerFarmers]);
+
   const coldStores = useMemo(() => {
     if (!entries) return [];
     const stores = new Set<string>();
@@ -342,14 +390,26 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
       farmerTotal += netPayable;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      farmerDue += Math.max(netPayable - amountPaid, 0);
+      const rawDue = Math.max(netPayable - amountPaid, 0);
+      
+      // Apply Net Due-based adjustment for display
+      const farmerNetDue = getFarmerNetDue(entry.farmerName, entry.village, entry.farmerContact);
+      let displayDue = rawDue;
+      if (farmerNetDue !== null) {
+        if (farmerNetDue > 0) {
+          displayDue = Math.min(farmerNetDue, rawDue);
+        } else {
+          displayDue = 0;
+        }
+      }
+      farmerDue += displayDue;
       
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
     });
 
     return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue };
-  }, [filteredEntries]);
+  }, [filteredEntries, getFarmerNetDue]);
 
   const handleDownloadCSV = () => {
     if (!downloadStartDate || !downloadEndDate) {
@@ -864,10 +924,27 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
             // Net Payable = Total Cost - Deductions + Adjustment (matches edit dialog formula)
             const adjustedEntryTotal = entryTotalAmount - entryDeductions + entryAdjustment;
-            const farmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
+            const rawFarmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
             const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
             
-            const isFarmerPaid = farmerRemainingDue <= 0 && entryTotalAmount > 0;
+            // Get farmer's Net Due from ledger for cross-settlement display
+            const farmerNetDue = getFarmerNetDue(entry.farmerName, entry.village, entry.farmerContact);
+            
+            // Adjusted display logic based on Net Due:
+            // If Net Due > 0 (we owe farmer): Show min(Net Due, rawDue) - they can only claim up to their net position
+            // If Net Due <= 0 (farmer owes us): Show 0 - their harvest dues are offset by what they owe us
+            let displayFarmerDue = rawFarmerRemainingDue;
+            if (farmerNetDue !== null) {
+              if (farmerNetDue > 0) {
+                // We owe the farmer - show Net Due if it's less than raw due (cross-settlement applied)
+                displayFarmerDue = Math.min(farmerNetDue, rawFarmerRemainingDue);
+              } else {
+                // Farmer owes us or net zero - all harvest dues offset
+                displayFarmerDue = 0;
+              }
+            }
+            
+            const isFarmerPaid = displayFarmerDue <= 0 && entryTotalAmount > 0;
             const isColdStorePaid = coldStoreRemainingDue <= 0 && entryColdStoreTotalCharges > 0;
 
             return (
@@ -893,7 +970,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                           </Badge>
                         ))}
                         
-                        {(farmerRemainingDue > 0 || coldStoreRemainingDue > 0) && (
+                        {(displayFarmerDue > 0 || coldStoreRemainingDue > 0) && (
                           <Badge 
                             variant="outline"
                             className="text-[11px] px-2 py-0.5 font-medium border-orange-400 text-orange-600 dark:border-orange-500 dark:text-orange-400 gap-1"
@@ -926,8 +1003,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             <span className="font-medium whitespace-nowrap">₹ {adjustedEntryTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                             <span className="text-muted-foreground">|</span>
                             <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
-                            <span className={`font-medium whitespace-nowrap ${farmerRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              ₹ {farmerRemainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            <span className={`font-medium whitespace-nowrap ${displayFarmerDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+                              ₹ {displayFarmerDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                             </span>
                           </span>
                         )}
