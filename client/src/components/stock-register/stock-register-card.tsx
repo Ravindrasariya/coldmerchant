@@ -409,6 +409,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Farmer Total ₹", "किसान कुल ₹"),
       t("Cold Charges ₹", "कोल्ड शुल्क ₹"),
       t("Hammali/Grading ₹", "हम्माली/ग्रेडिंग ₹"),
+      t("Advance ₹", "अग्रिम ₹"),
       t("Other Charges ₹", "अन्य शुल्क ₹"),
       t("Total Deductions ₹", "कुल कटौती ₹"),
       t("Interest ₹", "ब्याज ₹"),
@@ -446,14 +447,35 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           .filter(bd => bd.size === "Small")
           .reduce((sum, bd) => sum + bd.numberOfBags, 0);
         
-        // Deduction breakdown (matching edit dialog formula)
-        const coldCharges = parseFloat(lot.expectedColdCharges || "0");
-        const hammaliGrading = parseFloat(lot.hammaliGradingCharges || "0");
-        const otherCharges = (lot.charges || []).reduce((sum: number, c: { type: string; amount: number | string }) => {
+        // Deduction breakdown - categorize charges from charges array
+        const charges = lot.charges || [];
+        const getChargeAmount = (c: { type: string; amount: number | string }) => {
           const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : c.amount;
-          return sum + (isNaN(amt) ? 0 : amt);
-        }, 0);
-        const totalDeductions = coldCharges + hammaliGrading + otherCharges;
+          return isNaN(amt) ? 0 : amt;
+        };
+        
+        // Cold Charges = "Cold Charges" + "Ware House Charges" from charges array
+        const coldCharges = charges
+          .filter(c => c.type === "Cold Charges" || c.type === "Ware House Charges")
+          .reduce((sum, c) => sum + getChargeAmount(c), 0);
+        
+        // Hammali/Grading = "Hammali Charges" + "Grading Charges" from charges array
+        const hammaliGrading = charges
+          .filter(c => c.type === "Hammali Charges" || c.type === "Grading Charges")
+          .reduce((sum, c) => sum + getChargeAmount(c), 0);
+        
+        // Advance = "Advance" from charges array
+        const advanceCharges = charges
+          .filter(c => c.type === "Advance")
+          .reduce((sum, c) => sum + getChargeAmount(c), 0);
+        
+        // Other Charges = remaining types (Bag Charges, Freight Charges, Kata Charges, Other Charges)
+        const otherChargeTypes = ["Bag Charges", "Freight Charges", "Kata Charges", "Other Charges"];
+        const otherCharges = charges
+          .filter(c => otherChargeTypes.includes(c.type))
+          .reduce((sum, c) => sum + getChargeAmount(c), 0);
+        
+        const totalDeductions = coldCharges + hammaliGrading + advanceCharges + otherCharges;
         
         // Calculate dynamic interest (interest-only formula)
         let lotInterest = 0;
@@ -507,6 +529,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           lotFarmerTotal.toFixed(0),
           coldCharges.toFixed(0),
           hammaliGrading.toFixed(0),
+          advanceCharges.toFixed(0),
           otherCharges.toFixed(0),
           totalDeductions.toFixed(0),
           lotInterest > 0 ? lotInterest.toFixed(0) : "0",
