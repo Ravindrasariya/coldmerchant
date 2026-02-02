@@ -281,31 +281,31 @@ export default function BuyersPage() {
                     </div>
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Buyer ID", "खरीदार आईडी")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/50 rounded-md text-xs font-mono text-muted-foreground" data-testid={`text-buyer-code-${index}`}>
+                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/50 rounded-md text-[11px] font-mono text-muted-foreground break-all" data-testid={`text-buyer-code-${index}`}>
                         {buyer.buyerCode || '-'}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Name", "नाम")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/30 rounded-md text-sm truncate" data-testid={`text-name-${index}`}>
+                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs break-words" data-testid={`text-name-${index}`}>
                         {buyer.name}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Address", "पता")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/30 rounded-md text-sm truncate" data-testid={`text-address-${index}`}>
+                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs break-words" data-testid={`text-address-${index}`}>
                         {buyer.address}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Mandi Code", "मंडी कोड")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/30 rounded-md text-sm" data-testid={`text-mandi-code-${index}`}>
+                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs" data-testid={`text-mandi-code-${index}`}>
                         {buyer.mandiCode || '-'}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="md:hidden text-xs text-muted-foreground">{t("Contact", "संपर्क")}</Label>
-                      <div className="h-9 flex items-center px-3 bg-muted/30 rounded-md text-sm" data-testid={`text-contact-${index}`}>
+                      <div className="min-h-9 flex items-center px-2 py-1 bg-muted/30 rounded-md text-xs" data-testid={`text-contact-${index}`}>
                         {buyer.contact || '-'}
                       </div>
                     </div>
