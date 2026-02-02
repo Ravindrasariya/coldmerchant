@@ -2624,6 +2624,19 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/farmers/:id/edit-history - Get edit history for a specific farmer
+  app.get("/api/farmers/:id/edit-history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const farmerId = parseInt(req.params.id);
+      const history = await storage.getFarmerEditHistoryById(farmerId, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching farmer edit history:", error);
+      res.status(500).json({ message: "Failed to fetch farmer edit history" });
+    }
+  });
+
   // PATCH /api/farmers/:id/details - Update farmer details with propagation to linked records
   app.patch("/api/farmers/:id/details", requireMerchant, async (req, res) => {
     try {

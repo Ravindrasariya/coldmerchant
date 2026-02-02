@@ -190,6 +190,7 @@ export interface IStorage {
   
   // Farmer Edit History operations
   getFarmerEditHistory(merchantId: number): Promise<(FarmerEditHistory & { farmerName?: string; userName?: string })[]>;
+  getFarmerEditHistoryById(farmerId: number, merchantId: number): Promise<(FarmerEditHistory & { userName?: string })[]>;
   createFarmerEditHistory(data: Omit<InsertFarmerEditHistory, 'serialNumber'>): Promise<FarmerEditHistory>;
   updateFarmerWithPropagation(id: number, merchantId: number, userId: number | null, data: Partial<Farmer>): Promise<{ farmer: Farmer | undefined; changesLogged: number }>;
   mergeFarmers(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingFarmer: Farmer; mergedCount: number }>;
@@ -1934,6 +1935,25 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getFarmerEditHistoryById(farmerId: number, merchantId: number): Promise<(FarmerEditHistory & { userName?: string })[]> {
+    const history = await db.select({
+      history: farmerEditHistory,
+      userName: users.username,
+    })
+    .from(farmerEditHistory)
+    .leftJoin(users, eq(farmerEditHistory.changedBy, users.id))
+    .where(and(
+      eq(farmerEditHistory.farmerId, farmerId),
+      eq(farmerEditHistory.merchantId, merchantId)
+    ))
+    .orderBy(desc(farmerEditHistory.changedAt), desc(farmerEditHistory.serialNumber));
+    
+    return history.map(h => ({
+      ...h.history,
+      userName: h.userName || undefined,
+    }));
+  }
+
   async createFarmerEditHistory(data: Omit<InsertFarmerEditHistory, 'serialNumber'>): Promise<FarmerEditHistory> {
     // Get next serial number for this merchant
     const [result] = await db.select({ maxSerial: sql<number>`COALESCE(MAX(serial_number), 0)` })
@@ -2263,14 +2283,20 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(farmers.id, lowerId), eq(farmers.merchantId, merchantId)))
       .returning();
     
-    // Log the merge in edit history
+    // Log the merge in edit history with PY balance info
+    const mergingPyPayable = parseFloat(mergingFarmer.pyPayable || "0");
+    const mergingPyReceivable = parseFloat(mergingFarmer.pyReceivable || "0");
+    const pyInfo = mergingPyPayable > 0 || mergingPyReceivable > 0 
+      ? ` | PY: ₹${mergingPyPayable.toFixed(0)} payable, ₹${mergingPyReceivable.toFixed(0)} receivable`
+      : '';
+    
     await this.createFarmerEditHistory({
       merchantId,
       farmerId: lowerId,
       changedBy: userId,
       fieldName: 'merge',
-      oldValue: `Merged with ${mergingFarmer.farmerCode} (${mergingFarmer.name})`,
-      newValue: `Aggregated ${mergedCount} linked records`,
+      oldValue: `${mergingFarmer.farmerCode} (${mergingFarmer.name})${pyInfo}`,
+      newValue: `${mergedCount} linked records transferred`,
     });
     
     // Delete the merged farmer

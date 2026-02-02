@@ -69,8 +69,8 @@ export function FarmerLedgerTab() {
     state: "",
   });
   
-  // Edit tracker state
-  const [showEditTracker, setShowEditTracker] = useState(false);
+  // Edit history in dialog state
+  const [showDialogEditHistory, setShowDialogEditHistory] = useState(false);
   
   // Merge state
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
@@ -103,7 +103,7 @@ export function FarmerLedgerTab() {
     },
   });
 
-  // Edit history query
+  // Edit history query for individual farmer (in dialog)
   interface EditHistoryItem {
     id: number;
     serialNumber: number;
@@ -114,12 +114,11 @@ export function FarmerLedgerTab() {
     fieldName: string;
     oldValue: string | null;
     newValue: string | null;
-    farmerName?: string;
     userName?: string;
   }
-  const { data: editHistory = [] } = useQuery<EditHistoryItem[]>({
-    queryKey: ["/api/farmers/edit-history"],
-    enabled: !!user,
+  const { data: farmerEditHistory = [] } = useQuery<EditHistoryItem[]>({
+    queryKey: ["/api/farmers", editingFarmer?.id, "edit-history"],
+    enabled: !!user && !!editingFarmer?.id,
   });
 
   // Update farmer details with propagation mutation
@@ -141,7 +140,6 @@ export function FarmerLedgerTab() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers/edit-history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
@@ -186,7 +184,6 @@ export function FarmerLedgerTab() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers/edit-history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
@@ -225,6 +222,7 @@ export function FarmerLedgerTab() {
       district: farmer.district || "",
       state: farmer.state || "",
     });
+    setShowDialogEditHistory(false);
     setEditDialogOpen(true);
   };
 
@@ -631,70 +629,6 @@ export function FarmerLedgerTab() {
         </Card>
       </div>
 
-      {/* Edit Tracker Section */}
-      {editHistory.length > 0 && (
-        <Card>
-          <CardHeader className="py-3">
-            <button
-              type="button"
-              className="flex items-center justify-between w-full"
-              onClick={() => setShowEditTracker(!showEditTracker)}
-              data-testid="button-toggle-edit-tracker"
-            >
-              <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-sm">{t("Edit Tracker", "संपादन ट्रैकर")}</span>
-                <Badge variant="secondary" className="text-xs">{editHistory.length}</Badge>
-              </div>
-              {showEditTracker ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          </CardHeader>
-          {showEditTracker && (
-            <CardContent className="pt-0">
-              <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-background">
-                    <tr className="border-b bg-muted/50">
-                      <th className="p-2 text-left text-xs font-medium">{t("Sr#", "क्र.")}</th>
-                      <th className="p-2 text-left text-xs font-medium">{t("Date", "तारीख")}</th>
-                      <th className="p-2 text-left text-xs font-medium">{t("Farmer", "किसान")}</th>
-                      <th className="p-2 text-left text-xs font-medium">{t("Field", "फ़ील्ड")}</th>
-                      <th className="p-2 text-left text-xs font-medium">{t("Old Value", "पुराना मान")}</th>
-                      <th className="p-2 text-left text-xs font-medium">{t("New Value", "नया मान")}</th>
-                      <th className="p-2 text-left text-xs font-medium">{t("Changed By", "द्वारा बदला गया")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...editHistory]
-                      .sort((a, b) => {
-                        const dateA = new Date(a.changedAt || 0).getTime();
-                        const dateB = new Date(b.changedAt || 0).getTime();
-                        if (dateB !== dateA) return dateB - dateA;
-                        return (b.serialNumber || 0) - (a.serialNumber || 0);
-                      })
-                      .map((entry) => (
-                      <tr key={entry.id} className="border-b hover-elevate" data-testid={`row-edit-history-${entry.id}`}>
-                        <td className="p-2 text-xs font-mono">{entry.serialNumber || '-'}</td>
-                        <td className="p-2 text-xs">
-                          {entry.changedAt ? new Date(entry.changedAt).toLocaleString('en-IN', { 
-                            day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
-                          }) : '-'}
-                        </td>
-                        <td className="p-2 text-xs font-medium">{entry.farmerName || '-'}</td>
-                        <td className="p-2 text-xs capitalize">{entry.fieldName}</td>
-                        <td className="p-2 text-xs text-muted-foreground">{entry.oldValue || '-'}</td>
-                        <td className="p-2 text-xs font-medium">{entry.newValue || '-'}</td>
-                        <td className="p-2 text-xs text-muted-foreground">{entry.userName || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      )}
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
@@ -1033,6 +967,70 @@ export function FarmerLedgerTab() {
                 />
               </div>
             </div>
+
+            {/* Edit History Section */}
+            {farmerEditHistory.length > 0 && (
+              <div className="border rounded-md">
+                <button
+                  type="button"
+                  className="flex items-center justify-between w-full p-2 hover-elevate rounded-t-md"
+                  onClick={() => setShowDialogEditHistory(!showDialogEditHistory)}
+                  data-testid="button-toggle-dialog-edit-history"
+                >
+                  <div className="flex items-center gap-2">
+                    <History className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium">{t("Edit History", "संपादन इतिहास")}</span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5">{farmerEditHistory.length}</Badge>
+                  </div>
+                  {showDialogEditHistory ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                {showDialogEditHistory && (
+                  <div className="border-t max-h-40 overflow-y-auto">
+                    {farmerEditHistory.map((entry) => (
+                      <div 
+                        key={entry.id} 
+                        className={`p-2 border-b last:border-b-0 text-xs ${entry.fieldName === 'merge' ? 'bg-blue-50 dark:bg-blue-950/30' : ''}`}
+                        data-testid={`row-farmer-edit-history-${entry.id}`}
+                      >
+                        {entry.fieldName === 'merge' ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium">
+                              <Badge variant="outline" className="text-[10px] px-1 border-blue-400 text-blue-600 dark:text-blue-400">
+                                {t("Merge", "मर्ज")}
+                              </Badge>
+                              <span>{entry.oldValue}</span>
+                            </div>
+                            <div className="text-muted-foreground">{entry.newValue}</div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {entry.changedAt ? new Date(entry.changedAt).toLocaleString('en-IN', { 
+                                day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
+                              }) : '-'}
+                              {entry.userName && <span className="ml-2">{t("by", "द्वारा")} {entry.userName}</span>}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium capitalize">{entry.fieldName}:</span>
+                              <span className="text-muted-foreground line-through">{entry.oldValue || '-'}</span>
+                              <span className="mx-1">→</span>
+                              <span className="font-medium">{entry.newValue || '-'}</span>
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {entry.changedAt ? new Date(entry.changedAt).toLocaleString('en-IN', { 
+                                day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
+                              }) : '-'}
+                              {entry.userName && <span className="ml-2">{t("by", "द्वारा")} {entry.userName}</span>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
               {t("Note: Changes will be propagated to all linked stock entries, seed transactions, and receivables.", 
                  "नोट: परिवर्तन सभी संबंधित स्टॉक एंट्री, बीज लेनदेन और प्राप्य में प्रचारित किए जाएंगे।")}
