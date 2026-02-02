@@ -274,6 +274,12 @@ export async function registerRoutes(
             if (existingLot && lotData.adjustedAmountRemark !== undefined) {
               compareField('adjustedAmountRemark', existingLot.adjustedAmountRemark, lotData.adjustedAmountRemark, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.adjustedAmountRate !== undefined) {
+              compareField('adjustedAmountRate', existingLot.adjustedAmountRate, lotData.adjustedAmountRate, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.adjustedAmountEffectiveDate !== undefined) {
+              compareField('adjustedAmountEffectiveDate', existingLot.adjustedAmountEffectiveDate, lotData.adjustedAmountEffectiveDate, lotLabel, 'lot', lotData.id);
+            }
             if (existingLot && lotData.place !== undefined) {
               compareField('place', existingLot.place, lotData.place, lotLabel, 'lot', lotData.id);
             }
@@ -307,6 +313,12 @@ export async function registerRoutes(
                 : undefined,
               adjustedAmountRemark: lotData.adjustedAmountRemark !== undefined
                 ? (lotData.adjustedAmountRemark || null)
+                : undefined,
+              adjustedAmountRate: lotData.adjustedAmountRate !== undefined
+                ? (lotData.adjustedAmountRate ? lotData.adjustedAmountRate.toString() : null)
+                : undefined,
+              adjustedAmountEffectiveDate: lotData.adjustedAmountEffectiveDate !== undefined
+                ? (lotData.adjustedAmountEffectiveDate || null)
                 : undefined,
               place: lotData.place !== undefined
                 ? (lotData.place || "cold_store")
