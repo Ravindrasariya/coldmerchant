@@ -346,7 +346,7 @@ export default function BuyersPage() {
                 {/* Desktop/Tablet table view */}
                 <div className="hidden md:block rounded-lg border bg-card">
                   {/* Header row */}
-                  <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b" style={{ gridTemplateColumns: '40px minmax(90px,110px) minmax(100px,1fr) minmax(100px,1fr) minmax(60px,80px) minmax(80px,100px) minmax(55px,70px) 50px minmax(70px,100px) minmax(70px,90px)' }}>
+                  <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b" style={{ gridTemplateColumns: '36px 1fr 1fr 1.2fr 0.6fr 0.8fr 0.6fr 48px 0.8fr 0.7fr' }}>
                     <div></div>
                     <div 
                       className="flex items-center gap-1 cursor-pointer select-none"
@@ -386,7 +386,7 @@ export default function BuyersPage() {
                     <div 
                       key={buyer.id} 
                       className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0"
-                      style={{ gridTemplateColumns: '40px minmax(90px,110px) minmax(100px,1fr) minmax(100px,1fr) minmax(60px,80px) minmax(80px,100px) minmax(55px,70px) 50px minmax(70px,100px) minmax(70px,90px)' }}
+                      style={{ gridTemplateColumns: '36px 1fr 1fr 1.2fr 0.6fr 0.8fr 0.6fr 48px 0.8fr 0.7fr' }}
                       data-testid={`buyer-row-${index}`}
                     >
                         <div className="flex items-center justify-center">
