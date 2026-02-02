@@ -292,6 +292,19 @@ export const buyers = pgTable("buyers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Buyer Edit History - tracks all modifications to buyer records
+export const buyerEditHistory = pgTable("buyer_edit_history", {
+  id: serial("id").primaryKey(),
+  serialNumber: integer("serial_number").notNull(), // auto-incrementing per merchant
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  buyerId: integer("buyer_id").notNull().references(() => buyers.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changedBy: integer("changed_by").references(() => users.id), // userId who made the change
+  fieldName: text("field_name").notNull(), // name, address, mandiCode, contact, negativeFlag
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+});
+
 // Farmers - farmer ledger for tracking dues across harvest and seed modules
 export const farmers = pgTable("farmers", {
   id: serial("id").primaryKey(),
@@ -764,6 +777,7 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ i
 export const insertPartySchema = createInsertSchema(parties).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCashFarmerSchema = createInsertSchema(cashFarmers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBuyerEditHistorySchema = createInsertSchema(buyerEditHistory).omit({ id: true, changedAt: true });
 export const insertFarmerSchema = createInsertSchema(farmers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFarmerEditHistorySchema = createInsertSchema(farmerEditHistory).omit({ id: true, changedAt: true });
 
@@ -829,6 +843,9 @@ export type InsertCashFarmer = z.infer<typeof insertCashFarmerSchema>;
 
 export type Buyer = typeof buyers.$inferSelect;
 export type InsertBuyer = z.infer<typeof insertBuyerSchema>;
+
+export type BuyerEditHistory = typeof buyerEditHistory.$inferSelect;
+export type InsertBuyerEditHistory = z.infer<typeof insertBuyerEditHistorySchema>;
 
 export type Farmer = typeof farmers.$inferSelect;
 export type InsertFarmer = z.infer<typeof insertFarmerSchema>;

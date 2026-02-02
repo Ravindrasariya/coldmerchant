@@ -3,6 +3,7 @@ import {
   transactions, transactionItems, transactionEditHistory,
   cashEntries, cashEntryAllocations, coldStoreChargeAllocations,
   cashSettings, bankAccounts, parties, cashFarmers, buyers, farmers, farmerEditHistory,
+  buyerEditHistory,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
   farmerSettlements,
@@ -21,6 +22,7 @@ import {
   type Party, type InsertParty,
   type CashFarmer, type InsertCashFarmer,
   type Buyer, type InsertBuyer,
+  type BuyerEditHistory, type InsertBuyerEditHistory,
   type Farmer, type InsertFarmer, type FarmerEditHistory, type InsertFarmerEditHistory,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
@@ -134,6 +136,7 @@ export interface IStorage {
   
   // Buyer operations
   getBuyersByMerchant(merchantId: number): Promise<Buyer[]>;
+  getBuyerById(id: number, merchantId: number): Promise<Buyer | undefined>;
   getBuyerByName(merchantId: number, name: string): Promise<Buyer | undefined>;
   countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
@@ -142,6 +145,11 @@ export interface IStorage {
   deleteBuyer(id: number, merchantId: number): Promise<void>;
   lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }>;
   syncPartiesWithBuyers(merchantId: number): Promise<{ partiesLinked: number; buyersCreated: number }>;
+  
+  // Buyer Edit History operations
+  getBuyerEditHistory(buyerId: number, merchantId: number): Promise<BuyerEditHistory[]>;
+  getNextBuyerEditHistorySerialNumber(merchantId: number): Promise<number>;
+  createBuyerEditHistory(data: InsertBuyerEditHistory): Promise<BuyerEditHistory>;
   
   // Farmer Ledger operations
   getFarmersByMerchant(merchantId: number): Promise<Farmer[]>;
@@ -1600,6 +1608,19 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(buyers.dateAdded));
   }
 
+  async getBuyerById(id: number, merchantId: number): Promise<Buyer | undefined> {
+    const [buyer] = await db.select().from(buyers)
+      .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
+    return buyer || undefined;
+  }
+
+  async getBuyerByName(merchantId: number, name: string): Promise<Buyer | undefined> {
+    const normalizedName = normalizeName(name);
+    const allBuyers = await db.select().from(buyers)
+      .where(eq(buyers.merchantId, merchantId));
+    return allBuyers.find(b => normalizeName(b.name) === normalizedName);
+  }
+
   async countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number> {
     const result = await db.select().from(buyers)
       .where(and(
@@ -1664,13 +1685,6 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
   }
 
-  async getBuyerByName(merchantId: number, name: string): Promise<Buyer | undefined> {
-    const normalizedName = name.trim().toLowerCase();
-    const allBuyers = await db.select().from(buyers)
-      .where(eq(buyers.merchantId, merchantId));
-    return allBuyers.find(b => b.name.trim().toLowerCase() === normalizedName);
-  }
-
   async lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }> {
     // Check if buyer exists using name (case-insensitive)
     const existingBuyer = await this.getBuyerByName(merchantId, buyerData.name);
@@ -1732,6 +1746,29 @@ export class DatabaseStorage implements IStorage {
     }
     
     return { partiesLinked, buyersCreated };
+  }
+
+  // ===================== BUYER EDIT HISTORY OPERATIONS =====================
+
+  async getBuyerEditHistory(buyerId: number, merchantId: number): Promise<BuyerEditHistory[]> {
+    return await db.select().from(buyerEditHistory)
+      .where(and(
+        eq(buyerEditHistory.buyerId, buyerId),
+        eq(buyerEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(buyerEditHistory.changedAt), desc(buyerEditHistory.serialNumber));
+  }
+
+  async getNextBuyerEditHistorySerialNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: sql<number>`COALESCE(MAX(${buyerEditHistory.serialNumber}), 0)` })
+      .from(buyerEditHistory)
+      .where(eq(buyerEditHistory.merchantId, merchantId));
+    return (result?.maxSerial ?? 0) + 1;
+  }
+
+  async createBuyerEditHistory(data: InsertBuyerEditHistory): Promise<BuyerEditHistory> {
+    const [created] = await db.insert(buyerEditHistory).values(data).returning();
+    return created;
   }
 
   // ===================== FARMER LEDGER OPERATIONS =====================

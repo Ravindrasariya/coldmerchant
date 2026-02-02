@@ -2028,19 +2028,72 @@ export async function registerRoutes(
   app.patch("/api/buyers/:id/details", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
       const id = parseInt(req.params.id);
-      const { name, address, mandiCode, contact } = req.body;
+      const { name, address, mandiCode, contact, negativeFlag } = req.body;
 
       if (!name || name.trim() === '') {
         return res.status(400).json({ message: "Buyer name is required" });
       }
 
+      // Get existing buyer for comparison
+      const existingBuyer = await storage.getBuyerById(id, merchantId);
+      if (!existingBuyer) {
+        return res.status(404).json({ message: "Buyer not found" });
+      }
+
+      // Track changes for edit history
+      const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
+      
+      const newName = name.trim();
+      const newAddress = address?.trim() || null;
+      const newMandiCode = mandiCode?.trim() || null;
+      const newContact = contact?.trim() || null;
+      const newNegativeFlag = negativeFlag ?? existingBuyer.negativeFlag;
+
+      if (existingBuyer.name !== newName) {
+        changes.push({ fieldName: "name", oldValue: existingBuyer.name, newValue: newName });
+      }
+      if (existingBuyer.address !== newAddress) {
+        changes.push({ fieldName: "address", oldValue: existingBuyer.address, newValue: newAddress });
+      }
+      if (existingBuyer.mandiCode !== newMandiCode) {
+        changes.push({ fieldName: "mandiCode", oldValue: existingBuyer.mandiCode, newValue: newMandiCode });
+      }
+      if (existingBuyer.contact !== newContact) {
+        changes.push({ fieldName: "contact", oldValue: existingBuyer.contact, newValue: newContact });
+      }
+      if (existingBuyer.negativeFlag !== newNegativeFlag) {
+        changes.push({ fieldName: "negativeFlag", oldValue: String(existingBuyer.negativeFlag), newValue: String(newNegativeFlag) });
+      }
+
+      // If there are changes, record them
+      if (changes.length > 0) {
+        const nextSerial = await storage.getNextBuyerEditHistorySerialNumber(merchantId);
+        for (const change of changes) {
+          await storage.createBuyerEditHistory({
+            serialNumber: nextSerial,
+            merchantId,
+            buyerId: id,
+            changedBy: userId,
+            fieldName: change.fieldName,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          });
+        }
+      }
+
       const result = await storage.updateBuyerWithPropagation(id, merchantId, {
-        name: name.trim(),
-        address: address?.trim() || null,
-        mandiCode: mandiCode?.trim() || null,
-        contact: contact?.trim() || null,
+        name: newName,
+        address: newAddress,
+        mandiCode: newMandiCode,
+        contact: newContact,
       });
+
+      // Also update negativeFlag if changed
+      if (existingBuyer.negativeFlag !== newNegativeFlag) {
+        await storage.updateBuyer(id, merchantId, { negativeFlag: newNegativeFlag });
+      }
 
       if (!result.buyer) {
         return res.status(404).json({ message: "Buyer not found" });
@@ -2049,11 +2102,26 @@ export async function registerRoutes(
       res.json({
         buyer: result.buyer,
         transactionsUpdated: result.transactionsUpdated,
+        changesRecorded: changes.length,
         message: `Buyer updated. ${result.transactionsUpdated} transaction(s) updated.`
       });
     } catch (error) {
       console.error("Error updating buyer with propagation:", error);
       res.status(500).json({ message: "Failed to update buyer" });
+    }
+  });
+
+  // GET /api/buyers/:id/history - Get edit history for a buyer
+  app.get("/api/buyers/:id/history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const buyerId = parseInt(req.params.id);
+      
+      const history = await storage.getBuyerEditHistory(buyerId, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching buyer edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
     }
   });
 
