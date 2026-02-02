@@ -40,7 +40,6 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     ...lot,
     pricePerBag: lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0,
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0,
-    coldStoreChargesPaid: lot.coldStoreChargesPaid ? parseFloat(lot.coldStoreChargesPaid) : 0,
     hammaliCharges: lot.hammaliCharges ? parseFloat(lot.hammaliCharges) : 0,
     gradingCharges: lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0,
     transportCharges: lot.transportCharges ? parseFloat(lot.transportCharges) : 0,
@@ -56,7 +55,6 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     size: string;
     pricePerBag: number;
     coldStoreChargesPerBag: number;
-    coldStoreChargesPaid: number;
     hammaliCharges: number;
     gradingCharges: number;
     transportCharges: number;
@@ -116,7 +114,6 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
         size: lot.size,
         pricePerBag: lot.pricePerBag,
         coldStoreChargesPerBag: lot.coldStoreChargesPerBag,
-        coldStoreChargesPaid: lot.coldStoreChargesPaid,
         hammaliCharges: lot.hammaliCharges,
         gradingCharges: lot.gradingCharges,
         transportCharges: lot.transportCharges,
@@ -129,8 +126,19 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     return seedLots.reduce((sum, lot) => sum + (lot.originalBags * lot.pricePerBag), 0);
   };
 
+  const calculateAdditionalCharges = () => {
+    return seedLots.reduce((sum, lot) => {
+      const coldChargesTotal = (lot.coldStoreChargesPerBag || 0) * (lot.originalBags || 0);
+      const hammali = lot.hammaliCharges || 0;
+      const grading = lot.gradingCharges || 0;
+      const transport = lot.transportCharges || 0;
+      return sum + coldChargesTotal + hammali + grading + transport;
+    }, 0);
+  };
+
   const totalValue = calculateTotalValue();
   const remainingDue = Math.max(totalValue - amountPaid, 0);
+  const totalAdditionalCharges = calculateAdditionalCharges();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -186,8 +194,8 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="py-3 px-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <CardContent className="py-3 px-4 space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
                       <Input
@@ -218,6 +226,8 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                         data-testid={`input-seed-lot-${lotIndex}-price`}
                       />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3">
                     <div className="space-y-1">
                       <Label className="text-xs">{t("Cold Charges/Bag", "कोल्ड शुल्क/बोरी")}</Label>
                       <Input
@@ -226,16 +236,6 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                         onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPerBag", parseFloat(e.target.value) || 0)}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-cold-charges`}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">{t("Cold Charges Paid", "कोल्ड शुल्क भुगतान")}</Label>
-                      <Input
-                        type="number"
-                        value={lot.coldStoreChargesPaid || ""}
-                        onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPaid", parseFloat(e.target.value) || 0)}
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        data-testid={`input-seed-lot-${lotIndex}-cold-paid`}
                       />
                     </div>
                     <div className="space-y-1">
@@ -313,6 +313,13 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
               </p>
             </CardContent>
           </Card>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+            <span className="text-sm font-medium">{t("Additional Charges", "अतिरिक्त शुल्क")}</span>
+            <span className="text-sm font-semibold">
+              ₹{totalAdditionalCharges.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+          </div>
 
           <div className="space-y-2">
             <Label>{t("Remarks", "टिप्पणी")}</Label>
