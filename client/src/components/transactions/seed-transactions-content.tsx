@@ -54,6 +54,11 @@ interface SeedTransaction {
   totalRevenue: string | null;
   totalProfitLoss: string | null;
   totalDueToFarmer: string | null;
+  adjustmentType: string | null;
+  adjustmentAmount: string | null;
+  adjustmentRate: string | null;
+  adjustmentEffectiveDate: string | null;
+  adjustmentReason: string | null;
   createdAt: string;
   items: SeedTransactionItem[];
 }
@@ -131,7 +136,7 @@ export function SeedTransactionsContent() {
         return false;
       }
       if (filterPaymentDue !== "all") {
-        const dueAmount = parseFloat(txn.totalDueToFarmer || "0");
+        const dueAmount = getTotalDueWithAdjustment(txn);
         if (filterPaymentDue === "due" && dueAmount <= 0) return false;
         if (filterPaymentDue === "paid" && dueAmount > 0) return false;
       }
@@ -150,6 +155,31 @@ export function SeedTransactionsContent() {
     setFilterPaymentDue("all");
   };
 
+  // Helper function to calculate dynamic interest adjustment for a transaction
+  // Interest-only: returns 0 if no rate/date, otherwise calculates P × ((1 + r)^t - 1)
+  const calculateDynamicAdjustment = (txn: SeedTransaction): number => {
+    const principal = parseFloat(txn.adjustmentAmount || "0");
+    const rate = parseFloat(txn.adjustmentRate || "0");
+    const effectiveDate = txn.adjustmentEffectiveDate;
+    
+    if (principal <= 0 || rate <= 0 || !effectiveDate) return 0;
+    
+    const startDate = new Date(effectiveDate);
+    const today = new Date();
+    const days = Math.max(0, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const years = days / 365;
+    // Interest-only formula
+    const interest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
+    return txn.adjustmentType === "credit" ? interest : -interest;
+  };
+
+  // Helper function to get total due with dynamic adjustment
+  const getTotalDueWithAdjustment = (txn: SeedTransaction): number => {
+    const baseDue = parseFloat(txn.totalDueToFarmer || "0");
+    const dynamicAdjustment = calculateDynamicAdjustment(txn);
+    return baseDue + dynamicAdjustment;
+  };
+
   const summary = useMemo(() => {
     let totalBags = 0;
     let totalRevenue = 0;
@@ -162,7 +192,7 @@ export function SeedTransactionsContent() {
       totalRevenue += parseFloat(txn.totalRevenue || "0");
       totalCost += parseFloat(txn.totalCost || "0");
       totalProfitLoss += parseFloat(txn.totalProfitLoss || "0");
-      totalDue += parseFloat(txn.totalDueToFarmer || "0");
+      totalDue += getTotalDueWithAdjustment(txn);
     });
 
     return { totalBags, totalRevenue, totalCost, totalProfitLoss, totalDue, count: filteredTransactions.length };
@@ -540,7 +570,8 @@ export function SeedTransactionsContent() {
             const profitLoss = parseFloat(txn.totalProfitLoss || "0");
             const revenue = parseFloat(txn.totalRevenue || "0");
             const cost = parseFloat(txn.totalCost || "0");
-            const dueAmount = parseFloat(txn.totalDueToFarmer || "0");
+            const dueAmount = getTotalDueWithAdjustment(txn);
+            const dynamicAdjustment = calculateDynamicAdjustment(txn);
             const transportCharges = parseFloat(txn.transportCharges || "0");
             const otherCharges = parseFloat(txn.otherCharges || "0");
             const extraCharges = transportCharges + otherCharges;
