@@ -2270,7 +2270,8 @@ export async function registerRoutes(
                     const today = new Date();
                     const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
                     const years = days / 365;
-                    adjustedAmount = Math.round((adjustedAmount * Math.pow(1 + adjustedAmountRate / 100, years)) * 100) / 100;
+                    // Apply only interest portion (not principal+interest) since principal is already in the overall calculation
+                    adjustedAmount = Math.round((adjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
                   }
                   
                   if (lot.adjustedAmountType === "debit") {

@@ -223,12 +223,12 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       const today = new Date();
       const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
       const years = days / 365;
-      const finalAmount = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
-      const interest = Math.round((finalAmount - principal) * 100) / 100;
-      return { finalAmount, interest, days };
+      // Apply only interest portion (not principal+interest) since principal is already in overall calculation
+      const interest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
+      return { finalAmount: interest, interest, days };
     }
     
-    return { finalAmount: principal, interest: 0, days: 0 };
+    return { finalAmount: 0, interest: 0, days: 0 };
   }, [adjustmentAmount, adjustmentRate, adjustmentEffectiveDate]);
 
   const totals = useMemo(() => {

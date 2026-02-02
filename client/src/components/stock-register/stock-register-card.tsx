@@ -143,7 +143,8 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     const today = new Date();
     const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
     const years = days / 365;
-    finalAdjustment = Math.round((rawAdjustedAmount * Math.pow(1 + adjustedAmountRate / 100, years)) * 100) / 100;
+    // Apply only interest portion (not principal+interest) since principal is already in overall calculation
+    finalAdjustment = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
   }
   
   // Calculate total deductions: hammali/grading + all dynamic charges (which includes cold charges)

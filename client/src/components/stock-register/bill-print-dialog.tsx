@@ -120,7 +120,6 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
     const rate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
     
-    let adjustment = principal;
     let interestDays = 0;
     let interest = 0;
     if (principal > 0 && rate > 0 && lot.adjustedAmountEffectiveDate) {
@@ -128,18 +127,18 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
       const today = new Date();
       interestDays = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
       const years = interestDays / 365;
-      adjustment = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
-      interest = Math.round((adjustment - principal) * 100) / 100;
+      // Apply only interest portion (not principal+interest) since principal is already in overall calculation
+      interest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
     }
     
     let adjustedValue = 0;
-    if (adjustment > 0 && lot.adjustedAmountType) {
-      adjustedValue = lot.adjustedAmountType === "credit" ? adjustment : -adjustment;
+    if (interest > 0 && lot.adjustedAmountType) {
+      adjustedValue = lot.adjustedAmountType === "credit" ? interest : -interest;
     }
     
     const netPayable = totalPayable - totalDeductions + adjustedValue;
     
-    return { totalPayable, coldStoreDue, hammali, charges, dynamicCharges, totalDeductions, principal, rate, interestDays, interest, adjustment, adjustedValue, netPayable };
+    return { totalPayable, coldStoreDue, hammali, charges, dynamicCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
   };
 
   const overallTotals = entry.lots.reduce((acc, lot) => {

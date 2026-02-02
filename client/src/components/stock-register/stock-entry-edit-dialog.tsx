@@ -792,20 +792,20 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     
                     // Handle adjustment - calculate compound interest if rate-based
                     const principal = lot.adjustedAmount || 0;
-                    let finalAdjustment = principal;
+                    let interestOnly = 0;
                     
-                    // Calculate compound interest if rate and effective date are provided
+                    // Calculate compound interest only (not principal+interest) since principal is already in overall calculation
                     if (principal > 0 && lot.adjustedAmountRate && lot.adjustedAmountRate > 0 && lot.adjustedAmountEffectiveDate) {
                       const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
                       const today = new Date();
                       const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
                       const years = days / 365;
-                      finalAdjustment = Math.round((principal * Math.pow(1 + lot.adjustedAmountRate / 100, years)) * 100) / 100;
+                      interestOnly = Math.round((principal * (Math.pow(1 + lot.adjustedAmountRate / 100, years) - 1)) * 100) / 100;
                     }
                     
                     let adjustedValue = 0;
-                    if (finalAdjustment > 0 && lot.adjustedAmountType) {
-                      adjustedValue = lot.adjustedAmountType === "credit" ? finalAdjustment : -finalAdjustment;
+                    if (interestOnly > 0 && lot.adjustedAmountType) {
+                      adjustedValue = lot.adjustedAmountType === "credit" ? interestOnly : -interestOnly;
                     }
                     
                     const netPayable = totalPayable - totalDeductions + adjustedValue;
