@@ -505,12 +505,45 @@ interface PartiesSectionProps {
   isLoading: boolean;
 }
 
+interface LedgerBuyer {
+  id: number;
+  name: string;
+  address: string | null;
+  contact: string | null;
+}
+
 function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ name: "", contactNumber: "", address: "", pendingDues: "" });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Fetch buyers from Buyer Ledger for autocomplete suggestions
+  const { data: ledgerBuyers = [] } = useQuery<LedgerBuyer[]>({
+    queryKey: ["/api/buyers"],
+  });
+
+  // Filter suggestions based on input (case-insensitive)
+  const filteredSuggestions = ledgerBuyers.filter(buyer => {
+    if (!formData.name.trim()) return false;
+    const searchTerm = formData.name.trim().toLowerCase();
+    return buyer.name.toLowerCase().includes(searchTerm);
+  }).slice(0, 8); // Limit to 8 suggestions
+
+  // Check if buyer name already exists in managed parties
+  const existingPartyNames = parties.map(p => p.name.toLowerCase());
+
+  const handleSelectSuggestion = (buyer: LedgerBuyer) => {
+    setFormData({
+      ...formData,
+      name: buyer.name,
+      contactNumber: buyer.contact || "",
+      address: buyer.address || "",
+    });
+    setShowSuggestions(false);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -593,14 +626,47 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
         <Card>
           <CardContent className="pt-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
+              <div className="space-y-1 relative">
                 <Label className="text-xs">{t("Name", "नाम")} *</Label>
                 <Input
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   placeholder={t("Buyer name", "खरीदार का नाम")}
                   data-testid="input-party-name"
+                  autoComplete="off"
                 />
+                {showSuggestions && filteredSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {filteredSuggestions.map((buyer) => {
+                      const isAlreadyAdded = existingPartyNames.includes(buyer.name.toLowerCase());
+                      return (
+                        <div
+                          key={buyer.id}
+                          className={`px-3 py-2 cursor-pointer hover-elevate text-sm ${isAlreadyAdded ? 'opacity-50' : ''}`}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            if (!isAlreadyAdded) {
+                              handleSelectSuggestion(buyer);
+                            }
+                          }}
+                        >
+                          <div className="font-medium">{buyer.name}</div>
+                          {buyer.address && (
+                            <div className="text-xs text-muted-foreground">{buyer.address}</div>
+                          )}
+                          {isAlreadyAdded && (
+                            <div className="text-xs text-muted-foreground italic">{t("Already added", "पहले से जोड़ा गया")}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("Contact", "संपर्क")}</Label>
