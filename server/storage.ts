@@ -47,6 +47,34 @@ function normalizeName(name: string | null | undefined): string {
   return name.trim().toLowerCase();
 }
 
+// Helper function to format date as YYYYMMDD
+function formatDateYYYYMMDD(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+// Helper function to generate next unique ID with prefix (e.g., HSE202602021)
+async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any): Promise<string> {
+  const pattern = `${prefix}${dateStr}%`;
+  const [result] = await db.select({ uniqueId: uniqueIdColumn })
+    .from(table)
+    .where(sql`${uniqueIdColumn} LIKE ${pattern}`)
+    .orderBy(desc(uniqueIdColumn))
+    .limit(1);
+  
+  if (!result?.uniqueId) {
+    return `${prefix}${dateStr}1`;
+  }
+  
+  // Extract the sequence number from the existing ID
+  const existingId = result.uniqueId;
+  const sequenceStr = existingId.substring(prefix.length + dateStr.length);
+  const nextSequence = parseInt(sequenceStr, 10) + 1;
+  return `${prefix}${dateStr}${nextSequence}`;
+}
+
 export interface IStorage {
   sessionStore: session.Store;
   
@@ -453,13 +481,18 @@ export class DatabaseStorage implements IStorage {
     return { ...entry, lots: lotsWithBreakdowns };
   }
 
-  async createStockEntry(entry: InsertStockEntry & { merchantId: number; crop?: string }): Promise<StockEntry> {
+  async createStockEntry(entry: Omit<InsertStockEntry, 'uniqueId'> & { merchantId: number; crop?: string }): Promise<StockEntry> {
     const crop = entry.crop || "potato";
     const serialNumber = await this.getNextSerialNumber(entry.merchantId, crop);
+    // Use purchaseDate for unique ID generation (not current date)
+    const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : new Date();
+    const dateStr = formatDateYYYYMMDD(purchaseDateForId);
+    const uniqueId = await generateUniqueId("HSE", dateStr, stockEntries, stockEntries.uniqueId);
     const [created] = await db.insert(stockEntries).values({
       ...entry,
       crop,
       serialNumber,
+      uniqueId,
     }).returning();
     return created;
   }
@@ -610,10 +643,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(
-    transaction: InsertTransaction & { transactionNumber: number }, 
+    transaction: Omit<InsertTransaction, 'uniqueId'> & { transactionNumber: number }, 
     items: Omit<InsertTransactionItem, 'transactionId'>[]
   ): Promise<Transaction & { items: TransactionItem[] }> {
-    const [created] = await db.insert(transactions).values(transaction).returning();
+    const dateStr = formatDateYYYYMMDD(new Date());
+    const uniqueId = await generateUniqueId("HTE", dateStr, transactions, transactions.uniqueId);
+    const [created] = await db.insert(transactions).values({ ...transaction, uniqueId }).returning();
     
     const createdItems: TransactionItem[] = [];
     for (const item of items) {
@@ -2300,11 +2335,16 @@ export class DatabaseStorage implements IStorage {
     return { ...entry, seedLots: entryLots };
   }
 
-  async createSeedEntry(entry: InsertSeedStockEntry & { merchantId: number }): Promise<SeedStockEntry> {
+  async createSeedEntry(entry: Omit<InsertSeedStockEntry, 'uniqueId'> & { merchantId: number }): Promise<SeedStockEntry> {
     const serialNumber = await this.getNextSeedSerialNumber(entry.merchantId);
+    // Use purchaseDate for unique ID generation (not current date)
+    const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : new Date();
+    const dateStr = formatDateYYYYMMDD(purchaseDateForId);
+    const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId);
     const [created] = await db.insert(seedStockEntries).values({
       ...entry,
       serialNumber,
+      uniqueId,
     }).returning();
     return created;
   }
@@ -2524,10 +2564,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSeedTransaction(
-    transaction: InsertSeedTransaction & { transactionNumber: number },
+    transaction: Omit<InsertSeedTransaction, 'uniqueId'> & { transactionNumber: number },
     items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
   ): Promise<SeedTransactionWithItems> {
-    const [createdTxn] = await db.insert(seedTransactions).values(transaction).returning();
+    const dateStr = formatDateYYYYMMDD(new Date());
+    const uniqueId = await generateUniqueId("STE", dateStr, seedTransactions, seedTransactions.uniqueId);
+    const [createdTxn] = await db.insert(seedTransactions).values({ ...transaction, uniqueId }).returning();
     
     const createdItems: SeedTransactionItem[] = [];
     for (const item of items) {

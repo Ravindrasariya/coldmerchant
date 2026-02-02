@@ -33,6 +33,7 @@ export const users = pgTable("users", {
 // Stock Entries - main stock entry with farmer info
 export const stockEntries = pgTable("stock_entries", {
   id: serial("id").primaryKey(),
+  uniqueId: text("unique_id"), // HSE + YYYYMMDD + sequence (e.g., HSE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   serialNumber: integer("serial_number").notNull(),
   crop: text("crop").default("potato"), // potato or onion - for separate serial number sequences
@@ -124,6 +125,7 @@ export const stockEntryEditHistory = pgTable("stock_entry_edit_history", {
 // Transactions - "Load A Truck" transactions
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
+  uniqueId: text("unique_id"), // HTE + YYYYMMDD + sequence (e.g., HTE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
   crop: text("crop").default("potato"), // potato or onion - for separate transaction number sequences
@@ -343,6 +345,7 @@ export const farmerEditHistory = pgTable("farmer_edit_history", {
 // Seed Stock Entries - supplier info for seed purchases
 export const seedStockEntries = pgTable("seed_stock_entries", {
   id: serial("id").primaryKey(),
+  uniqueId: text("unique_id"), // SSE + YYYYMMDD + sequence (e.g., SSE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   serialNumber: integer("serial_number").notNull(),
   purchaseDate: date("purchase_date").notNull(),
@@ -393,6 +396,7 @@ export const seedStockEntryEditHistory = pgTable("seed_stock_entry_edit_history"
 // Seed Transactions - "Load a Seed Truck" transactions
 export const seedTransactions = pgTable("seed_transactions", {
   id: serial("id").primaryKey(),
+  uniqueId: text("unique_id"), // STE + YYYYMMDD + sequence (e.g., STE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
   farmerId: integer("farmer_id").references(() => farmers.id), // links to farmer ledger for matching
