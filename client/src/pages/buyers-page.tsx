@@ -280,7 +280,7 @@ export default function BuyersPage() {
         </div>
       </header>
 
-      <main className="container py-6">
+      <main className="container max-w-full lg:max-w-7xl py-6 px-4">
         <Card>
           <CardHeader className="flex flex-col gap-4">
             <div className="flex flex-row items-center justify-between gap-4">
@@ -344,9 +344,9 @@ export default function BuyersPage() {
             ) : (
               <div className="space-y-4">
                 {/* Desktop/Tablet table view */}
-                <div className="hidden md:block rounded-lg border bg-card">
+                <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
                   {/* Header row */}
-                  <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b" style={{ gridTemplateColumns: '36px 1fr 1fr 1.2fr 0.6fr 0.8fr 0.6fr 48px 0.8fr 0.7fr' }}>
+                  <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[900px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr)' }}>
                     <div></div>
                     <div 
                       className="flex items-center gap-1 cursor-pointer select-none"
@@ -385,8 +385,8 @@ export default function BuyersPage() {
                   {filteredBuyers.map((buyer, index) => (
                     <div 
                       key={buyer.id} 
-                      className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0"
-                      style={{ gridTemplateColumns: '36px 1fr 1fr 1.2fr 0.6fr 0.8fr 0.6fr 48px 0.8fr 0.7fr' }}
+                      className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[900px]"
+                      style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr)' }}
                       data-testid={`buyer-row-${index}`}
                     >
                         <div className="flex items-center justify-center">

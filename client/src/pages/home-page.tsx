@@ -178,6 +178,15 @@ export default function HomePage() {
                   <Wheat className="h-4 w-4" />
                   {t("Farmer Ledger", "किसान खाता")}
                 </TabsTrigger>
+                <Button
+                  variant="ghost"
+                  onClick={() => setLocation("/buyers")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 h-9 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  data-testid="nav-buyers"
+                >
+                  <Users className="h-4 w-4" />
+                  {t("Buyers", "खरीदार")}
+                </Button>
               </TabsList>
             </nav>
 
@@ -213,10 +222,6 @@ export default function HomePage() {
                       {t("Admin Panel", "एडमिन पैनल")}
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => setLocation("/buyers")} data-testid="button-buyers">
-                    <Users className="h-4 w-4 mr-2" />
-                    {t("Buyers", "खरीदार")}
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowPasswordDialog(true)} data-testid="button-change-password">
                     <KeyRound className="h-4 w-4 mr-2" />
                     {t("Change Password", "पासवर्ड बदलें")}
@@ -307,6 +312,15 @@ export default function HomePage() {
                           <Wheat className="h-4 w-4" />
                           {t("Farmer Ledger", "किसान खाता")}
                         </TabsTrigger>
+                        <Button
+                          variant="ghost"
+                          onClick={() => { setLocation("/buyers"); setIsMobileMenuOpen(false); }}
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          data-testid="nav-buyers-mobile"
+                        >
+                          <Users className="h-4 w-4" />
+                          {t("Buyers", "खरीदार")}
+                        </Button>
                       </TabsList>
                     </nav>
                   </div>
