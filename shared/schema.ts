@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, date, boolean, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, date, boolean, serial, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -292,7 +292,9 @@ export const buyers = pgTable("buyers", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  merchantBuyerCodeUnique: uniqueIndex("buyers_merchant_buyer_code_unique").on(table.merchantId, table.buyerCode),
+}));
 
 // Buyer Edit History - tracks all modifications to buyer records
 export const buyerEditHistory = pgTable("buyer_edit_history", {
@@ -325,7 +327,9 @@ export const farmers = pgTable("farmers", {
   isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  merchantFarmerCodeUnique: uniqueIndex("farmers_merchant_farmer_code_unique").on(table.merchantId, table.farmerCode),
+}));
 
 // Farmer Edit History - tracks all modifications to farmer records
 export const farmerEditHistory = pgTable("farmer_edit_history", {

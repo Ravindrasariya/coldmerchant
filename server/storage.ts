@@ -166,7 +166,7 @@ export interface IStorage {
   getBuyersByMerchant(merchantId: number): Promise<Buyer[]>;
   getBuyerById(id: number, merchantId: number): Promise<Buyer | undefined>;
   getBuyerByName(merchantId: number, name: string): Promise<Buyer | undefined>;
-  countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
+  getMaxBuyerCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
   updateBuyerWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }>;
@@ -181,7 +181,7 @@ export interface IStorage {
   
   // Farmer Ledger operations
   getFarmersByMerchant(merchantId: number): Promise<Farmer[]>;
-  countFarmersByCodePrefix(merchantId: number, prefix: string): Promise<number>;
+  getMaxFarmerCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createFarmer(farmer: InsertFarmer): Promise<Farmer>;
   updateFarmer(id: number, merchantId: number, data: Partial<Farmer>): Promise<Farmer | undefined>;
   getFarmerByCompositeKey(merchantId: number, name: string, contact: string | null, village: string | null): Promise<Farmer | undefined>;
@@ -1661,13 +1661,24 @@ export class DatabaseStorage implements IStorage {
     return allBuyers.find(b => normalizeName(b.name) === normalizedName);
   }
 
-  async countBuyersByCodePrefix(merchantId: number, prefix: string): Promise<number> {
-    const result = await db.select().from(buyers)
+  async getMaxBuyerCodeSequence(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select({ buyerCode: buyers.buyerCode }).from(buyers)
       .where(and(
         eq(buyers.merchantId, merchantId),
         sql`${buyers.buyerCode} LIKE ${prefix + '%'}`
       ));
-    return result.length;
+    
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.buyerCode) {
+        const seqStr = row.buyerCode.replace(prefix, '');
+        const seq = parseInt(seqStr, 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    }
+    return maxSeq;
   }
 
   async createBuyer(buyer: InsertBuyer): Promise<Buyer> {
@@ -1737,8 +1748,8 @@ export class DatabaseStorage implements IStorage {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
     const prefix = `BY${dateStr}`;
-    const count = await this.countBuyersByCodePrefix(merchantId, prefix);
-    const buyerCode = `${prefix}${count + 1}`;
+    const maxSeq = await this.getMaxBuyerCodeSequence(merchantId, prefix);
+    const buyerCode = `${prefix}${maxSeq + 1}`;
     
     const newBuyer = await this.createBuyer({
       merchantId,
@@ -1819,13 +1830,24 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(farmers.isArchived), desc(farmers.dateAdded));
   }
 
-  async countFarmersByCodePrefix(merchantId: number, prefix: string): Promise<number> {
-    const result = await db.select().from(farmers)
+  async getMaxFarmerCodeSequence(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select({ farmerCode: farmers.farmerCode }).from(farmers)
       .where(and(
         eq(farmers.merchantId, merchantId),
         sql`${farmers.farmerCode} LIKE ${prefix + '%'}`
       ));
-    return result.length;
+    
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.farmerCode) {
+        const seqStr = row.farmerCode.replace(prefix, '');
+        const seq = parseInt(seqStr, 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    }
+    return maxSeq;
   }
 
   async createFarmer(farmer: InsertFarmer): Promise<Farmer> {
@@ -1892,8 +1914,8 @@ export class DatabaseStorage implements IStorage {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
     const prefix = `FM${dateStr}`;
-    const count = await this.countFarmersByCodePrefix(merchantId, prefix);
-    const farmerCode = `${prefix}${count + 1}`;
+    const maxSeq = await this.getMaxFarmerCodeSequence(merchantId, prefix);
+    const farmerCode = `${prefix}${maxSeq + 1}`;
     
     const newFarmer = await this.createFarmer({
       merchantId,
