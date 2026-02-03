@@ -42,6 +42,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
 import { CashManagementTab } from "@/components/cash-management/cash-management-tab";
 import { FarmerLedgerTab } from "@/components/farmer-ledger/farmer-ledger-tab";
+import BuyersTab from "@/components/buyers/buyers-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -178,15 +179,14 @@ export default function HomePage() {
                   <Wheat className="h-4 w-4" />
                   {t("Farmer Ledger", "किसान खाता")}
                 </TabsTrigger>
-                <Button
-                  variant="ghost"
-                  onClick={() => setLocation("/buyers")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 h-9 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  data-testid="nav-buyers"
+                <TabsTrigger 
+                  value="buyers" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-buyers"
                 >
                   <Users className="h-4 w-4" />
                   {t("Buyers", "खरीदार")}
-                </Button>
+                </TabsTrigger>
               </TabsList>
             </nav>
 
@@ -312,15 +312,15 @@ export default function HomePage() {
                           <Wheat className="h-4 w-4" />
                           {t("Farmer Ledger", "किसान खाता")}
                         </TabsTrigger>
-                        <Button
-                          variant="ghost"
-                          onClick={() => { setLocation("/buyers"); setIsMobileMenuOpen(false); }}
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                          data-testid="nav-buyers-mobile"
+                        <TabsTrigger 
+                          value="buyers" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-buyers-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Users className="h-4 w-4" />
                           {t("Buyers", "खरीदार")}
-                        </Button>
+                        </TabsTrigger>
                       </TabsList>
                     </nav>
                   </div>
@@ -401,6 +401,10 @@ export default function HomePage() {
 
           <div className={activeTab === "farmer-ledger" ? "block" : "hidden"}>
             <FarmerLedgerTab />
+          </div>
+
+          <div className={activeTab === "buyers" ? "block" : "hidden"}>
+            <BuyersTab />
           </div>
 
           <footer className="mt-8 pt-4 border-t flex flex-col items-center text-center gap-2 text-sm text-muted-foreground">
