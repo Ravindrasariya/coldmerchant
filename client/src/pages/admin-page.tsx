@@ -333,11 +333,11 @@ export default function AdminPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
-          <TabsTrigger value="merchants" data-testid="tab-merchants">
+          <TabsTrigger value="merchants" className="font-bold" data-testid="tab-merchants">
             <Building2 className="h-4 w-4 mr-2" />
             Merchants
           </TabsTrigger>
-          <TabsTrigger value="users" data-testid="tab-users">
+          <TabsTrigger value="users" className="font-bold" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Users
           </TabsTrigger>
