@@ -51,7 +51,27 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
+        if (!user) {
+          return done(null, false, { message: "Invalid username or password" });
+        }
+        
+        // For system admin users, validate against ADMIN_PASSWORD env variable
+        if (user.isSystemAdmin) {
+          const adminPassword = process.env.ADMIN_PASSWORD;
+          if (!adminPassword) {
+            return done(null, false, { message: "Invalid username or password" });
+          }
+          // Use constant-time comparison to prevent timing attacks
+          const suppliedBuf = Buffer.from(password);
+          const storedBuf = Buffer.from(adminPassword);
+          if (suppliedBuf.length !== storedBuf.length || !timingSafeEqual(suppliedBuf, storedBuf)) {
+            return done(null, false, { message: "Invalid username or password" });
+          }
+          return done(null, user);
+        }
+        
+        // For regular users, validate against stored password hash
+        if (!(await comparePasswords(password, user.password))) {
           return done(null, false, { message: "Invalid username or password" });
         }
         return done(null, user);
@@ -163,6 +183,13 @@ export function setupAuth(app: Express) {
   app.post("/api/change-password", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // System admin password is managed via ADMIN_PASSWORD env variable
+    if (req.user.isSystemAdmin) {
+      return res.status(400).json({ 
+        message: "Admin password is managed via server configuration. Please update ADMIN_PASSWORD in your deployment settings." 
+      });
     }
 
     try {
