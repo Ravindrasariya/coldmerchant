@@ -57,22 +57,19 @@ function formatDateYYYYMMDD(date: Date = new Date()): string {
 
 // Helper function to generate next unique ID with prefix (e.g., HSE202602021)
 async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any): Promise<string> {
-  const pattern = `${prefix}${dateStr}%`;
-  const [result] = await db.select({ uniqueId: uniqueIdColumn })
+  const fullPrefix = `${prefix}${dateStr}`;
+  const prefixLength = fullPrefix.length;
+  
+  // Use database-side MAX extraction with CAST for efficient O(1) query
+  // Extract the numeric suffix and find the maximum in a single query
+  const [result] = await db.select({
+    maxSeq: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${uniqueIdColumn} FROM ${prefixLength + 1}) AS INTEGER)), 0)`
+  })
     .from(table)
-    .where(sql`${uniqueIdColumn} LIKE ${pattern}`)
-    .orderBy(desc(uniqueIdColumn))
-    .limit(1);
+    .where(sql`${uniqueIdColumn} LIKE ${fullPrefix + '%'}`);
   
-  if (!result?.uniqueId) {
-    return `${prefix}${dateStr}1`;
-  }
-  
-  // Extract the sequence number from the existing ID
-  const existingId = result.uniqueId;
-  const sequenceStr = existingId.substring(prefix.length + dateStr.length);
-  const nextSequence = parseInt(sequenceStr, 10) + 1;
-  return `${prefix}${dateStr}${nextSequence}`;
+  const nextSequence = (result?.maxSeq || 0) + 1;
+  return `${fullPrefix}${nextSequence}`;
 }
 
 export interface IStorage {
@@ -488,14 +485,29 @@ export class DatabaseStorage implements IStorage {
     // Use purchaseDate for unique ID generation (not current date)
     const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : new Date();
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
-    const uniqueId = await generateUniqueId("HSE", dateStr, stockEntries, stockEntries.uniqueId);
-    const [created] = await db.insert(stockEntries).values({
-      ...entry,
-      crop,
-      serialNumber,
-      uniqueId,
-    }).returning();
-    return created;
+    
+    // Retry loop for handling concurrent unique ID collisions
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const uniqueId = await generateUniqueId("HSE", dateStr, stockEntries, stockEntries.uniqueId);
+      try {
+        const [created] = await db.insert(stockEntries).values({
+          ...entry,
+          crop,
+          serialNumber,
+          uniqueId,
+        }).returning();
+        return created;
+      } catch (error: any) {
+        // Check if it's a unique constraint violation (PostgreSQL error code 23505)
+        if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
+          // Retry with a new unique ID
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Failed to generate unique ID after multiple attempts");
   }
 
   async updateStockEntry(id: number, merchantId: number, data: Partial<StockEntry>): Promise<StockEntry | undefined> {
@@ -648,8 +660,24 @@ export class DatabaseStorage implements IStorage {
     items: Omit<InsertTransactionItem, 'transactionId'>[]
   ): Promise<Transaction & { items: TransactionItem[] }> {
     const dateStr = formatDateYYYYMMDD(new Date());
-    const uniqueId = await generateUniqueId("HTE", dateStr, transactions, transactions.uniqueId);
-    const [created] = await db.insert(transactions).values({ ...transaction, uniqueId }).returning();
+    
+    // Retry loop for handling concurrent unique ID collisions
+    const maxRetries = 3;
+    let created: Transaction | undefined;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const uniqueId = await generateUniqueId("HTE", dateStr, transactions, transactions.uniqueId);
+      try {
+        const [result] = await db.insert(transactions).values({ ...transaction, uniqueId }).returning();
+        created = result;
+        break;
+      } catch (error: any) {
+        if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!created) throw new Error("Failed to generate unique ID after multiple attempts");
     
     const createdItems: TransactionItem[] = [];
     for (const item of items) {
@@ -2390,13 +2418,26 @@ export class DatabaseStorage implements IStorage {
     // Use purchaseDate for unique ID generation (not current date)
     const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : new Date();
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
-    const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId);
-    const [created] = await db.insert(seedStockEntries).values({
-      ...entry,
-      serialNumber,
-      uniqueId,
-    }).returning();
-    return created;
+    
+    // Retry loop for handling concurrent unique ID collisions
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId);
+      try {
+        const [created] = await db.insert(seedStockEntries).values({
+          ...entry,
+          serialNumber,
+          uniqueId,
+        }).returning();
+        return created;
+      } catch (error: any) {
+        if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Failed to generate unique ID after multiple attempts");
   }
 
   async updateSeedEntry(id: number, merchantId: number, data: Partial<SeedStockEntry>): Promise<SeedStockEntry | undefined> {
@@ -2618,8 +2659,24 @@ export class DatabaseStorage implements IStorage {
     items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
   ): Promise<SeedTransactionWithItems> {
     const dateStr = formatDateYYYYMMDD(new Date());
-    const uniqueId = await generateUniqueId("STE", dateStr, seedTransactions, seedTransactions.uniqueId);
-    const [createdTxn] = await db.insert(seedTransactions).values({ ...transaction, uniqueId }).returning();
+    
+    // Retry loop for handling concurrent unique ID collisions
+    const maxRetries = 3;
+    let createdTxn: any;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const uniqueId = await generateUniqueId("STE", dateStr, seedTransactions, seedTransactions.uniqueId);
+      try {
+        const [result] = await db.insert(seedTransactions).values({ ...transaction, uniqueId }).returning();
+        createdTxn = result;
+        break;
+      } catch (error: any) {
+        if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (!createdTxn) throw new Error("Failed to generate unique ID after multiple attempts");
     
     const createdItems: SeedTransactionItem[] = [];
     for (const item of items) {
