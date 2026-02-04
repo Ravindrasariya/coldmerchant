@@ -148,6 +148,7 @@ export function FarmerLedgerTab() {
       toast({
         title: t("Farmer Updated", "किसान अपडेट किया गया"),
         description: data.message,
+        variant: "success",
       });
     },
     onError: (error: any) => {
@@ -193,6 +194,7 @@ export function FarmerLedgerTab() {
       toast({
         title: t("Farmers Merged", "किसान मर्ज किए गए"),
         description: data.message,
+        variant: "success",
       });
     },
     onError: (error: any) => {

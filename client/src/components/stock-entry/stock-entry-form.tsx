@@ -140,6 +140,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }:
       toast({
         title: t("Stock Entry Created", "स्टॉक एंट्री बनाई गई"),
         description: t("The stock entry has been saved successfully.", "स्टॉक एंट्री सफलतापूर्वक सहेजी गई।"),
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });

@@ -59,6 +59,7 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
       toast({
         title: t("Seed Stock Entry Created", "बीज स्टॉक एंट्री बनाई गई"),
         description: t("The seed stock entry has been saved successfully.", "बीज स्टॉक एंट्री सफलतापूर्वक सहेजी गई।"),
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       form.reset();

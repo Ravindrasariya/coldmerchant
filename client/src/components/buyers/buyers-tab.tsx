@@ -85,7 +85,7 @@ export default function BuyersTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       setAddDialogOpen(false);
       setAddForm({ name: "", address: "", mandiCode: "", contact: "", negativeFlag: false });
-      toast({ title: t("Buyer added successfully", "खरीदार सफलतापूर्वक जोड़ा गया") });
+      toast({ title: t("Buyer added successfully", "खरीदार सफलतापूर्वक जोड़ा गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to add buyer", "खरीदार जोड़ने में विफल"), variant: "destructive" });
@@ -108,7 +108,7 @@ export default function BuyersTab() {
       setEditDialogOpen(false);
       setEditingBuyer(null);
       setShowHistory(false);
-      toast({ title: t("Buyer updated successfully", "खरीदार सफलतापूर्वक अपडेट किया गया") });
+      toast({ title: t("Buyer updated successfully", "खरीदार सफलतापूर्वक अपडेट किया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to update buyer", "खरीदार अपडेट करने में विफल"), variant: "destructive" });
@@ -124,10 +124,8 @@ export default function BuyersTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       toast({
         title: t("Sync Complete", "सिंक पूर्ण"),
-        description: t(
-          `${data.partiesLinked} parties linked, ${data.buyersCreated} new buyers created`,
-          `${data.partiesLinked} पार्टियां लिंक, ${data.buyersCreated} नए खरीदार बनाए गए`
-        ),
+        description: t(`${data.partiesLinked} parties linked, ${data.buyersCreated} new buyers created`, `${data.partiesLinked} पार्टियां लिंक, ${data.buyersCreated} नए खरीदार बनाए गए`),
+        variant: "success",
       });
     },
     onError: () => {

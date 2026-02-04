@@ -241,6 +241,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     toast({
       title: t("Success", "सफल"),
       description: t("CSV downloaded successfully", "CSV सफलतापूर्वक डाउनलोड हुई"),
+      variant: "success",
     });
   };
 

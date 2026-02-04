@@ -126,7 +126,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/settings", financialYear] });
-      toast({ title: t("Cash in hand saved", "हाथ में नकद सहेजा गया") });
+      toast({ title: t("Cash in hand saved", "हाथ में नकद सहेजा गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to save", "सहेजने में विफल"), variant: "destructive" });
@@ -141,7 +141,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       setShowAddAccount(false);
       setAccountForm({ name: "", accountType: "current", openingBalance: "" });
-      toast({ title: t("Bank account added", "बैंक खाता जोड़ा गया") });
+      toast({ title: t("Bank account added", "बैंक खाता जोड़ा गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to add bank account", "बैंक खाता जोड़ने में विफल"), variant: "destructive" });
@@ -155,7 +155,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       setEditingId(null);
-      toast({ title: t("Bank account updated", "बैंक खाता अपडेट किया गया") });
+      toast({ title: t("Bank account updated", "बैंक खाता अपडेट किया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to update bank account", "बैंक खाता अपडेट करने में विफल"), variant: "destructive" });
@@ -168,7 +168,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
-      toast({ title: t("Bank account deleted", "बैंक खाता हटाया गया") });
+      toast({ title: t("Bank account deleted", "बैंक खाता हटाया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to delete bank account", "बैंक खाता हटाने में विफल"), variant: "destructive" });
@@ -460,7 +460,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
       setShowAddForm(false);
       setFormData({ name: "", contactNumber: "", address: "", pendingDues: "" });
-      toast({ title: t("Buyer added", "खरीदार जोड़ा गया") });
+      toast({ title: t("Buyer added", "खरीदार जोड़ा गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to add buyer", "खरीदार जोड़ने में विफल"), variant: "destructive" });
@@ -474,7 +474,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
       setEditingId(null);
-      toast({ title: t("Buyer updated", "खरीदार अपडेट किया गया") });
+      toast({ title: t("Buyer updated", "खरीदार अपडेट किया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to update buyer", "खरीदार अपडेट करने में विफल"), variant: "destructive" });
@@ -487,7 +487,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
-      toast({ title: t("Buyer deleted", "खरीदार हटाया गया") });
+      toast({ title: t("Buyer deleted", "खरीदार हटाया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to delete buyer", "खरीदार हटाने में विफल"), variant: "destructive" });
@@ -773,7 +773,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
       setShowAddForm(false);
       setFormData(emptyFormData);
-      toast({ title: t("Farmer added", "किसान जोड़ा गया") });
+      toast({ title: t("Farmer added", "किसान जोड़ा गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to add farmer", "किसान जोड़ने में विफल"), variant: "destructive" });
@@ -787,7 +787,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
       setEditingId(null);
-      toast({ title: t("Farmer updated", "किसान अपडेट किया गया") });
+      toast({ title: t("Farmer updated", "किसान अपडेट किया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to update farmer", "किसान अपडेट करने में विफल"), variant: "destructive" });
@@ -800,7 +800,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
-      toast({ title: t("Farmer deleted", "किसान हटाया गया") });
+      toast({ title: t("Farmer deleted", "किसान हटाया गया"), variant: "success" });
     },
     onError: () => {
       toast({ title: t("Failed to delete farmer", "किसान हटाने में विफल"), variant: "destructive" });

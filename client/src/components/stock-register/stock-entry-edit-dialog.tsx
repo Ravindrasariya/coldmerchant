@@ -165,6 +165,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       toast({
         title: t("Entry Updated", "एंट्री अपडेट हो गई"),
         description: t("The stock entry has been updated successfully.", "स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock-entries', entry.id, 'history'] });

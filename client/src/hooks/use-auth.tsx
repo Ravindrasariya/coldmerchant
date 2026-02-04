@@ -88,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast({
         title: "Password changed",
         description: "Your password has been updated successfully.",
+        variant: "success",
       });
     },
     onError: (error: Error) => {

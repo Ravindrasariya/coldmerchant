@@ -75,6 +75,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
       toast({
         title: t("Entry Updated", "एंट्री अपडेट हो गई"),
         description: t("The seed stock entry has been updated successfully.", "बीज स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries", entry.id, "edit-history"] });

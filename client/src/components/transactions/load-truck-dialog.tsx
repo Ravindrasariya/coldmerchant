@@ -341,6 +341,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
       toast({
         title: t("Transaction Created", "लेनदेन बनाया गया"),
         description: t("Truck loaded successfully", "ट्रक सफलतापूर्वक लोड किया गया"),
+        variant: "success",
       });
       resetForm();
       onOpenChange(false);

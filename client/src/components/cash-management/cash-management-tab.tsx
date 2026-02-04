@@ -483,6 +483,7 @@ export function CashManagementTab() {
       toast({
         title: t("Success", "सफलता"),
         description: t("Entry recorded successfully", "प्रविष्टि सफलतापूर्वक दर्ज की गई"),
+        variant: "success",
       });
       if (activeTab === "inward") {
         inwardForm.reset({
@@ -933,6 +934,7 @@ export function CashManagementTab() {
       description: hasActiveFilters 
         ? t("Filtered entries downloaded successfully", "फ़िल्टर की गई प्रविष्टियाँ सफलतापूर्वक डाउनलोड हुई")
         : t("All entries downloaded successfully", "सभी प्रविष्टियाँ सफलतापूर्वक डाउनलोड हुई"),
+      variant: "success",
     });
   };
 
@@ -2145,6 +2147,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       toast({
         title: t("Entry Reversed", "प्रविष्टि उलट दी गई"),
         description: t("The cash entry has been reversed successfully.", "नकद प्रविष्टि सफलतापूर्वक उलट दी गई है।"),
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });

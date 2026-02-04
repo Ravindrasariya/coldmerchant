@@ -179,6 +179,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       toast({
         title: t("Success", "सफल"),
         description: t("Seed transaction updated successfully", "बीज लेनदेन सफलतापूर्वक अपडेट किया गया"),
+        variant: "success",
       });
       onOpenChange(false);
     },

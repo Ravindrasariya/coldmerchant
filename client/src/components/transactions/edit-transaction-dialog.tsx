@@ -241,6 +241,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       toast({
         title: t("Transaction Updated", "लेनदेन अपडेट किया गया"),
         description: t("Changes saved successfully", "परिवर्तन सफलतापूर्वक सहेजे गए"),
+        variant: "success",
       });
       onOpenChange(false);
     },
@@ -277,6 +278,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       toast({
         title: t("Items Updated", "आइटम अपडेट किए गए"),
         description: t("Transaction items saved successfully", "लेनदेन आइटम सफलतापूर्वक सहेजे गए"),
+        variant: "success",
       });
     },
     onError: (error: any) => {

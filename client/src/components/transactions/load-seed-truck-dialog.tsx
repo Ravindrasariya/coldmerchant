@@ -161,6 +161,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       toast({
         title: t("Success", "सफल"),
         description: t("Seed transaction created successfully", "बीज लेनदेन सफलतापूर्वक बनाया गया"),
+        variant: "success",
       });
       resetForm();
       onOpenChange(false);

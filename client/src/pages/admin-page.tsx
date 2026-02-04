@@ -77,7 +77,7 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       setMerchantDialogOpen(false);
       setMerchantForm({ name: "", contactNumber: "", address: "" });
-      toast({ title: "Merchant created successfully" });
+      toast({ title: "Merchant created successfully", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create merchant", description: error.message, variant: "destructive" });
@@ -94,7 +94,7 @@ export default function AdminPage() {
       setMerchantDialogOpen(false);
       setEditingMerchant(null);
       setMerchantForm({ name: "", contactNumber: "", address: "" });
-      toast({ title: "Merchant updated successfully" });
+      toast({ title: "Merchant updated successfully", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update merchant", description: error.message, variant: "destructive" });
@@ -116,7 +116,7 @@ export default function AdminPage() {
         inactive: "Merchant deactivated. All users have been logged out.",
         archived: "Merchant archived. All users have been logged out.",
       };
-      toast({ title: statusMessages[variables.status] || "Status updated" });
+      toast({ title: statusMessages[variables.status] || "Status updated", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
@@ -134,7 +134,7 @@ export default function AdminPage() {
       setResetDialogMerchant(null);
       setResetAdminPassword("");
       setResetSpecialPassword("");
-      toast({ title: "Factory reset complete", description: "All merchant data has been deleted." });
+      toast({ title: "Factory reset complete", description: "All merchant data has been deleted.", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to reset merchant", description: error.message, variant: "destructive" });
@@ -153,7 +153,7 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setUserDialogOpen(false);
       setUserForm({ username: "", name: "", mobileNumber: "", merchantId: "", canEdit: true });
-      toast({ title: "User created successfully", description: "Default password is 'password123'" });
+      toast({ title: "User created successfully", description: "Default password is 'password123'", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create user", description: error.message, variant: "destructive" });
@@ -170,7 +170,7 @@ export default function AdminPage() {
       setUserDialogOpen(false);
       setEditingUser(null);
       setUserForm({ username: "", name: "", mobileNumber: "", merchantId: "", canEdit: true });
-      toast({ title: "User updated successfully" });
+      toast({ title: "User updated successfully", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update user", description: error.message, variant: "destructive" });
@@ -182,7 +182,7 @@ export default function AdminPage() {
       await apiRequest("POST", `/api/admin/users/${id}/reset-password`);
     },
     onSuccess: () => {
-      toast({ title: "Password reset successfully", description: "New password is 'password123'" });
+      toast({ title: "Password reset successfully", description: "New password is 'password123'", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to reset password", description: error.message, variant: "destructive" });
@@ -195,7 +195,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "User deleted successfully" });
+      toast({ title: "User deleted successfully", variant: "success" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to delete user", description: error.message, variant: "destructive" });
