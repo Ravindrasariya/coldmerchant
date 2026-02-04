@@ -30,6 +30,7 @@ interface UnsoldInventoryItem {
   breakdownId: number | null;
   lotId: number;
   serialNumber: number;
+  place: string;
   coldStoreName: string;
   farmerName: string;
   farmerVillage: string;
@@ -650,7 +651,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                             <SelectItem key={key} value={key} className="py-2">
                                               <div className="flex flex-col">
                                                 <span className="text-sm font-medium">
-                                                  S#{inv.serialNumber} - {inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
+                                                  S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
                                                 </span>
                                                 <span className="text-xs text-muted-foreground">
                                                   {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {displayBags} {t("bags available", "बोरी उपलब्ध")}
