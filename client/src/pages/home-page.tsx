@@ -133,7 +133,7 @@ export default function HomePage() {
               <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
                 <TabsTrigger 
                   value="stock-entry" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-stock-entry"
                 >
                   <PackagePlus className="h-4 w-4" />
@@ -141,7 +141,7 @@ export default function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="stock-register" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-stock-register"
                 >
                   <ClipboardList className="h-4 w-4" />
@@ -149,7 +149,7 @@ export default function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="transactions" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-transactions"
                 >
                   <Truck className="h-4 w-4" />
@@ -157,7 +157,7 @@ export default function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="cash-management" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-cash-management"
                 >
                   <Wallet className="h-4 w-4" />
@@ -165,7 +165,7 @@ export default function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="seed" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-seed"
                 >
                   <Leaf className="h-4 w-4" />
@@ -173,7 +173,7 @@ export default function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="farmer-ledger" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-farmer-ledger"
                 >
                   <Wheat className="h-4 w-4" />
@@ -181,7 +181,7 @@ export default function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger 
                   value="buyers" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-buyers"
                 >
                   <Users className="h-4 w-4" />
@@ -260,7 +260,7 @@ export default function HomePage() {
                       <TabsList className="flex flex-col w-full h-auto gap-1 bg-transparent p-0">
                         <TabsTrigger 
                           value="stock-entry" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-stock-entry-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -269,7 +269,7 @@ export default function HomePage() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="stock-register" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-stock-register-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -278,7 +278,7 @@ export default function HomePage() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="transactions" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-transactions-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -287,7 +287,7 @@ export default function HomePage() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="cash-management" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-cash-management-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -296,7 +296,7 @@ export default function HomePage() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="seed" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-seed-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -305,7 +305,7 @@ export default function HomePage() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="farmer-ledger" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-farmer-ledger-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -314,7 +314,7 @@ export default function HomePage() {
                         </TabsTrigger>
                         <TabsTrigger 
                           value="buyers" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-buyers-mobile"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
