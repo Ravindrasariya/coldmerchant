@@ -162,10 +162,10 @@ export default function AuthPage() {
       <div className="hidden lg:flex flex-1 bg-primary/5 items-center justify-center p-12">
         <div className="max-w-lg space-y-8">
           <div>
-            <h2 className="text-3xl font-bold mb-4">Streamline Your Potato Trading Business</h2>
+            <h2 className="text-3xl font-bold mb-4">Streamline Your Agri Trading Business</h2>
             <p className="text-muted-foreground text-lg">
               Track purchases, manage inventory, and grow your business with Vyapar Vriddhi - 
-              the complete solution for potato merchants.
+              the complete solution for agri merchants.
             </p>
           </div>
 
