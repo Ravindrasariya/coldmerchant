@@ -30,6 +30,14 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Session table - managed by connect-pg-simple for express-session
+// This definition ensures drizzle-kit recognizes the table and doesn't try to delete it
+export const session = pgTable("session", {
+  sid: varchar("sid", { length: 255 }).primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+});
+
 // Stock Entries - main stock entry with farmer info
 export const stockEntries = pgTable("stock_entries", {
   id: serial("id").primaryKey(),
