@@ -1,0 +1,45 @@
+root@srv1277141:/var/www/vyapar-vriddhi# pm2 logs vyapar-vriddhi --lines 20
+[TAILING] Tailing last 20 lines for [vyapar-vriddhi] process (change the value with --lines option)
+/root/.pm2/logs/vyapar-vriddhi-error-2.log last 20 lines:
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+
+/root/.pm2/logs/vyapar-vriddhi-out-2.log last 20 lines:
+2|vyapar-v | 2:56:31 PM [express] GET /api/admin/users 403 in 1ms :: {"message":"Admin access required"}
+2|vyapar-v | 2:58:56 PM [express] POST /api/admin/merchants 403 in 2ms :: {"message":"Admin access required"}
+2|vyapar-v | 2:59:12 PM [express] POST /api/admin/merchants 403 in 1ms :: {"message":"Admin access required"}
+2|vyapar-v | [seed] Admin user already exists, skipping seed
+2|vyapar-v | 3:03:20 PM [express] serving on port 5002
+2|vyapar-v | 3:03:27 PM [express] POST /api/logout 200 in 12ms
+2|vyapar-v | 3:03:39 PM [express] POST /api/login 200 in 30ms :: {"id":1,"username":"admin","name":"System Administrator","mobileNumber":null,"merchantId":null,"isSystemAdmin":true,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T14:53:26.227Z"}
+2|vyapar-v | 3:03:40 PM [express] GET /api/admin/merchants 403 in 3ms :: {"message":"Admin access required"}
+2|vyapar-v | 3:03:40 PM [express] GET /api/admin/users 403 in 2ms :: {"message":"Admin access required"}
+2|vyapar-v | 3:04:52 PM [express] POST /api/admin/merchants 403 in 1ms :: {"message":"Admin access required"}
+2|vyapar-v | [seed] Admin user already exists, skipping seed
+2|vyapar-v | 3:06:30 PM [express] serving on port 5002
+2|vyapar-v | 3:06:53 PM [express] POST /api/admin/merchants 403 in 5ms :: {"message":"Admin access required"}
+2|vyapar-v | 3:06:57 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 3:07:13 PM [express] POST /api/login 200 in 17ms :: {"id":1,"username":"admin","name":"System Administrator","mobileNumber":null,"merchantId":null,"isSystemAdmin":true,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T14:53:26.227Z"}
+2|vyapar-v | 3:07:13 PM [express] GET /api/admin/merchants 403 in 1ms :: {"message":"Admin access required"}
+2|vyapar-v | 3:07:14 PM [express] GET /api/admin/users 403 in 1ms :: {"message":"Admin access required"}
+2|vyapar-v | 3:08:07 PM [express] POST /api/admin/merchants 403 in 1ms :: {"message":"Admin access required"}
+2|vyapar-v | [seed] Admin user already exists, skipping seed
+2|vyapar-v | 3:12:35 PM [express] serving on port 5002
