@@ -413,7 +413,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const hasItemChanges = editableItems.some(item => item.action !== 'keep');
 
   const onSubmit = (data: EditTransactionFormData) => {
+    // Update main transaction data
     updateMutation.mutate(data);
+    // Also update items (bags, weights, revenue) if there are any changes
+    if (hasItemChanges) {
+      updateItemsMutation.mutate();
+    }
   };
 
   const getFieldLabel = (field: string): string => {
