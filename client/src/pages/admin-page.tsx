@@ -16,7 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
-  LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle 
+  LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle, Search 
 } from "lucide-react";
 import type { Merchant, User } from "@shared/schema";
 
@@ -46,6 +46,9 @@ export default function AdminPage() {
   const [resetDialogMerchant, setResetDialogMerchant] = useState<MerchantWithUsers | null>(null);
   const [resetAdminPassword, setResetAdminPassword] = useState("");
   const [resetSpecialPassword, setResetSpecialPassword] = useState("");
+  
+  const [merchantFilter, setMerchantFilter] = useState("");
+  const [userFilter, setUserFilter] = useState("");
 
   useEffect(() => {
     if (!user?.isSystemAdmin) {
@@ -293,8 +296,18 @@ export default function AdminPage() {
     return aOrder - bOrder;
   });
 
-  const activeMerchants = sortedMerchants.filter(m => (m.status || "active") !== "archived");
-  const archivedMerchants = sortedMerchants.filter(m => m.status === "archived");
+  const filteredMerchants = sortedMerchants.filter(m => 
+    merchantFilter.trim() === "" || 
+    m.name.toLowerCase().includes(merchantFilter.toLowerCase().trim())
+  );
+  const activeMerchants = filteredMerchants.filter(m => (m.status || "active") !== "archived");
+  const archivedMerchants = filteredMerchants.filter(m => m.status === "archived");
+  
+  const filteredUsers = users.filter(u => 
+    userFilter.trim() === "" || 
+    u.name.toLowerCase().includes(userFilter.toLowerCase().trim()) ||
+    u.username.toLowerCase().includes(userFilter.toLowerCase().trim())
+  );
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-6xl">
@@ -332,15 +345,27 @@ export default function AdminPage() {
 
         <TabsContent value="merchants">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
               <div>
                 <CardTitle>Merchants</CardTitle>
                 <CardDescription>Manage all registered merchants/businesses</CardDescription>
               </div>
-              <Button onClick={() => openMerchantDialog()} data-testid="button-add-merchant">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Merchant
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search merchants..."
+                    value={merchantFilter}
+                    onChange={(e) => setMerchantFilter(e.target.value)}
+                    className="pl-8 w-48"
+                    data-testid="input-filter-merchants"
+                  />
+                </div>
+                <Button onClick={() => openMerchantDialog()} data-testid="button-add-merchant">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Merchant
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {merchantsLoading ? (
@@ -350,6 +375,10 @@ export default function AdminPage() {
               ) : merchants.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No merchants found. Add your first merchant to get started.
+                </div>
+              ) : filteredMerchants.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No merchants match your search.
                 </div>
               ) : (
                 <>
@@ -531,19 +560,31 @@ export default function AdminPage() {
 
         <TabsContent value="users">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
               <div>
                 <CardTitle>Users</CardTitle>
                 <CardDescription>Manage all user accounts</CardDescription>
               </div>
-              <Button 
-                onClick={() => openUserDialog()} 
-                disabled={merchants.length === 0}
-                data-testid="button-add-user"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add User
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search users..."
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value)}
+                    className="pl-8 w-48"
+                    data-testid="input-filter-users"
+                  />
+                </div>
+                <Button 
+                  onClick={() => openUserDialog()} 
+                  disabled={merchants.length === 0}
+                  data-testid="button-add-user"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {usersLoading ? (
@@ -553,6 +594,10 @@ export default function AdminPage() {
               ) : users.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No users found.
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No users match your search.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -568,7 +613,7 @@ export default function AdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.map((userItem) => (
+                      {filteredUsers.map((userItem) => (
                         <TableRow key={userItem.id} data-testid={`row-user-${userItem.id}`}>
                           <TableCell className="font-medium">{userItem.username}</TableCell>
                           <TableCell>{userItem.name}</TableCell>
