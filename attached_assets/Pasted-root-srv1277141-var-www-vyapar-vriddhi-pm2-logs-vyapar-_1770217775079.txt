@@ -1,0 +1,50 @@
+root@srv1277141:/var/www/vyapar-vriddhi# pm2 logs vyapar-vriddhi --lines 50
+[TAILING] Tailing last 50 lines for [vyapar-vriddhi] process (change the value with --lines option)
+/root/.pm2/logs/vyapar-vriddhi-error-2.log last 50 lines:
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+2|vyapar-v | Error: ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'
+2|vyapar-v |     at async open (node:internal/fs/promises:634:25)
+2|vyapar-v |     at async Object.readFile (node:internal/fs/promises:1236:14)
+2|vyapar-v |     at async n._rawEnsureSessionStoreTable (/var/www/vyapar-vriddhi/dist/index.cjs:76:7059)
+2|vyapar-v |     at async n._asyncQuery (/var/www/vyapar-vriddhi/dist/index.cjs:76:8144)
+
+/root/.pm2/logs/vyapar-vriddhi-out-2.log last 50 lines:
+2|vyapar-v | 1:42:16 PM [express] serving on port 5002
+2|vyapar-v | 1:53:07 PM [express] GET /api/user 401 in 3ms
+2|vyapar-v | 1:55:33 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 1:55:38 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 1:55:45 PM [express] GET /api/user 401 in 0ms
+2|vyapar-v | 1:55:46 PM [express] GET /api/user 401 in 0ms
+2|vyapar-v | 1:55:52 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 1:56:31 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 1:56:44 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 2:07:17 PM [express] POST /api/login 401 in 27ms :: {"message":"Invalid username or password"}
+2|vyapar-v | 2:10:44 PM [express] serving on port 5002
+2|vyapar-v | 2:10:59 PM [express] POST /api/login 401 in 27ms :: {"message":"Invalid username or password"}
+2|vyapar-v | 2:11:04 PM [express] GET /api/user 401 in 1ms
+2|vyapar-v | 2:11:22 PM [express] POST /api/login 401 in 14ms :: {"message":"Invalid username or password"}
+2|vyapar-v | 2:36:02 PM [express] GET /api/user 401 in 2ms
+2|vyapar-v | [seed] Admin user created successfully (password from ADMIN_PASSWORD env)
+2|vyapar-v | 2:53:26 PM [express] serving on port 5002
+2|vyapar-v | 2:53:32 PM [express] GET /api/user 401 in 2ms
+2|vyapar-v | 2:53:46 PM [express] POST /api/login 500 in 17ms :: {"message":"ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'"}
+2|vyapar-v | 2:54:00 PM [express] POST /api/login 500 in 24ms :: {"message":"ENOENT: no such file or directory, open '/var/www/vyapar-vriddhi/dist/table.sql'"}
+2|vyapar-v | [seed] Admin user already exists, skipping seed
+2|vyapar-v | 2:56:26 PM [express] serving on port 5002
+2|vyapar-v | 2:56:31 PM [express] POST /api/login 200 in 15ms :: {"id":1,"username":"admin","name":"System Administrator","mobileNumber":null,"merchantId":null,"isSystemAdmin":true,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T14:53:26.227Z"}
+2|vyapar-v | 2:56:31 PM [express] GET /api/admin/merchants 403 in 2ms :: {"message":"Admin access required"}
+2|vyapar-v | 2:56:31 PM [express] GET /api/admin/users 4
