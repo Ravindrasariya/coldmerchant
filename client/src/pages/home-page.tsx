@@ -36,7 +36,8 @@ import {
   Download,
   Leaf,
   Users,
-  Wheat
+  Wheat,
+  Phone
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -407,15 +408,29 @@ export default function HomePage() {
             <BuyersTab />
           </div>
 
-          <footer className="mt-8 pt-4 border-t flex flex-col items-center text-center gap-2 text-sm text-muted-foreground">
-            <div>
-              {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
+          <footer className="mt-8 pt-4 border-t text-sm text-muted-foreground">
+            {/* Desktop/Tablet: Single row layout */}
+            <div className="hidden md:flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                {t("Need Help? Reach out to", "मदद चाहिए? संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>: 8882589392
+              </div>
+              <div className="flex items-center gap-4">
+                <span>{t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span>
+                <span>{t("All Rights Reserved", "सर्वाधिकार सुरक्षित")}</span>
+              </div>
             </div>
-            <div>
-              {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
-            </div>
-            <div>
-              {t("All Rights Reserved", "सर्वाधिकार सुरक्षित")}
+            {/* Mobile: Stacked layout */}
+            <div className="flex flex-col items-center text-center gap-2 md:hidden">
+              <div>
+                {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
+              </div>
+              <div>
+                {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+              </div>
+              <div>
+                {t("All Rights Reserved", "सर्वाधिकार सुरक्षित")}
+              </div>
             </div>
           </footer>
         </main>
