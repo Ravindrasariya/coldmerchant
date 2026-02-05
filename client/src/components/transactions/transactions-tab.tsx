@@ -319,7 +319,13 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       </div>
 
       {/* Filters Row */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+        {/* Mobile: Button at top, full width */}
+        <Button onClick={() => setShowLoadDialog(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile">
+          <Truck className="h-4 w-4 mr-2" />
+          {t("Load A Truck", "ट्रक लोड करें")}
+        </Button>
+
         <Card className="flex-1">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -387,7 +393,8 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
           </CardContent>
         </Card>
 
-        <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-truck">
+        {/* Desktop: Button on right */}
+        <Button onClick={() => setShowLoadDialog(true)} className="hidden md:flex" data-testid="button-load-truck">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>

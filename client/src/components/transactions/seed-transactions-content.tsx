@@ -351,7 +351,24 @@ export function SeedTransactionsContent() {
       />
 
       {/* Filters Row */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+        {/* Mobile: Buttons at top, full width */}
+        <div className="flex gap-2 md:hidden">
+          <Button onClick={() => setShowLoadDialog(true)} className="flex-1" data-testid="button-load-seed-truck-mobile">
+            <Truck className="h-4 w-4 mr-2" />
+            {t("Load Seed Truck", "बीज ट्रक लोड करें")}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setDownloadDialogOpen(true)}
+            title={t("Download", "डाउनलोड")}
+            data-testid="button-seed-txn-download-mobile"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+
         <Card className="flex-1">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -458,16 +475,18 @@ export function SeedTransactionsContent() {
           </CardContent>
         </Card>
 
+        {/* Desktop: Buttons on right */}
         <Button
           variant="outline"
           size="icon"
           onClick={() => setDownloadDialogOpen(true)}
           title={t("Download", "डाउनलोड")}
+          className="hidden md:flex"
           data-testid="button-seed-txn-download"
         >
           <Download className="h-4 w-4" />
         </Button>
-        <Button onClick={() => setShowLoadDialog(true)} data-testid="button-load-seed-truck">
+        <Button onClick={() => setShowLoadDialog(true)} className="hidden md:flex" data-testid="button-load-seed-truck">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load Seed Truck", "बीज ट्रक लोड करें")}
         </Button>
