@@ -472,6 +472,19 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                   {t("Clear", "साफ़ करें")}
                 </Button>
               )}
+
+              {/* Desktop/Tablet: Download button at end of filter row */}
+              <div className="hidden md:flex flex-1 justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDownloadDialogOpen(true)}
+                  title={t("Download CSV", "CSV डाउनलोड")}
+                  data-testid="button-seed-txn-download-filter-row"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

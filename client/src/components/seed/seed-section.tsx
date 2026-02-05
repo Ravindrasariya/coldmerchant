@@ -59,19 +59,28 @@ export function SeedSection({ seedDownloadDialogOpen, setSeedDownloadDialogOpen 
             </TabsTrigger>
           </TabsList>
 
-          {(activeSeedTab === "seed-stock-register" || activeSeedTab === "seed-transactions") && (
+          {/* Mobile only: Download button in tab header - Stock Register has its own in filter row on desktop */}
+          {activeSeedTab === "seed-stock-register" && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                if (activeSeedTab === "seed-stock-register") {
-                  setSeedDownloadDialogOpen(true);
-                } else {
-                  setSeedTxnDownloadDialogOpen(true);
-                }
-              }}
+              onClick={() => setSeedDownloadDialogOpen(true)}
               title={t("Download CSV", "CSV डाउनलोड")}
               data-testid="button-seed-download-header"
+              className="md:hidden"
+            >
+              <Download className="h-5 w-5" />
+            </Button>
+          )}
+          {/* Transactions: Download button shows on all screen sizes here, but will be moved to filter row on desktop */}
+          {activeSeedTab === "seed-transactions" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSeedTxnDownloadDialogOpen(true)}
+              title={t("Download CSV", "CSV डाउनलोड")}
+              data-testid="button-seed-txn-download-header"
+              className="md:hidden"
             >
               <Download className="h-5 w-5" />
             </Button>

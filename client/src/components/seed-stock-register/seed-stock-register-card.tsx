@@ -318,13 +318,90 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
 
       <Card className="border-border">
         <CardContent className="py-3">
-          <div className="flex flex-col gap-2">
+          {/* Desktop/Tablet: Single row layout */}
+          <div className="hidden md:flex flex-wrap items-center gap-3">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+
+            <Select value={filterSerial} onValueChange={setFilterSerial}>
+              <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter">
+                <SelectValue placeholder={t("Serial #", "क्रमांक")} />
+              </SelectTrigger>
+              <SelectContent>
+                {serialNumbers.map((num) => (
+                  <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+              <SelectTrigger className="w-[160px]" data-testid="select-seed-supplier-filter">
+                <SelectValue placeholder={t("Supplier", "आपूर्तिकर्ता")} />
+              </SelectTrigger>
+              <SelectContent>
+                {supplierNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterPotatoType} onValueChange={setFilterPotatoType}>
+              <SelectTrigger className="w-[120px]" data-testid="select-seed-potato-type-filter">
+                <SelectValue placeholder={t("Potato Type", "आलू प्रकार")} />
+              </SelectTrigger>
+              <SelectContent>
+                {SEED_POTATO_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterColdStore} onValueChange={setFilterColdStore}>
+              <SelectTrigger className="w-[130px]" data-testid="select-seed-cold-store-filter">
+                <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
+              </SelectTrigger>
+              <SelectContent>
+                {coldStores.map((store) => (
+                  <SelectItem key={store} value={store}>{store}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant={filterUnsold ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilterUnsold(!filterUnsold)}
+              data-testid="button-seed-unsold-filter"
+            >
+              {t("Unsold Only", "केवल अनबिके")}
+            </Button>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
+                <X className="h-4 w-4 mr-1" />
+                {t("Clear", "साफ करें")}
+              </Button>
+            )}
+
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setDownloadDialogOpen(true)}
+              title={t("Download CSV", "CSV डाउनलोड")}
+              data-testid="button-seed-download-filter-row"
+            >
+              <Download className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Mobile: Multi-row layout */}
+          <div className="flex flex-col gap-2 md:hidden">
             {/* Row 1: Filter icon, Serial #, Supplier */}
             <div className="flex flex-wrap items-center gap-3">
               <Filter className="h-4 w-4 text-muted-foreground" />
 
               <Select value={filterSerial} onValueChange={setFilterSerial}>
-                <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter">
+                <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter-mobile">
                   <SelectValue placeholder={t("Serial #", "क्रमांक")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -335,7 +412,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
               </Select>
 
               <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-                <SelectTrigger className="w-[160px]" data-testid="select-seed-supplier-filter">
+                <SelectTrigger className="w-[140px]" data-testid="select-seed-supplier-filter-mobile">
                   <SelectValue placeholder={t("Supplier", "आपूर्तिकर्ता")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -349,7 +426,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             {/* Row 2: Potato Type, Cold Store */}
             <div className="flex flex-wrap items-center gap-3">
               <Select value={filterPotatoType} onValueChange={setFilterPotatoType}>
-                <SelectTrigger className="w-[120px]" data-testid="select-seed-potato-type-filter">
+                <SelectTrigger className="w-[120px]" data-testid="select-seed-potato-type-filter-mobile">
                   <SelectValue placeholder={t("Potato Type", "आलू प्रकार")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,7 +437,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
               </Select>
 
               <Select value={filterColdStore} onValueChange={setFilterColdStore}>
-                <SelectTrigger className="w-[130px]" data-testid="select-seed-cold-store-filter">
+                <SelectTrigger className="w-[130px]" data-testid="select-seed-cold-store-filter-mobile">
                   <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -377,13 +454,13 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                 variant={filterUnsold ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilterUnsold(!filterUnsold)}
-                data-testid="button-seed-unsold-filter"
+                data-testid="button-seed-unsold-filter-mobile"
               >
                 {t("Unsold Only", "केवल अनबिके")}
               </Button>
 
               {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
+                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters-mobile">
                   <X className="h-4 w-4 mr-1" />
                   {t("Clear", "साफ करें")}
                 </Button>
