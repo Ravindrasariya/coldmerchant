@@ -30,30 +30,30 @@ export function SeedSection({ seedDownloadDialogOpen, setSeedDownloadDialogOpen 
       </div>
 
       <Tabs value={activeSeedTab} onValueChange={setActiveSeedTab} className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2">
           <TabsList className="bg-green-50 dark:bg-green-900/20">
             <TabsTrigger 
               value="seed-stock-entry" 
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white"
+              className="text-xs md:text-sm px-2 md:px-3 data-[state=active]:bg-green-600 data-[state=active]:text-white"
               data-testid="tab-seed-stock-entry"
             >
-              <PackagePlus className="h-4 w-4 mr-1.5" />
+              <PackagePlus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 md:mr-1.5" />
               {t("Stock Entry", "स्टॉक एंट्री")}
             </TabsTrigger>
             <TabsTrigger 
               value="seed-stock-register" 
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white"
+              className="text-xs md:text-sm px-2 md:px-3 data-[state=active]:bg-green-600 data-[state=active]:text-white"
               data-testid="tab-seed-stock-register"
             >
-              <ClipboardList className="h-4 w-4 mr-1.5" />
+              <ClipboardList className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 md:mr-1.5" />
               {t("Stock Register", "स्टॉक रजिस्टर")}
             </TabsTrigger>
             <TabsTrigger 
               value="seed-transactions" 
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white"
+              className="text-xs md:text-sm px-2 md:px-3 data-[state=active]:bg-green-600 data-[state=active]:text-white"
               data-testid="tab-seed-transactions"
             >
-              <Truck className="h-4 w-4 mr-1.5" />
+              <Truck className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1 md:mr-1.5" />
               {t("Transactions", "लेनदेन")}
             </TabsTrigger>
           </TabsList>
