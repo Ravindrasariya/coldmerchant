@@ -64,15 +64,27 @@ interface SeedTransaction {
   items: SeedTransactionItem[];
 }
 
-export function SeedTransactionsContent() {
+interface SeedTransactionsContentProps {
+  downloadDialogOpen?: boolean;
+  onDownloadDialogClose?: () => void;
+}
+
+export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOpen, onDownloadDialogClose }: SeedTransactionsContentProps = {}) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [receiptTransactionId, setReceiptTransactionId] = useState<number | null>(null);
   
-  // Download dialog state (uses filtered transactions directly)
-  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  // Download dialog state - can be controlled externally or internally
+  const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
+  const downloadDialogOpen = externalDownloadOpen ?? internalDownloadOpen;
+  const setDownloadDialogOpen = (open: boolean) => {
+    if (!open && onDownloadDialogClose) {
+      onDownloadDialogClose();
+    }
+    setInternalDownloadOpen(open);
+  };
   
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
@@ -352,22 +364,11 @@ export function SeedTransactionsContent() {
 
       {/* Filters Row */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-        {/* Mobile: Buttons at top, full width */}
-        <div className="flex gap-2 md:hidden">
-          <Button onClick={() => setShowLoadDialog(true)} className="flex-1" data-testid="button-load-seed-truck-mobile">
-            <Truck className="h-4 w-4 mr-2" />
-            {t("Load Seed Truck", "बीज ट्रक लोड करें")}
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setDownloadDialogOpen(true)}
-            title={t("Download", "डाउनलोड")}
-            data-testid="button-seed-txn-download-mobile"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
+        {/* Mobile: Load truck button at top, full width */}
+        <Button onClick={() => setShowLoadDialog(true)} className="w-full md:hidden" data-testid="button-load-seed-truck-mobile">
+          <Truck className="h-4 w-4 mr-2" />
+          {t("Load Seed Truck", "बीज ट्रक लोड करें")}
+        </Button>
 
         <Card className="flex-1">
           <CardContent className="p-4">
@@ -475,17 +476,7 @@ export function SeedTransactionsContent() {
           </CardContent>
         </Card>
 
-        {/* Desktop: Buttons on right */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setDownloadDialogOpen(true)}
-          title={t("Download", "डाउनलोड")}
-          className="hidden md:flex"
-          data-testid="button-seed-txn-download"
-        >
-          <Download className="h-4 w-4" />
-        </Button>
+        {/* Desktop: Load truck button on right */}
         <Button onClick={() => setShowLoadDialog(true)} className="hidden md:flex" data-testid="button-load-seed-truck">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load Seed Truck", "बीज ट्रक लोड करें")}

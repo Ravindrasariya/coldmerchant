@@ -15,6 +15,7 @@ interface SeedSectionProps {
 export function SeedSection({ seedDownloadDialogOpen, setSeedDownloadDialogOpen }: SeedSectionProps) {
   const { t } = useLanguage();
   const [activeSeedTab, setActiveSeedTab] = useState("seed-stock-entry");
+  const [seedTxnDownloadDialogOpen, setSeedTxnDownloadDialogOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -58,11 +59,17 @@ export function SeedSection({ seedDownloadDialogOpen, setSeedDownloadDialogOpen 
             </TabsTrigger>
           </TabsList>
 
-          {activeSeedTab === "seed-stock-register" && (
+          {(activeSeedTab === "seed-stock-register" || activeSeedTab === "seed-transactions") && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSeedDownloadDialogOpen(true)}
+              onClick={() => {
+                if (activeSeedTab === "seed-stock-register") {
+                  setSeedDownloadDialogOpen(true);
+                } else {
+                  setSeedTxnDownloadDialogOpen(true);
+                }
+              }}
               title={t("Download CSV", "CSV डाउनलोड")}
               data-testid="button-seed-download-header"
             >
@@ -106,7 +113,10 @@ export function SeedSection({ seedDownloadDialogOpen, setSeedDownloadDialogOpen 
                 {t("View and manage seed sales transactions", "बीज बिक्री लेनदेन देखें और प्रबंधित करें")}
               </p>
             </div>
-            <SeedTransactionsContent />
+            <SeedTransactionsContent 
+              downloadDialogOpen={seedTxnDownloadDialogOpen}
+              onDownloadDialogClose={() => setSeedTxnDownloadDialogOpen(false)}
+            />
           </div>
         </TabsContent>
       </Tabs>
