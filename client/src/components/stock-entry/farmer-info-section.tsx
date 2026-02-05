@@ -187,7 +187,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                     }}
                     onFocus={() => {
                       setActiveField('name');
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setSearchQuery(field.value);
                         setShowSuggestions(true);
                       }
@@ -244,7 +244,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                     }}
                     onFocus={() => {
                       setActiveField('contact');
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setSearchQuery(field.value);
                         setShowSuggestions(true);
                       }
@@ -300,7 +300,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                     }}
                     onFocus={() => {
                       setActiveField('village');
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setSearchQuery(field.value);
                         setShowSuggestions(true);
                       }

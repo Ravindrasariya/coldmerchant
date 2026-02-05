@@ -150,7 +150,7 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
                       setShowColdStoreSuggestions(true);
                     }}
                     onFocus={() => {
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setColdStoreQuery(field.value);
                         setShowColdStoreSuggestions(true);
                       }

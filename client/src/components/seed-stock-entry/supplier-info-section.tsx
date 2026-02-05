@@ -170,7 +170,7 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                     }}
                     onFocus={() => {
                       setActiveField('name');
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setSearchQuery(field.value);
                         setShowSuggestions(true);
                       }
@@ -229,7 +229,7 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                     }}
                     onFocus={() => {
                       setActiveField('contact');
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setSearchQuery(field.value);
                         setShowSuggestions(true);
                       }
@@ -287,7 +287,7 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                     }}
                     onFocus={() => {
                       setActiveField('address');
-                      if (field.value && field.value.length >= 2) {
+                      if (field.value && field.value.length >= 1) {
                         setSearchQuery(field.value);
                         setShowSuggestions(true);
                       }

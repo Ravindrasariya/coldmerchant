@@ -193,7 +193,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                           setShowColdStoreSuggestions(true);
                         }}
                         onFocus={() => {
-                          if (field.value && field.value.length >= 2) {
+                          if (field.value && field.value.length >= 1) {
                             setColdStoreQuery(field.value);
                             setShowColdStoreSuggestions(true);
                           }

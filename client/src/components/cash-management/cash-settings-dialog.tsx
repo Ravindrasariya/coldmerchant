@@ -743,7 +743,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   });
 
   const getFilteredSuggestions = (field: 'name' | 'contact' | 'village', value: string) => {
-    if (!value || value.length < 2) return [];
+    if (!value || value.length < 1) return [];
     const searchTerm = value.toLowerCase();
     const fieldMap = { name: 'name', contact: 'contact', village: 'village' } as const;
     return farmerSuggestions.filter(farmer => {
