@@ -349,7 +349,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             {/* Row 2: Potato Type, Cold Store */}
             <div className="flex flex-wrap items-center gap-3">
               <Select value={filterPotatoType} onValueChange={setFilterPotatoType}>
-                <SelectTrigger className="w-[140px]" data-testid="select-seed-potato-type-filter">
+                <SelectTrigger className="w-[120px]" data-testid="select-seed-potato-type-filter">
                   <SelectValue placeholder={t("Potato Type", "आलू प्रकार")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,7 +360,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
               </Select>
 
               <Select value={filterColdStore} onValueChange={setFilterColdStore}>
-                <SelectTrigger className="w-[160px]" data-testid="select-seed-cold-store-filter">
+                <SelectTrigger className="w-[130px]" data-testid="select-seed-cold-store-filter">
                   <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
                 </SelectTrigger>
                 <SelectContent>
