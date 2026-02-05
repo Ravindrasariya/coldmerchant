@@ -318,68 +318,77 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
 
       <Card className="border-border">
         <CardContent className="py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Filter className="h-4 w-4 text-muted-foreground" />
+          <div className="flex flex-col gap-2">
+            {/* Row 1: Filter icon, Serial #, Supplier */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Filter className="h-4 w-4 text-muted-foreground" />
 
-            <Select value={filterSerial} onValueChange={setFilterSerial}>
-              <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter">
-                <SelectValue placeholder={t("Serial #", "क्रमांक")} />
-              </SelectTrigger>
-              <SelectContent>
-                {serialNumbers.map((num) => (
-                  <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={filterSerial} onValueChange={setFilterSerial}>
+                <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter">
+                  <SelectValue placeholder={t("Serial #", "क्रमांक")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {serialNumbers.map((num) => (
+                    <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={filterSupplier} onValueChange={setFilterSupplier}>
-              <SelectTrigger className="w-[160px]" data-testid="select-seed-supplier-filter">
-                <SelectValue placeholder={t("Supplier", "आपूर्तिकर्ता")} />
-              </SelectTrigger>
-              <SelectContent>
-                {supplierNames.map((name) => (
-                  <SelectItem key={name} value={name}>{name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={filterSupplier} onValueChange={setFilterSupplier}>
+                <SelectTrigger className="w-[160px]" data-testid="select-seed-supplier-filter">
+                  <SelectValue placeholder={t("Supplier", "आपूर्तिकर्ता")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {supplierNames.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={filterPotatoType} onValueChange={setFilterPotatoType}>
-              <SelectTrigger className="w-[140px]" data-testid="select-seed-potato-type-filter">
-                <SelectValue placeholder={t("Potato Type", "आलू प्रकार")} />
-              </SelectTrigger>
-              <SelectContent>
-                {SEED_POTATO_TYPES.map((type) => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Row 2: Potato Type, Cold Store */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={filterPotatoType} onValueChange={setFilterPotatoType}>
+                <SelectTrigger className="w-[140px]" data-testid="select-seed-potato-type-filter">
+                  <SelectValue placeholder={t("Potato Type", "आलू प्रकार")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEED_POTATO_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={filterColdStore} onValueChange={setFilterColdStore}>
-              <SelectTrigger className="w-[160px]" data-testid="select-seed-cold-store-filter">
-                <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
-              </SelectTrigger>
-              <SelectContent>
-                {coldStores.map((store) => (
-                  <SelectItem key={store} value={store}>{store}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={filterColdStore} onValueChange={setFilterColdStore}>
+                <SelectTrigger className="w-[160px]" data-testid="select-seed-cold-store-filter">
+                  <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {coldStores.map((store) => (
+                    <SelectItem key={store} value={store}>{store}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Button
-              variant={filterUnsold ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterUnsold(!filterUnsold)}
-              data-testid="button-seed-unsold-filter"
-            >
-              {t("Unsold Only", "केवल अनबिके")}
-            </Button>
-
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
-                <X className="h-4 w-4 mr-1" />
-                {t("Clear", "साफ करें")}
+            {/* Row 3: Unsold Only, Clear (when filters active) */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant={filterUnsold ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterUnsold(!filterUnsold)}
+                data-testid="button-seed-unsold-filter"
+              >
+                {t("Unsold Only", "केवल अनबिके")}
               </Button>
-            )}
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
+                  <X className="h-4 w-4 mr-1" />
+                  {t("Clear", "साफ करें")}
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
