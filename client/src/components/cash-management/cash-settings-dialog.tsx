@@ -589,6 +589,9 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                   placeholder={t("Contact number", "संपर्क नंबर")}
                   data-testid="input-party-contact"
                 />
+                {formData.contactNumber && formData.contactNumber.length > 0 && formData.contactNumber.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-party-contact-invalid">{t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -938,6 +941,9 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                       </div>
                     ))}
                   </div>
+                )}
+                {formData.contactNumber && formData.contactNumber.length > 0 && formData.contactNumber.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-farmer-party-contact-invalid">{t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}</p>
                 )}
               </div>
             </div>

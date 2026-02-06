@@ -927,6 +927,9 @@ export function FarmerLedgerTab() {
                   placeholder={t("Phone number", "फोन नंबर")}
                   data-testid="input-edit-farmer-contact"
                 />
+                {editForm.contact && editForm.contact.length > 0 && editForm.contact.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-farmer-contact-invalid">{t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

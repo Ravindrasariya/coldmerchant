@@ -45,7 +45,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const searchFarmers = useCallback(async (query: string) => {
-    if (query.length < 2) {
+    if (query.length < 1) {
       setSuggestions([]);
       return;
     }
@@ -280,6 +280,11 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                       </div>
                     ))}
                   </div>
+                )}
+                {field.value && field.value.length > 0 && field.value.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-contact-invalid">
+                    {t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}
+                  </p>
                 )}
                 <FormMessage />
               </FormItem>

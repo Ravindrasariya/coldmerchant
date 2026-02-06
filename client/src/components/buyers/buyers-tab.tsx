@@ -506,6 +506,9 @@ export default function BuyersTab() {
                   placeholder={t("Phone", "फ़ोन")}
                   data-testid="input-edit-contact"
                 />
+                {editForm.contact && editForm.contact.length > 0 && editForm.contact.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-edit-contact-invalid">{t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -632,6 +635,9 @@ export default function BuyersTab() {
                   placeholder={t("Phone", "फ़ोन")}
                   data-testid="input-add-contact"
                 />
+                {addForm.contact && addForm.contact.length > 0 && addForm.contact.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-add-contact-invalid">{t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
