@@ -604,6 +604,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                       <Label>{t("Price/Bag", "मूल्य/बैग")}</Label>
                       <Input
                         type="number"
+                        step="any"
                         min="0"
                         value={selection.pricePerBag || ""}
                         onChange={(e) => updateLotSelection(index, "pricePerBag", parseFloat(e.target.value) || 0)}
@@ -650,6 +651,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Label>{t("Transport Charges", "परिवहन शुल्क")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={transportCharges}
                   onChange={(e) => setTransportCharges(e.target.value)}
                   placeholder="0"
@@ -660,6 +662,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Label>{t("Other Charges", "अन्य शुल्क")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={otherCharges}
                   onChange={(e) => setOtherCharges(e.target.value)}
                   placeholder="0"

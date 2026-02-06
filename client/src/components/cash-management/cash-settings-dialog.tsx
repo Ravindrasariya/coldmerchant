@@ -220,6 +220,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
               <Input
                 id="cash-in-hand"
                 type="number"
+                step="any"
                 value={cashInHand}
                 onChange={(e) => setCashInHand(e.target.value)}
                 placeholder="0"
@@ -277,6 +278,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
                         </Select>
                         <Input
                           type="number"
+                          step="any"
                           value={accountForm.openingBalance}
                           onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })}
                           placeholder={t("Opening Balance", "प्रारंभिक शेष")}
@@ -358,6 +360,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
                 </Select>
                 <Input
                   type="number"
+                  step="any"
                   value={accountForm.openingBalance}
                   onChange={(e) => setAccountForm({ ...accountForm, openingBalance: e.target.value })}
                   placeholder={t("Opening Balance", "प्रारंभिक शेष")}
@@ -600,6 +603,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                 <Label className="text-xs">{t("Pending Dues", "बकाया राशि")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={formData.pendingDues}
                   onChange={(e) => setFormData({ ...formData, pendingDues: e.target.value })}
                   placeholder="0"
@@ -664,6 +668,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                       />
                       <Input
                         type="number"
+                        step="any"
                         value={formData.pendingDues}
                         onChange={(e) => setFormData({ ...formData, pendingDues: e.target.value })}
                         placeholder={t("Pending Dues", "बकाया राशि")}
@@ -985,6 +990,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 <Label className="text-xs">{t("Due to be Paid", "भुगतान करना है")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={formData.pendingDueToBePaid}
                   onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
                   placeholder="0"
@@ -1089,6 +1095,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                       />
                       <Input
                         type="number"
+                        step="any"
                         value={formData.pendingDueToBePaid}
                         onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
                         placeholder={t("Due to be Paid", "भुगतान करना है")}

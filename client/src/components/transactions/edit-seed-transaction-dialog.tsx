@@ -502,6 +502,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                           <div className="flex items-center gap-2">
                             <Input
                               type="number"
+                              step="any"
                               value={selection.pricePerBag || ""}
                               onChange={(e) => updateLotSelection(index, "pricePerBag", parseFloat(e.target.value) || 0)}
                               placeholder="0"
@@ -548,6 +549,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                 <Label>{t("Transport Charges", "परिवहन शुल्क")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={transportCharges}
                   onChange={(e) => setTransportCharges(e.target.value)}
                   placeholder="0"
@@ -558,6 +560,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                 <Label>{t("Other Charges", "अन्य शुल्क")}</Label>
                 <Input
                   type="number"
+                  step="any"
                   value={otherCharges}
                   onChange={(e) => setOtherCharges(e.target.value)}
                   placeholder="0"

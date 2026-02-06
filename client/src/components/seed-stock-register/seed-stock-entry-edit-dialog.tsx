@@ -221,6 +221,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Price/Bag", "मूल्य/बोरी")}</Label>
                       <Input
                         type="number"
+                        step="any"
                         value={lot.pricePerBag || ""}
                         onChange={(e) => handleLotChange(lotIndex, "pricePerBag", parseFloat(e.target.value) || 0)}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -233,6 +234,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Cold Charges/Bag", "कोल्ड शुल्क/बोरी")}</Label>
                       <Input
                         type="number"
+                        step="any"
                         value={lot.coldStoreChargesPerBag || ""}
                         onChange={(e) => handleLotChange(lotIndex, "coldStoreChargesPerBag", parseFloat(e.target.value) || 0)}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -243,6 +245,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Total Hammali", "कुल हम्माली")}</Label>
                       <Input
                         type="number"
+                        step="any"
                         value={lot.hammaliCharges || ""}
                         onChange={(e) => handleLotChange(lotIndex, "hammaliCharges", parseFloat(e.target.value) || 0)}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -253,6 +256,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Total Grading", "कुल ग्रेडिंग")}</Label>
                       <Input
                         type="number"
+                        step="any"
                         value={lot.gradingCharges || ""}
                         onChange={(e) => handleLotChange(lotIndex, "gradingCharges", parseFloat(e.target.value) || 0)}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -263,6 +267,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Total Transport", "कुल ट्रांसपोर्ट")}</Label>
                       <Input
                         type="number"
+                        step="any"
                         value={lot.transportCharges || ""}
                         onChange={(e) => handleLotChange(lotIndex, "transportCharges", parseFloat(e.target.value) || 0)}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

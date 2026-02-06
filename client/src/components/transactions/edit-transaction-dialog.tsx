@@ -524,7 +524,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <Input
                       type="number"
                       min="0"
-                      step="0.1"
+                      step="any"
                       placeholder={t("Weight (Kg)", "वजन (किग्रा)")}
                       value={newItemWeight || ""}
                       onChange={(e) => setNewItemWeight(parseFloat(e.target.value) || 0)}
@@ -569,7 +569,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <Input
                       type="number"
                       min="0"
-                      step="0.1"
+                      step="any"
                       value={item.netWeight || ""}
                       onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
                       className="h-8 text-right no-spinner"
@@ -584,6 +584,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     </div>
                     <Input
                       type="number"
+                      step="any"
                       min="0"
                       value={item.revenue || ""}
                       onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
@@ -731,7 +732,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <FormItem>
                         <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-advance-payment" />
+                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -745,7 +746,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <FormItem>
                         <FormLabel>{t("Amount Received", "प्राप्त राशि")} (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-amount-received" />
+                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-amount-received" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -769,7 +770,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <FormItem>
                         <FormLabel>{t("Transportation", "परिवहन")} (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-transportation" />
+                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-transportation" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -783,7 +784,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <FormItem>
                         <FormLabel>{t("Other Charges", "अन्य शुल्क")} (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-other-charges" />
+                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-other-charges" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

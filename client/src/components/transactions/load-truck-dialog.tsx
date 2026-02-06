@@ -748,7 +748,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             </Label>
                             <Input
                               type="number"
-                              step="0.01"
+                              step="any"
                               value={section.advancePayment || ""}
                               onChange={(e) =>
                                 updateBuyerSection(section.id, {
@@ -765,7 +765,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             </Label>
                             <Input
                               type="number"
-                              step="0.01"
+                              step="any"
                               value={section.transportationCharges || ""}
                               onChange={(e) =>
                                 updateBuyerSection(section.id, {
@@ -780,7 +780,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             <Label className="text-xs">{t("Other Charges", "अन्य शुल्क")}</Label>
                             <Input
                               type="number"
-                              step="0.01"
+                              step="any"
                               value={section.otherCharges || ""}
                               onChange={(e) =>
                                 updateBuyerSection(section.id, {
@@ -795,7 +795,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                             <Label className="text-xs">{t("Revenue", "राजस्व")}</Label>
                             <Input
                               type="number"
-                              step="0.01"
+                              step="any"
                               value={section.revenue || ""}
                               onChange={(e) =>
                                 updateBuyerSection(section.id, {

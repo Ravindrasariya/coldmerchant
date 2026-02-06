@@ -1626,7 +1626,7 @@ export function CashManagementTab() {
                           {t("Amount", "राशि")} (₹) *
                         </FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="0" min="0" {...field} data-testid="input-amount" />
+                          <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-amount" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1908,7 +1908,7 @@ export function CashManagementTab() {
                           {t("Amount", "राशि")} (₹) *
                         </FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="0" min="0" {...field} data-testid="input-outflow-amount" />
+                          <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-outflow-amount" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2038,7 +2038,7 @@ export function CashManagementTab() {
                       <FormItem>
                         <FormLabel>{t("Amount", "राशि")} (₹) *</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="0" min="0" {...field} data-testid="input-transfer-amount" />
+                          <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-transfer-amount" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
