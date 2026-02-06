@@ -499,74 +499,97 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           const netWeight = (bd.weight || 0) - (bd.numberOfBags || 0);
                           const total = netWeight > 0 ? netWeight * (bd.pricePerKg || 0) : 0;
                           return (
-                            <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-8 gap-2 p-2 bg-muted/30 rounded-md items-center">
-                              <Select
-                                value={bd.size}
-                                onValueChange={(v) => handleBreakdownChange(lotIndex, bdIndex, "size", v)}
-                              >
-                                <SelectTrigger className="h-8" data-testid={`edit-breakdown-size-${lotIndex}-${bdIndex}`}>
-                                  <SelectValue placeholder={t("Size", "आकार")} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {SIZE_OPTIONS.map((size) => (
-                                    <SelectItem key={size} value={size}>{size}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                className="h-8"
-                                placeholder=""
-                                value={bd.numberOfBags ?? ""}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(/[^0-9]/g, '');
-                                  handleBreakdownChange(lotIndex, bdIndex, "numberOfBags", val === "" ? undefined : parseInt(val));
-                                }}
-                                data-testid={`edit-breakdown-bags-${lotIndex}-${bdIndex}`}
-                              />
-                              <div className="font-mono text-sm font-medium">
-                                <span className="text-primary">{remaining}</span>
-                                <span className="text-muted-foreground">/{bd.numberOfBags}</span>
+                            <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-8 gap-2 p-2 bg-muted/30 rounded-md items-end md:items-center">
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Size", "आकार")}</label>
+                                <Select
+                                  value={bd.size}
+                                  onValueChange={(v) => handleBreakdownChange(lotIndex, bdIndex, "size", v)}
+                                >
+                                  <SelectTrigger className="h-8" data-testid={`edit-breakdown-size-${lotIndex}-${bdIndex}`}>
+                                    <SelectValue placeholder={t("Size", "आकार")} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {SIZE_OPTIONS.map((size) => (
+                                      <SelectItem key={size} value={size}>{size}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
-                              <Input
-                                type="number"
-                                step="any"
-                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder=""
-                                value={bd.weight ?? ""}
-                                onChange={(e) => {
-                                  handleBreakdownChange(lotIndex, bdIndex, "weight", e.target.value === "" ? undefined : parseFloat(e.target.value));
-                                }}
-                                data-testid={`edit-breakdown-weight-${lotIndex}-${bdIndex}`}
-                              />
-                              <div className="font-mono text-sm text-muted-foreground">
-                                {bd.weight && bd.numberOfBags ? parseFloat(netWeight.toFixed(1)) : "—"}
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("# Bags", "बोरी")}</label>
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  className="h-8"
+                                  placeholder=""
+                                  value={bd.numberOfBags ?? ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9]/g, '');
+                                    handleBreakdownChange(lotIndex, bdIndex, "numberOfBags", val === "" ? undefined : parseInt(val));
+                                  }}
+                                  data-testid={`edit-breakdown-bags-${lotIndex}-${bdIndex}`}
+                                />
                               </div>
-                              <Input
-                                type="number"
-                                step="any"
-                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder=""
-                                value={bd.pricePerKg ?? ""}
-                                onChange={(e) => {
-                                  handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", e.target.value === "" ? undefined : parseFloat(e.target.value));
-                                }}
-                                data-testid={`edit-breakdown-price-${lotIndex}-${bdIndex}`}
-                              />
-                              <div className="font-mono text-sm">
-                                {total > 0 ? `₹${parseFloat(total.toFixed(1)).toLocaleString('en-IN')}` : "—"}
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Remaining", "शेष")}</label>
+                                <div className="font-mono text-sm font-medium">
+                                  <span className="text-primary">{remaining}</span>
+                                  <span className="text-muted-foreground">/{bd.numberOfBags}</span>
+                                </div>
                               </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => setDeleteConfirm({ lotIndex, bdIndex })}
-                                data-testid={`edit-remove-breakdown-${lotIndex}-${bdIndex}`}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Total Wt", "कुल वजन")}</label>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder=""
+                                  value={bd.weight ?? ""}
+                                  onChange={(e) => {
+                                    handleBreakdownChange(lotIndex, bdIndex, "weight", e.target.value === "" ? undefined : parseFloat(e.target.value));
+                                  }}
+                                  data-testid={`edit-breakdown-weight-${lotIndex}-${bdIndex}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Net Wt", "शुद्ध वजन")}</label>
+                                <div className="font-mono text-sm text-muted-foreground">
+                                  {bd.weight && bd.numberOfBags ? parseFloat(netWeight.toFixed(1)) : "—"}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Price/kg", "मूल्य/किलो")}</label>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  placeholder=""
+                                  value={bd.pricePerKg ?? ""}
+                                  onChange={(e) => {
+                                    handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", e.target.value === "" ? undefined : parseFloat(e.target.value));
+                                  }}
+                                  data-testid={`edit-breakdown-price-${lotIndex}-${bdIndex}`}
+                                />
+                              </div>
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Total", "कुल")}</label>
+                                <div className="font-mono text-sm">
+                                  {total > 0 ? `₹${parseFloat(total.toFixed(1)).toLocaleString('en-IN')}` : "—"}
+                                </div>
+                              </div>
+                              <div className="flex items-end md:items-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => setDeleteConfirm({ lotIndex, bdIndex })}
+                                  data-testid={`edit-remove-breakdown-${lotIndex}-${bdIndex}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
                           );
                         })}
