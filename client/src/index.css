@@ -13,6 +13,19 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* Auto-capitalize first letter of each word in text inputs */
+input[type="text"],
+input:not([type]),
+textarea {
+  text-transform: capitalize;
+}
+input[type="password"],
+input[type="email"],
+input[type="url"],
+input[type="search"] {
+  text-transform: none;
+}
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);
