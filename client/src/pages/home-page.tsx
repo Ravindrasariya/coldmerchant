@@ -130,7 +130,7 @@ export default function HomePage() {
             </div>
 
             {/* Navigation Tabs - Desktop (hidden on mobile) */}
-            <nav className="hidden md:flex flex-1 justify-center overflow-x-auto">
+            <nav className="hidden md:flex flex-1 overflow-x-auto scrollbar-hide">
               <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
                 <TabsTrigger 
                   value="stock-entry" 
