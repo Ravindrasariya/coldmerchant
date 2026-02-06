@@ -1047,7 +1047,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                                         <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                                         {weight > 0 && (
                                           <span className="text-muted-foreground">
-                                            , {weight.toFixed(0)}kg, {netWeight.toFixed(0)}kg, ₹{parseFloat(price.toFixed(1))}/kg
+                                            , {weight.toFixed(0)}kg, {netWeight.toFixed(0)}kg, ₹{parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}/kg
                                           </span>
                                         )}
                                       </span>
