@@ -323,14 +323,14 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
                 <FormLabel>{t("Price per Bag", "प्रति बोरी मूल्य")} *</FormLabel>
                 <FormControl>
                   <Input 
-                    type="text"
-                    inputMode="decimal"
+                    type="number"
+                    step="any"
                     placeholder="" 
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     {...field}
                     value={field.value ?? ""}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9.]/g, '');
-                      field.onChange(val === "" ? undefined : parseFloat(val));
+                      field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                     }}
                     data-testid={`input-seed-price-per-bag-${lotIndex}`}
                   />
@@ -348,14 +348,14 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
                 <FormLabel>{t("Cold Store Charges/Bag", "कोल्ड स्टोर शुल्क/बोरी")}</FormLabel>
                 <FormControl>
                   <Input 
-                    type="text"
-                    inputMode="decimal"
+                    type="number"
+                    step="any"
                     placeholder="" 
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     {...field}
                     value={field.value ?? ""}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9.]/g, '');
-                      field.onChange(val === "" ? undefined : parseFloat(val));
+                      field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                     }}
                     data-testid={`input-seed-coldstore-charge-${lotIndex}`}
                   />

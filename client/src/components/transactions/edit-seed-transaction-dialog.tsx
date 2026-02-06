@@ -598,23 +598,25 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
               <div className="space-y-1">
                 <Label className="text-xs">{t("Amount (₹)", "राशि (₹)")}</Label>
                 <Input
-                  type="text"
-                  inputMode="decimal"
+                  type="number"
+                  step="any"
                   placeholder="0"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   value={adjustmentAmount}
-                  onChange={(e) => setAdjustmentAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onChange={(e) => setAdjustmentAmount(e.target.value)}
                   data-testid="input-edit-seed-adjustment-amount"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("Rate %", "दर %")}</Label>
                 <Input
-                  type="text"
-                  inputMode="decimal"
+                  type="number"
+                  step="any"
                   placeholder="0%"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   value={adjustmentRate}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9.]/g, '');
+                    const val = e.target.value;
                     setAdjustmentRate(val);
                     if (val && parseFloat(val) > 0 && !adjustmentEffectiveDate) {
                       setAdjustmentEffectiveDate(new Date().toISOString().split('T')[0]);

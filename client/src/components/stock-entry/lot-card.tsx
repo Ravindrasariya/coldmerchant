@@ -450,14 +450,14 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                     <FormLabel>{t("Price/kg", "मूल्य/किलो")}</FormLabel>
                     <FormControl>
                       <Input 
-                        type="text"
-                        inputMode="decimal"
+                        type="number"
+                        step="any"
                         placeholder="" 
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         {...field}
                         value={field.value ?? ""}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          field.onChange(val === "" ? undefined : parseFloat(val));
+                          field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                         }}
                         data-testid={`input-price-per-kg-${lotIndex}`}
                       />
@@ -475,14 +475,14 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                     <FormLabel>{t("Total Weight (Kg)", "कुल वजन (किलो)")}</FormLabel>
                     <FormControl>
                       <Input 
-                        type="text"
-                        inputMode="decimal"
+                        type="number"
+                        step="any"
                         placeholder="" 
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         {...field}
                         value={field.value ?? ""}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          field.onChange(val === "" ? undefined : parseFloat(val));
+                          field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                         }}
                         data-testid={`input-total-weight-${lotIndex}`}
                       />
@@ -555,14 +555,14 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                         )}
                         <FormControl>
                           <Input 
-                            type="text"
-                            inputMode="decimal"
+                            type="number"
+                            step="any"
                             placeholder="0" 
+                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             {...field}
                             value={field.value ?? ""}
                             onChange={(e) => {
-                              const val = e.target.value.replace(/[^0-9.]/g, '');
-                              field.onChange(val === "" ? 0 : parseFloat(val));
+                              field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value));
                             }}
                             data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
                           />

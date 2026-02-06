@@ -691,8 +691,8 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
 
                                 <div className="col-span-3 md:col-span-2">
                                   <Input
-                                    type="text"
-                                    inputMode="decimal"
+                                    type="number"
+                                    step="any"
                                     value={item.totalWeight || ""}
                                     onChange={(e) => {
                                       const totalWt = Number(e.target.value) || 0;

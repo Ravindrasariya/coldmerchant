@@ -92,14 +92,14 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
             <FormLabel className="md:hidden text-xs">{t("Weight", "वजन")}</FormLabel>
             <FormControl>
               <Input 
-                type="text"
-                inputMode="decimal"
+                type="number"
+                step="any"
                 placeholder="" 
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 {...field}
                 value={field.value ?? ""}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9.]/g, '');
-                  field.onChange(val === "" ? undefined : parseFloat(val));
+                  field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                 }}
                 data-testid={`input-breakdown-weight-${lotIndex}-${breakdownIndex}`}
               />
@@ -117,14 +117,14 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
             <FormLabel className="md:hidden text-xs">{t("Price/kg", "मूल्य/किलो")}</FormLabel>
             <FormControl>
               <Input 
-                type="text"
-                inputMode="decimal"
+                type="number"
+                step="any"
                 placeholder="" 
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 {...field}
                 value={field.value ?? ""}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/[^0-9.]/g, '');
-                  field.onChange(val === "" ? undefined : parseFloat(val));
+                  field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                 }}
                 data-testid={`input-breakdown-price-${lotIndex}-${breakdownIndex}`}
               />

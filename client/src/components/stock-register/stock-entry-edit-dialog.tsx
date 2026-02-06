@@ -530,14 +530,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                               </div>
                               <Input
-                                type="text"
-                                inputMode="decimal"
-                                className="h-8"
+                                type="number"
+                                step="any"
+                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 placeholder=""
                                 value={bd.weight ?? ""}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^0-9.]/g, '');
-                                  handleBreakdownChange(lotIndex, bdIndex, "weight", val === "" ? undefined : parseFloat(val));
+                                  handleBreakdownChange(lotIndex, bdIndex, "weight", e.target.value === "" ? undefined : parseFloat(e.target.value));
                                 }}
                                 data-testid={`edit-breakdown-weight-${lotIndex}-${bdIndex}`}
                               />
@@ -545,14 +544,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 {bd.weight && bd.numberOfBags ? parseFloat(netWeight.toFixed(1)) : "—"}
                               </div>
                               <Input
-                                type="text"
-                                inputMode="decimal"
-                                className="h-8"
+                                type="number"
+                                step="any"
+                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 placeholder=""
                                 value={bd.pricePerKg ?? ""}
                                 onChange={(e) => {
-                                  const val = e.target.value.replace(/[^0-9.]/g, '');
-                                  handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", val === "" ? undefined : parseFloat(val));
+                                  handleBreakdownChange(lotIndex, bdIndex, "pricePerKg", e.target.value === "" ? undefined : parseFloat(e.target.value));
                                 }}
                                 data-testid={`edit-breakdown-price-${lotIndex}-${bdIndex}`}
                               />
@@ -606,14 +604,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       <div className="space-y-1">
                         <Label className="text-xs">{t("Amount (₹)", "राशि")}</Label>
                         <Input
-                          type="text"
-                          inputMode="decimal"
-                          className="h-8"
+                          type="number"
+                          step="any"
+                          className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           placeholder="₹0"
                           value={lot.adjustedAmount ?? ""}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9.]/g, '');
-                            handleLotFieldChange(lotIndex, "adjustedAmount", val === "" ? null : parseFloat(val));
+                            handleLotFieldChange(lotIndex, "adjustedAmount", e.target.value === "" ? null : parseFloat(e.target.value));
                           }}
                           data-testid={`edit-adjustment-amount-${lotIndex}`}
                         />
@@ -621,14 +618,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       <div className="space-y-1">
                         <Label className="text-xs">{t("Rate %", "दर %")}</Label>
                         <Input
-                          type="text"
-                          inputMode="decimal"
-                          className="h-8"
+                          type="number"
+                          step="any"
+                          className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           placeholder="0%"
                           value={lot.adjustedAmountRate ?? ""}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9.]/g, '');
-                            const newRate = val === "" ? null : parseFloat(val);
+                            const newRate = e.target.value === "" ? null : parseFloat(e.target.value);
                             handleLotFieldChange(lotIndex, "adjustedAmountRate", newRate);
                             if (newRate && newRate > 0 && !lot.adjustedAmountEffectiveDate) {
                               handleLotFieldChange(lotIndex, "adjustedAmountEffectiveDate", new Date().toISOString().split('T')[0]);
@@ -733,14 +729,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           </SelectContent>
                         </Select>
                         <Input
-                          type="text"
-                          inputMode="decimal"
-                          className="h-8 w-28"
+                          type="number"
+                          step="any"
+                          className="h-8 w-28 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           placeholder="₹0"
                           value={charge.amount || ""}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9.]/g, '');
-                            handleChargeChange(lotIndex, chargeIndex, "amount", val === "" ? 0 : parseFloat(val));
+                            handleChargeChange(lotIndex, chargeIndex, "amount", e.target.value === "" ? 0 : parseFloat(e.target.value));
                           }}
                           data-testid={`edit-charge-amount-${lotIndex}-${chargeIndex}`}
                         />
