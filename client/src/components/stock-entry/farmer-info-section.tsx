@@ -235,12 +235,15 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                 <FormLabel>{t("Contact Number", "संपर्क नंबर")} *</FormLabel>
                 <FormControl>
                   <Input 
+                    type="tel"
+                    maxLength={10}
                     placeholder={t("Enter contact number", "संपर्क नंबर दर्ज करें")} 
                     {...field} 
                     value={field.value || ""}
                     onChange={(e) => {
-                      field.onChange(e);
-                      handleInputChange(e.target.value, 'contact');
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      field.onChange(val);
+                      handleInputChange(val, 'contact');
                     }}
                     onFocus={() => {
                       setActiveField('contact');

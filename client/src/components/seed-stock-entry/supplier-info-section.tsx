@@ -217,13 +217,16 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                 <FormLabel>{t("Contact Number", "संपर्क नंबर")} *</FormLabel>
                 <FormControl>
                   <Input 
+                    type="tel"
+                    maxLength={10}
                     placeholder={t("Enter contact number", "संपर्क नंबर दर्ज करें")} 
                     {...field} 
                     value={field.value || ""}
                     className={getHighlightClass("supplierContact")}
                     onChange={(e) => {
-                      field.onChange(e);
-                      setSearchQuery(e.target.value);
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      field.onChange(val);
+                      setSearchQuery(val);
                       setActiveField('contact');
                       setShowSuggestions(true);
                     }}

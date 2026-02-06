@@ -165,12 +165,20 @@ export default function BuyersTab() {
       toast({ title: t("Name and Address are required", "नाम और पता आवश्यक हैं"), variant: "destructive" });
       return;
     }
+    if (editForm.contact && !/^\d{10}$/.test(editForm.contact)) {
+      toast({ title: t("Enter valid 10-digit contact number", "मान्य 10 अंकों का संपर्क नंबर दर्ज करें"), variant: "destructive" });
+      return;
+    }
     updateMutation.mutate({ id: editingBuyer.id, ...editForm });
   };
 
   const handleAddBuyer = () => {
     if (!addForm.name.trim() || !addForm.address.trim()) {
       toast({ title: t("Name and Address are required", "नाम और पता आवश्यक हैं"), variant: "destructive" });
+      return;
+    }
+    if (addForm.contact && !/^\d{10}$/.test(addForm.contact)) {
+      toast({ title: t("Enter valid 10-digit contact number", "मान्य 10 अंकों का संपर्क नंबर दर्ज करें"), variant: "destructive" });
       return;
     }
     createMutation.mutate(addForm);
@@ -491,8 +499,10 @@ export default function BuyersTab() {
               <div className="space-y-2">
                 <Label>{t("Contact", "संपर्क")}</Label>
                 <Input
+                  type="tel"
+                  maxLength={10}
                   value={editForm.contact}
-                  onChange={(e) => setEditForm({ ...editForm, contact: e.target.value })}
+                  onChange={(e) => setEditForm({ ...editForm, contact: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   placeholder={t("Phone", "फ़ोन")}
                   data-testid="input-edit-contact"
                 />
@@ -615,8 +625,10 @@ export default function BuyersTab() {
               <div className="space-y-2">
                 <Label>{t("Contact", "संपर्क")}</Label>
                 <Input
+                  type="tel"
+                  maxLength={10}
                   value={addForm.contact}
-                  onChange={(e) => setAddForm({ ...addForm, contact: e.target.value })}
+                  onChange={(e) => setAddForm({ ...addForm, contact: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   placeholder={t("Phone", "फ़ोन")}
                   data-testid="input-add-contact"
                 />

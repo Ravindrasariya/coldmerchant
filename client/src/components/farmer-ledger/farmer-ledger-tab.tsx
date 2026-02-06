@@ -235,6 +235,7 @@ export function FarmerLedgerTab() {
     const missingFields: string[] = [];
     if (!editForm.name.trim()) missingFields.push(t("Name", "नाम"));
     if (!editForm.contact.trim()) missingFields.push(t("Contact", "संपर्क"));
+    if (editForm.contact.trim() && !/^\d{10}$/.test(editForm.contact.trim())) missingFields.push(t("Valid 10-digit Contact", "मान्य 10 अंकों का संपर्क"));
     if (!editForm.village.trim()) missingFields.push(t("Village", "गांव"));
     if (!editForm.tehsil.trim()) missingFields.push(t("Tehsil", "तहसील"));
     if (!editForm.district.trim()) missingFields.push(t("District", "जिला"));
@@ -919,8 +920,10 @@ export function FarmerLedgerTab() {
                 <Label htmlFor="edit-contact">{t("Contact", "संपर्क")} <span className="text-destructive">*</span></Label>
                 <Input
                   id="edit-contact"
+                  type="tel"
+                  maxLength={10}
                   value={editForm.contact}
-                  onChange={(e) => setEditForm(f => ({ ...f, contact: e.target.value }))}
+                  onChange={(e) => setEditForm(f => ({ ...f, contact: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
                   placeholder={t("Phone number", "फोन नंबर")}
                   data-testid="input-edit-farmer-contact"
                 />

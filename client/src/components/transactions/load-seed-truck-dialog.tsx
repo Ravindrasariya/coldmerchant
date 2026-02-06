@@ -278,10 +278,10 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       return;
     }
 
-    if (!farmerContact.trim()) {
+    if (!farmerContact.trim() || !/^\d{10}$/.test(farmerContact.trim())) {
       toast({
         title: t("Error", "त्रुटि"),
-        description: t("Contact number is required", "संपर्क नंबर आवश्यक है"),
+        description: t("Enter valid 10-digit contact number", "मान्य 10 अंकों का संपर्क नंबर दर्ज करें"),
         variant: "destructive",
       });
       return;
@@ -425,9 +425,12 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <Label>{t("Contact Number", "संपर्क नंबर")} *</Label>
                 <Input
                   ref={contactInputRef}
+                  type="tel"
+                  maxLength={10}
                   value={farmerContact}
                   onChange={(e) => {
-                    setFarmerContact(e.target.value);
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFarmerContact(val);
                     setActiveField('contact');
                     setShowFarmerSuggestions(true);
                   }}

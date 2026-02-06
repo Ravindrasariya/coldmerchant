@@ -582,8 +582,10 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
               <div className="space-y-1">
                 <Label className="text-xs">{t("Contact", "संपर्क")}</Label>
                 <Input
+                  type="tel"
+                  maxLength={10}
                   value={formData.contactNumber}
-                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   placeholder={t("Contact number", "संपर्क नंबर")}
                   data-testid="input-party-contact"
                 />
@@ -898,9 +900,12 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
               <div className="space-y-1 relative">
                 <Label className="text-xs">{t("Contact", "संपर्क")} *</Label>
                 <Input
+                  type="tel"
+                  maxLength={10}
                   value={formData.contactNumber}
                   onChange={(e) => {
-                    setFormData({ ...formData, contactNumber: e.target.value });
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, contactNumber: val });
                     setActiveField('contact');
                     setShowSuggestions(true);
                   }}
@@ -1048,7 +1053,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
               <Button 
                 size="sm" 
                 onClick={() => createMutation.mutate(formData)}
-                disabled={!formData.name || !formData.contactNumber || !formData.village || !formData.tehsil || !formData.district || !formData.state || createMutation.isPending}
+                disabled={!formData.name || !formData.contactNumber || !/^\d{10}$/.test(formData.contactNumber) || !formData.village || !formData.tehsil || !formData.district || !formData.state || createMutation.isPending}
                 data-testid="button-save-farmer"
               >
                 {createMutation.isPending ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
