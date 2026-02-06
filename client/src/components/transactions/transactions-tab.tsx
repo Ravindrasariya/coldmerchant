@@ -207,9 +207,9 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         itemsDetail || "-",
         txn.totalBags.toString(),
         txn.totalNetWeight || "-",
-        revenue.toFixed(0),
-        amountReceived.toFixed(0),
-        dueAmount.toFixed(0),
+        parseFloat(revenue.toFixed(1)).toLocaleString('en-IN'),
+        parseFloat(amountReceived.toFixed(1)).toLocaleString('en-IN'),
+        parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN'),
         txn.profitLoss || "-",
       ];
     });
@@ -415,7 +415,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                     ? parseFloat(txn.revenue) 
                     : txn.items.reduce((s, item) => s + parseFloat(item.revenue || "0"), 0);
                   return sum + rev;
-                }, 0).toLocaleString("en-IN")}
+                }, 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -426,7 +426,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 {t("Total Cost", "कुल लागत")}
               </div>
               <p className="text-lg font-bold">
-                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -453,7 +453,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                       {t("Total P&L", "कुल लाभ/हानि")}
                     </div>
                     <p className={`text-lg font-bold ${totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {totalPL >= 0 ? "+" : ""}₹{Math.abs(totalPL).toLocaleString("en-IN")}
+                      {totalPL >= 0 ? "+" : ""}₹{Math.abs(totalPL).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </p>
                   </>
                 );
@@ -467,7 +467,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 {t("Total Paid", "कुल भुगतान")}
               </div>
               <p className="text-lg font-bold text-green-600">
-                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.amountReceived || "0")), 0).toLocaleString("en-IN")}
+                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.amountReceived || "0")), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -484,7 +484,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                     : txn.items.reduce((s, item) => s + parseFloat(item.revenue || "0"), 0);
                   const received = parseFloat(txn.amountReceived || "0");
                   return sum + (rev - received);
-                }, 0)).toLocaleString("en-IN")}
+                }, 0)).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -605,7 +605,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 {profitLoss !== 0 && (
                   <Badge variant={profitLoss >= 0 ? "default" : "destructive"} className="flex items-center gap-1">
                     {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    ₹{Math.abs(profitLoss).toFixed(0)}
+                    ₹{parseFloat(Math.abs(profitLoss).toFixed(1)).toLocaleString('en-IN')}
                   </Badge>
                 )}
               </div>
@@ -623,16 +623,16 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
               </span>
               <span className="col-span-1">
                 <span className="text-muted-foreground">{t("Cost", "लागत")}:</span>
-                <span className="font-medium ml-1">₹{totalCost.toFixed(0)}</span>
+                <span className="font-medium ml-1">₹{parseFloat(totalCost.toFixed(1)).toLocaleString('en-IN')}</span>
               </span>
               <span className="col-span-1">
                 <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
-                <span className="font-medium ml-1">₹{revenue.toFixed(0)}</span>
+                <span className="font-medium ml-1">₹{parseFloat(revenue.toFixed(1)).toLocaleString('en-IN')}</span>
               </span>
               {dueAmount > 0 ? (
                 <div className="col-span-2 sm:col-span-1">
                   <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                    {t("Due", "बकाया")}: ₹{dueAmount.toFixed(0)}
+                    {t("Due", "बकाया")}: ₹{parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN')}
                   </Badge>
                 </div>
               ) : revenue > 0 && (

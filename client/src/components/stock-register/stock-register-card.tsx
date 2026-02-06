@@ -521,18 +521,18 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           mediumBags.toString(),
           smallBags.toString(),
           metrics.remainingToSell.toString(),
-          lotFarmerTotal.toFixed(0),
-          coldCharges.toFixed(0),
-          hammaliGrading.toFixed(0),
-          advanceCharges.toFixed(0),
-          otherCharges.toFixed(0),
-          totalDeductions.toFixed(0),
-          lotInterest > 0 ? lotInterest.toFixed(0) : "0",
-          lotNetPayable.toFixed(0),
-          lotFarmerPaid.toFixed(0),
-          lotFarmerDue.toFixed(0),
-          coldTotal.toFixed(0),
-          coldDue.toFixed(0),
+          parseFloat(lotFarmerTotal.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(coldCharges.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(hammaliGrading.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(advanceCharges.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(otherCharges.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(totalDeductions.toFixed(1)).toLocaleString('en-IN'),
+          lotInterest > 0 ? parseFloat(lotInterest.toFixed(1)).toLocaleString('en-IN') : "0",
+          parseFloat(lotNetPayable.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(lotFarmerPaid.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(lotFarmerDue.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(coldTotal.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(coldDue.toFixed(1)).toLocaleString('en-IN'),
         ]);
       });
     });
@@ -785,11 +785,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -804,11 +804,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -934,22 +934,22 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                         {(entryTotalAmount > 0 || entryAdjustment !== 0) && (
                           <span className="inline-flex items-center gap-1">
                             <span className="text-muted-foreground whitespace-nowrap">{t("Farmer Total", "किसान कुल")}</span>
-                            <span className="font-medium whitespace-nowrap">₹ {adjustedEntryTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                            <span className="font-medium whitespace-nowrap">₹ {adjustedEntryTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                             <span className="text-muted-foreground">|</span>
                             <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
                             <span className={`font-medium whitespace-nowrap ${farmerRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              ₹ {farmerRemainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              ₹ {farmerRemainingDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                             </span>
                           </span>
                         )}
                         {entryColdStoreTotalCharges > 0 && (
                           <span className="inline-flex items-center gap-1">
                             <span className="text-muted-foreground whitespace-nowrap">{t("Cold Total", "कोल्ड कुल")}</span>
-                            <span className="font-medium whitespace-nowrap">₹ {entryColdStoreTotalCharges.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                            <span className="font-medium whitespace-nowrap">₹ {entryColdStoreTotalCharges.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                             <span className="text-muted-foreground">|</span>
                             <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
                             <span className={`font-medium whitespace-nowrap ${coldStoreRemainingDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                              ₹ {coldStoreRemainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              ₹ {coldStoreRemainingDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                             </span>
                           </span>
                         )}
@@ -1047,7 +1047,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                                         <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                                         {weight > 0 && (
                                           <span className="text-muted-foreground">
-                                            , {weight.toFixed(0)}kg, {netWeight.toFixed(0)}kg, ₹{price.toFixed(2)}/kg
+                                            , {weight.toFixed(0)}kg, {netWeight.toFixed(0)}kg, ₹{parseFloat(price.toFixed(1))}/kg
                                           </span>
                                         )}
                                       </span>
@@ -1067,11 +1067,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                           {lotColdTotal > 0 && (
                             <span className="inline-flex items-center gap-1 text-[13px] mt-1">
                               <span className="text-muted-foreground whitespace-nowrap">{t("Cold Total", "कोल्ड कुल")}</span>
-                              <span className="font-medium whitespace-nowrap">₹ {lotColdTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                              <span className="font-medium whitespace-nowrap">₹ {lotColdTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                               <span className="text-muted-foreground">|</span>
                               <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
                               <span className={`font-medium whitespace-nowrap ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                                ₹ {lotColdDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                ₹ {lotColdDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                               </span>
                             </span>
                           )}

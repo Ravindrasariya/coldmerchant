@@ -229,12 +229,12 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           lot.size,
           metrics.originalBags.toString(),
           metrics.remainingBags.toString(),
-          metrics.pricePerBag.toFixed(2),
-          metrics.totalAmount.toFixed(0),
-          metrics.coldStoreChargesPerBag.toFixed(2),
-          metrics.hammaliCharges.toFixed(2),
-          metrics.gradingCharges.toFixed(2),
-          metrics.transportCharges.toFixed(2),
+          parseFloat(metrics.pricePerBag.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(metrics.totalAmount.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(metrics.coldStoreChargesPerBag.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(metrics.hammaliCharges.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(metrics.gradingCharges.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(metrics.transportCharges.toFixed(1)).toLocaleString('en-IN'),
         ]);
       });
     });
@@ -500,11 +500,11 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             <div className="flex justify-between items-baseline gap-2">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold" data-testid="text-seed-supplier-total">₹{summaryTotals.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-sm font-bold" data-testid="text-seed-supplier-total">₹{summaryTotals.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बकाया")}</span>
-                <p className="text-sm font-bold text-red-600" data-testid="text-seed-supplier-due">₹{summaryTotals.totalSupplierDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-sm font-bold text-red-600" data-testid="text-seed-supplier-due">₹{summaryTotals.totalSupplierDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -519,11 +519,11 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             <div className="flex justify-between items-baseline gap-2">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold" data-testid="text-seed-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-sm font-bold" data-testid="text-seed-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बकाया")}</span>
-                <p className="text-sm font-bold text-red-600" data-testid="text-seed-cold-due">₹{summaryTotals.totalColdStoreDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                <p className="text-sm font-bold text-red-600" data-testid="text-seed-cold-due">₹{summaryTotals.totalColdStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -537,7 +537,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             </div>
             <div>
               <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-              <p className="text-sm font-bold" data-testid="text-seed-extra-cost-total">₹{summaryTotals.totalExtraCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+              <p className="text-sm font-bold" data-testid="text-seed-extra-cost-total">₹{summaryTotals.totalExtraCost.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
           </CardContent>
         </Card>
@@ -625,10 +625,10 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                           return (
                             <div className="flex items-center gap-1">
                               <span className="text-muted-foreground">{t("Supplier:", "आपूर्तिकर्ता:")}</span>{" "}
-                              <span className="font-medium">{t("Total", "कुल")} ₹{entryTotalAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                              <span className="font-medium">{t("Total", "कुल")} ₹{entryTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                               <span className="text-muted-foreground">|</span>
                               <span className={`font-medium ${supplierDue > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                                {t("Due", "बकाया")} ₹{supplierDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                {t("Due", "बकाया")} ₹{supplierDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                               </span>
                             </div>
                           );
@@ -636,7 +636,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                         {entryColdStoreTotal > 0 && (
                           <div className="flex items-center gap-1">
                             <span className="text-muted-foreground">{t("Cold Total", "कोल्ड कुल")}</span>{" "}
-                            <span className="font-medium">₹ {entryColdStoreTotal.toFixed(0)}</span>
+                            <span className="font-medium">₹ {parseFloat(entryColdStoreTotal.toFixed(1)).toLocaleString('en-IN')}</span>
                           </div>
                         )}
                       </div>
@@ -717,23 +717,23 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="text-muted-foreground">{t("Total", "कुल")}:</span>
-                              <span className="font-medium">₹{metrics.totalAmount.toLocaleString()}</span>
+                              <span className="font-medium">₹{metrics.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                             </div>
                             {metrics.coldStoreTotal > 0 && (
                               <div className="flex items-center gap-1">
                                 <span className="text-muted-foreground">{t("Cold", "कोल्ड")}:</span>
-                                <span className="font-medium">₹{metrics.coldStoreTotal.toLocaleString()}</span>
+                                <span className="font-medium">₹{metrics.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                                 <span className="text-muted-foreground">|</span>
                                 <span className="text-muted-foreground">{t("Due", "बाकी")}:</span>
                                 <span className={`font-medium ${metrics.coldStoreDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-                                  ₹{metrics.coldStoreDue.toLocaleString()}
+                                  ₹{metrics.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                                 </span>
                               </div>
                             )}
                             {metrics.totalExtraCost > 0 && (
                               <div className="flex items-center gap-1">
                                 <span className="text-muted-foreground">{t("Extra Cost", "अतिरिक्त लागत")}:</span>
-                                <span className="font-medium text-purple-600 dark:text-purple-400">₹{metrics.totalExtraCost.toLocaleString()}</span>
+                                <span className="font-medium text-purple-600 dark:text-purple-400">₹{metrics.totalExtraCost.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                               </div>
                             )}
                           </div>

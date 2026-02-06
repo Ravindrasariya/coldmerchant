@@ -967,7 +967,7 @@ export function CashManagementTab() {
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")}</Label>
                   <p className={cn("font-bold text-lg", viewDetailsEntry.direction === "inward" ? "text-green-600" : "text-amber-600")}>
-                    {viewDetailsEntry.direction === "inward" ? "+" : "-"}₹{parseFloat(viewDetailsEntry.amount).toLocaleString()}
+                    {viewDetailsEntry.direction === "inward" ? "+" : "-"}₹{parseFloat(viewDetailsEntry.amount).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                   </p>
                 </div>
                 <div>
@@ -1125,7 +1125,7 @@ export function CashManagementTab() {
               <Banknote className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Cash Received", "नकद प्राप्त")}</span>
             </div>
-            <p className="text-lg font-bold text-green-600">₹{totalCashReceived.toLocaleString()}</p>
+            <p className="text-lg font-bold text-green-600">₹{totalCashReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </CardContent>
         </Card>
 
@@ -1135,7 +1135,7 @@ export function CashManagementTab() {
               <ArrowUpRight className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Cash Expense", "नकद खर्च")}</span>
             </div>
-            <p className="text-lg font-bold text-amber-600">₹{totalCashExpense.toLocaleString()}</p>
+            <p className="text-lg font-bold text-amber-600">₹{totalCashExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </CardContent>
         </Card>
 
@@ -1146,7 +1146,7 @@ export function CashManagementTab() {
               <span className="text-xs font-medium">{t("Net Cash in Hand", "हाथ में शुद्ध नकद")}</span>
             </div>
             <p className={`text-lg font-bold ${netCashInHand >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
-              ₹{netCashInHand.toLocaleString()}
+              ₹{netCashInHand.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </p>
           </CardContent>
         </Card>
@@ -1157,19 +1157,19 @@ export function CashManagementTab() {
               <Building2 className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Account Received", "खाते में प्राप्त")}</span>
             </div>
-            <p className="text-lg font-bold text-blue-600">₹{totalAccountReceived.toLocaleString()}</p>
+            <p className="text-lg font-bold text-blue-600">₹{totalAccountReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             {accountWiseBreakdown.length > 0 && (
               <div className="mt-2 pt-2 border-t border-blue-200 space-y-1">
                 {accountWiseBreakdown.filter(a => a.inward > 0).map(account => (
                   <div key={account.id} className="flex justify-between text-xs">
                     <span className="text-muted-foreground truncate max-w-[100px]" title={account.name}>{account.name}</span>
-                    <span className="text-blue-600 font-medium">₹{account.inward.toLocaleString()}</span>
+                    <span className="text-blue-600 font-medium">₹{account.inward.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                   </div>
                 ))}
                 {unassignedAccountReceived > 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground italic">{t("Unassigned", "अनिर्दिष्ट")}</span>
-                    <span className="text-blue-600 font-medium">₹{unassignedAccountReceived.toLocaleString()}</span>
+                    <span className="text-blue-600 font-medium">₹{unassignedAccountReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                   </div>
                 )}
               </div>
@@ -1183,19 +1183,19 @@ export function CashManagementTab() {
               <CreditCard className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Account Expense", "खाता खर्च")}</span>
             </div>
-            <p className="text-lg font-bold text-orange-600">₹{totalAccountExpense.toLocaleString()}</p>
+            <p className="text-lg font-bold text-orange-600">₹{totalAccountExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             {accountWiseBreakdown.length > 0 && (
               <div className="mt-2 pt-2 border-t border-orange-200 space-y-1">
                 {accountWiseBreakdown.filter(a => a.outflow > 0).map(account => (
                   <div key={account.id} className="flex justify-between text-xs">
                     <span className="text-muted-foreground truncate max-w-[100px]" title={account.name}>{account.name}</span>
-                    <span className="text-orange-600 font-medium">₹{account.outflow.toLocaleString()}</span>
+                    <span className="text-orange-600 font-medium">₹{account.outflow.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                   </div>
                 ))}
                 {unassignedAccountExpense > 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground italic">{t("Unassigned", "अनिर्दिष्ट")}</span>
-                    <span className="text-orange-600 font-medium">₹{unassignedAccountExpense.toLocaleString()}</span>
+                    <span className="text-orange-600 font-medium">₹{unassignedAccountExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                   </div>
                 )}
               </div>
@@ -1210,7 +1210,7 @@ export function CashManagementTab() {
               <span className="text-xs font-medium">{t("Net in Accounts", "खातों में शुद्ध")}</span>
             </div>
             <p className={`text-lg font-bold ${netCashInAccount >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-              ₹{netCashInAccount.toLocaleString()}
+              ₹{netCashInAccount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </p>
             {accountWiseBreakdown.length > 0 && (
               <div className="mt-2 pt-2 border-t border-indigo-200 space-y-1">
@@ -1218,7 +1218,7 @@ export function CashManagementTab() {
                   <div key={account.id} className="flex justify-between text-xs">
                     <span className="text-muted-foreground truncate max-w-[100px]" title={account.name}>{account.name}</span>
                     <span className={`font-medium ${account.net >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                      ₹{account.net.toLocaleString()}
+                      ₹{account.net.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </span>
                   </div>
                 ))}
@@ -1226,7 +1226,7 @@ export function CashManagementTab() {
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground italic">{t("Unassigned", "अनिर्दिष्ट")}</span>
                     <span className={`font-medium ${unassignedAccountNet >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                      ₹{unassignedAccountNet.toLocaleString()}
+                      ₹{unassignedAccountNet.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </span>
                   </div>
                 )}
@@ -1350,10 +1350,10 @@ export function CashManagementTab() {
             <div className="mt-3 pt-3 border-t flex items-center gap-4 text-sm">
               <span className="text-muted-foreground">{t("Filtered Total", "फ़िल्टर्ड कुल")}:</span>
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 dark:bg-green-900/20 dark:text-green-400">
-                {t("Inflow", "आवक")}: ₹{filteredInflow.toLocaleString()}
+                {t("Inflow", "आवक")}: ₹{filteredInflow.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </Badge>
               <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400">
-                {t("Outflow", "बहिर्वाह")}: ₹{filteredOutflow.toLocaleString()}
+                {t("Outflow", "बहिर्वाह")}: ₹{filteredOutflow.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </Badge>
               <span className="text-muted-foreground">({filteredEntries.length} {t("entries", "प्रविष्टियाँ")})</span>
             </div>
@@ -1509,10 +1509,10 @@ export function CashManagementTab() {
                                         <span className="text-xs text-muted-foreground">({party.address})</span>
                                       )}
                                       <Badge variant="secondary">
-                                        {t("Due", "बकाया")}: ₹{party.overallDue.toFixed(0)}
+                                        {t("Due", "बकाया")}: ₹{parseFloat(party.overallDue.toFixed(1)).toLocaleString('en-IN')}
                                         {party.receivables > 0 && (
                                           <span className="ml-1 text-xs opacity-75">
-                                            ({t("incl.", "शामिल")} ₹{party.receivables.toFixed(0)} {t("receivable", "प्राप्य")})
+                                            ({t("incl.", "शामिल")} ₹{parseFloat(party.receivables.toFixed(1)).toLocaleString('en-IN')} {t("receivable", "प्राप्य")})
                                           </span>
                                         )}
                                       </Badge>
@@ -1599,7 +1599,7 @@ export function CashManagementTab() {
                                                 </span>
                                               </div>
                                               <Badge variant="secondary" className="ml-2">
-                                                {t("Due", "बकाया")}: ₹{amountOwedToUs.toFixed(0)}
+                                                {t("Due", "बकाया")}: ₹{parseFloat(amountOwedToUs.toFixed(1)).toLocaleString('en-IN')}
                                               </Badge>
                                             </CommandItem>
                                           );
@@ -1745,7 +1745,7 @@ export function CashManagementTab() {
                                             {farmer.contact || ""}
                                           </span>
                                           <Badge variant="secondary">
-                                            {t("Due", "बकाया")}: ₹{netDue.toFixed(0)}
+                                            {t("Due", "बकाया")}: ₹{parseFloat(netDue.toFixed(1)).toLocaleString('en-IN')}
                                           </Badge>
                                         </div>
                                       </SelectItem>
@@ -1780,7 +1780,7 @@ export function CashManagementTab() {
                                   <div className="flex items-center justify-between gap-4">
                                     <span>{store.coldStoreName}</span>
                                     <Badge variant="secondary">
-                                      {t("Due", "बकाया")}: ₹{store.totalDue.toFixed(0)}
+                                      {t("Due", "बकाया")}: ₹{parseFloat(store.totalDue.toFixed(1)).toLocaleString('en-IN')}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
                                       ({store.lotCount} {t("lots", "लॉट")})
@@ -1818,7 +1818,7 @@ export function CashManagementTab() {
                                       <span className="text-xs text-muted-foreground">({supplier.district})</span>
                                     )}
                                     <Badge variant="secondary">
-                                      {t("Due", "बकाया")}: ₹{supplier.totalDue.toFixed(0)}
+                                      {t("Due", "बकाया")}: ₹{parseFloat(supplier.totalDue.toFixed(1)).toLocaleString('en-IN')}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
                                       ({supplier.entryCount} {t("entries", "प्रविष्टियाँ")})
@@ -2261,7 +2261,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
               "font-bold",
               isReversed ? "text-muted-foreground line-through" : isInward ? 'text-green-600' : 'text-amber-600'
             )}>
-              {isInward ? '+' : '-'}₹{amount.toLocaleString()}
+              {isInward ? '+' : '-'}₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </span>
             {!isReversed && (
               <AlertDialog>
@@ -2324,7 +2324,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
           )}
           {isInward && totalApplied > 0 && !isReversed && (
             <span className="text-green-600">
-              {t("Applied", "लागू")}: ₹{totalApplied.toLocaleString()}
+              {t("Applied", "लागू")}: ₹{totalApplied.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </span>
           )}
           {entry.remarks && (

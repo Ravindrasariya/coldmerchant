@@ -301,16 +301,16 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs">{t("Total Value", "कुल मूल्य")}</span>
-                  <div className="font-semibold text-lg">₹{totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                  <div className="font-semibold text-lg">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs">{t("Amount Paid", "भुगतान राशि")}</span>
-                  <div className="font-semibold text-lg text-green-600 dark:text-green-400">₹{amountPaid.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+                  <div className="font-semibold text-lg text-green-600 dark:text-green-400">₹{amountPaid.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs">{t("Remaining Due", "बाकी राशि")}</span>
                   <div className={`font-semibold text-lg ${remainingDue > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
-                    ₹{remainingDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    ₹{remainingDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                   </div>
                 </div>
               </div>
@@ -323,7 +323,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
           <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
             <span className="text-sm font-medium">{t("Additional Charges", "अतिरिक्त शुल्क")}</span>
             <span className="text-sm font-semibold">
-              ₹{totalAdditionalCharges.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              ₹{totalAdditionalCharges.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </span>
           </div>
 

@@ -311,7 +311,7 @@ function OpeningBalanceSection({ settings, financialYear, isLoading, bankAccount
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="flex-1 min-w-0 font-medium text-sm truncate" data-testid={`text-account-name-${account.id}`}>{account.name}</span>
                       <span className="text-xs text-muted-foreground" data-testid={`text-account-type-${account.id}`}>{getAccountTypeLabel(account.accountType)}</span>
-                      <span className="text-sm font-medium" data-testid={`text-account-balance-${account.id}`}>₹{parseFloat(account.openingBalance || "0").toLocaleString()}</span>
+                      <span className="text-sm font-medium" data-testid={`text-account-balance-${account.id}`}>₹{parseFloat(account.openingBalance || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -690,7 +690,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                       {party.contactNumber && <p className="text-sm text-muted-foreground">{party.contactNumber}</p>}
                       {party.address && <p className="text-sm text-muted-foreground">{party.address}</p>}
                       {parseFloat(party.pendingDues || "0") > 0 && (
-                        <p className="text-sm text-amber-600">{t("Pending", "बकाया")}: ₹{parseFloat(party.pendingDues || "0").toLocaleString()}</p>
+                        <p className="text-sm text-amber-600">{t("Pending", "बकाया")}: ₹{parseFloat(party.pendingDues || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                       )}
                     </div>
                     <div className="flex gap-1">
@@ -1150,7 +1150,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         </p>
                       )}
                       {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
-                        <p className="text-sm text-red-600">{t("Due to Pay", "भुगतान करना है")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString()}</p>
+                        <p className="text-sm text-red-600">{t("Due to Pay", "भुगतान करना है")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                       )}
                     </div>
                     <div className="flex gap-1">

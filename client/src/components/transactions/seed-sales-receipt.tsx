@@ -73,8 +73,8 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
   const isLoading = txnLoading || merchantLoading;
 
   const formatCurrency = (value: string | null | undefined) => {
-    if (!value) return "₹0.00";
-    return `₹${parseFloat(value).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (!value) return "₹0";
+    return `₹${parseFloat(value).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
   };
 
   const handlePrint = () => {

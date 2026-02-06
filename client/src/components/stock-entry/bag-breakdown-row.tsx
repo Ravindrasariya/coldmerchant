@@ -138,7 +138,7 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
         <div className="flex-1">
           <p className="md:hidden text-xs text-muted-foreground mb-1">{t("Total", "कुल")}</p>
           <p className="font-mono text-sm font-medium" data-testid={`text-breakdown-total-${lotIndex}-${breakdownIndex}`}>
-            {totalAmount > 0 ? `₹${totalAmount.toFixed(2)}` : "—"}
+            {totalAmount > 0 ? `₹${parseFloat(totalAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}
           </p>
         </div>
       </div>

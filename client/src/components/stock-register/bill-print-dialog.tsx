@@ -180,8 +180,8 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd;">${getSizeBilingual(bd.size)}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bd.numberOfBags}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${weight > 0 ? weight.toFixed(2) : "—"}</td>
-              <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${price.toFixed(2)}` : "—"}</td>
-              <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${amount > 0 ? `₹${amount.toFixed(2)}` : "—"}</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${parseFloat(price.toFixed(1))}` : "—"}</td>
+              <td style="padding: 8px 12px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
             </tr>
           `;
         }).join("");
@@ -206,7 +206,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         breakdownHtml = `
           <div style="background: #f5f5f5; padding: 12px; border-radius: 4px; margin-top: 12px;">
             <p style="margin: 0;"><span style="color: #666;">Size / आकार:</span> ${getSizeBilingual(lot.size)}</p>
-            ${lot.pricePerKg ? `<p style="margin: 4px 0 0 0;"><span style="color: #666;">Price/kg / मूल्य प्रति किलो:</span> ₹${parseFloat(lot.pricePerKg).toFixed(2)}</p>` : ""}
+            ${lot.pricePerKg ? `<p style="margin: 4px 0 0 0;"><span style="color: #666;">Price/kg / मूल्य प्रति किलो:</span> ₹${parseFloat(parseFloat(lot.pricePerKg).toFixed(1))}</p>` : ""}
           </div>
         `;
       }
@@ -225,21 +225,21 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         return amt > 0;
       }).map(c => {
         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-        return `<div><span style="color: #666;">${c.type || "Charge"}:</span></div><div style="text-align: right; font-family: monospace;">₹${amt.toLocaleString("en-IN")}</div>`;
+        return `<div><span style="color: #666;">${c.type || "Charge"}:</span></div><div style="text-align: right; font-family: monospace;">₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>`;
       }).join("");
       
       const adjustmentLabel = lotTotals.rate > 0 && lotTotals.interestDays > 0 
-        ? `Adjustment / समायोजन (₹${lotTotals.principal.toLocaleString("en-IN")} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
+        ? `Adjustment / समायोजन (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
         : `Adjustment / समायोजन${lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}`;
       
       const deductionsHtml = hasDeductions ? `
         <div style="margin-top: 12px; padding: 12px; background: #fff7ed; border-radius: 4px; border-left: 3px solid #f97316;">
           <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 8px 0; font-weight: 600;">Deductions / कटौती</p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
-            ${lotTotals.coldStoreDue > 0 ? `<div><span style="color: #666;">Cold Store Due / कोल्ड स्टोर बकाया:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.coldStoreDue.toLocaleString("en-IN")}</div>` : ""}
-            ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN")}</div>` : ""}
+            ${lotTotals.coldStoreDue > 0 ? `<div><span style="color: #666;">Cold Store Due / कोल्ड स्टोर बकाया:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.coldStoreDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
+            ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
             ${chargesHtml}
-            ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">${adjustmentLabel}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</div>` : ""}
+            ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">${adjustmentLabel}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
           </div>
         </div>
       ` : "";
@@ -249,15 +249,15 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 11px; text-align: center;">
             <div>
               <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Total Payable / कुल देय</p>
-              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #15803d;">₹${lotTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #15803d;">₹${lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
             <div>
               <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Deductions / कटौती</p>
-              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #ea580c;">₹${lotTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #ea580c;">₹${lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
             <div>
               <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Net Payable / शुद्ध देय</p>
-              <p style="font-family: monospace; font-weight: 700; margin: 0; color: #0d9488; font-size: 13px;">₹${lotTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+              <p style="font-family: monospace; font-weight: 700; margin: 0; color: #0d9488; font-size: 13px;">₹${lotTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
           </div>
         </div>
@@ -348,15 +348,15 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                 </div>
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Payable / कुल देय</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Deductions / कटौती</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 <div style="background: #0d9488; padding: 8px; border-radius: 6px; margin: -8px;">
                   <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">Net Due to Farmer / किसान को देय</p>
-                  <p style="font-family: monospace; font-weight: 700; font-size: 20px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                  <p style="font-family: monospace; font-weight: 700; font-size: 20px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
               </div>
             </div>
@@ -474,8 +474,8 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                               <td className="py-2 px-3">{getSizeBilingual(bd.size)}</td>
                               <td className="py-2 px-3 text-right font-mono">{bd.numberOfBags}</td>
                               <td className="py-2 px-3 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
-                              <td className="py-2 px-3 text-right font-mono">{price > 0 ? `₹${price.toFixed(2)}` : "—"}</td>
-                              <td className="py-2 px-3 text-right font-mono font-medium">{amount > 0 ? `₹${amount.toFixed(2)}` : "—"}</td>
+                              <td className="py-2 px-3 text-right font-mono">{price > 0 ? `₹${parseFloat(price.toFixed(1))}` : "—"}</td>
+                              <td className="py-2 px-3 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
                             </tr>
                           );
                         })}
@@ -484,7 +484,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                   ) : lot.cutType === "gate_cut" && lot.size && (
                     <div className="text-sm bg-gray-100 rounded p-3">
                       <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
-                      {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat(lot.pricePerKg).toFixed(2)}</p>}
+                      {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat(parseFloat(lot.pricePerKg).toFixed(1))}</p>}
                     </div>
                   )}
 
@@ -500,13 +500,13 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                               {lotTotals.coldStoreDue > 0 && (
                                 <>
                                   <span className="text-gray-600">Cold Store Due / कोल्ड स्टोर बकाया:</span>
-                                  <span className="text-right font-mono">₹{lotTotals.coldStoreDue.toLocaleString("en-IN")}</span>
+                                  <span className="text-right font-mono">₹{lotTotals.coldStoreDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                                 </>
                               )}
                               {lotTotals.hammali > 0 && (
                                 <>
                                   <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
-                                  <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN")}</span>
+                                  <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                                 </>
                               )}
                               {lotTotals.charges.filter(c => {
@@ -517,7 +517,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                                 return (
                                 <React.Fragment key={i}>
                                   <span className="text-gray-600">{c.type || "Charge"}:</span>
-                                  <span className="text-right font-mono">₹{amt.toLocaleString("en-IN")}</span>
+                                  <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                                 </React.Fragment>
                                 );
                               })}
@@ -526,11 +526,11 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                                   <span className="text-gray-600">
                                     Adjustment / समायोजन
                                     {lotTotals.rate > 0 && lotTotals.interestDays > 0 
-                                      ? ` (₹${lotTotals.principal.toLocaleString("en-IN")} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
+                                      ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
                                       : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
                                   </span>
                                   <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                    {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                    {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                                   </span>
                                 </>
                               )}
@@ -542,15 +542,15 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                           <div className="grid grid-cols-3 gap-3 text-center text-xs">
                             <div>
                               <p className="text-gray-600 mb-1">Total Payable / कुल देय</p>
-                              <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                              <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                             </div>
                             <div>
                               <p className="text-gray-600 mb-1">Deductions / कटौती</p>
-                              <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                              <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                             </div>
                             <div>
                               <p className="text-gray-600 mb-1">Net Payable / शुद्ध देय</p>
-                              <p className="font-mono font-bold text-teal-700 text-sm">₹{lotTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                              <p className="font-mono font-bold text-teal-700 text-sm">₹{lotTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                             </div>
                           </div>
                         </div>
@@ -576,15 +576,15 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
-                  <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                  <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
-                  <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                  <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
                   <p className="text-xs opacity-90 mb-1">Net Due to Farmer / किसान को देय</p>
-                  <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+                  <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
               </div>
             </div>

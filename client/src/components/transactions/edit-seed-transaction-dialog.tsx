@@ -524,13 +524,13 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                       {selection.seedLotId > 0 && selection.bagsMoved > 0 && (
                         <div className="flex gap-4 mt-3 text-sm">
                           <span className="text-muted-foreground">
-                            {t("Cost", "लागत")}: <span className="font-medium">₹{lineCost.toLocaleString("en-IN")}</span>
+                            {t("Cost", "लागत")}: <span className="font-medium">₹{lineCost.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                           </span>
                           <span className="text-muted-foreground">
-                            {t("Revenue", "राजस्व")}: <span className="font-medium text-green-600">₹{lineRevenue.toLocaleString("en-IN")}</span>
+                            {t("Revenue", "राजस्व")}: <span className="font-medium text-green-600">₹{lineRevenue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                           </span>
                           <span className={linePL >= 0 ? "text-green-600" : "text-red-600"}>
-                            {t("P&L", "लाभ/हानि")}: ₹{linePL.toLocaleString("en-IN")}
+                            {t("P&L", "लाभ/हानि")}: ₹{linePL.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                           </span>
                         </div>
                       )}
@@ -647,9 +647,9 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
             {calculatedAdjustment.finalAmount > 0 && calculatedAdjustment.interest > 0 && (
               <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800" data-testid="text-edit-seed-adjustment-interest">
                 <div className="text-xs text-amber-800 dark:text-amber-200">
-                  {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN")} | 
-                  {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN")} | 
-                  <span className="font-semibold" data-testid="text-edit-seed-adjustment-final"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN")}</span>
+                  {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} | 
+                  {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} | 
+                  <span className="font-semibold" data-testid="text-edit-seed-adjustment-final"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                 </div>
               </div>
             )}
@@ -668,23 +668,23 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{t("Total Cost", "कुल लागत")}</div>
-                  <div className="text-lg font-semibold">₹{totals.totalCost.toLocaleString("en-IN")}</div>
+                  <div className="text-lg font-semibold">₹{totals.totalCost.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}</div>
-                  <div className="text-lg font-semibold text-green-600">₹{totals.totalRevenue.toLocaleString("en-IN")}</div>
+                  <div className="text-lg font-semibold text-green-600">₹{totals.totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{t("P&L", "लाभ/हानि")}</div>
                   <div className={`text-lg font-semibold ${totals.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    ₹{totals.totalProfitLoss.toLocaleString("en-IN")}
+                    ₹{totals.totalProfitLoss.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">{t("Total Due", "कुल देय")}</div>
                   <div className="text-lg font-semibold text-orange-600 flex items-center justify-center gap-1">
                     <IndianRupee className="h-4 w-4" />
-                    {totals.totalDue.toLocaleString("en-IN")}
+                    {totals.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                   </div>
                 </div>
               </div>

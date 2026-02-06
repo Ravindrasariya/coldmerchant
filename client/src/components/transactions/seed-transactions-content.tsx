@@ -520,7 +520,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
               <IndianRupee className="h-3.5 w-3.5" />
               {t("Total Revenue", "कुल राजस्व")}
             </div>
-            <div className="text-lg font-semibold text-green-600">₹{summary.totalRevenue.toLocaleString("en-IN")}</div>
+            <div className="text-lg font-semibold text-green-600">₹{summary.totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
           </CardContent>
         </Card>
         <Card>
@@ -529,7 +529,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
               <Receipt className="h-3.5 w-3.5" />
               {t("Total Cost", "कुल लागत")}
             </div>
-            <div className="text-lg font-semibold">₹{summary.totalCost.toLocaleString("en-IN")}</div>
+            <div className="text-lg font-semibold">₹{summary.totalCost.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
           </CardContent>
         </Card>
         <Card>
@@ -539,7 +539,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
               {t("Total P&L", "कुल लाभ/हानि")}
             </div>
             <div className={`text-lg font-semibold ${summary.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-              ₹{Math.abs(summary.totalProfitLoss).toLocaleString("en-IN")}
+              ₹{Math.abs(summary.totalProfitLoss).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </div>
           </CardContent>
         </Card>
@@ -549,7 +549,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
               <Clock className="h-3.5 w-3.5" />
               {t("Total Due", "कुल बकाया")}
             </div>
-            <div className="text-lg font-semibold text-orange-600">₹{summary.totalDue.toLocaleString("en-IN")}</div>
+            <div className="text-lg font-semibold text-orange-600">₹{summary.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
           </CardContent>
         </Card>
       </div>
@@ -623,7 +623,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                           {profitLoss !== 0 && (
                             <Badge variant={profitLoss >= 0 ? "default" : "destructive"} className="flex items-center gap-1">
                               {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                              ₹{Math.abs(profitLoss).toLocaleString("en-IN")}
+                              ₹{Math.abs(profitLoss).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                             </Badge>
                           )}
                         </div>
@@ -638,22 +638,22 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                         </span>
                         <span className="col-span-1">
                           <span className="text-muted-foreground">{t("Cost", "लागत")}:</span>
-                          <span className="font-medium ml-1">₹{cost.toLocaleString("en-IN")}</span>
+                          <span className="font-medium ml-1">₹{cost.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                         </span>
                         <span className="col-span-1">
                           <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
-                          <span className="font-medium ml-1">₹{revenue.toLocaleString("en-IN")}</span>
+                          <span className="font-medium ml-1">₹{revenue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                         </span>
                         {extraCharges > 0 && (
                           <span className="col-span-1">
                             <span className="text-muted-foreground">{t("Charges", "शुल्क")}:</span>
-                            <span className="font-medium ml-1">₹{extraCharges.toLocaleString("en-IN")}</span>
+                            <span className="font-medium ml-1">₹{extraCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                           </span>
                         )}
                         {dueAmount > 0 ? (
                           <div className="col-span-2 sm:col-span-1">
                             <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                              {t("Due", "बकाया")}: ₹{dueAmount.toLocaleString("en-IN")}
+                              {t("Due", "बकाया")}: ₹{dueAmount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                             </Badge>
                           </div>
                         ) : revenue > 0 && (

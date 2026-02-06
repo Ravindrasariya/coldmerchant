@@ -143,11 +143,11 @@ function ProfitLossDisplay({
       <div className="flex justify-between items-center">
         <span className="font-medium">{t("Profit/Loss", "लाभ/हानि")}</span>
         <span className={`text-xl font-bold ${profitLoss >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-          {profitLoss >= 0 ? "+" : ""}₹{profitLoss.toFixed(2)}
+          {profitLoss >= 0 ? "+" : ""}₹{parseFloat(profitLoss.toFixed(1)).toLocaleString('en-IN')}
         </span>
       </div>
       <p className="text-xs text-muted-foreground mt-1">
-        {t("Revenue", "राजस्व")} (₹{safeRevenue.toFixed(0)}) - {t("Cost", "लागत")} (₹{safeCost.toFixed(0)}) - {t("Charges", "शुल्क")} (₹{(safeTrans + safeOther).toFixed(0)})
+        {t("Revenue", "राजस्व")} (₹{parseFloat(safeRevenue.toFixed(1)).toLocaleString('en-IN')}) - {t("Cost", "लागत")} (₹{parseFloat(safeCost.toFixed(1)).toLocaleString('en-IN')}) - {t("Charges", "शुल्क")} (₹{parseFloat((safeTrans + safeOther).toFixed(1)).toLocaleString('en-IN')})
       </p>
     </div>
   );
@@ -593,7 +593,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       data-testid={`input-item-revenue-${index}`}
                     />
                     <span className={`text-right text-xs font-medium ${itemPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                      {itemPL >= 0 ? "+" : ""}₹{itemPL.toFixed(0)}
+                      {itemPL >= 0 ? "+" : ""}₹{parseFloat(itemPL.toFixed(1)).toLocaleString('en-IN')}
                     </span>
                     <Button 
                       type="button" 
@@ -620,7 +620,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </span>
                 <span></span>
                 <span className="text-right h-8 flex items-center justify-end">
-                  ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(0)}
+                  ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
                 </span>
                 <span className={`text-right h-8 flex items-center justify-end ${
                   editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 
@@ -628,7 +628,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     : "text-red-600 dark:text-red-400"
                 }`}>
                   {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "+" : ""}
-                  ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0).toFixed(0)}
+                  ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0).toFixed(1)).toLocaleString('en-IN')}
                 </span>
                 <span></span>
               </div>
@@ -756,7 +756,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   <div>
                     <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
                     <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
-                      ₹{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(0)}
+                      ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
                       <span className="text-xs text-muted-foreground ml-2">({t("sum of lot revenues", "लॉट राजस्व का योग")})</span>
                     </div>
                   </div>

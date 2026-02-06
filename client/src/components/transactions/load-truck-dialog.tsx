@@ -716,7 +716,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
 
                                 <div className="col-span-3 md:col-span-2">
                                   <div className="h-9 px-2 flex items-center justify-center bg-muted/50 rounded-md text-sm font-medium">
-                                    ₹{itemCost.toFixed(0)}
+                                    ₹{parseFloat(itemCost.toFixed(1)).toLocaleString('en-IN')}
                                   </div>
                                 </div>
 
@@ -823,7 +823,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                               <p className="text-muted-foreground">{t("Net Weight (Kg)", "शुद्ध वजन (किग्रा)")}</p>
                             </div>
                             <div>
-                              <p className="text-lg font-bold">₹{(summary.totalCostOfGoods + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0)).toFixed(0)}</p>
+                              <p className="text-lg font-bold">₹{parseFloat((summary.totalCostOfGoods + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0)).toFixed(1)).toLocaleString('en-IN')}</p>
                               <p className="text-muted-foreground flex items-center justify-center gap-1">
                                 <IndianRupee className="h-3 w-3" />
                                 {t("Total Cost", "कुल लागत")}
@@ -835,7 +835,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                   summary.profitLoss >= 0 ? "text-green-600" : "text-red-600"
                                 }`}
                               >
-                                {summary.profitLoss >= 0 ? "+" : ""}₹{summary.profitLoss.toFixed(0)}
+                                {summary.profitLoss >= 0 ? "+" : ""}₹{parseFloat(summary.profitLoss.toFixed(1)).toLocaleString('en-IN')}
                               </p>
                               <p className="text-muted-foreground">{t("P/L", "लाभ/हानि")}</p>
                             </div>
@@ -880,7 +880,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                       <p className="text-xs text-muted-foreground">{t("Total Weight (Kg)", "कुल वजन (किग्रा)")}</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">₹{grandTotals.totalCostOfGoods.toFixed(0)}</p>
+                      <p className="text-2xl font-bold">₹{parseFloat(grandTotals.totalCostOfGoods.toFixed(1)).toLocaleString('en-IN')}</p>
                       <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                         <IndianRupee className="h-3 w-3" />
                         {t("Total Cost", "कुल लागत")}
@@ -892,7 +892,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                           grandTotals.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {grandTotals.totalProfitLoss >= 0 ? "+" : ""}₹{grandTotals.totalProfitLoss.toFixed(0)}
+                        {grandTotals.totalProfitLoss >= 0 ? "+" : ""}₹{parseFloat(grandTotals.totalProfitLoss.toFixed(1)).toLocaleString('en-IN')}
                       </p>
                       <p className="text-xs text-muted-foreground">{t("Total Profit/Loss", "कुल लाभ/हानि")}</p>
                     </div>

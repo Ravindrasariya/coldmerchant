@@ -542,7 +542,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 data-testid={`edit-breakdown-weight-${lotIndex}-${bdIndex}`}
                               />
                               <div className="font-mono text-sm text-muted-foreground">
-                                {bd.weight && bd.numberOfBags ? netWeight.toFixed(2) : "—"}
+                                {bd.weight && bd.numberOfBags ? parseFloat(netWeight.toFixed(1)) : "—"}
                               </div>
                               <Input
                                 type="text"
@@ -557,7 +557,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 data-testid={`edit-breakdown-price-${lotIndex}-${bdIndex}`}
                               />
                               <div className="font-mono text-sm">
-                                {total > 0 ? `₹${total.toFixed(2)}` : "—"}
+                                {total > 0 ? `₹${parseFloat(total.toFixed(1)).toLocaleString('en-IN')}` : "—"}
                               </div>
                               <Button
                                 type="button"
@@ -676,7 +676,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                               <div>
                                 <span className="text-muted-foreground">{t("Principal", "मूलधन")}:</span>
-                                <span className="font-mono font-medium ml-1">₹{principal.toLocaleString("en-IN")}</span>
+                                <span className="font-mono font-medium ml-1">₹{principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">{t("Days", "दिन")}:</span>
@@ -684,11 +684,11 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               </div>
                               <div>
                                 <span className="text-muted-foreground">{t("Interest", "ब्याज")}:</span>
-                                <span className="font-mono font-medium ml-1 text-amber-700 dark:text-amber-400">₹{interest.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                <span className="font-mono font-medium ml-1 text-amber-700 dark:text-amber-400">₹{interest.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                               </div>
                               <div>
                                 <span className="text-muted-foreground">{t("Final Amount", "अंतिम राशि")}:</span>
-                                <span className="font-mono font-bold ml-1 text-primary">₹{finalAmount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                                <span className="font-mono font-bold ml-1 text-primary">₹{finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                               </div>
                             </div>
                           </div>
@@ -822,13 +822,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         <div className="text-center">
                           <p className="text-xs text-muted-foreground">{t("Total Payable", "कुल देय")}</p>
                           <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">
-                            ₹{totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                            ₹{totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                           </p>
                         </div>
                         <div className="text-center">
                           <p className="text-xs text-muted-foreground">{t("Deductions", "कटौती")}</p>
                           <p className="font-mono font-semibold text-sm text-orange-600 dark:text-orange-400">
-                            ₹{totalDeductions.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                            ₹{totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                           </p>
                         </div>
                         <div className="text-center">
@@ -840,13 +840,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 ? "text-green-600 dark:text-green-400" 
                                 : "text-red-600 dark:text-red-400"
                           }`}>
-                            {adjustedValue > 0 ? "+" : adjustedValue < 0 ? "-" : ""}₹{Math.abs(adjustedValue).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                            {adjustedValue > 0 ? "+" : adjustedValue < 0 ? "-" : ""}₹{Math.abs(adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                           </p>
                         </div>
                         <div className="text-center">
                           <p className="text-xs text-muted-foreground">{t("Net Payable", "शुद्ध देय")}</p>
                           <p className="font-mono font-bold text-sm text-primary">
-                            ₹{netPayable.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                            ₹{netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                           </p>
                         </div>
                         <div className="text-center flex items-center justify-center">

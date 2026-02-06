@@ -615,14 +615,14 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                     <div className="w-28 space-y-2">
                       <Label className="text-muted-foreground">{t("Cost/Bag", "लागत/बैग")}</Label>
                       <div className="h-9 flex items-center px-3 rounded-md bg-muted text-sm">
-                        ₹{costPerBag.toFixed(0)}
+                        ₹{parseFloat(costPerBag.toFixed(1)).toLocaleString('en-IN')}
                       </div>
                     </div>
 
                     <div className="w-28 space-y-2">
                       <Label className="text-muted-foreground">{t("P&L", "लाभ/हानि")}</Label>
                       <div className={`h-9 flex items-center px-3 rounded-md text-sm font-medium ${profitLoss >= 0 ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"}`}>
-                        ₹{profitLoss.toFixed(0)}
+                        ₹{parseFloat(profitLoss.toFixed(1)).toLocaleString('en-IN')}
                       </div>
                     </div>
 
@@ -749,9 +749,9 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
             {calculatedAdjustment.finalAmount > 0 && calculatedAdjustment.interest > 0 && (
               <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800" data-testid="text-seed-adjustment-interest">
                 <div className="text-xs text-amber-800 dark:text-amber-200">
-                  {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN")} | 
-                  {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN")} | 
-                  <span className="font-semibold" data-testid="text-seed-adjustment-final"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN")}</span>
+                  {t("Principal", "मूलधन")}: ₹{parseFloat(adjustmentAmount).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} | 
+                  {t("Interest", "ब्याज")} ({calculatedAdjustment.days} {t("days", "दिन")}): ₹{calculatedAdjustment.interest.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} | 
+                  <span className="font-semibold" data-testid="text-seed-adjustment-final"> {t("Final", "अंतिम")}: ₹{calculatedAdjustment.finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                 </div>
               </div>
             )}
@@ -767,21 +767,21 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("Total Cost", "कुल लागत")}</span>
-                  <div className="font-semibold text-lg">₹{totals.totalCost.toLocaleString("en-IN")}</div>
+                  <div className="font-semibold text-lg">₹{totals.totalCost.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}</span>
-                  <div className="font-semibold text-lg text-green-600">₹{totals.totalRevenue.toLocaleString("en-IN")}</div>
+                  <div className="font-semibold text-lg text-green-600">₹{totals.totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("P&L", "लाभ/हानि")}</span>
                   <div className={`font-semibold text-lg ${totals.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                    ₹{totals.totalProfitLoss.toLocaleString("en-IN")}
+                    ₹{totals.totalProfitLoss.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                   </div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("Due to Farmer", "किसान को देय")}</span>
-                  <div className="font-semibold text-lg text-orange-600">₹{totals.totalDue.toLocaleString("en-IN")}</div>
+                  <div className="font-semibold text-lg text-orange-600">₹{totals.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
               </div>
             </CardContent>

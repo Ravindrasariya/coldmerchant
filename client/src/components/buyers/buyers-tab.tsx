@@ -396,10 +396,10 @@ export default function BuyersTab() {
                       />
                     </div>
                     <div className="text-xs font-mono">
-                      ₹{buyer.overallDue.toLocaleString("en-IN")}
+                      ₹{buyer.overallDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
                     <div className="text-xs font-mono text-orange-600 dark:text-orange-400">
-                      ₹{buyer.receivables.toLocaleString("en-IN")}
+                      ₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
                   </div>
                 ))}
@@ -439,8 +439,8 @@ export default function BuyersTab() {
                       />
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN")}</div>
-                      <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN")}</div>
+                      <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                     </div>
                   </div>
                 </div>

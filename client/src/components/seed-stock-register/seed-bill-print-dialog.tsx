@@ -62,8 +62,8 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
             <span style="font-family: monospace; font-size: 12px;"><strong>${lot.remainingBags}</strong>/${lot.originalBags} bags</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 12px;">
-            <span>₹${pricePerBag.toFixed(2)}/bag</span>
-            <span style="font-weight: 600;">₹${lotTotal.toLocaleString('en-IN')}</span>
+            <span>₹${parseFloat(pricePerBag.toFixed(1))}/bag</span>
+            <span style="font-weight: 600;">₹${lotTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
           </div>
           ${lot.remarks ? `<p style="font-size: 10px; color: #666; margin-top: 6px;">Remarks: ${lot.remarks}</p>` : ""}
         </div>
@@ -207,7 +207,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
                   </div>
                   <div className="flex justify-between items-center text-sm mt-1">
                     <span className="text-muted-foreground">₹{pricePerBag}/bag</span>
-                    <span className="font-medium">₹{lotTotal.toLocaleString()}</span>
+                    <span className="font-medium">₹{lotTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                   </div>
                 </div>
               );
@@ -224,7 +224,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
             <Separator />
             <div className="flex justify-between font-semibold">
               <span>Grand Total / कुल योग</span>
-              <span className="font-mono">₹{grandTotal.toLocaleString()}</span>
+              <span className="font-mono">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
           </div>
 
