@@ -234,7 +234,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const handleChargeAdd = (lotIndex: number) => {
     const newLots = [...lots];
     const currentCharges = newLots[lotIndex].charges || [];
-    newLots[lotIndex].charges = [...currentCharges, { type: "", amount: 0 }];
+    newLots[lotIndex].charges = [...currentCharges, { type: "", amount: "" as any }];
     setLots(newLots);
   };
 
@@ -758,7 +758,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           placeholder="₹0"
                           value={charge.amount || ""}
                           onChange={(e) => {
-                            handleChargeChange(lotIndex, chargeIndex, "amount", e.target.value === "" ? 0 : parseFloat(e.target.value));
+                            handleChargeChange(lotIndex, chargeIndex, "amount", e.target.value === "" ? "" : parseFloat(e.target.value));
                           }}
                           data-testid={`edit-charge-amount-${lotIndex}-${chargeIndex}`}
                         />

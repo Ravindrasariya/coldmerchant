@@ -43,7 +43,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   });
 
   const handleAddCharge = () => {
-    appendCharge({ type: "", amount: 0 });
+    appendCharge({ type: "", amount: undefined as any });
   };
 
   const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
@@ -560,9 +560,9 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                             placeholder="0" 
                             className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             {...field}
-                            value={field.value ?? ""}
+                            value={field.value || ""}
                             onChange={(e) => {
-                              field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value));
+                              field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
                             }}
                             data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
                           />
