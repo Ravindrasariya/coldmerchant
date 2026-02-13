@@ -2273,27 +2273,27 @@ export async function registerRoutes(
                 }
                 entryDeductions += hammaliGradingCharges + dynamicCharges;
                 
-                // Apply adjustment with compound interest (matches edit dialog formula)
+                // Apply interest-only adjustment (principal is already included in total amount)
                 if (lot.adjustedAmount && lot.adjustedAmountType) {
-                  let adjustedAmount = parseFloat(lot.adjustedAmount);
-                  
-                  // Calculate compound interest if rate and effective date are provided
+                  const principal = parseFloat(lot.adjustedAmount);
                   const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
                   const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
                   
-                  if (adjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
+                  let interestAmount = 0;
+                  if (principal > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
                     const effectiveDate = new Date(adjustedAmountEffectiveDate);
                     const today = new Date();
                     const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
                     const years = days / 365;
-                    // Apply only interest portion (not principal+interest) since principal is already in the overall calculation
-                    adjustedAmount = Math.round((adjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
+                    interestAmount = Math.round((principal * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
                   }
                   
-                  if (lot.adjustedAmountType === "debit") {
-                    entryAdjustment -= adjustedAmount;
-                  } else if (lot.adjustedAmountType === "credit") {
-                    entryAdjustment += adjustedAmount;
+                  if (interestAmount > 0) {
+                    if (lot.adjustedAmountType === "debit") {
+                      entryAdjustment -= interestAmount;
+                    } else if (lot.adjustedAmountType === "credit") {
+                      entryAdjustment += interestAmount;
+                    }
                   }
                 }
                 
