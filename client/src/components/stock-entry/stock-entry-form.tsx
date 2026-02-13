@@ -145,6 +145,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }:
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cross-settlement-check"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       resetFormAndClearStorage();
       onSuccess?.();
     },

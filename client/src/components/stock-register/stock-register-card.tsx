@@ -91,25 +91,20 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   let totalWeight = 0;
   let totalAmount: number | null = null;
   
-  // For gate_cut: use lot-level totalWeight, pricePerKg, and originalBags
-  if (lot.cutType === "gate_cut") {
-    const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
-    const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-    const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
-    totalWeight = lotTotalWeight;
-    if (netWeight > 0 && price > 0) {
-      totalAmount = netWeight * price;
-    }
-  } else {
-    // For bilty_cut: calculate from bagBreakdowns
-    let totalBags = 0;
+  // Calculate from bagBreakdowns for all cut types (matches edit dialog formula)
+  const sellableBreakdownsForCalc = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
+  const hasBreakdownData = sellableBreakdownsForCalc.some(bd => {
+    const w = bd.weight ? parseFloat(bd.weight) : 0;
+    const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+    return w > 0 && p > 0;
+  });
+
+  if (hasBreakdownData) {
     lot.bagBreakdowns.forEach(bd => {
       if (bd.size !== "Wastage") {
         const weight = bd.weight ? parseFloat(bd.weight) : 0;
         totalWeight += weight;
-        totalBags += bd.numberOfBags;
-        
-        // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
+
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
         const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
         if (netWeight > 0 && price > 0) {
@@ -117,6 +112,15 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
         }
       }
     });
+  } else {
+    // Fallback to lot-level data when no breakdown weight/price data exists
+    const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+    const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+    const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+    totalWeight = lotTotalWeight;
+    if (netWeight > 0 && price > 0) {
+      totalAmount = netWeight * price;
+    }
   }
   
   const sellableBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");

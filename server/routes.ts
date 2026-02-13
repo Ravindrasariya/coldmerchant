@@ -2241,10 +2241,20 @@ export async function registerRoutes(
                   }
                 }
                 
-                // Fallback when no breakdowns exist
-                if (lotBreakdowns.length === 0 && lot.pricePerKg) {
-                  // Estimate from lot's pricePerKg and bags (approx 50kg per bag)
-                  entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
+                // Fallback to lot-level data when no breakdown weight/price data exists
+                const hasBreakdownData = lotBreakdowns.some(bd => {
+                  if (bd.size === "Wastage") return false;
+                  const w = parseFloat(bd.weight || "0");
+                  const p = parseFloat(bd.pricePerKg || "0");
+                  return w > 0 && p > 0;
+                });
+                if (!hasBreakdownData && lot.pricePerKg) {
+                  const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+                  const price = parseFloat(lot.pricePerKg);
+                  const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+                  if (netWeight > 0 && price > 0) {
+                    entryTotalCost += netWeight * price;
+                  }
                 }
                 
                 // Calculate deductions (matches edit dialog formula): hammali/grading + all dynamic charges
