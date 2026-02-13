@@ -402,7 +402,7 @@ export function CashManagementTab() {
       partyName: "",
       seedFarmerName: "",
       bankAccountId: undefined,
-      amount: 0,
+      amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
     },
@@ -424,7 +424,7 @@ export function CashManagementTab() {
       farmerName: "",
       coldStoreName: "",
       supplierName: "",
-      amount: 0,
+      amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
     },
@@ -438,7 +438,7 @@ export function CashManagementTab() {
     defaultValues: {
       fromAccountType: "cash_in_hand",
       toAccountType: "",
-      amount: 0,
+      amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
     },
@@ -491,7 +491,7 @@ export function CashManagementTab() {
           revenueType: "raw_potato",
           partyName: "",
           seedFarmerName: "",
-          amount: 0,
+          amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
         });
@@ -502,7 +502,7 @@ export function CashManagementTab() {
           farmerName: "",
           coldStoreName: "",
           supplierName: "",
-          amount: 0,
+          amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
         });
@@ -510,7 +510,7 @@ export function CashManagementTab() {
         transferForm.reset({
           fromAccountType: "cash_in_hand",
           toAccountType: "",
-          amount: 0,
+          amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
         });
@@ -584,7 +584,7 @@ export function CashManagementTab() {
   const onInwardSubmit = (values: InwardFormValues) => {
     if (values.revenueType === "raw_potato") {
       // Raw potato inward always requires amount > 0
-      if (values.amount <= 0) {
+      if (!values.amount || values.amount <= 0) {
         inwardForm.setError("amount", { 
           type: "manual", 
           message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
@@ -607,8 +607,7 @@ export function CashManagementTab() {
       // Seed sale - use farmer ledger (farmers with negative Net Due - they owe us)
       const selectedLedgerFarmer = ledgerFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
       
-      // Validate: amount must be > 0
-      if (values.amount === 0) {
+      if (!values.amount || values.amount <= 0) {
         inwardForm.setError("amount", { 
           type: "manual", 
           message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
@@ -635,8 +634,7 @@ export function CashManagementTab() {
       ? mergedFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
-    // Validate: amount must be > 0
-    if (values.amount === 0) {
+    if (!values.amount || values.amount <= 0) {
       outflowForm.setError("amount", { 
         type: "manual", 
         message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
