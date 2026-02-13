@@ -33,6 +33,7 @@ interface SeedTransactionItem {
   revenue: string;
   cost: string;
   profitLoss: string;
+  supplierName?: string;
 }
 
 interface SeedTransaction {
@@ -230,7 +231,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
       t("Village", "गाँव"),
       t("District", "जिला"),
       t("Vehicle #", "वाहन #"),
-      t("Items (S# - Type - Size - Bags)", "आइटम (क्रमांक - प्रकार - साइज - बैग)"),
+      t("Items (S# - Type - Size - Bags - Supplier)", "आइटम (क्रमांक - प्रकार - साइज - बैग - आपूर्तिकर्ता)"),
       t("Total Bags", "कुल बैग"),
       t("Total Cost ₹", "कुल लागत ₹"),
       t("Total Revenue ₹", "कुल राजस्व ₹"),
@@ -242,7 +243,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
 
     const rows = filteredForDownload.map(txn => {
       const itemsDetail = txn.items.map(item => 
-        `S#${item.serialNumber} (${item.potatoType} - ${item.size} - ${item.bagsMoved})`
+        `S#${item.serialNumber} (${item.potatoType} - ${item.size} - ${item.bagsMoved}${item.supplierName ? ` - ${item.supplierName}` : ''})`
       ).join(", ");
       
       return [
@@ -678,7 +679,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                               variant="outline" 
                               className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
                             >
-                              S#{item.serialNumber} ({item.bagsMoved} - {item.size || item.potatoType})
+                              S#{item.serialNumber} ({item.bagsMoved} - {item.size} - {item.potatoType}{item.supplierName ? ` - ${item.supplierName}` : ''})
                             </Badge>
                           ))}
                           {txn.items.length > 3 && (

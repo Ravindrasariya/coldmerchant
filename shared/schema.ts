@@ -1094,7 +1094,8 @@ export const seedTransactionFormSchema = z.object({
 export type SeedTransactionItemForm = z.infer<typeof seedTransactionItemFormSchema>;
 export type SeedTransactionForm = z.infer<typeof seedTransactionFormSchema>;
 
-// Extended type for seed transaction with items
+// Extended type for seed transaction with items (enriched with supplier info from join)
+export type SeedTransactionItemEnriched = SeedTransactionItem & { supplierName: string };
 export type SeedTransactionWithItems = SeedTransaction & {
-  items: SeedTransactionItem[];
+  items: SeedTransactionItemEnriched[];
 };

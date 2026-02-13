@@ -34,7 +34,7 @@ import {
   type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, asc, sql, gt, ne, isNull } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, gt, ne, isNull, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -2537,23 +2537,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(seedTransactions.merchantId, merchantId))
       .orderBy(desc(seedTransactions.transactionNumber));
 
-    const result = await Promise.all(txns.map(async (txn) => {
-      const items = await db.select().from(seedTransactionItems)
-        .where(eq(seedTransactionItems.seedTransactionId, txn.id));
-      
-      // If farmerId exists, get current farmer details from linked farmer record
-      let linkedFarmer = null;
-      if (txn.farmerId) {
-        const [farmer] = await db.select().from(farmers)
-          .where(and(eq(farmers.id, txn.farmerId), eq(farmers.merchantId, merchantId)));
-        linkedFarmer = farmer || null;
-      }
-      
-      // Return with current farmer details if linked, otherwise use stored values
+    const allItems = await db.select({
+      item: seedTransactionItems,
+      supplierName: seedStockEntries.supplierName,
+    })
+    .from(seedTransactionItems)
+    .innerJoin(seedLots, eq(seedTransactionItems.seedLotId, seedLots.id))
+    .innerJoin(seedStockEntries, eq(seedLots.seedEntryId, seedStockEntries.id))
+    .where(eq(seedTransactionItems.merchantId, merchantId));
+
+    const itemsByTxnId = new Map<number, (typeof allItems[0]["item"] & { supplierName: string })[]>();
+    for (const row of allItems) {
+      const txnId = row.item.seedTransactionId;
+      if (!itemsByTxnId.has(txnId)) itemsByTxnId.set(txnId, []);
+      itemsByTxnId.get(txnId)!.push({ ...row.item, supplierName: row.supplierName });
+    }
+
+    const farmerIds = txns.map(t => t.farmerId).filter((id): id is number => id != null);
+    const linkedFarmers = farmerIds.length > 0
+      ? await db.select().from(farmers).where(and(inArray(farmers.id, farmerIds), eq(farmers.merchantId, merchantId)))
+      : [];
+    const farmerMap = new Map(linkedFarmers.map(f => [f.id, f]));
+
+    const result = txns.map(txn => {
+      const linkedFarmer = txn.farmerId ? farmerMap.get(txn.farmerId) || null : null;
       return { 
         ...txn, 
-        items,
-        // Use linked farmer's current details if available
+        items: itemsByTxnId.get(txn.id) || [],
         farmerName: linkedFarmer?.name || txn.farmerName,
         farmerContact: linkedFarmer?.contact || txn.farmerContact,
         village: linkedFarmer?.village || txn.village,
@@ -2561,7 +2571,7 @@ export class DatabaseStorage implements IStorage {
         district: linkedFarmer?.district || txn.district,
         state: linkedFarmer?.state || txn.state,
       };
-    }));
+    });
 
     return result;
   }
@@ -2572,10 +2582,17 @@ export class DatabaseStorage implements IStorage {
     
     if (!txn) return undefined;
 
-    const items = await db.select().from(seedTransactionItems)
-      .where(eq(seedTransactionItems.seedTransactionId, txn.id));
-    
-    // If farmerId exists, get current farmer details from linked farmer record
+    const itemRows = await db.select({
+      item: seedTransactionItems,
+      supplierName: seedStockEntries.supplierName,
+    })
+    .from(seedTransactionItems)
+    .innerJoin(seedLots, eq(seedTransactionItems.seedLotId, seedLots.id))
+    .innerJoin(seedStockEntries, eq(seedLots.seedEntryId, seedStockEntries.id))
+    .where(eq(seedTransactionItems.seedTransactionId, txn.id));
+
+    const enrichedItems = itemRows.map(row => ({ ...row.item, supplierName: row.supplierName }));
+
     let linkedFarmer = null;
     if (txn.farmerId) {
       const [farmer] = await db.select().from(farmers)
@@ -2583,11 +2600,9 @@ export class DatabaseStorage implements IStorage {
       linkedFarmer = farmer || null;
     }
     
-    // Return with current farmer details if linked, otherwise use stored values
     return { 
       ...txn, 
-      items,
-      // Use linked farmer's current details if available
+      items: enrichedItems,
       farmerName: linkedFarmer?.name || txn.farmerName,
       farmerContact: linkedFarmer?.contact || txn.farmerContact,
       village: linkedFarmer?.village || txn.village,
@@ -2628,15 +2643,12 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     // Create new items and deduct from seed lots
-    const createdItems: SeedTransactionItem[] = [];
     for (const item of items) {
-      const [createdItem] = await db.insert(seedTransactionItems).values({
+      await db.insert(seedTransactionItems).values({
         ...item,
         seedTransactionId: id,
       }).returning();
-      createdItems.push(createdItem);
 
-      // Deduct from seed lot
       const seedLot = await this.getSeedLotById(item.seedLotId, merchantId);
       if (seedLot) {
         await this.updateSeedLot(item.seedLotId, merchantId, {
@@ -2645,7 +2657,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return { ...updatedTxn, items: createdItems };
+    const enrichedResult = await this.getSeedTransactionById(id, merchantId);
+    return enrichedResult || { ...updatedTxn, items: [] };
   }
 
   async updateSeedTransactionFarmerId(id: number, merchantId: number, farmerId: number): Promise<void> {
@@ -2678,15 +2691,12 @@ export class DatabaseStorage implements IStorage {
     }
     if (!createdTxn) throw new Error("Failed to generate unique ID after multiple attempts");
     
-    const createdItems: SeedTransactionItem[] = [];
     for (const item of items) {
-      const [createdItem] = await db.insert(seedTransactionItems).values({
+      await db.insert(seedTransactionItems).values({
         ...item,
         seedTransactionId: createdTxn.id,
       }).returning();
-      createdItems.push(createdItem);
       
-      // Update seed lot remaining bags
       const seedLot = await this.getSeedLotById(item.seedLotId, transaction.merchantId);
       if (seedLot) {
         await this.updateSeedLot(item.seedLotId, transaction.merchantId, {
@@ -2695,7 +2705,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return { ...createdTxn, items: createdItems };
+    const enrichedResult = await this.getSeedTransactionById(createdTxn.id, transaction.merchantId);
+    return enrichedResult || { ...createdTxn, items: [] };
   }
 
   async getNextSeedTransactionNumber(merchantId: number): Promise<number> {
