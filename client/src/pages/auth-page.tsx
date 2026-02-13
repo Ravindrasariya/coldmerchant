@@ -88,6 +88,10 @@ export default function AuthPage() {
                         <Input 
                           placeholder="Enter your username" 
                           {...field} 
+                          autoCapitalize="off"
+                          autoCorrect="off"
+                          autoComplete="username"
+                          spellCheck={false}
                           data-testid="input-login-username"
                         />
                       </FormControl>
@@ -107,6 +111,10 @@ export default function AuthPage() {
                           type={showPassword ? "text" : "password"} 
                           placeholder="Enter password" 
                           {...field} 
+                          autoCapitalize="off"
+                          autoCorrect="off"
+                          autoComplete="current-password"
+                          spellCheck={false}
                           data-testid="input-login-password"
                         />
                       </FormControl>
