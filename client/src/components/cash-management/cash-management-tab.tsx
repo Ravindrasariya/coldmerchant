@@ -218,7 +218,8 @@ const outflowFormSchema = z.object({
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
-  if (data.expenseType === "farmer" && (!data.farmerName || data.farmerName.length === 0)) {
+  const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
+  if (farmerExpenseTypes.includes(data.expenseType) && (!data.farmerName || data.farmerName.length === 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Farmer name is required",
@@ -630,7 +631,9 @@ export function CashManagementTab() {
   };
 
   const onOutflowSubmit = (values: OutflowFormValues) => {
-    const selectedFarmer = values.expenseType === "farmer" 
+    const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
+    const isFarmerType = farmerExpenseTypes.includes(values.expenseType);
+    const selectedFarmer = isFarmerType
       ? mergedFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
@@ -647,7 +650,7 @@ export function CashManagementTab() {
       expenseType: values.expenseType,
       paymentMode: values.paymentMode,
       bankAccountId: values.paymentMode === "account_transfer" ? values.bankAccountId : null,
-      farmerName: values.expenseType === "farmer" ? values.farmerName : null,
+      farmerName: isFarmerType ? values.farmerName : null,
       farmerVillage: selectedFarmer?.address || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
       supplierName: values.expenseType === "supplier" ? values.supplierName : null,
@@ -1724,8 +1727,6 @@ export function CashManagementTab() {
                                 {ledgerFarmers
                                   .filter(f => !f.isArchived)
                                   .filter(f => {
-                                    // Show farmers with positive Net Due (we owe them)
-                                    // Net Due = pyReceivable + harvestDue - seedDue - receivables
                                     const pyReceivable = parseFloat(f.pyReceivable || "0");
                                     const netDue = pyReceivable + f.harvestDue - f.seedDue - (f.receivables || 0);
                                     return netDue > 0;
@@ -1757,6 +1758,45 @@ export function CashManagementTab() {
                       />
                       
                     </>
+                  )}
+
+                  {(expenseType === "farmer_advance" || expenseType === "farmer_freight" || expenseType === "farmer_others") && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="farmerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-farmer-name-expense">
+                                <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {ledgerFarmers
+                                .filter(f => !f.isArchived)
+                                .map((farmer) => (
+                                  <SelectItem key={farmer.name} value={farmer.name}>
+                                    <div className="flex items-center gap-4">
+                                      <span>{farmer.name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {farmer.contact || ""}
+                                        {farmer.contact && farmer.village && " • "}
+                                        {farmer.village || ""}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
 
                   {expenseType === "cold_store_charge" && (
@@ -2179,12 +2219,15 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
 
   const getExpenseTypeLabel = (type: string | null) => {
     switch (type) {
-      case "salary": return t("Salary", "वेतन");
+      case "cold_store_charge": return t("Cold Store", "शीत भंडार");
+      case "farmer": return t("Farmer", "किसान");
+      case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");
+      case "farmer_freight": return t("Farmer Freight", "किसान भाड़ा");
+      case "farmer_others": return t("Farmer Others", "किसान अन्य");
       case "general_expense": return t("General", "सामान्य");
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
-      case "farmer": return t("Farmer", "किसान");
-      case "cold_store_charge": return t("Cold Store", "शीत भंडार");
+      case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       default: return type || "";
     }

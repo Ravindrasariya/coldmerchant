@@ -1549,14 +1549,15 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge", "supplier"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
         }
         if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
           return res.status(400).json({ message: "Valid payment mode is required for outflow entries" });
         }
-        if (expenseType === "farmer" && !farmerName) {
-          return res.status(400).json({ message: "Farmer name is required when expense type is farmer" });
+        const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
+        if (farmerExpenseTypes.includes(expenseType) && !farmerName) {
+          return res.status(400).json({ message: "Farmer name is required when expense type is farmer-related" });
         }
         if (expenseType === "cold_store_charge" && !coldStoreName) {
           return res.status(400).json({ message: "Cold store name is required when expense type is cold store charge" });
