@@ -454,7 +454,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                   <Label className="text-xs">{t("Vehicle #", "वाहन नं")}</Label>
                   <Input
                     value={vehicleNumber}
-                    onChange={(e) => setVehicleNumber(e.target.value)}
+                    onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
                     placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
                     data-testid="input-vehicle-number"
                   />

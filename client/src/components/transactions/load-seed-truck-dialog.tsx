@@ -544,7 +544,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
               <Label>{t("Vehicle Number", "वाहन नंबर")} ({t("Optional", "वैकल्पिक")})</Label>
               <Input
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
                 placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
                 className="w-48"
                 data-testid="input-seed-vehicle"

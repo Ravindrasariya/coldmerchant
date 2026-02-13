@@ -716,7 +716,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <FormItem className="flex flex-col">
                         <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
                         <FormControl>
-                          <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} data-testid="input-vehicle-number" />
+                          <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

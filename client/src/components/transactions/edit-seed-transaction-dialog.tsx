@@ -435,7 +435,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
               <Label>{t("Vehicle Number", "वाहन नंबर")}</Label>
               <Input
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
                 placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
                 className="max-w-xs"
                 data-testid="input-edit-seed-vehicle"
