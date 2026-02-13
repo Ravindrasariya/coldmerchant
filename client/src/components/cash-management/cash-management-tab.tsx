@@ -813,12 +813,15 @@ export function CashManagementTab() {
 
   const getExpenseTypeLabel = (type: string) => {
     switch (type) {
-      case "salary": return t("Salary", "वेतन");
+      case "cold_store_charge": return t("Cold Store Charge", "शीत भंडार शुल्क");
+      case "farmer": return t("Farmer - Harvest", "किसान - फसल");
+      case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");
+      case "farmer_freight": return t("Farmer Freight", "किसान भाड़ा");
+      case "farmer_others": return t("Farmer Others", "किसान अन्य");
       case "general_expense": return t("General Expense", "सामान्य खर्च");
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
-      case "farmer": return t("Farmer", "किसान");
-      case "cold_store_charge": return t("Cold Store Charge", "शीत भंडार शुल्क");
+      case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       default: return type;
     }
@@ -2220,7 +2223,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
   const getExpenseTypeLabel = (type: string | null) => {
     switch (type) {
       case "cold_store_charge": return t("Cold Store", "शीत भंडार");
-      case "farmer": return t("Farmer", "किसान");
+      case "farmer": return t("Farmer - Harvest", "किसान - फसल");
       case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");
       case "farmer_freight": return t("Farmer Freight", "किसान भाड़ा");
       case "farmer_others": return t("Farmer Others", "किसान अन्य");
