@@ -58,7 +58,6 @@ interface StockEntryWithLots {
     totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
-    expectedColdCharges: string | null;
     charges: Array<{ type: string; amount: number | string }> | null;
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;

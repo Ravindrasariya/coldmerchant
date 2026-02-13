@@ -92,7 +92,6 @@ export const lots = pgTable("lots", {
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalWeight: decimal("total_weight", { precision: 12, scale: 2 }), // Total weight in kg (optional)
   charges: jsonb("charges"), // Dynamic charges array: [{ type: string, amount: number }]
-  expectedColdCharges: decimal("expected_cold_charges", { precision: 12, scale: 2 }), // legacy: total expected cold storage charges
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // legacy: charges per bag from cold store
   hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // legacy: hammali and grading charges
   coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges

@@ -39,7 +39,6 @@ interface StockEntryWithLots {
     pricePerKg: string | null;
     totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
-    expectedColdCharges: string | null;
     hammaliGradingCharges: string | null;
     charges: Array<{ type: string; amount: number | string }> | null;
     coldStorageChargesPaid: string | null;
@@ -108,14 +107,13 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         return sum + (netWeight * price);
       }, 0);
     
-    const coldStoreDue = lot.expectedColdCharges ? parseFloat(lot.expectedColdCharges) : 0;
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
     const charges = lot.charges || [];
     const dynamicCharges = charges.reduce((sum, c) => {
       const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
       return sum + amt;
     }, 0);
-    const totalDeductions = coldStoreDue + hammali + dynamicCharges;
+    const totalDeductions = hammali + dynamicCharges;
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
     const rate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
@@ -138,7 +136,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     
     const netPayable = totalPayable - totalDeductions + adjustedValue;
     
-    return { totalPayable, coldStoreDue, hammali, charges, dynamicCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
+    return { totalPayable, hammali, charges, dynamicCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
   };
 
   const overallTotals = entry.lots.reduce((acc, lot) => {
@@ -236,7 +234,6 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         <div style="margin-top: 12px; padding: 12px; background: #fff7ed; border-radius: 4px; border-left: 3px solid #f97316;">
           <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 8px 0; font-weight: 600;">Deductions / कटौती</p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
-            ${lotTotals.coldStoreDue > 0 ? `<div><span style="color: #666;">Cold Store Due / कोल्ड स्टोर बकाया:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.coldStoreDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
             ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
             ${chargesHtml}
             ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">${adjustmentLabel}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
@@ -497,12 +494,6 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
                           <div className="mt-3 p-3 bg-orange-50 rounded border-l-4 border-orange-400">
                             <p className="text-xs uppercase text-gray-600 font-semibold mb-2">Deductions / कटौती</p>
                             <div className="grid grid-cols-2 gap-2 text-xs">
-                              {lotTotals.coldStoreDue > 0 && (
-                                <>
-                                  <span className="text-gray-600">Cold Store Due / कोल्ड स्टोर बकाया:</span>
-                                  <span className="text-right font-mono">₹{lotTotals.coldStoreDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                                </>
-                              )}
                               {lotTotals.hammali > 0 && (
                                 <>
                                   <span className="text-gray-600">Hammali/Grading / हम्माली:</span>

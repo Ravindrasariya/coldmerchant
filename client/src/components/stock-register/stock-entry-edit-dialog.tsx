@@ -65,7 +65,6 @@ interface StockEntryWithLots {
     totalWeight: string | null;
     charges: Array<{ type: string; amount: number | string }> | null;
     coldStoreChargesPerBag: string | null;
-    expectedColdCharges: string | null;
     hammaliGradingCharges: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -108,7 +107,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     totalWeight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : null,
     charges: lot.charges || [],
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
-    expectedColdCharges: lot.expectedColdCharges !== null ? parseFloat(lot.expectedColdCharges) : null,
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
     adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
     adjustedAmountType: lot.adjustedAmountType || null,
@@ -801,13 +799,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         return sum + (netWeight * price);
                       }, 0);
                     
-                    const coldStoreDue = lot.expectedColdCharges || 0;
                     const hammali = lot.hammaliGradingCharges || 0;
                     const dynamicCharges = (lot.charges || []).reduce((sum, c) => {
                       const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
                       return sum + amt;
                     }, 0);
-                    const totalDeductions = coldStoreDue + hammali + dynamicCharges;
+                    const totalDeductions = hammali + dynamicCharges;
                     
                     // Handle adjustment - calculate compound interest if rate-based
                     const principal = lot.adjustedAmount || 0;

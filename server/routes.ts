@@ -262,9 +262,6 @@ export async function registerRoutes(
             if (existingLot && lotData.hammaliGradingCharges !== undefined) {
               compareField('hammaliGradingCharges', existingLot.hammaliGradingCharges, lotData.hammaliGradingCharges, lotLabel, 'lot', lotData.id);
             }
-            if (existingLot && lotData.expectedColdCharges !== undefined) {
-              compareField('expectedColdCharges', existingLot.expectedColdCharges, lotData.expectedColdCharges, lotLabel, 'lot', lotData.id);
-            }
             if (existingLot && lotData.adjustedAmount !== undefined) {
               compareField('adjustedAmount', existingLot.adjustedAmount, lotData.adjustedAmount, lotLabel, 'lot', lotData.id);
             }
@@ -301,9 +298,6 @@ export async function registerRoutes(
                 : undefined,
               hammaliGradingCharges: lotData.hammaliGradingCharges !== undefined
                 ? (lotData.hammaliGradingCharges ? lotData.hammaliGradingCharges.toString() : null)
-                : undefined,
-              expectedColdCharges: lotData.expectedColdCharges !== undefined
-                ? (lotData.expectedColdCharges ? lotData.expectedColdCharges.toString() : null)
                 : undefined,
               adjustedAmount: lotData.adjustedAmount !== undefined
                 ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
@@ -2207,7 +2201,7 @@ export async function registerRoutes(
         
         // Calculate Harvest Due (sum of bag breakdown amounts - amount paid, from stock entries with status due/partial)
         let harvestDue = 0;
-        // Calculate Cold Due (sum of expectedColdCharges from lots in matching stock entries)
+        // Calculate Cold Due (sum of Cold Charges/Ware House Charges from lot charges array)
         let coldDue = 0;
         
         for (const entry of stockEntryList) {
