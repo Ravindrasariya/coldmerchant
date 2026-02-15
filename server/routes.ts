@@ -546,6 +546,9 @@ export async function registerRoutes(
             if (existingLot && lotData.harvestPotatoType !== undefined) {
               compareField('harvestPotatoType', existingLot.harvestPotatoType, lotData.harvestPotatoType, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.coldStoreName !== undefined) {
+              compareField('coldStoreName', existingLot.coldStoreName, lotData.coldStoreName, lotLabel, 'lot', lotData.id);
+            }
             if (existingLot && lotData.coldStoreLotNumber !== undefined) {
               compareField('coldStoreLotNumber', existingLot.coldStoreLotNumber, lotData.coldStoreLotNumber, lotLabel, 'lot', lotData.id);
             }
@@ -582,6 +585,9 @@ export async function registerRoutes(
                 : undefined,
               harvestPotatoType: lotData.harvestPotatoType !== undefined
                 ? (lotData.harvestPotatoType || null)
+                : undefined,
+              coldStoreName: lotData.coldStoreName !== undefined
+                ? (lotData.coldStoreName || null)
                 : undefined,
               coldStoreLotNumber: lotData.coldStoreLotNumber !== undefined
                 ? (lotData.coldStoreLotNumber || null)

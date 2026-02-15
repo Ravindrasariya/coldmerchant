@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -137,6 +137,38 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   })));
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState<number | null>(null);
+  const coldStoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const searchColdStores = useCallback(async (query: string, lotIndex: number) => {
+    if (query.length < 1) {
+      setColdStoreSuggestions([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/cold-stores/search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setColdStoreSuggestions(data);
+        setShowColdStoreSuggestions(lotIndex);
+      }
+    } catch (error) {
+      console.error("Error searching cold stores:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const dropdowns = document.querySelectorAll('[data-edit-coldstore-dropdown]');
+      let isInside = false;
+      dropdowns.forEach(el => { if (el.contains(target)) isInside = true; });
+      if (!isInside) setShowColdStoreSuggestions(null);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Fetch edit history
   const { data: editHistory = [], isLoading: historyLoading } = useQuery<Array<{
@@ -446,12 +478,60 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
               <Card key={lot.id || lotIndex} className="border-border">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 shrink-0">
                         <Package className="h-3 w-3 text-primary" />
                       </div>
-                      <CardTitle className="text-base font-medium">{lot.coldStoreName}</CardTitle>
-                      <Badge variant="outline" className="text-xs">
+                      {lot.place === "farm_gate" ? (
+                        <CardTitle className="text-base font-medium">{t("Farm Gate", "फार्म गेट")}</CardTitle>
+                      ) : (
+                        <div className="relative flex-1 max-w-[220px]">
+                          <Input
+                            value={lot.coldStoreName}
+                            onChange={(e) => {
+                              const newLots = [...lots];
+                              newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: e.target.value };
+                              setLots(newLots);
+                              if (coldStoreDebounceRef.current) clearTimeout(coldStoreDebounceRef.current);
+                              coldStoreDebounceRef.current = setTimeout(() => {
+                                searchColdStores(e.target.value, lotIndex);
+                              }, 300);
+                            }}
+                            onFocus={() => {
+                              if (lot.coldStoreName && lot.coldStoreName.length >= 1) {
+                                searchColdStores(lot.coldStoreName, lotIndex);
+                              }
+                            }}
+                            placeholder={t("Cold Store Name", "कोल्ड स्टोर का नाम")}
+                            autoComplete="off"
+                            className="h-8 text-sm"
+                            data-testid={`edit-cold-store-name-${lotIndex}`}
+                          />
+                          {showColdStoreSuggestions === lotIndex && coldStoreSuggestions.length > 0 && (
+                            <div
+                              data-edit-coldstore-dropdown
+                              className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md max-h-40 overflow-auto"
+                            >
+                              {coldStoreSuggestions.map((name, idx) => (
+                                <div
+                                  key={idx}
+                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                                  onClick={() => {
+                                    const newLots = [...lots];
+                                    newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: name };
+                                    setLots(newLots);
+                                    setShowColdStoreSuggestions(null);
+                                  }}
+                                  data-testid={`edit-coldstore-suggestion-${lotIndex}-${idx}`}
+                                >
+                                  {name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <Badge variant="outline" className="text-xs shrink-0">
                         {lot.potatoType} • {lot.quality}
                       </Badge>
                     </div>

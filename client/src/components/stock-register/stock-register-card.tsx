@@ -242,7 +242,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     const stores = new Set<string>();
     entries.forEach(entry => {
       entry.lots.forEach(lot => {
-        if (lot.coldStoreName) {
+        if (lot.place === "farm_gate") {
+          stores.add("Farm Gate");
+        } else if (lot.coldStoreName) {
           stores.add(lot.coldStoreName);
         }
       });
@@ -312,7 +314,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       }
 
       if (filterColdStore) {
-        const hasColdStore = entry.lots.some(lot => lot.coldStoreName === filterColdStore);
+        const hasColdStore = entry.lots.some(lot => {
+          if (filterColdStore === "Farm Gate") return lot.place === "farm_gate";
+          return lot.coldStoreName === filterColdStore;
+        });
         if (!hasColdStore) return false;
       }
 
@@ -535,7 +540,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           format(new Date(entry.purchaseDate), "dd/MM/yyyy"),
           entry.farmerName,
           entry.village || "-",
-          lot.coldStoreName || "-",
+          lot.place === "farm_gate" ? "Farm Gate" : (lot.coldStoreName || "-"),
           lot.potatoType || "-",
           lot.quality,
           cutTypeDisplay,
@@ -1040,7 +1045,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1}</span>
                             <div className="flex items-center gap-1.5">
                               <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="font-medium">{lot.coldStoreName}</span>
+                              <span className="font-medium">{lot.place === "farm_gate" ? t("Farm Gate", "फार्म गेट") : lot.coldStoreName}</span>
                             </div>
                             <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
                               {lot.potatoType}
