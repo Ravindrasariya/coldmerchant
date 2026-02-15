@@ -1438,17 +1438,31 @@ export class DatabaseStorage implements IStorage {
         }
         
         // STEP 1: First reduce farmer's pyReceivable in farmer ledger
+        // Compute accrued amount (principal + compound interest to today) before deducting
         if (matchedFarmerId && remainingAmount > 0) {
           const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
           if (matchedFarmer) {
-            const currentPyReceivable = parseFloat(matchedFarmer.pyReceivable || "0");
-            if (currentPyReceivable > 0) {
-              const toApply = Math.min(remainingAmount, currentPyReceivable);
-              const newPyReceivable = currentPyReceivable - toApply;
+            const principal = parseFloat(matchedFarmer.pyReceivable || "0");
+            const roi = parseFloat(matchedFarmer.receivableInterestRate || "0");
+            const effDate = matchedFarmer.receivableEffectiveDate;
+            let accruedAmount = principal;
+            if (principal > 0 && roi > 0 && effDate) {
+              const today = new Date();
+              const startDate = new Date(effDate);
+              const diffMs = today.getTime() - startDate.getTime();
+              if (diffMs > 0) {
+                const days = diffMs / (1000 * 60 * 60 * 24);
+                accruedAmount = principal * Math.pow(1 + roi / 100, days / 365);
+              }
+            }
+            if (accruedAmount > 0) {
+              const toApply = Math.min(remainingAmount, accruedAmount);
+              const newAccrued = accruedAmount - toApply;
               await tx.update(farmers)
                 .set({ 
-                  pyReceivable: newPyReceivable.toFixed(2),
-                  receivableEffectiveDate: newPyReceivable > 0 ? new Date().toISOString().split('T')[0] : null,
+                  pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
+                  receivableEffectiveDate: newAccrued > 0 ? new Date().toISOString().split('T')[0] : null,
+                  receivableInterestRate: newAccrued > 0 ? matchedFarmer.receivableInterestRate : "0.00",
                 })
                 .where(eq(farmers.id, matchedFarmerId));
               remainingAmount -= toApply;
@@ -3312,17 +3326,31 @@ export class DatabaseStorage implements IStorage {
           }
           
           // STEP 1: First reduce farmer's pyReceivable in farmer ledger
+          // Compute accrued amount (principal + compound interest to today) before deducting
           if (matchedFarmerId && remainingAmount > 0) {
             const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
             if (matchedFarmer) {
-              const currentPyReceivable = parseFloat(matchedFarmer.pyReceivable || "0");
-              if (currentPyReceivable > 0) {
-                const toApply = Math.min(remainingAmount, currentPyReceivable);
-                const newPyReceivable = currentPyReceivable - toApply;
+              const principal = parseFloat(matchedFarmer.pyReceivable || "0");
+              const roi = parseFloat(matchedFarmer.receivableInterestRate || "0");
+              const effDate = matchedFarmer.receivableEffectiveDate;
+              let accruedAmount = principal;
+              if (principal > 0 && roi > 0 && effDate) {
+                const today = new Date();
+                const startDate = new Date(effDate);
+                const diffMs = today.getTime() - startDate.getTime();
+                if (diffMs > 0) {
+                  const days = diffMs / (1000 * 60 * 60 * 24);
+                  accruedAmount = principal * Math.pow(1 + roi / 100, days / 365);
+                }
+              }
+              if (accruedAmount > 0) {
+                const toApply = Math.min(remainingAmount, accruedAmount);
+                const newAccrued = accruedAmount - toApply;
                 await tx.update(farmers)
                   .set({ 
-                    pyReceivable: newPyReceivable.toFixed(2),
-                    receivableEffectiveDate: newPyReceivable > 0 ? new Date().toISOString().split('T')[0] : null,
+                    pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
+                    receivableEffectiveDate: newAccrued > 0 ? new Date().toISOString().split('T')[0] : null,
+                    receivableInterestRate: newAccrued > 0 ? matchedFarmer.receivableInterestRate : "0.00",
                   })
                   .where(eq(farmers.id, matchedFarmerId));
                 remainingAmount -= toApply;
