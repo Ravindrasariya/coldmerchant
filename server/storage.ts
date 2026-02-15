@@ -1420,8 +1420,8 @@ export class DatabaseStorage implements IStorage {
         
         const farmerCompositeMatch = (name: string | null, contact: string | null, village: string | null) => {
           if (normalizeName(name) !== normalizedFarmerName) return false;
-          if (normalizedFarmerContact && contact && normalizeName(contact) !== normalizedFarmerContact) return false;
-          if (normalizedFarmerVillage && village && normalizeName(village) !== normalizedFarmerVillage) return false;
+          if (normalizeName(contact) !== normalizedFarmerContact) return false;
+          if (normalizeName(village) !== normalizedFarmerVillage) return false;
           return true;
         };
         
@@ -1494,13 +1494,16 @@ export class DatabaseStorage implements IStorage {
           ))
           .orderBy(asc(stockEntries.createdAt));
         
-        // Filter: primary by farmerId, fallback by composite (name+contact+village)
+        const farmerCompositeMatchSE = (name: string | null, contact: string | null, village: string | null) => {
+          if (normalizeName(name) !== normalizedFarmerName) return false;
+          if (normalizeName(contact) !== normalizedFarmerContact) return false;
+          if (normalizeName(village) !== normalizedFarmerVillage) return false;
+          return true;
+        };
+        
         const farmerEntries = allFarmerEntries.filter(se => {
           if (entryFarmerId && se.farmerId === entryFarmerId) return true;
-          if (normalizeName(se.farmerName) !== normalizedFarmerName) return false;
-          if (normalizedFarmerContact && se.farmerContact && normalizeName(se.farmerContact) !== normalizedFarmerContact) return false;
-          if (normalizedFarmerVillage && se.village && normalizeName(se.village) !== normalizedFarmerVillage) return false;
-          return true;
+          return farmerCompositeMatchSE(se.farmerName, se.farmerContact, se.village);
         });
         
         for (const stockEntry of farmerEntries) {
@@ -3280,8 +3283,8 @@ export class DatabaseStorage implements IStorage {
           
           const farmerCompositeMatch = (name: string | null, contact: string | null, village: string | null) => {
             if (normalizeName(name) !== normalizedFarmerName) return false;
-            if (normalizedFarmerContact && contact && normalizeName(contact) !== normalizedFarmerContact) return false;
-            if (normalizedFarmerVillage && village && normalizeName(village) !== normalizedFarmerVillage) return false;
+            if (normalizeName(contact) !== normalizedFarmerContact) return false;
+            if (normalizeName(village) !== normalizedFarmerVillage) return false;
             return true;
           };
           
@@ -3381,8 +3384,8 @@ export class DatabaseStorage implements IStorage {
           
           const farmerCompositeMatch = (name: string | null, contact: string | null, village: string | null) => {
             if (normalizeName(name) !== normalizedFarmerName) return false;
-            if (normalizedFarmerContact && contact && normalizeName(contact) !== normalizedFarmerContact) return false;
-            if (normalizedFarmerVillage && village && normalizeName(village) !== normalizedFarmerVillage) return false;
+            if (normalizeName(contact) !== normalizedFarmerContact) return false;
+            if (normalizeName(village) !== normalizedFarmerVillage) return false;
             return true;
           };
           
@@ -3402,13 +3405,9 @@ export class DatabaseStorage implements IStorage {
             ))
             .orderBy(asc(stockEntries.createdAt));
           
-          // Filter: primary by farmerId, fallback by composite (name+contact+village)
           const farmerEntries = allFarmerEntries.filter(se => {
             if (matchedFarmerId && se.farmerId === matchedFarmerId) return true;
-            if (normalizeName(se.farmerName) !== normalizedFarmerName) return false;
-            if (normalizedFarmerContact && se.farmerContact && normalizeName(se.farmerContact) !== normalizedFarmerContact) return false;
-            if (normalizedFarmerVillage && se.village && normalizeName(se.village) !== normalizedFarmerVillage) return false;
-            return true;
+            return farmerCompositeMatch(se.farmerName, se.farmerContact, se.village);
           });
           
           for (const stockEntry of farmerEntries) {
@@ -3582,18 +3581,18 @@ export class DatabaseStorage implements IStorage {
       const [settlement] = await tx.select().from(farmerSettlements)
         .where(eq(farmerSettlements.cashEntryId, cashEntryId));
 
-      // Helper function to match farmer using composite identity (name + village + contact)
-      const matchesFarmerIdentity = (
-        se: { farmerName: string; village?: string | null; farmerContact?: string | null },
-        targetName: string, 
-        targetVillage?: string | null,
-        targetContact?: string | null
+      const entryFarmerId = entry.farmerId || null;
+      const normalizedFarmerName = entry.farmerName ? normalizeName(entry.farmerName) : null;
+      const normalizedFarmerContact = entry.farmerContact ? normalizeName(entry.farmerContact) : null;
+      const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
+
+      const matchesFarmerForReversal = (
+        record: { farmerId?: number | null; farmerName: string; farmerContact?: string | null; village?: string | null }
       ) => {
-        if (normalizeName(se.farmerName) !== normalizeName(targetName)) return false;
-        // If village is specified, match on village as well
-        if (targetVillage && se.village && normalizeName(se.village) !== normalizeName(targetVillage)) return false;
-        // If contact is specified, match on contact as well
-        if (targetContact && se.farmerContact && normalizeName(se.farmerContact) !== normalizeName(targetContact)) return false;
+        if (entryFarmerId && record.farmerId === entryFarmerId) return true;
+        if (normalizeName(record.farmerName) !== normalizedFarmerName) return false;
+        if (normalizeName(record.farmerContact) !== normalizedFarmerContact) return false;
+        if (normalizeName(record.village) !== normalizedFarmerVillage) return false;
         return true;
       };
 
@@ -3617,23 +3616,12 @@ export class DatabaseStorage implements IStorage {
       }
       
       // 4b. Reverse seed sale inflow (add back dues to seedTransactions.totalDueToFarmer)
-      // Uses composite identity (name + village) and distributes reversal proportionally
       if (entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
-        // Find seed transactions for this farmer using composite identity matching
         const allSeedTxns = await tx.select().from(seedTransactions)
           .where(eq(seedTransactions.merchantId, merchantId))
           .orderBy(asc(seedTransactions.createdAt));
         
-        // Use composite identity helper for seed transactions (adapt to same field names)
-        const matchingTxns = allSeedTxns.filter(txn => {
-          // Adapt seed transaction fields to match the helper signature
-          const adapted = {
-            farmerName: txn.farmerName,
-            village: txn.village,
-            farmerContact: txn.farmerContact
-          };
-          return matchesFarmerIdentity(adapted, entry.farmerName!, entry.farmerVillage, null);
-        });
+        const matchingTxns = allSeedTxns.filter(txn => matchesFarmerForReversal(txn));
         
         let amountToRestore = parseFloat(entry.amount);
         if (settlement && settlement.settlementDirection === 'seed_to_raw') {
@@ -3666,14 +3654,11 @@ export class DatabaseStorage implements IStorage {
       
       // 4c. Reverse farmer payment (reduces amountPaid on stock entries)
       if (entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
-        // Find stock entries for this farmer using composite identity
         const farmerStockEntries = await tx.select().from(stockEntries)
           .where(eq(stockEntries.merchantId, merchantId))
           .orderBy(asc(stockEntries.createdAt));
         
-        const matchingEntries = farmerStockEntries.filter(se => 
-          matchesFarmerIdentity(se, entry.farmerName!, entry.farmerVillage, null)
-        );
+        const matchingEntries = farmerStockEntries.filter(se => matchesFarmerForReversal(se));
         
         // Calculate total amount to reverse (excluding cross-settlement if any)
         let amountToReverse = parseFloat(entry.amount);

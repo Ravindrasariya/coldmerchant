@@ -200,9 +200,11 @@ export async function registerRoutes(
         farmerDueMap.set(dateKey, (farmerDueMap.get(dateKey) || 0) + farmerDue);
         volumeMap.set(dateKey, (volumeMap.get(dateKey) || 0) + entryVolume);
 
-        const farmerId = entry.farmerId ? String(entry.farmerId) : `name:${(entry.farmerName || "").toLowerCase().trim()}`;
-        const prev = perFarmerHarvestDue.get(farmerId) || 0;
-        perFarmerHarvestDue.set(farmerId, prev + farmerDue);
+        const farmerKey = entry.farmerId
+          ? String(entry.farmerId)
+          : `composite:${(entry.farmerName || "").toLowerCase().trim()}|${(entry.farmerContact || "").toLowerCase().trim()}|${(entry.village || "").toLowerCase().trim()}`;
+        const prev = perFarmerHarvestDue.get(farmerKey) || 0;
+        perFarmerHarvestDue.set(farmerKey, prev + farmerDue);
 
         const entryCrop = entry.crop || "potato";
         cropDuesMap[entryCrop] = (cropDuesMap[entryCrop] || 0) + farmerDue;
@@ -229,8 +231,8 @@ export async function registerRoutes(
         summaryBuyerTotalRevenue += revenue;
         summaryBuyerTotalDue += buyerDue;
 
-        const buyerName = tx.partyName || "Unknown";
-        buyerDueByNameMap.set(buyerName, (buyerDueByNameMap.get(buyerName) || 0) + buyerDue);
+        const buyerKey = tx.buyerId ? String(tx.buyerId) : `name:${(tx.partyName || "Unknown").toLowerCase().trim()}`;
+        buyerDueByNameMap.set(buyerKey, (buyerDueByNameMap.get(buyerKey) || 0) + buyerDue);
 
         const profitLoss = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
         pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
@@ -247,8 +249,10 @@ export async function registerRoutes(
 
         const totalDueToFarmer = seedTx.totalDueToFarmer ? parseFloat(seedTx.totalDueToFarmer) : 0;
         const seedDue = Math.max(totalDueToFarmer, 0);
-        const farmerId = seedTx.farmerId ? String(seedTx.farmerId) : `name:${(seedTx.farmerName || "").toLowerCase().trim()}`;
-        perFarmerSeedDue.set(farmerId, (perFarmerSeedDue.get(farmerId) || 0) + seedDue);
+        const farmerKey = seedTx.farmerId
+          ? String(seedTx.farmerId)
+          : `composite:${(seedTx.farmerName || "").toLowerCase().trim()}|${(seedTx.farmerContact || "").toLowerCase().trim()}|${(seedTx.village || "").toLowerCase().trim()}`;
+        perFarmerSeedDue.set(farmerKey, (perFarmerSeedDue.get(farmerKey) || 0) + seedDue);
       }
 
       const allFarmerIdsArr = Array.from(new Set([...Array.from(perFarmerHarvestDue.keys()), ...Array.from(perFarmerSeedDue.keys())]));
