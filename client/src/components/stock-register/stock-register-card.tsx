@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download, Check, ChevronsUpDown } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download, Check, ChevronsUpDown, IndianRupee } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -335,6 +335,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     let farmerDue = 0;
     let coldStoreTotal = 0;
     let coldStoreDue = 0;
+    let totalPayable = 0;
+    let totalDeductions = 0;
 
     filteredEntries.forEach(entry => {
       let entryTotalAmount = 0;
@@ -368,11 +370,13 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       farmerDue += Math.max(netPayable - amountPaid, 0);
       
+      totalPayable += entryTotalAmount;
+      totalDeductions += entryDeductions;
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
     });
 
-    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue };
+    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions };
   }, [filteredEntries]);
 
   const handleDownloadCSV = () => {
@@ -759,7 +763,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card data-testid="card-bags-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -769,11 +773,30 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
+                <p className="text-sm font-bold" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Remaining (Unsold)", "बचे (अनबिके)")}</span>
-                <p className="text-lg font-bold text-amber-600" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+                <p className="text-sm font-bold text-amber-600" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-cost-summary">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <IndianRupee className="h-5 w-5 text-orange-600" />
+              <span className="font-medium">{t("Total Cost", "कुल लागत")}</span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <div>
+                <span className="text-xs text-muted-foreground">{t("Total Payable", "कुल देय")}</span>
+                <p className="text-sm font-bold" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-muted-foreground">{t("Total Deductions", "कुल कटौती")}</span>
+                <p className="text-sm font-bold text-red-600" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -788,11 +811,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-sm font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-sm font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -807,11 +830,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-lg font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-sm font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-lg font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-sm font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
