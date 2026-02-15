@@ -424,7 +424,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="font-mono text-primary">#{entry.serialNumber}</span>
