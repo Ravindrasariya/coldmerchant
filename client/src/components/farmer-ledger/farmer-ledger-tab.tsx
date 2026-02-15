@@ -90,6 +90,7 @@ export function FarmerLedgerTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
     },
   });
 
@@ -100,6 +101,7 @@ export function FarmerLedgerTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
     },
   });
 
@@ -143,6 +145,7 @@ export function FarmerLedgerTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setEditDialogOpen(false);
       setEditingFarmer(null);
       toast({
@@ -188,6 +191,7 @@ export function FarmerLedgerTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setMergeDialogOpen(false);
       setMergingFarmer(null);
       setEditingFarmer(null);

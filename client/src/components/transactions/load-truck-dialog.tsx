@@ -338,6 +338,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/transporters"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       toast({
         title: t("Transaction Created", "लेनदेन बनाया गया"),
         description: t("Truck loaded successfully", "ट्रक सफलतापूर्वक लोड किया गया"),

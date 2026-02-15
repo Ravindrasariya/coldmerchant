@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
+      queryClient.clear();
       queryClient.setQueryData(["/api/user"], user);
     },
     onError: (error: Error) => {

@@ -481,6 +481,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       toast({
         title: t("Success", "सफलता"),
         description: t("Entry recorded successfully", "प्रविष्टि सफलतापूर्वक दर्ज की गई"),
@@ -2202,6 +2203,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
     },
     onError: (error: any) => {
       toast({

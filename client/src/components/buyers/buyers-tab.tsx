@@ -83,6 +83,7 @@ export default function BuyersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setAddDialogOpen(false);
       setAddForm({ name: "", address: "", mandiCode: "", contact: "", negativeFlag: false });
       toast({ title: t("Buyer added successfully", "खरीदार सफलतापूर्वक जोड़ा गया"), variant: "success" });
@@ -105,6 +106,7 @@ export default function BuyersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setEditDialogOpen(false);
       setEditingBuyer(null);
       setShowHistory(false);
@@ -122,6 +124,7 @@ export default function BuyersTab() {
     },
     onSuccess: (data: { partiesLinked: number; buyersCreated: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       toast({
         title: t("Sync Complete", "सिंक पूर्ण"),
         description: t(`${data.partiesLinked} parties linked, ${data.buyersCreated} new buyers created`, `${data.partiesLinked} पार्टियां लिंक, ${data.buyersCreated} नए खरीदार बनाए गए`),
@@ -143,6 +146,7 @@ export default function BuyersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
     },
   });
 

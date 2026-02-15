@@ -62,6 +62,7 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
         variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       form.reset();
       onSuccess?.();
     },
