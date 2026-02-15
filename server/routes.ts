@@ -1816,7 +1816,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, farmerName, farmerVillage, farmerContact, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -1919,10 +1919,11 @@ export async function registerRoutes(
       }
 
       // Resolve buyerId and farmerId from ledger for reliable matching
-      let resolvedBuyerId: number | null = null;
-      let resolvedFarmerId: number | null = null;
+      // If IDs are provided directly from the frontend (from ledger dropdowns), use them
+      let resolvedBuyerId: number | null = requestBuyerId ? parseInt(requestBuyerId) : null;
+      let resolvedFarmerId: number | null = requestFarmerId ? parseInt(requestFarmerId) : null;
       
-      if (partyName) {
+      if (!resolvedBuyerId && partyName) {
         try {
           const { buyerId: bId } = await storage.lookupOrCreateBuyer(merchantId, {
             name: titleCaseKeep(partyName),
@@ -1935,7 +1936,7 @@ export async function registerRoutes(
         }
       }
       
-      if (farmerName) {
+      if (!resolvedFarmerId && farmerName) {
         try {
           const { farmerId: fId } = await storage.lookupOrCreateFarmer(merchantId, {
             name: titleCaseKeep(farmerName),

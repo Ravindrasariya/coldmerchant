@@ -604,6 +604,7 @@ export function CashManagementTab() {
         revenueType: values.revenueType,
         partyName: values.partyName,
         partyVillage: selectedBuyer?.address || null,
+        buyerId: selectedBuyer?.id || null,
         bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
         amount: values.amount,
         entryDate: values.entryDate,
@@ -627,6 +628,8 @@ export function CashManagementTab() {
         revenueType: values.revenueType,
         farmerName: values.seedFarmerName,
         farmerVillage: selectedLedgerFarmer?.village || null,
+        farmerContact: selectedLedgerFarmer?.contact || null,
+        farmerId: selectedLedgerFarmer?.id || null,
         bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
         amount: values.amount,
         entryDate: values.entryDate,
@@ -638,8 +641,8 @@ export function CashManagementTab() {
   const onOutflowSubmit = (values: OutflowFormValues) => {
     const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
     const isFarmerType = farmerExpenseTypes.includes(values.expenseType);
-    const selectedFarmer = isFarmerType
-      ? mergedFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
+    const selectedLedgerFarmerOut = isFarmerType
+      ? ledgerFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
     if (!values.amount || values.amount <= 0) {
@@ -656,7 +659,9 @@ export function CashManagementTab() {
       paymentMode: values.paymentMode,
       bankAccountId: values.paymentMode === "account_transfer" ? values.bankAccountId : null,
       farmerName: isFarmerType ? values.farmerName : null,
-      farmerVillage: selectedFarmer?.address || null,
+      farmerVillage: selectedLedgerFarmerOut?.village || null,
+      farmerContact: selectedLedgerFarmerOut?.contact || null,
+      farmerId: selectedLedgerFarmerOut?.id || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
       supplierName: values.expenseType === "supplier" ? values.supplierName : null,
       amount: values.amount,
