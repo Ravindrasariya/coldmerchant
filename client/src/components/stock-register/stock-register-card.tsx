@@ -767,17 +767,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <Card data-testid="card-bags-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Boxes className="h-5 w-5 text-blue-600" />
-              <span className="font-medium">{t("Bags", "बैग")}</span>
+              <Boxes className="h-4 w-4 text-blue-600" />
+              <span className="text-xs font-medium">{t("Bags", "बैग")}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
+                <p className="text-xs font-bold" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Remaining (Unsold)", "बचे (अनबिके)")}</span>
-                <p className="text-sm font-bold text-amber-600" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+                <p className="text-xs font-bold text-amber-600" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -786,17 +786,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <Card data-testid="card-cost-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <IndianRupee className="h-5 w-5 text-orange-600" />
-              <span className="font-medium">{t("Total Cost", "कुल लागत")}</span>
+              <IndianRupee className="h-4 w-4 text-orange-600" />
+              <span className="text-xs font-medium">{t("Total Cost", "कुल लागत")}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total Payable", "कुल देय")}</span>
-                <p className="text-sm font-bold" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-xs font-bold" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Total Deductions", "कुल कटौती")}</span>
-                <p className="text-sm font-bold text-red-600" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-xs font-bold text-red-600" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -805,17 +805,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <Card data-testid="card-farmer-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Users className="h-5 w-5 text-green-600" />
-              <span className="font-medium">{t("Farmer", "किसान")}</span>
+              <Users className="h-4 w-4 text-green-600" />
+              <span className="text-xs font-medium">{t("Farmer", "किसान")}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-xs font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-sm font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-xs font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
@@ -824,17 +824,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <Card data-testid="card-cold-store-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Building2 className="h-5 w-5 text-purple-600" />
-              <span className="font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
+              <Building2 className="h-4 w-4 text-purple-600" />
+              <span className="text-xs font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
             </div>
             <div className="flex justify-between items-baseline">
               <div>
                 <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-xs font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
                 <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-sm font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <p className="text-xs font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
