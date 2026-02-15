@@ -1197,9 +1197,18 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Add receivables from managed farmers (cash farmers with pendingDueToBePaid)
+    // Add receivables from managed farmers (cash farmers with pendingDueToBePaid + interest)
     for (const farmer of managedFarmers) {
-      const receivables = parseFloat(farmer.pendingDueToBePaid || "0");
+      const principal = parseFloat(farmer.pendingDueToBePaid || "0");
+      const roi = parseFloat(farmer.rateOfInterest || "0");
+      let receivables = principal;
+      if (roi > 0 && principal > 0 && farmer.effectiveDate) {
+        const diffMs = new Date().getTime() - new Date(farmer.effectiveDate).getTime();
+        if (diffMs > 0) {
+          const days = diffMs / (1000 * 60 * 60 * 24);
+          receivables = principal * Math.pow(1 + roi / 100, days / 365);
+        }
+      }
       if (receivables <= 0) continue;
       
       // Use composite key (name + contact) for consistency with /api/farmers

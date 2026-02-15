@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -743,7 +744,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const emptyFormData = { name: "", contactNumber: "", village: "", tehsil: "", district: "", state: "", pendingDueToBePaid: "" };
+  const emptyFormData = { name: "", contactNumber: "", village: "", tehsil: "", district: "", state: "", pendingDueToBePaid: "", rateOfInterest: "", effectiveDate: new Date().toISOString().split('T')[0] };
   const [formData, setFormData] = useState(emptyFormData);
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -827,6 +828,8 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
       district: farmer.district || "",
       state: farmer.state || "",
       pendingDueToBePaid: farmer.pendingDueToBePaid || "0",
+      rateOfInterest: farmer.rateOfInterest || "0",
+      effectiveDate: farmer.effectiveDate || new Date().toISOString().split('T')[0],
     });
   };
 
@@ -997,18 +1000,6 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                   data-testid="input-farmer-tehsil"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("Due to be Paid", "भुगतान करना है")}</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={formData.pendingDueToBePaid}
-                  onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
-                  placeholder="0"
-                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  data-testid="input-farmer-pending-due"
-                />
-              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
@@ -1044,6 +1035,48 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 </Select>
               </div>
             </div>
+            <Separator className="my-2" />
+            <p className="text-xs font-medium text-muted-foreground">{t("Receivable Details", "प्राप्य विवरण")}</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Due Amount (₹)", "देय राशि (₹)")}</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={formData.pendingDueToBePaid}
+                  onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
+                  placeholder="0"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  data-testid="input-farmer-pending-due"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Rate of Interest (%)", "ब्याज दर (%)")}</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={formData.rateOfInterest}
+                  onChange={(e) => setFormData({ ...formData, rateOfInterest: e.target.value })}
+                  placeholder="0"
+                  className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  data-testid="input-farmer-roi"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("Effective Date", "प्रभावी तिथि")}</Label>
+                <Input
+                  type="date"
+                  value={formData.effectiveDate}
+                  onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
+                  data-testid="input-farmer-effective-date"
+                />
+              </div>
+            </div>
+            {parseFloat(formData.pendingDueToBePaid || "0") > 0 && parseFloat(formData.rateOfInterest || "0") > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {t("Compound interest will be calculated annually from the effective date", "प्रभावी तिथि से वार्षिक चक्रवृद्धि ब्याज की गणना की जाएगी")}
+              </p>
+            )}
             <div className="flex gap-2 justify-end">
               <Button 
                 variant="outline" 
@@ -1093,7 +1126,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         placeholder={t("Contact", "संपर्क")}
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       <Input
                         value={formData.village}
                         onChange={(e) => setFormData({ ...formData, village: e.target.value })}
@@ -1103,14 +1136,6 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         value={formData.tehsil}
                         onChange={(e) => setFormData({ ...formData, tehsil: e.target.value })}
                         placeholder={t("Tehsil", "तहसील")}
-                      />
-                      <Input
-                        type="number"
-                        step="any"
-                        value={formData.pendingDueToBePaid}
-                        onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
-                        placeholder={t("Due to be Paid", "भुगतान करना है")}
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -1141,6 +1166,39 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         </SelectContent>
                       </Select>
                     </div>
+                    <Separator className="my-1" />
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("Due Amount", "देय राशि")}</Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          value={formData.pendingDueToBePaid}
+                          onChange={(e) => setFormData({ ...formData, pendingDueToBePaid: e.target.value })}
+                          placeholder="0"
+                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("ROI %", "ब्याज %")}</Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          value={formData.rateOfInterest}
+                          onChange={(e) => setFormData({ ...formData, rateOfInterest: e.target.value })}
+                          placeholder="0"
+                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("Eff. Date", "प्रभावी तिथि")}</Label>
+                        <Input
+                          type="date"
+                          value={formData.effectiveDate}
+                          onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
+                        />
+                      </div>
+                    </div>
                     <div className="flex gap-2 justify-end">
                       <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>
                         <X className="h-4 w-4" />
@@ -1161,7 +1219,16 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         </p>
                       )}
                       {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
-                        <p className="text-sm text-red-600">{t("Due to Pay", "भुगतान करना है")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                        <div className="text-sm">
+                          <span className="text-red-600">
+                            {t("Due", "देय")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                          </span>
+                          {parseFloat(farmer.rateOfInterest || "0") > 0 && (
+                            <span className="text-muted-foreground ml-2">
+                              @ {farmer.rateOfInterest}% {t("from", "से")} {farmer.effectiveDate || "-"}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                     <div className="flex gap-1">

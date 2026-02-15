@@ -283,6 +283,8 @@ export const cashFarmers = pgTable("cash_farmers", {
   district: text("district"),
   state: text("state"),
   pendingDueToBePaid: decimal("pending_due_to_be_paid", { precision: 12, scale: 2 }).default("0"),
+  rateOfInterest: decimal("rate_of_interest", { precision: 5, scale: 2 }).default("0"),
+  effectiveDate: date("effective_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

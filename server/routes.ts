@@ -39,6 +39,24 @@ function requireSystemAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+function computeCompoundInterestDue(principal: number, rateOfInterest: number, effectiveDate: string | null): number {
+  if (!effectiveDate || !rateOfInterest || rateOfInterest <= 0 || principal <= 0) {
+    return principal;
+  }
+  const today = new Date();
+  const startDate = new Date(effectiveDate);
+  const diffMs = today.getTime() - startDate.getTime();
+  if (diffMs <= 0) return principal;
+  const days = diffMs / (1000 * 60 * 60 * 24);
+  return principal * Math.pow(1 + rateOfInterest / 100, days / 365);
+}
+
+function getReceivableWithInterest(farmer: { pendingDueToBePaid: string | null; rateOfInterest: string | null; effectiveDate: string | null }): number {
+  const principal = parseFloat(farmer.pendingDueToBePaid || "0");
+  const roi = parseFloat(farmer.rateOfInterest || "0");
+  return computeCompoundInterestDue(principal, roi, farmer.effectiveDate);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -2096,7 +2114,11 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const farmers = await storage.getCashFarmersByMerchant(merchantId);
-      res.json(farmers);
+      const farmersWithFinalDue = farmers.map(f => ({
+        ...f,
+        finalDue: getReceivableWithInterest(f).toFixed(2),
+      }));
+      res.json(farmersWithFinalDue);
     } catch (error) {
       console.error("Error fetching managed farmers:", error);
       res.status(500).json({ message: "Failed to fetch managed farmers" });
@@ -2106,7 +2128,7 @@ export async function registerRoutes(
   app.post("/api/cash/managed-farmers", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid } = req.body;
+      const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid, rateOfInterest, effectiveDate } = req.body;
       
       if (!name) {
         return res.status(400).json({ message: "Farmer name is required" });
@@ -2133,6 +2155,8 @@ export async function registerRoutes(
         district: titleCase(district) || null,
         state: titleCase(state) || null,
         pendingDueToBePaid: pendingDueToBePaid?.toString() || "0",
+        rateOfInterest: rateOfInterest?.toString() || "0",
+        effectiveDate: effectiveDate || new Date().toISOString().split('T')[0],
       });
       res.status(201).json(farmer);
     } catch (error) {
@@ -2145,7 +2169,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
-      const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid } = req.body;
+      const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid, rateOfInterest, effectiveDate } = req.body;
 
       const farmer = await storage.updateCashFarmer(id, merchantId, {
         ...(name && { name: titleCaseKeep(name) }),
@@ -2155,6 +2179,8 @@ export async function registerRoutes(
         ...(district !== undefined && { district: titleCase(district) }),
         ...(state !== undefined && { state: titleCase(state) }),
         ...(pendingDueToBePaid !== undefined && { pendingDueToBePaid: pendingDueToBePaid?.toString() }),
+        ...(rateOfInterest !== undefined && { rateOfInterest: rateOfInterest?.toString() }),
+        ...(effectiveDate !== undefined && { effectiveDate }),
       });
       
       if (!farmer) {
@@ -2466,14 +2492,12 @@ export async function registerRoutes(
       const receivablesByFarmerId = new Map<number, number>();
       const receivablesByCompositeKey = new Map<string, number>();
       for (const mf of managedFarmerList) {
-        const receivables = parseFloat(mf.pendingDueToBePaid || "0");
+        const receivables = getReceivableWithInterest(mf);
         if (receivables > 0) {
           if (mf.farmerId) {
-            // Use farmerId for matching (primary)
             const existing = receivablesByFarmerId.get(mf.farmerId) || 0;
             receivablesByFarmerId.set(mf.farmerId, existing + receivables);
           } else if (mf.name) {
-            // Fallback to composite key for legacy data
             const key = mf.name.trim().toLowerCase() + "|" + (mf.contactNumber?.trim().toLowerCase() || "");
             const existing = receivablesByCompositeKey.get(key) || 0;
             receivablesByCompositeKey.set(key, existing + receivables);
