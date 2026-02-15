@@ -52,7 +52,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const searchColdStores = useCallback(async (query: string) => {
-    if (query.length < 2) {
+    if (query.length < 1) {
       setColdStoreSuggestions([]);
       return;
     }
