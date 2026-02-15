@@ -1893,36 +1893,48 @@ export async function registerRoutes(
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
 
-      // Generate cash flow code: CFYYYYMMDD{seq} - unique per merchant
+      // Generate cash flow code: CFYYYYMMDD{seq} - unique per merchant (MAX-based with retry)
       const txDateStr = parseDateToCodeFormat(entryDate);
       const txCodePrefix = `CF${txDateStr}`;
-      const existingTxCount = await storage.countCashEntriesByCodePrefix(merchantId, txCodePrefix);
-      const transactionCode = generateTransactionCode(txDateStr, existingTxCount);
-
-      // Create the cash entry with FIFO allocation and optional cross-settlement
-      const createdEntry = await storage.createCashEntryWithCrossSettlement({
-        merchantId,
-        transactionCode,
-        direction,
-        receiptType: receiptType || null,
-        revenueType: revenueType || null,
-        expenseType: expenseType || null,
-        paymentMode: paymentMode || null,
-        bankAccountId: bankAccountId || null,
-        fromAccountType: fromAccountType || null,
-        fromBankAccountId: fromBankAccountId || null,
-        toAccountType: toAccountType || null,
-        toBankAccountId: toBankAccountId || null,
-        partyName: titleCase(partyName) || null,
-        partyVillage: titleCase(partyVillage) || null,
-        farmerName: titleCase(farmerName) || null,
-        farmerVillage: titleCase(farmerVillage) || null,
-        coldStoreName: titleCase(coldStoreName) || null,
-        supplierName: titleCase(supplierName) || null,
-        amount: amount.toString(),
-        entryDate,
-        remarks: remarks || null,
-      }, applyFIFO, validatedCrossSettlement, userId);
+      
+      const maxRetries = 3;
+      let createdEntry: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxCashCodeSequence(merchantId, txCodePrefix);
+        const transactionCode = `CF${txDateStr}${maxSeq + 1 + attempt}`;
+        try {
+          createdEntry = await storage.createCashEntryWithCrossSettlement({
+            merchantId,
+            transactionCode,
+            direction,
+            receiptType: receiptType || null,
+            revenueType: revenueType || null,
+            expenseType: expenseType || null,
+            paymentMode: paymentMode || null,
+            bankAccountId: bankAccountId || null,
+            fromAccountType: fromAccountType || null,
+            fromBankAccountId: fromBankAccountId || null,
+            toAccountType: toAccountType || null,
+            toBankAccountId: toBankAccountId || null,
+            partyName: titleCase(partyName) || null,
+            partyVillage: titleCase(partyVillage) || null,
+            farmerName: titleCase(farmerName) || null,
+            farmerVillage: titleCase(farmerVillage) || null,
+            coldStoreName: titleCase(coldStoreName) || null,
+            supplierName: titleCase(supplierName) || null,
+            amount: amount.toString(),
+            entryDate,
+            remarks: remarks || null,
+          }, applyFIFO, validatedCrossSettlement, userId);
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('transaction_code') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!createdEntry) throw new Error("Failed to generate unique cash code after multiple attempts");
       
       res.status(201).json(createdEntry);
     } catch (error) {
@@ -2232,24 +2244,37 @@ export async function registerRoutes(
       
       const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
 
-      // Generate buyer code: BYYYYYMMDD{seq} - unique per merchant
+      // Generate buyer code: BYYYYYMMDD{seq} - unique per merchant (MAX-based with retry)
       const effectiveDateAdded = dateAdded || new Date().toISOString().split('T')[0];
       const dateStr = parseDateToCodeFormat(effectiveDateAdded);
       const codePrefix = `BY${dateStr}`;
-      const existingCount = await storage.countBuyersByCodePrefix(merchantId, codePrefix);
-      const buyerCode = generateBuyerCode(dateStr, existingCount);
-
-      const buyer = await storage.createBuyer({
-        merchantId,
-        buyerCode,
-        dateAdded: effectiveDateAdded,
-        name: titleCaseKeep(name),
-        address: titleCase(address) || address,
-        mandiCode: mandiCode || null,
-        contact: contact || null,
-        negativeFlag: negativeFlag ?? false,
-        isActive: isActive ?? true,
-      });
+      
+      const maxRetries = 3;
+      let buyer: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxBuyerCodeSequence(merchantId, codePrefix);
+        const buyerCode = `BY${dateStr}${maxSeq + 1 + attempt}`;
+        try {
+          buyer = await storage.createBuyer({
+            merchantId,
+            buyerCode,
+            dateAdded: effectiveDateAdded,
+            name: titleCaseKeep(name),
+            address: titleCase(address) || address,
+            mandiCode: mandiCode || null,
+            contact: contact || null,
+            negativeFlag: negativeFlag ?? false,
+            isActive: isActive ?? true,
+          });
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('buyer_code') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!buyer) throw new Error("Failed to generate unique buyer code after multiple attempts");
       res.status(201).json(buyer);
     } catch (error) {
       console.error("Error creating buyer:", error);
@@ -2765,23 +2790,36 @@ export async function registerRoutes(
         
         if (!existing) {
           const codePrefix = `FM${dateStr}`;
-          const existingCount = await storage.countFarmersByCodePrefix(merchantId, codePrefix);
-          const farmerCode = generateFarmerCode(dateStr, existingCount);
-          
-          existing = await storage.createFarmer({
-            merchantId,
-            farmerCode,
-            dateAdded: today,
-            name: data.name,
-            contact: data.contact,
-            village: data.village,
-            tehsil: data.tehsil,
-            district: data.district,
-            state: data.state,
-            pyReceivable: "0",
-            negativeFlag: false,
-            isArchived: false,
-          });
+          const fmMaxRetries = 3;
+          let createdFarmer: any = null;
+          for (let attempt = 0; attempt < fmMaxRetries; attempt++) {
+            const maxSeq = await storage.getMaxFarmerCodeSequence(merchantId, codePrefix);
+            const farmerCode = `FM${dateStr}${maxSeq + 1 + attempt}`;
+            try {
+              createdFarmer = await storage.createFarmer({
+                merchantId,
+                farmerCode,
+                dateAdded: today,
+                name: data.name,
+                contact: data.contact,
+                village: data.village,
+                tehsil: data.tehsil,
+                district: data.district,
+                state: data.state,
+                pyReceivable: "0",
+                negativeFlag: false,
+                isArchived: false,
+              });
+              break;
+            } catch (error: any) {
+              if (error?.code === '23505' && error?.constraint?.includes('farmer_code') && attempt < fmMaxRetries - 1) {
+                continue;
+              }
+              throw error;
+            }
+          }
+          if (!createdFarmer) throw new Error("Failed to generate unique farmer code after multiple attempts");
+          existing = createdFarmer;
           createdCount++;
         } else if (data.village && !existing.village) {
           // Update existing farmer with village data if missing

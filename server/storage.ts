@@ -130,6 +130,7 @@ export interface IStorage {
   // Cash Entry operations
   getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]>;
   countCashEntriesByCodePrefix(merchantId: number, prefix: string): Promise<number>;
+  getMaxCashCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
@@ -941,6 +942,26 @@ export class DatabaseStorage implements IStorage {
         sql`${cashEntries.transactionCode} LIKE ${prefix + '%'}`
       ));
     return result.length;
+  }
+
+  async getMaxCashCodeSequence(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select({ transactionCode: cashEntries.transactionCode }).from(cashEntries)
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        sql`${cashEntries.transactionCode} LIKE ${prefix + '%'}`
+      ));
+    
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.transactionCode) {
+        const seqStr = row.transactionCode.replace(prefix, '');
+        const seq = parseInt(seqStr, 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    }
+    return maxSeq;
   }
 
   async createCashEntry(entry: InsertCashEntry): Promise<CashEntry> {
@@ -1769,26 +1790,36 @@ export class DatabaseStorage implements IStorage {
       return { buyerId: existingBuyer.id, isNew: false };
     }
     
-    // Create new buyer with ID format: BYYYYYMMDD#
+    // Create new buyer with ID format: BYYYYYMMDD# (with retry for collision handling)
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
     const prefix = `BY${dateStr}`;
-    const maxSeq = await this.getMaxBuyerCodeSequence(merchantId, prefix);
-    const buyerCode = `${prefix}${maxSeq + 1}`;
     
-    const newBuyer = await this.createBuyer({
-      merchantId,
-      buyerCode,
-      dateAdded: today.toISOString().split('T')[0],
-      name: buyerData.name,
-      contact: buyerData.contact || null,
-      address: buyerData.address || "",
-      mandiCode: buyerData.mandiCode || null,
-      negativeFlag: false,
-      isActive: true,
-    });
-    
-    return { buyerId: newBuyer.id, isNew: true };
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const maxSeq = await this.getMaxBuyerCodeSequence(merchantId, prefix);
+      const buyerCode = `${prefix}${maxSeq + 1 + attempt}`;
+      try {
+        const newBuyer = await this.createBuyer({
+          merchantId,
+          buyerCode,
+          dateAdded: today.toISOString().split('T')[0],
+          name: buyerData.name,
+          contact: buyerData.contact || null,
+          address: buyerData.address || "",
+          mandiCode: buyerData.mandiCode || null,
+          negativeFlag: false,
+          isActive: true,
+        });
+        return { buyerId: newBuyer.id, isNew: true };
+      } catch (error: any) {
+        if (error?.code === '23505' && error?.constraint?.includes('buyer_code') && attempt < maxRetries - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Failed to generate unique buyer code after multiple attempts");
   }
 
   async syncPartiesWithBuyers(merchantId: number): Promise<{ partiesLinked: number; buyersCreated: number }> {
@@ -1935,30 +1966,40 @@ export class DatabaseStorage implements IStorage {
       return { farmerId: existingFarmer.id, isNew: false };
     }
     
-    // Create new farmer
+    // Create new farmer with retry for collision handling
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
     const prefix = `FM${dateStr}`;
-    const maxSeq = await this.getMaxFarmerCodeSequence(merchantId, prefix);
-    const farmerCode = `${prefix}${maxSeq + 1}`;
     
-    const newFarmer = await this.createFarmer({
-      merchantId,
-      farmerCode,
-      dateAdded: today.toISOString().split('T')[0],
-      name: farmerData.name,
-      contact: farmerData.contact || null,
-      village: farmerData.village || null,
-      tehsil: farmerData.tehsil || null,
-      district: farmerData.district || null,
-      state: farmerData.state || null,
-      pyPayable: "0",
-      pyReceivable: "0",
-      negativeFlag: false,
-      isArchived: false,
-    });
-    
-    return { farmerId: newFarmer.id, isNew: true };
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const maxSeq = await this.getMaxFarmerCodeSequence(merchantId, prefix);
+      const farmerCode = `${prefix}${maxSeq + 1 + attempt}`;
+      try {
+        const newFarmer = await this.createFarmer({
+          merchantId,
+          farmerCode,
+          dateAdded: today.toISOString().split('T')[0],
+          name: farmerData.name,
+          contact: farmerData.contact || null,
+          village: farmerData.village || null,
+          tehsil: farmerData.tehsil || null,
+          district: farmerData.district || null,
+          state: farmerData.state || null,
+          pyPayable: "0",
+          pyReceivable: "0",
+          negativeFlag: false,
+          isArchived: false,
+        });
+        return { farmerId: newFarmer.id, isNew: true };
+      } catch (error: any) {
+        if (error?.code === '23505' && error?.constraint?.includes('farmer_code') && attempt < maxRetries - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Failed to generate unique farmer code after multiple attempts");
   }
 
   // ===================== FARMER EDIT HISTORY OPERATIONS =====================
