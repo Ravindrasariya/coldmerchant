@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -44,6 +44,39 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     gradingCharges: lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0,
     transportCharges: lot.transportCharges ? parseFloat(lot.transportCharges) : 0,
   })));
+
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState<number | null>(null);
+  const coldStoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const searchColdStores = useCallback(async (query: string, lotIndex: number) => {
+    if (query.length < 1) {
+      setColdStoreSuggestions([]);
+      return;
+    }
+    try {
+      const response = await fetch(`/api/cold-stores/search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setColdStoreSuggestions(data);
+        setShowColdStoreSuggestions(lotIndex);
+      }
+    } catch (error) {
+      console.error("Error searching cold stores:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const dropdowns = document.querySelectorAll('[data-seed-edit-coldstore-dropdown]');
+      let isInside = false;
+      dropdowns.forEach(el => { if (el.contains(target)) isInside = true; });
+      if (!isInside) setShowColdStoreSuggestions(null);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   interface SeedLotUpdate {
     id: number;
@@ -144,7 +177,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {t("Edit Seed Stock Entry", "बीज स्टॉक एंट्री संपादित करें")} #{entry.serialNumber}
@@ -185,13 +218,53 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
             {seedLots.map((lot, lotIndex) => (
               <Card key={lot.id} className="border-border/50">
                 <CardHeader className="py-2 px-4">
-                  <div className="flex items-center gap-2">
-                    <Snowflake className="h-4 w-4 text-blue-500" />
-                    <span className="font-medium">{lot.coldStoreName}</span>
-                    <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <Snowflake className="h-4 w-4 text-blue-500 shrink-0" />
+                    <div className="relative flex-1 max-w-[220px]">
+                      <Input
+                        value={lot.coldStoreName}
+                        onChange={(e) => {
+                          handleLotChange(lotIndex, "coldStoreName", e.target.value);
+                          if (coldStoreDebounceRef.current) clearTimeout(coldStoreDebounceRef.current);
+                          coldStoreDebounceRef.current = setTimeout(() => {
+                            searchColdStores(e.target.value, lotIndex);
+                          }, 300);
+                        }}
+                        onFocus={() => {
+                          if (lot.coldStoreName && lot.coldStoreName.length >= 1) {
+                            searchColdStores(lot.coldStoreName, lotIndex);
+                          }
+                        }}
+                        placeholder={t("Cold Store Name", "कोल्ड स्टोर का नाम")}
+                        autoComplete="off"
+                        className="h-8 text-sm"
+                        data-testid={`seed-edit-cold-store-name-${lotIndex}`}
+                      />
+                      {showColdStoreSuggestions === lotIndex && coldStoreSuggestions.length > 0 && (
+                        <div
+                          data-seed-edit-coldstore-dropdown
+                          className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md max-h-40 overflow-auto"
+                        >
+                          {coldStoreSuggestions.map((name, idx) => (
+                            <div
+                              key={idx}
+                              className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                              onClick={() => {
+                                handleLotChange(lotIndex, "coldStoreName", name);
+                                setShowColdStoreSuggestions(null);
+                              }}
+                              data-testid={`seed-edit-coldstore-suggestion-${lotIndex}-${idx}`}
+                            >
+                              {name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0 shrink-0">
                       {lot.potatoType}
                     </Badge>
-                    <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0">
+                    <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0 shrink-0">
                       {lot.size}
                     </Badge>
                   </div>
