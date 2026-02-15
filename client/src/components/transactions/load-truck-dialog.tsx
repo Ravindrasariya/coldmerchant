@@ -364,12 +364,11 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
   };
 
   const handleSubmit = () => {
-    // Validate at least one buyer has items
-    const validSections = buyerSections.filter(
+    const sectionsWithItems = buyerSections.filter(
       (s) => s.items.some((item) => item.inventoryKey && item.bagsMoved > 0)
     );
 
-    if (validSections.length === 0) {
+    if (sectionsWithItems.length === 0) {
       toast({
         title: t("Error", "त्रुटि"),
         description: t("At least one lot must be selected", "कम से कम एक लॉट चुनना होगा"),
@@ -378,7 +377,17 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
       return;
     }
 
-    createMutation.mutate(validSections);
+    const missingBuyer = sectionsWithItems.find((s) => !s.buyerId);
+    if (missingBuyer) {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: t("Please select a buyer for all sections", "सभी अनुभागों के लिए खरीदार चुनें"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createMutation.mutate(sectionsWithItems);
   };
 
   const handleCancel = () => {
@@ -543,17 +552,6 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                   ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("Party Name (Custom)", "पार्टी का नाम (कस्टम)")}</Label>
-                            <Input
-                              value={section.partyName}
-                              onChange={(e) =>
-                                updateBuyerSection(section.id, { partyName: e.target.value })
-                              }
-                              placeholder={t("Or enter custom name", "या कस्टम नाम दर्ज करें")}
-                              data-testid={`input-party-name-${sectionIndex}`}
-                            />
                           </div>
                         </div>
 
