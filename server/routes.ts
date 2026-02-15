@@ -6,6 +6,15 @@ import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStoc
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 
+function titleCase(str: string | null | undefined): string | null {
+  if (!str) return null;
+  return str.trim().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function titleCaseKeep(str: string): string {
+  return str.trim().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated() || !req.user) {
@@ -348,12 +357,12 @@ export async function registerRoutes(
 
       // Lookup or create farmer in farmer ledger
       const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
-        name: data.farmerName,
+        name: titleCaseKeep(data.farmerName),
         contact: data.farmerContact || null,
-        village: data.village || null,
-        tehsil: data.tehsil || null,
-        district: data.district || null,
-        state: data.state || null,
+        village: titleCase(data.village) || null,
+        tehsil: titleCase(data.tehsil) || null,
+        district: titleCase(data.district) || null,
+        state: titleCase(data.state) || null,
       });
 
       // Create stock entry
@@ -362,12 +371,12 @@ export async function registerRoutes(
         crop: entryCrop,
         purchaseDate: data.purchaseDate,
         farmerId,
-        farmerName: data.farmerName,
+        farmerName: titleCaseKeep(data.farmerName),
         farmerContact: data.farmerContact || null,
-        village: data.village || null,
-        tehsil: data.tehsil || null,
-        district: data.district,
-        state: data.state,
+        village: titleCase(data.village) || null,
+        tehsil: titleCase(data.tehsil) || null,
+        district: titleCase(data.district) || data.district,
+        state: titleCase(data.state) || data.state,
         remarks: data.remarks || null,
         paymentStatus: "due",
       });
@@ -378,7 +387,7 @@ export async function registerRoutes(
           stockEntryId: stockEntry.id,
           merchantId,
           place: lotData.place || "cold_store",
-          coldStoreName: lotData.place === "cold_store" ? (lotData.coldStoreName || null) : null,
+          coldStoreName: lotData.place === "cold_store" ? (titleCase(lotData.coldStoreName) || null) : null,
           coldStoreLotNumber: lotData.place === "cold_store" ? (lotData.coldStoreLotNumber || null) : null,
           crop: lotData.crop || "potato",
           originalBags: lotData.originalBags,
@@ -587,7 +596,7 @@ export async function registerRoutes(
                 ? (lotData.harvestPotatoType || null)
                 : undefined,
               coldStoreName: lotData.coldStoreName !== undefined
-                ? (lotData.coldStoreName || null)
+                ? (titleCase(lotData.coldStoreName) || null)
                 : undefined,
               coldStoreLotNumber: lotData.coldStoreLotNumber !== undefined
                 ? (lotData.coldStoreLotNumber || null)
@@ -1219,9 +1228,9 @@ export async function registerRoutes(
           merchantId,
           transactionNumber,
           crop: transactionCrop,
-          transporterName: transporterName || null,
+          transporterName: titleCase(transporterName) || null,
           dateOfLoading: dateOfLoading || null,
-          partyName: partyName || null,
+          partyName: titleCase(partyName) || null,
           partyAddress: partyAddress || null,
           vehicleNumber: vehicleNumber || null,
           buyerId: buyerId ? parseInt(buyerId) : null,
@@ -1325,7 +1334,7 @@ export async function registerRoutes(
       
       // Update the transaction (do NOT update revenue - it's derived from items)
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
-        partyName: partyName || null,
+        partyName: titleCase(partyName) || null,
         partyAddress: partyAddress || null,
         vehicleNumber: vehicleNumber || null,
         advancePayment: advancePayment ? advancePayment.toString() : null,
@@ -1904,12 +1913,12 @@ export async function registerRoutes(
         fromBankAccountId: fromBankAccountId || null,
         toAccountType: toAccountType || null,
         toBankAccountId: toBankAccountId || null,
-        partyName: partyName || null,
-        partyVillage: partyVillage || null,
-        farmerName: farmerName || null,
-        farmerVillage: farmerVillage || null,
-        coldStoreName: coldStoreName || null,
-        supplierName: supplierName || null,
+        partyName: titleCase(partyName) || null,
+        partyVillage: titleCase(partyVillage) || null,
+        farmerName: titleCase(farmerName) || null,
+        farmerVillage: titleCase(farmerVillage) || null,
+        coldStoreName: titleCase(coldStoreName) || null,
+        supplierName: titleCase(supplierName) || null,
         amount: amount.toString(),
         entryDate,
         remarks: remarks || null,
@@ -2001,18 +2010,19 @@ export async function registerRoutes(
       }
 
       // Lookup or create buyer in buyer ledger
+      const tcPartyName = titleCaseKeep(name);
       const { buyerId } = await storage.lookupOrCreateBuyer(merchantId, {
-        name: name,
+        name: tcPartyName,
         contact: contactNumber || null,
-        address: address || null,
+        address: titleCase(address) || null,
       });
 
       const party = await storage.createParty({
         merchantId,
         buyerId,
-        name,
+        name: tcPartyName,
         contactNumber: contactNumber || null,
-        address: address || null,
+        address: titleCase(address) || null,
         pendingDues: pendingDues?.toString() || "0",
       });
       res.status(201).json(party);
@@ -2091,24 +2101,25 @@ export async function registerRoutes(
       }
 
       // Lookup or create farmer in farmer ledger
+      const tcName = titleCaseKeep(name);
       const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
-        name: name,
+        name: tcName,
         contact: contactNumber || null,
-        village: village || null,
-        tehsil: tehsil || null,
-        district: district || null,
-        state: state || null,
+        village: titleCase(village) || null,
+        tehsil: titleCase(tehsil) || null,
+        district: titleCase(district) || null,
+        state: titleCase(state) || null,
       });
 
       const farmer = await storage.createCashFarmer({
         merchantId,
         farmerId,
-        name,
+        name: tcName,
         contactNumber: contactNumber || null,
-        village: village || null,
-        tehsil: tehsil || null,
-        district: district || null,
-        state: state || null,
+        village: titleCase(village) || null,
+        tehsil: titleCase(tehsil) || null,
+        district: titleCase(district) || null,
+        state: titleCase(state) || null,
         pendingDueToBePaid: pendingDueToBePaid?.toString() || "0",
       });
       res.status(201).json(farmer);
@@ -2125,12 +2136,12 @@ export async function registerRoutes(
       const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid } = req.body;
 
       const farmer = await storage.updateCashFarmer(id, merchantId, {
-        ...(name && { name }),
+        ...(name && { name: titleCaseKeep(name) }),
         ...(contactNumber !== undefined && { contactNumber }),
-        ...(village !== undefined && { village }),
-        ...(tehsil !== undefined && { tehsil }),
-        ...(district !== undefined && { district }),
-        ...(state !== undefined && { state }),
+        ...(village !== undefined && { village: titleCase(village) }),
+        ...(tehsil !== undefined && { tehsil: titleCase(tehsil) }),
+        ...(district !== undefined && { district: titleCase(district) }),
+        ...(state !== undefined && { state: titleCase(state) }),
         ...(pendingDueToBePaid !== undefined && { pendingDueToBePaid: pendingDueToBePaid?.toString() }),
       });
       
@@ -2232,8 +2243,8 @@ export async function registerRoutes(
         merchantId,
         buyerCode,
         dateAdded: effectiveDateAdded,
-        name,
-        address,
+        name: titleCaseKeep(name),
+        address: titleCase(address) || address,
         mandiCode: mandiCode || null,
         contact: contact || null,
         negativeFlag: negativeFlag ?? false,
@@ -2266,8 +2277,8 @@ export async function registerRoutes(
 
       const buyer = await storage.updateBuyer(id, merchantId, {
         ...(dateAdded !== undefined && { dateAdded }),
-        ...(name !== undefined && { name }),
-        ...(address !== undefined && { address }),
+        ...(name !== undefined && { name: titleCaseKeep(name) }),
+        ...(address !== undefined && { address: titleCase(address) || address }),
         ...(mandiCode !== undefined && { mandiCode }),
         ...(contact !== undefined && { contact }),
         ...(negativeFlag !== undefined && { negativeFlag }),
@@ -2701,12 +2712,12 @@ export async function registerRoutes(
           // Prefer entries with more complete data (tehsil, district, state)
           if (!existing || (entry.tehsil && !existing.tehsil)) {
             farmerMap.set(key, {
-              name: entry.farmerName.trim(),
+              name: titleCaseKeep(entry.farmerName.trim()),
               contact: entry.farmerContact?.trim() || null,
-              village: entry.village?.trim() || null,
-              tehsil: entry.tehsil?.trim() || existing?.tehsil || null,
-              district: entry.district || existing?.district || null,
-              state: entry.state || existing?.state || null,
+              village: titleCase(entry.village) || null,
+              tehsil: titleCase(entry.tehsil) || existing?.tehsil || null,
+              district: titleCase(entry.district) || existing?.district || null,
+              state: titleCase(entry.state) || existing?.state || null,
             });
           }
         }
@@ -2720,20 +2731,20 @@ export async function registerRoutes(
           
           if (!existing) {
             farmerMap.set(key, {
-              name: txn.farmerName.trim(),
+              name: titleCaseKeep(txn.farmerName.trim()),
               contact: txn.farmerContact?.trim() || null,
-              village: txn.village?.trim() || null,
-              tehsil: txn.tehsil?.trim() || null,
-              district: txn.district || null,
-              state: txn.state || null,
+              village: titleCase(txn.village) || null,
+              tehsil: titleCase(txn.tehsil) || null,
+              district: titleCase(txn.district) || null,
+              state: titleCase(txn.state) || null,
             });
           } else if (txn.tehsil && !existing.tehsil) {
             // Update with tehsil/district/state if missing
             farmerMap.set(key, {
               ...existing,
-              tehsil: txn.tehsil?.trim() || null,
-              district: txn.district || existing.district || null,
-              state: txn.state || existing.state || null,
+              tehsil: titleCase(txn.tehsil) || null,
+              district: titleCase(txn.district) || existing.district || null,
+              state: titleCase(txn.state) || existing.state || null,
             });
           }
         }
@@ -2939,12 +2950,12 @@ export async function registerRoutes(
 
       // Update farmer with propagation
       const result = await storage.updateFarmerWithPropagation(id, merchantId, userId, {
-        name: name.trim(),
+        name: titleCaseKeep(name.trim()),
         contact: contact?.trim() || null,
-        village: village?.trim() || null,
-        tehsil: tehsil?.trim() || null,
-        district: district?.trim() || null,
-        state: state?.trim() || null,
+        village: titleCase(village) || null,
+        tehsil: titleCase(tehsil) || null,
+        district: titleCase(district) || null,
+        state: titleCase(state) || null,
       });
 
       if (!result.farmer) {
@@ -3113,11 +3124,11 @@ export async function registerRoutes(
       const seedEntry = await storage.createSeedEntry({
         merchantId,
         purchaseDate: data.purchaseDate,
-        supplierName: data.supplierName,
+        supplierName: titleCaseKeep(data.supplierName),
         supplierContact: data.supplierContact || null,
-        address: data.address || null,
-        district: data.district,
-        state: data.state,
+        address: titleCase(data.address) || null,
+        district: titleCase(data.district) || data.district,
+        state: titleCase(data.state) || data.state,
         remarks: data.remarks || null,
         paymentStatus: "due",
       });
@@ -3127,7 +3138,7 @@ export async function registerRoutes(
         await storage.createSeedLot({
           seedEntryId: seedEntry.id,
           merchantId,
-          coldStoreName: lotData.coldStoreName,
+          coldStoreName: titleCaseKeep(lotData.coldStoreName),
           originalBags: lotData.originalBags,
           potatoType: lotData.potatoType,
           bagType: lotData.bagType,
@@ -3269,7 +3280,7 @@ export async function registerRoutes(
 
             // Update existing lot
             await storage.updateSeedLot(lotData.id, merchantId, {
-              coldStoreName: lotData.coldStoreName,
+              coldStoreName: titleCase(lotData.coldStoreName) || lotData.coldStoreName,
               originalBags: lotData.originalBags,
               potatoType: lotData.potatoType,
               bagType: lotData.bagType,
@@ -3295,7 +3306,7 @@ export async function registerRoutes(
             await storage.createSeedLot({
               seedEntryId: id,
               merchantId,
-              coldStoreName: lotData.coldStoreName,
+              coldStoreName: titleCaseKeep(lotData.coldStoreName),
               originalBags: lotData.originalBags,
               potatoType: lotData.potatoType,
               bagType: lotData.bagType,
@@ -3625,13 +3636,14 @@ export async function registerRoutes(
       }
 
       // Lookup or create farmer in farmer ledger
+      const tcFarmerName = titleCaseKeep(farmerName);
       const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
-        name: farmerName,
+        name: tcFarmerName,
         contact: farmerContact || null,
-        village: village || null,
-        tehsil: tehsil || null,
-        district: district || null,
-        state: state || null,
+        village: titleCase(village) || null,
+        tehsil: titleCase(tehsil) || null,
+        district: titleCase(district) || null,
+        state: titleCase(state) || null,
       });
 
       // Calculate totals
@@ -3694,12 +3706,12 @@ export async function registerRoutes(
           merchantId,
           transactionNumber,
           farmerId,
-          farmerName,
+          farmerName: tcFarmerName,
           farmerContact: farmerContact || null,
-          village: village || null,
-          tehsil: tehsil || null,
-          district,
-          state,
+          village: titleCase(village) || null,
+          tehsil: titleCase(tehsil) || null,
+          district: titleCase(district) || district,
+          state: titleCase(state) || state,
           vehicleNumber: vehicleNumber || null,
           transportCharges: transportTotal.toString(),
           otherCharges: otherTotal.toString(),

@@ -478,7 +478,7 @@ export default function HomePage() {
               {t("Please set a new password to continue. This is required on first login.", "जारी रखने के लिए कृपया नया पासवर्ड सेट करें। पहले लॉगिन पर यह आवश्यक है।")}
             </p>
           )}
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4" data-no-capitalize>
             {/* Mobile number is always required for validation */}
             <div className="space-y-2">
               <Label htmlFor="mobile-number">{t("Registered Mobile Number", "पंजीकृत मोबाइल नंबर")}</Label>
