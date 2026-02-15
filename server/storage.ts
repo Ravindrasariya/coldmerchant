@@ -1342,26 +1342,7 @@ export class DatabaseStorage implements IStorage {
         const entryBuyerId = entry.buyerId || null;
         const normalizedPartyName = normalizeName(entry.partyName);
         
-        // STEP 1: First clear receivable dues (pendingDues) from managed party in Cash Settings
-        const allParties = await tx.select().from(parties)
-          .where(eq(parties.merchantId, entry.merchantId));
-        const matchingParty = allParties.find(p => {
-          if (entryBuyerId && p.buyerId === entryBuyerId) return true;
-          return normalizeName(p.name) === normalizedPartyName;
-        });
-        if (matchingParty && remainingAmount > 0) {
-          const currentPendingDues = parseFloat(matchingParty.pendingDues || "0");
-          if (currentPendingDues > 0) {
-            const toApplyToReceivable = Math.min(remainingAmount, currentPendingDues);
-            const newPendingDues = currentPendingDues - toApplyToReceivable;
-            await tx.update(parties)
-              .set({ pendingDues: newPendingDues.toFixed(2), updatedAt: new Date() })
-              .where(and(eq(parties.id, matchingParty.id), eq(parties.merchantId, entry.merchantId)));
-            remainingAmount -= toApplyToReceivable;
-          }
-        }
-        
-        // STEP 2: Apply remaining amount to transactions using FIFO (oldest first)
+        // Apply amount to transactions using FIFO (oldest first)
         if (remainingAmount > 0) {
           const txns = await tx.select().from(transactions)
             .where(eq(transactions.merchantId, entry.merchantId))
@@ -1425,26 +1406,7 @@ export class DatabaseStorage implements IStorage {
           return true;
         };
         
-        // STEP 1: First clear PY receivable dues (pendingDueToBePaid) from managed farmer in Cash Settings
-        const allCashFarmers = await tx.select().from(cashFarmers)
-          .where(eq(cashFarmers.merchantId, entry.merchantId));
-        const matchingCashFarmer = allCashFarmers.find(f => {
-          if (entryFarmerId && f.farmerId === entryFarmerId) return true;
-          return farmerCompositeMatch(f.name, f.contactNumber, f.village);
-        });
-        if (matchingCashFarmer && remainingAmount > 0) {
-          const currentReceivable = parseFloat(matchingCashFarmer.pendingDueToBePaid || "0");
-          if (currentReceivable > 0) {
-            const toApplyToReceivable = Math.min(remainingAmount, currentReceivable);
-            const newReceivable = currentReceivable - toApplyToReceivable;
-            await tx.update(cashFarmers)
-              .set({ pendingDueToBePaid: newReceivable.toFixed(2), updatedAt: new Date() })
-              .where(and(eq(cashFarmers.id, matchingCashFarmer.id), eq(cashFarmers.merchantId, entry.merchantId)));
-            remainingAmount -= toApplyToReceivable;
-          }
-        }
-        
-        // STEP 2: Apply remaining amount to seed transactions using FIFO (oldest first)
+        // Apply amount to seed transactions using FIFO (oldest first)
         if (remainingAmount > 0) {
           const allSeedTxns = await tx.select().from(seedTransactions)
             .where(eq(seedTransactions.merchantId, entry.merchantId))
@@ -3200,26 +3162,7 @@ export class DatabaseStorage implements IStorage {
           matchedBuyerId = matchedBuyer?.id || null;
         }
         
-        // STEP 1: First clear receivable dues from managed party
-        const allParties = await tx.select().from(parties)
-          .where(eq(parties.merchantId, entry.merchantId));
-        const matchingParty = allParties.find(p => {
-          if (matchedBuyerId && p.buyerId === matchedBuyerId) return true;
-          return normalizeName(p.name) === normalizedPartyName;
-        });
-        if (matchingParty && remainingAmount > 0) {
-          const currentPendingDues = parseFloat(matchingParty.pendingDues || "0");
-          if (currentPendingDues > 0) {
-            const toApplyToReceivable = Math.min(remainingAmount, currentPendingDues);
-            const newPendingDues = currentPendingDues - toApplyToReceivable;
-            await tx.update(parties)
-              .set({ pendingDues: newPendingDues.toFixed(2), updatedAt: new Date() })
-              .where(and(eq(parties.id, matchingParty.id), eq(parties.merchantId, entry.merchantId)));
-            remainingAmount -= toApplyToReceivable;
-          }
-        }
-        
-        // STEP 2: Apply remaining to transactions FIFO
+        // Apply to transactions FIFO
         if (remainingAmount > 0) {
           const txns = await tx.select().from(transactions)
             .where(eq(transactions.merchantId, entry.merchantId))
@@ -3288,55 +3231,16 @@ export class DatabaseStorage implements IStorage {
             return true;
           };
           
-          // Use entry.farmerId directly if available, otherwise find by composite key
+          // Resolve farmerId if not directly available
           let matchedFarmerId = entryFarmerId;
-          let matchedFarmer: any = null;
-          if (matchedFarmerId) {
-            const [f] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
-            matchedFarmer = f || null;
-          }
-          if (!matchedFarmer) {
+          if (!matchedFarmerId) {
             const allFarmers = await tx.select().from(farmers)
               .where(eq(farmers.merchantId, entry.merchantId));
-            matchedFarmer = allFarmers.find(f => farmerCompositeMatch(f.name, f.contact, f.village));
+            const matchedFarmer = allFarmers.find(f => farmerCompositeMatch(f.name, f.contact, f.village));
             matchedFarmerId = matchedFarmer?.id || null;
           }
           
-          // STEP 1: Clear PY receivable from managed farmer (Cash Settings)
-          const allCashFarmers = await tx.select().from(cashFarmers)
-            .where(eq(cashFarmers.merchantId, entry.merchantId));
-          const matchingCashFarmer = allCashFarmers.find(f => {
-            if (matchedFarmerId && f.farmerId === matchedFarmerId) return true;
-            return farmerCompositeMatch(f.name, f.contactNumber, f.village);
-          });
-          if (matchingCashFarmer && remainingAmount > 0) {
-            const currentReceivable = parseFloat(matchingCashFarmer.pendingDueToBePaid || "0");
-            if (currentReceivable > 0) {
-              const toApplyToReceivable = Math.min(remainingAmount, currentReceivable);
-              const newReceivable = currentReceivable - toApplyToReceivable;
-              await tx.update(cashFarmers)
-                .set({ pendingDueToBePaid: newReceivable.toFixed(2), updatedAt: new Date() })
-                .where(and(eq(cashFarmers.id, matchingCashFarmer.id), eq(cashFarmers.merchantId, entry.merchantId)));
-              remainingAmount -= toApplyToReceivable;
-            }
-          }
-          
-          // STEP 2: Reduce farmer's pyReceivable balance in farmer ledger
-          if (matchedFarmer && remainingAmount > 0) {
-            const currentPyReceivable = parseFloat(matchedFarmer.pyReceivable || "0");
-            if (currentPyReceivable > 0) {
-              const toApplyToPy = Math.min(remainingAmount, currentPyReceivable);
-              const newPyReceivable = currentPyReceivable - toApplyToPy;
-              
-              await tx.update(farmers)
-                .set({ pyReceivable: newPyReceivable.toString() })
-                .where(eq(farmers.id, matchedFarmer.id));
-              
-              remainingAmount -= toApplyToPy;
-            }
-          }
-          
-          // STEP 3: Apply remaining to seed transactions FIFO
+          // Apply to seed transactions FIFO
           if (remainingAmount > 0) {
             const allSeedTxns = await tx.select().from(seedTransactions)
               .where(eq(seedTransactions.merchantId, entry.merchantId))
