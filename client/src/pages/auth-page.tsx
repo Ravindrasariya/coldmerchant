@@ -160,8 +160,8 @@ export default function AuthPage() {
             </Form>
 
             <div className="mt-6 pt-4 border-t text-center text-sm text-muted-foreground">
-              Need Help? Please reach out to <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>{" "}
-              <span className="font-medium">8882589392</span>
+              Need Help? Please reach out to <span className="whitespace-nowrap"><span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span>{" "}
+              <span className="font-medium">+918882589392</span>
             </div>
           </CardContent>
         </Card>

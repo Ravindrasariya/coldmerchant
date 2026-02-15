@@ -125,7 +125,7 @@ export default function HomePage() {
               </div>
               <div className="flex flex-col h-9 sm:h-12">
                 <span className="font-bold text-base sm:text-xl leading-tight text-primary">Vyapar Vriddhi</span>
-                <span className="text-[9px] sm:text-[10px] leading-none mt-1 sm:mt-2">
+                <span className="text-[9px] sm:text-[10px] leading-none mt-1 sm:mt-2 whitespace-nowrap">
                   by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
                 </span>
               </div>
@@ -261,7 +261,7 @@ export default function HomePage() {
                         </div>
                         <div className="flex flex-col h-12 justify-center">
                           <span className="font-bold text-xl leading-tight text-primary">Vyapar Vriddhi</span>
-                          <span className="text-[10px] leading-none mt-1">
+                          <span className="text-[10px] leading-none mt-1 whitespace-nowrap">
                             by <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
                           </span>
                         </div>
@@ -436,20 +436,20 @@ export default function HomePage() {
             <div className="hidden md:flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                {t("Need Help? Reach out to", "मदद चाहिए? संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>: 8882589392
+                {t("Need Help? Reach out to", "मदद चाहिए? संपर्क करें")} <span className="whitespace-nowrap"><span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span>: +918882589392
               </div>
               <div className="flex items-center gap-4">
-                <span>{t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span>
+                <span>{t("Powered by", "द्वारा संचालित")} <span className="whitespace-nowrap"><span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span></span>
                 <span>{t("All Rights Reserved", "सर्वाधिकार सुरक्षित")}</span>
               </div>
             </div>
             {/* Mobile: Stacked layout */}
             <div className="flex flex-col items-center text-center gap-2 md:hidden">
               <div>
-                {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span> - 8882589392
+                {t("Need help? Please reach out to", "मदद चाहिए? कृपया संपर्क करें")} <span className="whitespace-nowrap"><span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span> - +918882589392
               </div>
               <div>
-                {t("Powered by", "द्वारा संचालित")} <span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span>
+                {t("Powered by", "द्वारा संचालित")} <span className="whitespace-nowrap"><span className="text-green-500 font-medium">Krashu</span><span className="text-orange-500 font-medium">Ved</span></span>
               </div>
               <div>
                 {t("All Rights Reserved", "सर्वाधिकार सुरक्षित")}
