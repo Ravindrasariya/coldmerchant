@@ -339,6 +339,9 @@ export function DashboardTab() {
         if (metrics.totalAmount !== null) {
           totalAmount += metrics.totalAmount;
         }
+        if (lot.place === "farm_gate") {
+          totalAmount += metrics.coldStoreTotalCharges;
+        }
       });
     });
 
