@@ -1778,7 +1778,7 @@ export async function registerRoutes(
   app.get("/api/cash/cross-settlement-check", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { farmerName, farmerVillage, farmerContact } = req.query;
+      const { farmerName, farmerVillage, farmerContact, farmerId } = req.query;
       
       if (!farmerName || typeof farmerName !== 'string') {
         return res.status(400).json({ message: "Farmer name is required" });
@@ -1788,7 +1788,8 @@ export async function registerRoutes(
         merchantId,
         farmerName,
         typeof farmerVillage === 'string' ? farmerVillage : null,
-        typeof farmerContact === 'string' ? farmerContact : null
+        typeof farmerContact === 'string' ? farmerContact : null,
+        farmerId ? parseInt(farmerId as string, 10) : null
       );
       
       res.json(eligibility);

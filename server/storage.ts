@@ -226,7 +226,7 @@ export interface IStorage {
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
   
   // Cross-Settlement operations (farmer identity matching across Raw Potato and Seed modules)
-  checkCrossSettlementEligibility(merchantId: number, farmerName: string, farmerVillage?: string | null, farmerContact?: string | null): Promise<{
+  checkCrossSettlementEligibility(merchantId: number, farmerName: string, farmerVillage?: string | null, farmerContact?: string | null, farmerId?: number | null): Promise<{
     hasSeedDues: boolean;
     seedDueAmount: number;
     seedTransactionIds: number[];
@@ -1030,12 +1030,21 @@ export class DatabaseStorage implements IStorage {
         or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
       ));
     
-    // Group by normalized farmerName (case-insensitive, trimmed) and calculate total due from lots
+    // Group by farmerId (primary) or composite key name+contact+village (fallback)
     const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }>();
     
+    const getFarmerKey = (entry: typeof entries[0]): string | null => {
+      if (entry.farmerId) return `id:${entry.farmerId}`;
+      const n = normalizeName(entry.farmerName);
+      if (!n) return null;
+      const c = normalizeName(entry.farmerContact);
+      const v = normalizeName(entry.village);
+      return `composite:${n}|${c}|${v}`;
+    };
+    
     for (const entry of entries) {
-      const normalizedName = normalizeName(entry.farmerName);
-      if (!normalizedName) continue;
+      const key = getFarmerKey(entry);
+      if (!key) continue;
       
       // Get all lots for this entry and calculate total cost
       const entryLots = await db.select().from(lots)
@@ -1044,19 +1053,15 @@ export class DatabaseStorage implements IStorage {
       let entryTotalCost = 0;
       let entryAdjustment = 0;
       for (const lot of entryLots) {
-        // Get breakdowns to calculate total weight and cost
         const breakdownList = await db.select().from(bagBreakdowns)
           .where(eq(bagBreakdowns.lotId, lot.id));
         
         if (breakdownList.length > 0) {
-          // Sum up total amount from breakdowns
           entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
         } else if (lot.pricePerKg) {
-          // Estimate from lot's pricePerKg and bags (approx 50kg per bag)
           entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
         }
         
-        // Apply adjustment (debit subtracts, credit adds)
         if (lot.adjustedAmount && lot.adjustedAmountType) {
           const adjustedAmount = parseFloat(lot.adjustedAmount);
           if (lot.adjustedAmountType === "debit") {
@@ -1067,24 +1072,22 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // Calculate due by subtracting amount already paid, and apply adjustment
       const amountPaid = parseFloat(entry.amountPaid || "0");
       const adjustedTotal = entryTotalCost + entryAdjustment;
       const entryDue = Math.max(0, adjustedTotal - amountPaid);
       
-      if (entryDue <= 0) continue; // Skip fully paid entries
+      if (entryDue <= 0) continue;
       
-      const existing = farmerMap.get(normalizedName);
+      const existing = farmerMap.get(key);
       if (existing) {
         existing.totalDue += entryDue;
         existing.entryCount += 1;
-        // Update contact if not already set
         if (!existing.farmerContact && entry.farmerContact) {
           existing.farmerContact = entry.farmerContact;
         }
       } else {
-        farmerMap.set(normalizedName, {
-          displayName: entry.farmerName.trim(), // Keep original casing but trim spaces
+        farmerMap.set(key, {
+          displayName: entry.farmerName.trim(),
           farmerContact: entry.farmerContact || null,
           village: entry.village,
           totalDue: entryDue,
@@ -1165,29 +1168,36 @@ export class DatabaseStorage implements IStorage {
     // Note: seed_sale cash entries are already applied via FIFO to reduce totalDueToFarmer,
     // so we don't need to subtract them again here. Just use totalDueToFarmer directly.
     
-    // Build farmer map from seed transactions (totalDueToFarmer is already reduced by FIFO payments)
+    // Build farmer map using farmerId (primary) or composite key name+contact+village (fallback)
     const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }>();
+    
+    const getSeedFarmerKey = (farmerId: number | null | undefined, name: string | null, contact: string | null | undefined, village: string | null | undefined): string | null => {
+      if (farmerId) return `id:${farmerId}`;
+      const n = normalizeName(name);
+      if (!n) return null;
+      const c = normalizeName(contact);
+      const v = normalizeName(village);
+      return `composite:${n}|${c}|${v}`;
+    };
     
     for (const txn of txns) {
       const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
       
-      if (dueToFarmer <= 0) continue; // Skip fully paid
+      if (dueToFarmer <= 0) continue;
       
-      // Use composite key (name + contact) for consistency with /api/farmers
-      const key = normalizeName(txn.farmerName) + "|" + normalizeName(txn.farmerContact || "");
-      if (!normalizeName(txn.farmerName)) continue;
+      const key = getSeedFarmerKey(txn.farmerId, txn.farmerName, txn.farmerContact, txn.village);
+      if (!key) continue;
       
       const existing = farmerMap.get(key);
       if (existing) {
         existing.totalDue += dueToFarmer;
         existing.transactionCount += 1;
-        // Update village if not already set
         if (!existing.village && txn.village) {
           existing.village = txn.village;
         }
       } else {
         farmerMap.set(key, {
-          displayName: txn.farmerName.trim(), // Keep original casing but trim spaces
+          displayName: txn.farmerName.trim(),
           farmerContact: txn.farmerContact || null,
           village: txn.village || null,
           totalDue: dueToFarmer,
@@ -1211,21 +1221,17 @@ export class DatabaseStorage implements IStorage {
       }
       if (receivables <= 0) continue;
       
-      // Use composite key (name + contact) for consistency with /api/farmers
-      const key = normalizeName(farmer.name) + "|" + normalizeName(farmer.contactNumber || "");
-      if (!normalizeName(farmer.name)) continue;
+      const key = getSeedFarmerKey(farmer.farmerId, farmer.name, farmer.contactNumber, farmer.village);
+      if (!key) continue;
       
       const existing = farmerMap.get(key);
       if (existing) {
-        // Farmer already exists from seed transactions - add receivables
         existing.receivables += receivables;
         existing.totalDue += receivables;
-        // Update village if not already set
         if (!existing.village && farmer.village) {
           existing.village = farmer.village;
         }
       } else {
-        // New farmer entry only from receivables (no seed transactions)
         farmerMap.set(key, {
           displayName: farmer.name.trim(),
           farmerContact: farmer.contactNumber || null,
@@ -2866,7 +2872,8 @@ export class DatabaseStorage implements IStorage {
     merchantId: number, 
     farmerName: string, 
     farmerVillage?: string | null, 
-    farmerContact?: string | null
+    farmerContact?: string | null,
+    farmerId?: number | null
   ): Promise<{
     hasSeedDues: boolean;
     seedDueAmount: number;
@@ -2875,50 +2882,33 @@ export class DatabaseStorage implements IStorage {
     rawPotatoDueAmount: number;
     rawPotatoEntryIds: number[];
   }> {
+    const entryFarmerId = farmerId || null;
     const normalizedName = normalizeName(farmerName);
     const normalizedVillage = normalizeName(farmerVillage);
     const normalizedContact = normalizeName(farmerContact);
 
-    // Helper to match farmer identity (name required, village and contact optional but must match if provided)
     const matchesFarmer = (
+      recordFarmerId: number | null | undefined,
       name: string | null | undefined,
-      village: string | null | undefined,
-      contact: string | null | undefined
+      contact: string | null | undefined,
+      village: string | null | undefined
     ): boolean => {
+      if (entryFarmerId && recordFarmerId === entryFarmerId) return true;
       if (normalizeName(name) !== normalizedName) return false;
-      // If village is provided in search and in record, they must match
-      if (normalizedVillage && normalizeName(village) && normalizeName(village) !== normalizedVillage) return false;
-      // If contact is provided in search and in record, they must match
       if (normalizedContact && normalizeName(contact) && normalizeName(contact) !== normalizedContact) return false;
+      if (normalizedVillage && normalizeName(village) && normalizeName(village) !== normalizedVillage) return false;
       return true;
     };
 
     // Check for seed transaction dues (farmer owes money to merchant)
     const allSeedTxns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
-    
-    // Get all seed inward payments to calculate how much has been paid
-    const seedCashEntries = await db.select().from(cashEntries)
-      .where(and(
-        eq(cashEntries.merchantId, merchantId),
-        eq(cashEntries.direction, "inward"),
-        eq(cashEntries.revenueType, "seed_sale")
-      ));
-    
-    // Calculate paid amount per farmer (normalized)
-    const seedPaidByFarmer = new Map<string, number>();
-    for (const entry of seedCashEntries) {
-      if (entry.farmerName) {
-        const key = normalizeName(entry.farmerName);
-        seedPaidByFarmer.set(key, (seedPaidByFarmer.get(key) || 0) + parseFloat(entry.amount || "0"));
-      }
-    }
 
     let seedDueAmount = 0;
     const seedTransactionIdsWithDue: number[] = [];
     
     for (const txn of allSeedTxns) {
-      if (!matchesFarmer(txn.farmerName, txn.village, txn.farmerContact)) continue;
+      if (!matchesFarmer(txn.farmerId, txn.farmerName, txn.farmerContact, txn.village)) continue;
       
       const totalDue = parseFloat(txn.totalDueToFarmer || "0");
       if (totalDue > 0) {
@@ -2926,10 +2916,6 @@ export class DatabaseStorage implements IStorage {
         seedTransactionIdsWithDue.push(txn.id);
       }
     }
-    
-    // Subtract what's already been paid
-    const paidTowardsSeed = seedPaidByFarmer.get(normalizedName) || 0;
-    seedDueAmount = Math.max(0, seedDueAmount - paidTowardsSeed);
     
     // Also subtract cross-settlements (raw_to_seed) that offset seed dues
     const rawToSeedSettlements = await db.select().from(farmerSettlements)
@@ -2955,7 +2941,7 @@ export class DatabaseStorage implements IStorage {
     const rawPotatoEntryIdsWithDue: number[] = [];
 
     for (const entry of allStockEntries) {
-      if (!matchesFarmer(entry.farmerName, entry.village, entry.farmerContact)) continue;
+      if (!matchesFarmer(entry.farmerId, entry.farmerName, entry.farmerContact, entry.village)) continue;
       
       // Calculate total cost for this entry from lots and breakdowns
       const entryLots = await db.select().from(lots)
@@ -3030,7 +3016,7 @@ export class DatabaseStorage implements IStorage {
           settledAmount: crossSettlement.settledAmount.toString(),
           farmerName: entry.farmerName || "",
           farmerVillage: entry.farmerVillage,
-          farmerContact: null, // Could be added if needed
+          farmerContact: entry.farmerContact || null,
           rawPotatoStockEntryIds: crossSettlement.rawPotatoEntryIds,
           seedTransactionIds: crossSettlement.seedTransactionIds,
           cashEntryId: createdEntry.id,
