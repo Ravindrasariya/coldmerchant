@@ -200,7 +200,7 @@ const MONTHS_HI = ["जन", "फर", "मार्च", "अप्रै", "�
 
 const formatINR = (value: number) => `₹${new Intl.NumberFormat('en-IN').format(Math.round(value))}`;
 
-const PIE_COLORS = ["#16a34a", "#f97316", "#3b82f6", "#eab308", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
+const PIE_COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed", "#0891b2", "#be185d", "#4f46e5", "#ca8a04", "#0d9488"];
 
 export function DashboardTab() {
   const { user } = useAuth();
