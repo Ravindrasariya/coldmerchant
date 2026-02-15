@@ -37,6 +37,190 @@ export async function registerRoutes(
   // Setup authentication routes
   setupAuth(app);
 
+  // Dashboard Timeseries endpoint
+  app.get("/api/dashboard/timeseries", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const crop = (req.query.crop as string) || "all";
+      const yearsParam = (req.query.years as string) || "all";
+      const monthsParam = (req.query.months as string) || "all";
+      const daysParam = (req.query.days as string) || "all";
+
+      const yearsFilter = yearsParam === "all" ? null : yearsParam.split(",").map(Number);
+      const monthsFilter = monthsParam === "all" ? null : monthsParam.split(",").map(Number);
+      const daysFilter = daysParam === "all" ? null : daysParam.split(",").map(Number);
+
+      const matchesDateFilter = (dateStr: string): boolean => {
+        const d = new Date(dateStr);
+        if (yearsFilter && !yearsFilter.includes(d.getFullYear())) return false;
+        if (monthsFilter && !monthsFilter.includes(d.getMonth() + 1)) return false;
+        if (daysFilter && !daysFilter.includes(d.getDate())) return false;
+        return true;
+      };
+
+      const [allEntries, allLots, allBreakdowns, allTransactions, allSeedTransactions] = await Promise.all([
+        storage.getStockEntriesByMerchant(merchantId),
+        storage.getAllLotsByMerchant(merchantId),
+        storage.getAllBagBreakdownsByMerchant(merchantId),
+        storage.getTransactionsByMerchant(merchantId),
+        storage.getSeedTransactionsByMerchant(merchantId),
+      ]);
+
+      const lotsMap = new Map<number, any[]>();
+      for (const lot of allLots) {
+        const arr = lotsMap.get(lot.stockEntryId) || [];
+        arr.push(lot);
+        lotsMap.set(lot.stockEntryId, arr);
+      }
+
+      const breakdownsMap = new Map<number, any[]>();
+      for (const bd of allBreakdowns) {
+        const arr = breakdownsMap.get(bd.lotId) || [];
+        arr.push(bd);
+        breakdownsMap.set(bd.lotId, arr);
+      }
+
+      const filteredEntries = allEntries.filter(entry => {
+        if (crop !== "all" && entry.crop !== crop) return false;
+        if (!entry.purchaseDate) return false;
+        return matchesDateFilter(entry.purchaseDate);
+      });
+
+      const farmerDueMap = new Map<string, number>();
+      const volumeMap = new Map<string, number>();
+
+      for (const entry of filteredEntries) {
+        const dateKey = entry.purchaseDate;
+        const entryLots = lotsMap.get(entry.id) || [];
+
+        let entryTotalAmount = 0;
+        let entryDeductions = 0;
+        let entryAdjustment = 0;
+        let entryVolume = 0;
+
+        for (const lot of entryLots) {
+          const lotBreakdowns = breakdownsMap.get(lot.id) || [];
+          const sellable = lotBreakdowns.filter((bd: any) => bd.size !== "Wastage");
+
+          const hasBreakdownData = sellable.some((bd: any) => {
+            const w = bd.weight ? parseFloat(bd.weight) : 0;
+            const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+            return w > 0 && p > 0;
+          });
+
+          if (hasBreakdownData) {
+            for (const bd of sellable) {
+              const weight = bd.weight ? parseFloat(bd.weight) : 0;
+              entryVolume += weight;
+              const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+              const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+              if (netWeight > 0 && price > 0) {
+                entryTotalAmount += netWeight * price;
+              }
+            }
+          } else {
+            const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+            const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+            const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+            entryVolume += lotTotalWeight;
+            if (netWeight > 0 && price > 0) {
+              entryTotalAmount += netWeight * price;
+            }
+          }
+
+          const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
+          const dynamicCharges = (lot.charges || []).reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+          entryDeductions += hammaliGradingCharges + dynamicCharges;
+
+          const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
+          const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
+          const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
+
+          let finalAdj = 0;
+          if (rawAdjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
+            const effectiveDate = new Date(adjustedAmountEffectiveDate);
+            const today = new Date();
+            const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+            const years = days / 365;
+            finalAdj = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
+          }
+
+          if (finalAdj > 0 && lot.adjustedAmountType) {
+            if (lot.adjustedAmountType === "credit") {
+              entryAdjustment += finalAdj;
+            } else if (lot.adjustedAmountType === "debit") {
+              entryAdjustment -= finalAdj;
+            }
+          }
+        }
+
+        const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
+        const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+        const farmerDue = Math.max(netPayable - amountPaid, 0);
+
+        farmerDueMap.set(dateKey, (farmerDueMap.get(dateKey) || 0) + farmerDue);
+        volumeMap.set(dateKey, (volumeMap.get(dateKey) || 0) + entryVolume);
+      }
+
+      const filteredTransactions = allTransactions.filter(tx => {
+        if (crop !== "all" && tx.crop !== crop) return false;
+        if (!tx.dateOfLoading) return false;
+        return matchesDateFilter(tx.dateOfLoading);
+      });
+
+      const buyerDueMap = new Map<string, number>();
+      const pnlMap = new Map<string, number>();
+
+      for (const tx of filteredTransactions) {
+        const dateKey = tx.dateOfLoading!;
+        const revenue = tx.revenue ? parseFloat(tx.revenue) : 0;
+        const amountReceived = tx.amountReceived ? parseFloat(tx.amountReceived) : 0;
+        const buyerDue = Math.max(revenue - amountReceived, 0);
+        buyerDueMap.set(dateKey, (buyerDueMap.get(dateKey) || 0) + buyerDue);
+
+        const profitLoss = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
+        pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
+      }
+
+      for (const seedTx of allSeedTransactions) {
+        if (!seedTx.createdAt) continue;
+        const dateKey = new Date(seedTx.createdAt).toISOString().split("T")[0];
+        if (!matchesDateFilter(dateKey)) continue;
+        const totalPL = seedTx.totalProfitLoss ? parseFloat(seedTx.totalProfitLoss) : 0;
+        pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + totalPL);
+      }
+
+      const farmerDueTimeSeries = Array.from(farmerDueMap.entries())
+        .map(([date, amount]) => ({ date, amount: Math.round(amount * 100) / 100 }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const buyerDueTimeSeries = Array.from(buyerDueMap.entries())
+        .map(([date, amount]) => ({ date, amount: Math.round(amount * 100) / 100 }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const dailyVolumeTimeSeries = Array.from(volumeMap.entries())
+        .map(([date, volume]) => ({ date, volume: Math.round(volume * 100) / 100 }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const sortedPnlDates = Array.from(pnlMap.keys()).sort();
+      let cumulative = 0;
+      const cumulativePnlTimeSeries = sortedPnlDates.map(date => {
+        cumulative += pnlMap.get(date)!;
+        return { date, pnl: Math.round(cumulative * 100) / 100 };
+      });
+
+      res.json({
+        farmerDueTimeSeries,
+        buyerDueTimeSeries,
+        dailyVolumeTimeSeries,
+        cumulativePnlTimeSeries,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard timeseries:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard timeseries" });
+    }
+  });
+
   // Stock Entries Routes
   // GET /api/stock-entries - Get all stock entries for the authenticated merchant
   app.get("/api/stock-entries", requireMerchant, async (req, res) => {

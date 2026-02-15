@@ -37,19 +37,21 @@ import {
   Leaf,
   Users,
   Wheat,
-  Phone
+  Phone,
+  LayoutDashboard
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
 import { CashManagementTab } from "@/components/cash-management/cash-management-tab";
 import { FarmerLedgerTab } from "@/components/farmer-ledger/farmer-ledger-tab";
 import BuyersTab from "@/components/buyers/buyers-tab";
+import { DashboardTab } from "@/components/dashboard/dashboard-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
   const { user, logoutMutation, changePasswordMutation } = useAuth();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState("stock-entry");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [seedDownloadDialogOpen, setSeedDownloadDialogOpen] = useState(false);
   const [rawDownloadDialogOpen, setRawDownloadDialogOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -132,6 +134,14 @@ export default function HomePage() {
             {/* Navigation Tabs - Desktop (hidden on mobile) */}
             <nav className="hidden md:flex flex-1 overflow-x-auto scrollbar-hide">
               <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
+                <TabsTrigger 
+                  value="dashboard" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-dashboard"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  {t("Dashboard", "डैशबोर्ड")}
+                </TabsTrigger>
                 <TabsTrigger 
                   value="stock-entry" 
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
@@ -260,6 +270,15 @@ export default function HomePage() {
                     <nav className="flex-1 p-2">
                       <TabsList className="flex flex-col w-full h-auto gap-1 bg-transparent p-0">
                         <TabsTrigger 
+                          value="dashboard" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-dashboard-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="h-4 w-4" />
+                          {t("Dashboard", "डैशबोर्ड")}
+                        </TabsTrigger>
+                        <TabsTrigger 
                           value="stock-entry" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-stock-entry-mobile"
@@ -332,6 +351,10 @@ export default function HomePage() {
         </header>
 
         <main className="container max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
+          <div className={activeTab === "dashboard" ? "block" : "hidden"}>
+            <DashboardTab />
+          </div>
+
           <div className={activeTab === "stock-entry" ? "block" : "hidden"}>
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
