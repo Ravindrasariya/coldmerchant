@@ -351,6 +351,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       let entryColdStoreTotalCharges = 0;
       let entryColdStorePaid = 0;
 
+      let entryFarmGateColdCharges = 0;
+
       entry.lots.forEach(lot => {
         const metrics = computeLotMetrics(lot);
         bagsTotal += metrics.actualSellableBags;
@@ -368,6 +370,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         entryDeductions += metrics.totalDeductions;
         entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
         entryColdStorePaid += metrics.coldStorePaid;
+        if (lot.place === "farm_gate") {
+          entryFarmGateColdCharges += metrics.coldStoreTotalCharges;
+        }
       });
 
       // Net Payable = Total Payable - Deductions + Adjustment (matches edit dialog formula)
@@ -376,7 +381,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       farmerDue += Math.max(netPayable - amountPaid, 0);
       
-      totalPayable += entryTotalAmount;
+      // Total Cost: base payable + cold/warehouse charges for Farm Gate lots
+      // (Farm Gate cold charges aren't deducted from farmer but are still merchant's cost)
+      totalPayable += entryTotalAmount + entryFarmGateColdCharges;
       totalDeductions += entryDeductions;
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
