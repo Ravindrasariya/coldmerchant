@@ -121,6 +121,7 @@ interface LedgerFarmer {
   pyReceivable: string | null;
   harvestDue: number;
   seedDue: number;
+  netDue: number;
   coldDue: number;
   receivables: number;
   negativeFlag: boolean | null;
@@ -1571,18 +1572,9 @@ export function CashManagementTab() {
                                     <CommandGroup>
                                       {ledgerFarmers
                                         .filter(f => !f.isArchived)
-                                        .filter(f => {
-                                          // Show farmers with negative Net Due (they owe us)
-                                          // Net Due = pyReceivable + harvestDue - seedDue - receivables
-                                          const pyReceivable = parseFloat(f.pyReceivable || "0");
-                                          const netDue = pyReceivable + f.harvestDue - f.seedDue - (f.receivables || 0);
-                                          return netDue < 0;
-                                        })
+                                        .filter(f => f.netDue < 0)
                                         .map((farmer) => {
-                                          // Show absolute Net Due (positive value since they owe us)
-                                          const pyReceivable = parseFloat(farmer.pyReceivable || "0");
-                                          const netDue = pyReceivable + farmer.harvestDue - farmer.seedDue - (farmer.receivables || 0);
-                                          const amountOwedToUs = Math.abs(netDue);
+                                          const amountOwedToUs = Math.abs(farmer.netDue);
                                           return (
                                             <CommandItem
                                               key={farmer.id}
@@ -1733,15 +1725,8 @@ export function CashManagementTab() {
                               <SelectContent>
                                 {ledgerFarmers
                                   .filter(f => !f.isArchived)
-                                  .filter(f => {
-                                    const pyReceivable = parseFloat(f.pyReceivable || "0");
-                                    const netDue = pyReceivable + f.harvestDue - f.seedDue - (f.receivables || 0);
-                                    return netDue > 0;
-                                  })
-                                  .map((farmer) => {
-                                    const pyReceivable = parseFloat(farmer.pyReceivable || "0");
-                                    const netDue = pyReceivable + farmer.harvestDue - farmer.seedDue - (farmer.receivables || 0);
-                                    return (
+                                  .filter(f => f.netDue > 0)
+                                  .map((farmer) => (
                                       <SelectItem key={farmer.name} value={farmer.name}>
                                         <div className="flex items-center justify-between gap-4">
                                           <span>{farmer.name}</span>
@@ -1751,12 +1736,11 @@ export function CashManagementTab() {
                                             {farmer.contact || ""}
                                           </span>
                                           <Badge variant="secondary">
-                                            {t("Due", "बकाया")}: ₹{parseFloat(netDue.toFixed(1)).toLocaleString('en-IN')}
+                                            {t("Due", "बकाया")}: ₹{parseFloat(farmer.netDue.toFixed(1)).toLocaleString('en-IN')}
                                           </Badge>
                                         </div>
                                       </SelectItem>
-                                    );
-                                  })}
+                                    ))}
                               </SelectContent>
                             </Select>
                             <FormMessage />
