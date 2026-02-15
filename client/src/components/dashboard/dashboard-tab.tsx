@@ -399,6 +399,27 @@ export function DashboardTab() {
     return timeseries.buyerDueByName;
   }, [timeseries]);
 
+  const coldStoreBagsSplit = useMemo(() => {
+    const totalMap = new Map<string, number>();
+    const remainingMap = new Map<string, number>();
+    if (!stockEntries) return { total: [], remaining: [] };
+    stockEntries.forEach(entry => {
+      if (!matchesFilter(entry.purchaseDate, entry.crop || "potato")) return;
+      (entry.lots || []).forEach(lot => {
+        if (cropFilter !== "all" && (lot.crop || "potato") !== cropFilter) return;
+        if (lot.place !== "cold_store" || !lot.coldStoreName) return;
+        const name = lot.coldStoreName.trim();
+        const totalBags = (lot.bagBreakdowns || []).reduce((s: number, b: any) => s + (b.numberOfBags || 0), 0);
+        const remBags = (lot.bagBreakdowns || []).reduce((s: number, b: any) => s + (b.remainingBags || 0), 0);
+        totalMap.set(name, (totalMap.get(name) || 0) + totalBags);
+        remainingMap.set(name, (remainingMap.get(name) || 0) + remBags);
+      });
+    });
+    const total = Array.from(totalMap.entries()).map(([name, value]) => ({ name, value })).filter(d => d.value > 0);
+    const remaining = Array.from(remainingMap.entries()).map(([name, value]) => ({ name, value })).filter(d => d.value > 0);
+    return { total, remaining };
+  }, [stockEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
+
   const isLoading = stockLoading || seedLoading || timeseriesLoading;
 
   const yearLabel = allYearsSelected ? t("All Years", "सभी वर्ष") : selectedYears.length === 1 ? selectedYears[0].toString() : `${selectedYears.length} ${t("Years", "वर्ष")}`;
@@ -410,6 +431,15 @@ export function DashboardTab() {
     potato: { label: t("Potato", "आलू"), color: "#16a34a" },
     onion: { label: t("Onion", "प्याज"), color: "#f97316" },
   };
+
+  const coldStoreTotalPieConfig: ChartConfig = {};
+  coldStoreBagsSplit.total.forEach((c, i) => {
+    coldStoreTotalPieConfig[c.name] = { label: c.name, color: PIE_COLORS[i % PIE_COLORS.length] };
+  });
+  const coldStoreRemPieConfig: ChartConfig = {};
+  coldStoreBagsSplit.remaining.forEach((c, i) => {
+    coldStoreRemPieConfig[c.name] = { label: c.name, color: PIE_COLORS[i % PIE_COLORS.length] };
+  });
 
   const buyerPieConfig: ChartConfig = {};
   buyerDueByName.forEach((b, i) => {
@@ -645,6 +675,72 @@ export function DashboardTab() {
               <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
               <span className="font-bold text-orange-600 dark:text-orange-400" data-testid="text-buyer-due">{formatINR(buyerSummary.totalDue)}</span>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-cs-total-bags">
+          <CardHeader className="p-3 pb-0">
+            <CardTitle className="text-sm">{t("Total Bags by Cold Store", "कोल्ड स्टोर के अनुसार कुल बैग")}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            {coldStoreBagsSplit.total.length > 0 ? (
+              <ChartContainer config={coldStoreTotalPieConfig} className="h-[200px] w-full">
+                <PieChart>
+                  <Pie
+                    data={coldStoreBagsSplit.total}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={70}
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {coldStoreBagsSplit.total.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                {t("No data", "कोई डेटा नहीं")}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-cs-remaining-bags">
+          <CardHeader className="p-3 pb-0">
+            <CardTitle className="text-sm">{t("Remaining Bags by Cold Store", "कोल्ड स्टोर के अनुसार शेष बैग")}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            {coldStoreBagsSplit.remaining.length > 0 ? (
+              <ChartContainer config={coldStoreRemPieConfig} className="h-[200px] w-full">
+                <PieChart>
+                  <Pie
+                    data={coldStoreBagsSplit.remaining}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={70}
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {coldStoreBagsSplit.remaining.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                {t("No data", "कोई डेटा नहीं")}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
