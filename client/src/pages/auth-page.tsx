@@ -88,7 +88,8 @@ export default function AuthPage() {
                         <Input 
                           placeholder="Enter your username" 
                           {...field} 
-                          autoCapitalize="off"
+                          onChange={(e) => field.onChange(e.target.value.toLowerCase())}
+                          autoCapitalize="none"
                           autoCorrect="off"
                           autoComplete="username"
                           spellCheck={false}
