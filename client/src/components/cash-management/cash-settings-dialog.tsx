@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/hooks/use-language";
-import { Plus, Trash2, Edit2, Save, X, Wallet, Users, Tractor, Building2, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Edit2, Save, X, Wallet, Users, Tractor, Building2, RefreshCw, Search, Download } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Party, CashFarmer, CashSettings, BankAccount } from "@shared/schema";
 import { DISTRICTS, STATES } from "@shared/schema";
@@ -757,6 +757,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const [formData, setFormData] = useState(emptyFormData);
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: farmerSuggestions = [] } = useQuery<FarmerSuggestion[]>({
     queryKey: ["/api/farmers/suggestions"],
@@ -858,6 +859,49 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: formData });
     }
+  };
+
+  const filteredFarmers = farmers.filter((farmer) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      farmer.name?.toLowerCase().includes(q) ||
+      farmer.contactNumber?.toLowerCase().includes(q) ||
+      farmer.village?.toLowerCase().includes(q)
+    );
+  });
+
+  const downloadCSV = () => {
+    const rows = filteredFarmers.map((f) => {
+      const principal = parseFloat(f.pendingDueToBePaid || "0");
+      const roi = parseFloat(f.rateOfInterest || "0");
+      const finalDue = (f as any).finalDue ? parseFloat((f as any).finalDue) : principal;
+      return {
+        Name: f.name,
+        Contact: f.contactNumber || "",
+        Village: f.village || "",
+        Tehsil: f.tehsil || "",
+        District: f.district || "",
+        State: f.state || "",
+        "Due Amount": principal.toFixed(2),
+        "Rate of Interest (%)": roi.toFixed(2),
+        "Effective Date": f.effectiveDate || "",
+        "Final Due (with Interest)": finalDue.toFixed(2),
+      };
+    });
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) => headers.map((h) => `"${(r as any)[h]}"`).join(","))
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `farmer_receivables_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -1124,15 +1168,41 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
         </Card>
       )}
 
-      <div className="space-y-2 max-h-64 overflow-y-auto">
-        {farmers.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {t("No farmers added yet", "अभी तक कोई किसान नहीं जोड़ा गया")}
+      {farmers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={t("Search by name, phone or village...", "नाम, फोन या गाँव से खोजें...")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+              data-testid="input-farmer-search"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={downloadCSV}
+            title={t("Download CSV", "CSV डाउनलोड करें")}
+            data-testid="button-download-farmer-csv"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <div className="space-y-2 max-h-72 overflow-y-auto">
+        {filteredFarmers.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            {farmers.length === 0
+              ? t("No farmers added yet", "अभी तक कोई किसान नहीं जोड़ा गया")
+              : t("No matching farmers found", "कोई मेल खाने वाला किसान नहीं मिला")}
           </div>
         ) : (
-          farmers.map((farmer) => (
+          filteredFarmers.map((farmer) => (
             <Card key={farmer.id} data-testid={`card-farmer-${farmer.id}`}>
-              <CardContent className="p-3">
+              <CardContent className="px-3 py-2">
                 {editingId === farmer.id ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -1230,35 +1300,41 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{farmer.name}</p>
-                      {farmer.contactNumber && <p className="text-sm text-muted-foreground">{farmer.contactNumber}</p>}
-                      {(farmer.village || farmer.tehsil || farmer.district || farmer.state) && (
-                        <p className="text-sm text-muted-foreground">
-                          {[farmer.village, farmer.tehsil, farmer.district, farmer.state].filter(Boolean).join(", ")}
-                        </p>
-                      )}
-                      {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
-                        <div className="text-sm">
-                          <span className="text-red-600">
-                            {t("Due", "देय")}: ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                  <div className="flex justify-between items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2">
+                        <span className="font-medium text-sm truncate">{farmer.name}</span>
+                        {farmer.contactNumber && (
+                          <span className="text-xs text-muted-foreground shrink-0">{farmer.contactNumber}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        {(farmer.village || farmer.tehsil || farmer.district) && (
+                          <span className="text-xs text-muted-foreground truncate">
+                            {[farmer.village, farmer.tehsil, farmer.district].filter(Boolean).join(", ")}
                           </span>
-                          {parseFloat(farmer.rateOfInterest || "0") > 0 && (
-                            <span className="text-muted-foreground ml-2">
-                              @ {farmer.rateOfInterest}% {t("from", "से")} {farmer.effectiveDate || "-"}
+                        )}
+                        {parseFloat(farmer.pendingDueToBePaid || "0") > 0 && (
+                          <>
+                            <span className="text-xs text-red-600 font-medium shrink-0">
+                              ₹{parseFloat(farmer.pendingDueToBePaid || "0").toLocaleString('en-IN')}
                             </span>
-                          )}
-                        </div>
-                      )}
+                            {parseFloat(farmer.rateOfInterest || "0") > 0 && (
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                @ {farmer.rateOfInterest}% {t("from", "से")} {farmer.effectiveDate || "-"}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => startEdit(farmer)} data-testid={`button-edit-farmer-${farmer.id}`}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="ghost" 
-                        size="icon" 
+                        size="icon"
                         onClick={() => deleteMutation.mutate(farmer.id)}
                         disabled={deleteMutation.isPending}
                         data-testid={`button-delete-farmer-${farmer.id}`}
