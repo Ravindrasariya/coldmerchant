@@ -62,7 +62,6 @@ interface BuyerSection {
   advancePayment: number;
   transportationCharges: number;
   otherCharges: number;
-  revenue: number;
   isExpanded: boolean;
 }
 
@@ -80,7 +79,6 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   advancePayment: 0,
   transportationCharges: 0,
   otherCharges: 0,
-  revenue: 0,
   isExpanded: true,
 });
 
@@ -175,16 +173,10 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
         totalCostOfGoods += costOfGoods;
       });
 
-      const revenue = Number(section.revenue) || 0;
-      const transport = Number(section.transportationCharges) || 0;
-      const other = Number(section.otherCharges) || 0;
-      const profitLoss = revenue - totalCostOfGoods - transport - other;
-
       return {
         totalBags: isNaN(totalBags) ? 0 : totalBags,
         totalNetWeight: isNaN(totalNetWeight) ? 0 : totalNetWeight,
         totalCostOfGoods: isNaN(totalCostOfGoods) ? 0 : totalCostOfGoods,
-        profitLoss: isNaN(profitLoss) ? 0 : profitLoss,
       };
     },
     [findInventoryByKey]
@@ -222,21 +214,18 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
     let totalBags = 0;
     let totalNetWeight = 0;
     let totalCostOfGoods = 0;
-    let totalProfitLoss = 0;
 
     buyerSections.forEach((section) => {
       const summary = calculateBuyerSummary(section);
       totalBags += summary.totalBags;
       totalNetWeight += summary.totalNetWeight;
       totalCostOfGoods += summary.totalCostOfGoods;
-      totalProfitLoss += summary.profitLoss;
     });
 
     return {
       totalBags,
       totalNetWeight,
       totalCostOfGoods,
-      totalProfitLoss,
     };
   }, [buyerSections, calculateBuyerSummary]);
 
@@ -325,7 +314,6 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
           advancePayment: section.advancePayment,
           transportationCharges: section.transportationCharges,
           otherCharges: section.otherCharges,
-          revenue: section.revenue,
           items,
         });
       });
@@ -740,7 +728,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                         <Separator />
 
                         {/* Charges */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
                             <Label className="text-xs">
                               {t("Advance to Driver", "ड्राइवर को अग्रिम")}
@@ -790,26 +778,11 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                               data-testid={`input-other-${sectionIndex}`}
                             />
                           </div>
-                          <div>
-                            <Label className="text-xs">{t("Revenue", "राजस्व")}</Label>
-                            <Input
-                              type="number"
-                              step="any"
-                              value={section.revenue || ""}
-                              onChange={(e) =>
-                                updateBuyerSection(section.id, {
-                                  revenue: Number(e.target.value) || 0,
-                                })
-                              }
-                              placeholder="0"
-                              data-testid={`input-revenue-${sectionIndex}`}
-                            />
-                          </div>
                         </div>
 
                         {/* Buyer Summary (smaller font) */}
                         <div className="bg-muted/30 rounded-lg p-3">
-                          <div className="grid grid-cols-4 gap-3 text-center text-xs">
+                          <div className="grid grid-cols-3 gap-3 text-center text-xs">
                             <div>
                               <p className="text-lg font-bold">{summary.totalBags}</p>
                               <p className="text-muted-foreground flex items-center justify-center gap-1">
@@ -827,16 +800,6 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                 <IndianRupee className="h-3 w-3" />
                                 {t("Total Cost", "कुल लागत")}
                               </p>
-                            </div>
-                            <div>
-                              <p
-                                className={`text-lg font-bold ${
-                                  summary.profitLoss >= 0 ? "text-green-600" : "text-red-600"
-                                }`}
-                              >
-                                {summary.profitLoss >= 0 ? "+" : ""}₹{parseFloat(summary.profitLoss.toFixed(1)).toLocaleString('en-IN')}
-                              </p>
-                              <p className="text-muted-foreground">{t("P/L", "लाभ/हानि")}</p>
                             </div>
                           </div>
                         </div>
@@ -866,7 +829,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
               <Separator />
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                       <p className="text-2xl font-bold">{grandTotals.totalBags}</p>
                       <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -884,16 +847,6 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                         <IndianRupee className="h-3 w-3" />
                         {t("Total Cost", "कुल लागत")}
                       </p>
-                    </div>
-                    <div>
-                      <p
-                        className={`text-2xl font-bold ${
-                          grandTotals.totalProfitLoss >= 0 ? "text-green-600" : "text-red-600"
-                        }`}
-                      >
-                        {grandTotals.totalProfitLoss >= 0 ? "+" : ""}₹{parseFloat(grandTotals.totalProfitLoss.toFixed(1)).toLocaleString('en-IN')}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{t("Total Profit/Loss", "कुल लाभ/हानि")}</p>
                     </div>
                   </div>
                 </CardContent>
