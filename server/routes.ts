@@ -221,6 +221,7 @@ export async function registerRoutes(
       let summaryBuyerTotalRevenue = 0;
       let summaryBuyerTotalDue = 0;
       const buyerDueByNameMap = new Map<string, number>();
+      const buyerKeyToName = new Map<string, string>();
 
       for (const tx of filteredTransactions) {
         const dateKey = tx.dateOfLoading!;
@@ -233,6 +234,9 @@ export async function registerRoutes(
 
         const buyerKey = tx.buyerId ? String(tx.buyerId) : `name:${(tx.partyName || "Unknown").toLowerCase().trim()}`;
         buyerDueByNameMap.set(buyerKey, (buyerDueByNameMap.get(buyerKey) || 0) + buyerDue);
+        if (!buyerKeyToName.has(buyerKey)) {
+          buyerKeyToName.set(buyerKey, tx.partyName || "Unknown");
+        }
 
         const profitLoss = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
         pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
@@ -299,9 +303,10 @@ export async function registerRoutes(
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8)
-        .map(([name, value]) => {
+        .map(([key, value]) => {
           const total = Array.from(buyerDueByNameMap.values()).reduce((s, v) => s + v, 0);
-          return { name: name.length > 12 ? name.substring(0, 12) + "..." : name, value: Math.round(value), percentage: total > 0 ? Math.round((value / total) * 100) : 0 };
+          const displayName = buyerKeyToName.get(key) || key;
+          return { name: displayName.length > 12 ? displayName.substring(0, 12) + "..." : displayName, value: Math.round(value), percentage: total > 0 ? Math.round((value / total) * 100) : 0 };
         });
 
       res.json({
