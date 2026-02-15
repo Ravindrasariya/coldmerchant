@@ -1335,49 +1335,63 @@ export class DatabaseStorage implements IStorage {
         let remainingAmount = parseFloat(entry.amount);
         const normalizedPartyName = normalizeName(entry.partyName);
         
-        // Get all transactions for this merchant with party name (FIFO order)
-        const txns = await tx.select().from(transactions)
-          .where(eq(transactions.merchantId, entry.merchantId))
-          .orderBy(asc(transactions.createdAt));
+        // STEP 1: First clear receivable dues (pendingDues) from managed party in Cash Settings
+        const allParties = await tx.select().from(parties)
+          .where(eq(parties.merchantId, entry.merchantId));
+        const matchingParty = allParties.find(p => normalizeName(p.name) === normalizedPartyName);
+        if (matchingParty && remainingAmount > 0) {
+          const currentPendingDues = parseFloat(matchingParty.pendingDues || "0");
+          if (currentPendingDues > 0) {
+            const toApplyToReceivable = Math.min(remainingAmount, currentPendingDues);
+            const newPendingDues = currentPendingDues - toApplyToReceivable;
+            await tx.update(parties)
+              .set({ pendingDues: newPendingDues.toFixed(2), updatedAt: new Date() })
+              .where(and(eq(parties.id, matchingParty.id), eq(parties.merchantId, entry.merchantId)));
+            remainingAmount -= toApplyToReceivable;
+          }
+        }
         
-        // Filter to only those matching party (case-insensitive, trimmed) with remaining due
-        const transactionsWithDue = txns.filter(txn => {
-          if (!txn.partyName) return false;
-          if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
-          const revenue = parseFloat(txn.revenue || "0");
-          const received = parseFloat(txn.amountReceived || "0");
-          return revenue > received;
-        });
-        
-        for (const txn of transactionsWithDue) {
-          if (remainingAmount <= 0) break;
+        // STEP 2: Apply remaining amount to transactions using FIFO (oldest first)
+        if (remainingAmount > 0) {
+          const txns = await tx.select().from(transactions)
+            .where(eq(transactions.merchantId, entry.merchantId))
+            .orderBy(asc(transactions.createdAt));
           
-          const revenue = parseFloat(txn.revenue || "0");
-          const currentReceived = parseFloat(txn.amountReceived || "0");
-          const due = revenue - currentReceived;
+          const transactionsWithDue = txns.filter(txn => {
+            if (!txn.partyName) return false;
+            if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
+            const revenue = parseFloat(txn.revenue || "0");
+            const received = parseFloat(txn.amountReceived || "0");
+            return revenue > received;
+          });
           
-          if (due <= 0) continue;
-          
-          // Calculate how much to apply to this transaction
-          const toApply = Math.min(remainingAmount, due);
-          
-          // Create allocation record within transaction
-          const [allocation] = await tx.insert(cashEntryAllocations).values({
-            cashEntryId: createdEntry.id,
-            transactionId: txn.id,
-            merchantId: entry.merchantId,
-            appliedAmount: toApply.toString(),
-          }).returning();
-          
-          allocations.push(allocation);
-          
-          // Update transaction's amountReceived within transaction
-          const newReceived = currentReceived + toApply;
-          await tx.update(transactions)
-            .set({ amountReceived: newReceived.toString() })
-            .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, entry.merchantId)));
-          
-          remainingAmount -= toApply;
+          for (const txn of transactionsWithDue) {
+            if (remainingAmount <= 0) break;
+            
+            const revenue = parseFloat(txn.revenue || "0");
+            const currentReceived = parseFloat(txn.amountReceived || "0");
+            const due = revenue - currentReceived;
+            
+            if (due <= 0) continue;
+            
+            const toApply = Math.min(remainingAmount, due);
+            
+            const [allocation] = await tx.insert(cashEntryAllocations).values({
+              cashEntryId: createdEntry.id,
+              transactionId: txn.id,
+              merchantId: entry.merchantId,
+              appliedAmount: toApply.toString(),
+            }).returning();
+            
+            allocations.push(allocation);
+            
+            const newReceived = currentReceived + toApply;
+            await tx.update(transactions)
+              .set({ amountReceived: newReceived.toString() })
+              .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, entry.merchantId)));
+            
+            remainingAmount -= toApply;
+          }
         }
       }
       
@@ -1387,42 +1401,59 @@ export class DatabaseStorage implements IStorage {
         const normalizedFarmerName = normalizeName(entry.farmerName);
         const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
         
-        // Get seed transactions for this merchant (FIFO order by createdAt)
-        const allSeedTxns = await tx.select().from(seedTransactions)
-          .where(eq(seedTransactions.merchantId, entry.merchantId))
-          .orderBy(asc(seedTransactions.createdAt));
-        
-        // Filter to only those matching farmer using composite identity (name + village)
-        const matchingSeedTxns = allSeedTxns.filter(txn => {
-          if (normalizeName(txn.farmerName) !== normalizedFarmerName) return false;
-          // If village is provided, check it matches
-          if (normalizedFarmerVillage && txn.village && normalizeName(txn.village) !== normalizedFarmerVillage) return false;
+        // STEP 1: First clear PY receivable dues (pendingDueToBePaid) from managed farmer in Cash Settings
+        const allCashFarmers = await tx.select().from(cashFarmers)
+          .where(eq(cashFarmers.merchantId, entry.merchantId));
+        const matchingCashFarmer = allCashFarmers.find(f => {
+          if (normalizeName(f.name) !== normalizedFarmerName) return false;
+          if (normalizedFarmerVillage && f.village && normalizeName(f.village) !== normalizedFarmerVillage) return false;
           return true;
         });
+        if (matchingCashFarmer && remainingAmount > 0) {
+          const currentReceivable = parseFloat(matchingCashFarmer.pendingDueToBePaid || "0");
+          if (currentReceivable > 0) {
+            const toApplyToReceivable = Math.min(remainingAmount, currentReceivable);
+            const newReceivable = currentReceivable - toApplyToReceivable;
+            await tx.update(cashFarmers)
+              .set({ pendingDueToBePaid: newReceivable.toFixed(2), updatedAt: new Date() })
+              .where(and(eq(cashFarmers.id, matchingCashFarmer.id), eq(cashFarmers.merchantId, entry.merchantId)));
+            remainingAmount -= toApplyToReceivable;
+          }
+        }
         
-        // Filter to only those with remaining due
-        const seedTxnsWithDue = matchingSeedTxns.filter(txn => {
-          const totalDue = parseFloat(txn.totalDueToFarmer || "0");
-          return totalDue > 0;
-        });
-        
-        for (const seedTxn of seedTxnsWithDue) {
-          if (remainingAmount <= 0) break;
+        // STEP 2: Apply remaining amount to seed transactions using FIFO (oldest first)
+        if (remainingAmount > 0) {
+          const allSeedTxns = await tx.select().from(seedTransactions)
+            .where(eq(seedTransactions.merchantId, entry.merchantId))
+            .orderBy(asc(seedTransactions.createdAt));
           
-          const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+          const matchingSeedTxns = allSeedTxns.filter(txn => {
+            if (normalizeName(txn.farmerName) !== normalizedFarmerName) return false;
+            if (normalizedFarmerVillage && txn.village && normalizeName(txn.village) !== normalizedFarmerVillage) return false;
+            return true;
+          });
           
-          if (currentDue <= 0) continue;
+          const seedTxnsWithDue = matchingSeedTxns.filter(txn => {
+            const totalDue = parseFloat(txn.totalDueToFarmer || "0");
+            return totalDue > 0;
+          });
           
-          // Calculate how much to apply to this seed transaction
-          const toApply = Math.min(remainingAmount, currentDue);
-          
-          // Update seed transaction's totalDueToFarmer (reduce by payment amount)
-          const newDue = currentDue - toApply;
-          await tx.update(seedTransactions)
-            .set({ totalDueToFarmer: newDue.toString() })
-            .where(and(eq(seedTransactions.id, seedTxn.id), eq(seedTransactions.merchantId, entry.merchantId)));
-          
-          remainingAmount -= toApply;
+          for (const seedTxn of seedTxnsWithDue) {
+            if (remainingAmount <= 0) break;
+            
+            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
+            
+            if (currentDue <= 0) continue;
+            
+            const toApply = Math.min(remainingAmount, currentDue);
+            
+            const newDue = currentDue - toApply;
+            await tx.update(seedTransactions)
+              .set({ totalDueToFarmer: newDue.toString() })
+              .where(and(eq(seedTransactions.id, seedTxn.id), eq(seedTransactions.merchantId, entry.merchantId)));
+            
+            remainingAmount -= toApply;
+          }
         }
       }
       
