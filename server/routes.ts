@@ -2800,8 +2800,8 @@ export async function registerRoutes(
           pyReceivableWithInterest = computeCompoundInterestDue(pyPrincipal, pyRoi, farmer.receivableEffectiveDate);
         }
         
-        // Net Due = PY Receivable (with interest) + Harvest Due - Seed Due
-        const netDue = pyReceivableWithInterest + harvestDue - seedDue;
+        // Net Due = Harvest Due - PY Receivables - Seed Due
+        const netDue = harvestDue - pyReceivableWithInterest - seedDue;
         
         return {
           ...farmer,

@@ -130,7 +130,7 @@ When paying a supplier:
   - PY Receivable: Combined pyReceivable + receivables from managed cash farmers (pendingDueToBePaid)
   - Harvest Due: Sum of totalDueToFarmer from matching stock entries
   - Seed Due: Sum of totalDueFromFarmer from matching seed transactions
-  - Net Due = PY Receivable + Harvest Due - Seed Due - Receivables
+  - Net Due = Harvest Due - PY Receivable - Seed Due
 - **Receivables Integration**: Managed farmers from Cash Settings with pendingDueToBePaid are combined into PY Receivable column and appear in Seed farmer dropdown
 - **PY Balances**: Previous year payable/receivable are editable inline with blur-based commits
 - **Negative Flag & Archive**: Toggle controls per farmer; archived farmers shown at bottom with toggle to show/hide
