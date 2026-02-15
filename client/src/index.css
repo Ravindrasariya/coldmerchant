@@ -22,7 +22,8 @@ textarea {
 input[type="password"],
 input[type="email"],
 input[type="url"],
-input[type="search"] {
+input[type="search"],
+[data-no-capitalize] input {
   text-transform: none;
 }
 

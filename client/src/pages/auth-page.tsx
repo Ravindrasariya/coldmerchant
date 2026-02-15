@@ -77,7 +77,7 @@ export default function AuthPage() {
           </CardHeader>
           <CardContent>
             <Form {...loginForm}>
-              <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+              <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4" data-no-capitalize>
                 <FormField
                   control={loginForm.control}
                   name="username"
@@ -88,7 +88,6 @@ export default function AuthPage() {
                         <Input 
                           placeholder="Enter your username" 
                           {...field} 
-                          onChange={(e) => field.onChange(e.target.value.toLowerCase())}
                           autoCapitalize="none"
                           autoCorrect="off"
                           autoComplete="username"
