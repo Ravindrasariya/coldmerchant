@@ -430,6 +430,38 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ name: "", contactNumber: "", address: "", pendingDues: "" });
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [buyerSearchQuery, setBuyerSearchQuery] = useState("");
+
+  const filteredParties = parties.filter((party) => {
+    if (!buyerSearchQuery.trim()) return true;
+    const q = buyerSearchQuery.toLowerCase().trim();
+    return (
+      party.name.toLowerCase().includes(q) ||
+      (party.contactNumber && party.contactNumber.toLowerCase().includes(q)) ||
+      (party.address && party.address.toLowerCase().includes(q))
+    );
+  });
+
+  const downloadBuyerCSV = () => {
+    const rows = filteredParties.map((p) => ({
+      Name: p.name,
+      Contact: p.contactNumber || "",
+      Address: p.address || "",
+      Amount: parseFloat(p.pendingDues || "0").toFixed(2),
+    }));
+    const headers = Object.keys(rows[0] || { Name: "", Contact: "", Address: "", Amount: "" });
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((r) => headers.map((h) => `"${(r as any)[h] || ""}"`).join(","))
+    ].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `buyer_receivables_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Fetch buyers from Buyer Ledger for autocomplete suggestions
   const { data: ledgerBuyers = [] } = useQuery<LedgerBuyer[]>({
@@ -615,7 +647,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">{t("Pending Dues", "बकाया राशि")}</Label>
+                <Label className="text-xs">{t("Amount", "राशि")}</Label>
                 <Input
                   type="number"
                   step="any"
@@ -652,13 +684,39 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
         </Card>
       )}
 
+      {parties.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={t("Search by name, contact or address...", "नाम, संपर्क या पता से खोजें...")}
+              value={buyerSearchQuery}
+              onChange={(e) => setBuyerSearchQuery(e.target.value)}
+              className="pl-8"
+              data-testid="input-buyer-search"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={downloadBuyerCSV}
+            title={t("Download CSV", "CSV डाउनलोड करें")}
+            data-testid="button-download-buyer-csv"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-2 max-h-64 overflow-y-auto">
-        {parties.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {t("No buyers added yet", "अभी तक कोई खरीदार नहीं जोड़ा गया")}
+        {filteredParties.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            {parties.length === 0
+              ? t("No buyers added yet", "अभी तक कोई खरीदार नहीं जोड़ा गया")
+              : t("No buyers match your search", "कोई खरीदार आपकी खोज से मेल नहीं खाता")}
           </div>
         ) : (
-          parties.map((party) => (
+          filteredParties.map((party) => (
             <Card key={party.id} data-testid={`card-party-${party.id}`}>
               <CardContent className="p-3">
                 {editingId === party.id ? (
@@ -686,7 +744,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                         step="any"
                         value={formData.pendingDues}
                         onChange={(e) => setFormData({ ...formData, pendingDues: e.target.value })}
-                        placeholder={t("Pending Dues", "बकाया राशि")}
+                        placeholder={t("Amount", "राशि")}
                       />
                     </div>
                     <div className="flex gap-2 justify-end">
@@ -699,16 +757,26 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">{party.name}</p>
-                      {party.contactNumber && <p className="text-sm text-muted-foreground">{party.contactNumber}</p>}
-                      {party.address && <p className="text-sm text-muted-foreground">{party.address}</p>}
-                      {parseFloat(party.pendingDues || "0") > 0 && (
-                        <p className="text-sm text-amber-600">{t("Pending", "बकाया")}: ₹{parseFloat(party.pendingDues || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                      )}
+                  <div className="flex justify-between items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2">
+                        <span className="font-medium text-sm truncate">{party.name}</span>
+                        {party.contactNumber && (
+                          <span className="text-xs text-muted-foreground shrink-0">{party.contactNumber}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        {party.address && (
+                          <span className="text-xs text-muted-foreground truncate">{party.address}</span>
+                        )}
+                        {parseFloat(party.pendingDues || "0") > 0 && (
+                          <span className="text-xs font-medium text-amber-600 shrink-0">
+                            {t("Amount", "राशि")}: ₹{parseFloat(party.pendingDues || "0").toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5 shrink-0">
                       <Button variant="ghost" size="icon" onClick={() => startEdit(party)} data-testid={`button-edit-party-${party.id}`}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
