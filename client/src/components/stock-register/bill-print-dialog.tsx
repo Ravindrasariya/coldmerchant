@@ -109,10 +109,14 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
     const charges = lot.charges || [];
-    const dynamicCharges = charges.reduce((sum, c) => {
-      const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-      return sum + amt;
-    }, 0);
+    const isFarmGate = lot.place === "farm_gate";
+    const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+    const dynamicCharges = charges
+      .filter(c => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+      .reduce((sum, c) => {
+        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+        return sum + amt;
+      }, 0);
     const totalDeductions = hammali + dynamicCharges;
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;

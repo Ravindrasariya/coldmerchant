@@ -800,10 +800,14 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       }, 0);
                     
                     const hammali = lot.hammaliGradingCharges || 0;
-                    const dynamicCharges = (lot.charges || []).reduce((sum, c) => {
-                      const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                      return sum + amt;
-                    }, 0);
+                    const isFarmGate = lot.place === "farm_gate";
+                    const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+                    const dynamicCharges = (lot.charges || [])
+                      .filter(c => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+                      .reduce((sum, c) => {
+                        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                        return sum + amt;
+                      }, 0);
                     const totalDeductions = hammali + dynamicCharges;
                     
                     // Handle adjustment - calculate compound interest if rate-based

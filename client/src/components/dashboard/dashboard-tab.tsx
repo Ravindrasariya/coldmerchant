@@ -160,7 +160,11 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   }
 
   const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
-  const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+  const isFarmGate = lot.place === "farm_gate";
+  const farmerDeductionTypes = ["Cold Charges", "Ware House Charges"];
+  const dynamicCharges = (lot.charges || [])
+    .filter(c => !(isFarmGate && farmerDeductionTypes.includes(c.type)))
+    .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
   const totalDeductions = hammaliGradingCharges + dynamicCharges;
 
   const coldStoreTypes = ["Cold Charges", "Ware House Charges"];

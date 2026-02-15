@@ -152,9 +152,15 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     finalAdjustment = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
   }
   
-  // Calculate total deductions: hammali/grading + all dynamic charges (which includes cold charges)
+  // Calculate total deductions: hammali/grading + dynamic charges
+  // For Farm Gate lots, exclude Cold Charges and Ware House Charges from farmer deductions
+  // (merchant pays cold store separately, not deducted from farmer)
+  const isFarmGate = lot.place === "farm_gate";
+  const farmerDeductionTypes = ["Cold Charges", "Ware House Charges"];
   const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
-  const dynamicCharges = (lot.charges || []).reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+  const dynamicCharges = (lot.charges || [])
+    .filter(c => !(isFarmGate && farmerDeductionTypes.includes(c.type)))
+    .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
   const totalDeductions = hammaliGradingCharges + dynamicCharges;
   
   return {
@@ -451,12 +457,14 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         
         // Deduction breakdown - categorize charges from charges array
         const charges = lot.charges || [];
+        const csvIsFarmGate = lot.place === "farm_gate";
         const getChargeAmount = (c: { type: string; amount: number | string }) => {
           const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : c.amount;
           return isNaN(amt) ? 0 : amt;
         };
         
         // Cold Charges = "Cold Charges" + "Ware House Charges" from charges array
+        // For Farm Gate: still shown in CSV column but excluded from totalDeductions (merchant pays, not farmer)
         const coldCharges = charges
           .filter(c => c.type === "Cold Charges" || c.type === "Ware House Charges")
           .reduce((sum, c) => sum + getChargeAmount(c), 0);
@@ -477,7 +485,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           .filter(c => otherChargeTypes.includes(c.type))
           .reduce((sum, c) => sum + getChargeAmount(c), 0);
         
-        const totalDeductions = coldCharges + hammaliGrading + advanceCharges + otherCharges;
+        // For Farm Gate lots, cold/warehouse charges are NOT deducted from farmer
+        const farmerColdCharges = csvIsFarmGate ? 0 : coldCharges;
+        const totalDeductions = farmerColdCharges + hammaliGrading + advanceCharges + otherCharges;
         
         // Calculate dynamic interest (interest-only formula)
         let lotInterest = 0;
