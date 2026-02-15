@@ -612,7 +612,7 @@ export function DashboardTab() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-        <Card data-testid="card-harvest">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-harvest">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Harvest", "फसल")}</div>
             <div className="text-sm font-bold mt-1" data-testid="text-harvest-bags">
@@ -624,7 +624,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-seed">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-seed">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Seed", "बीज")}</div>
             <div className="text-sm font-bold mt-1" data-testid="text-seed-bags">
@@ -633,7 +633,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-farmer-harvest">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-harvest">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Harvest", "किसान - फसल")}</div>
             <div className="text-xs mt-1">
@@ -647,7 +647,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-farmer-seed">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-seed">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Seed", "किसान - बीज")}</div>
             <div className="text-xs mt-1">
@@ -661,7 +661,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-cold-store">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-cold-store">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
             <div className="text-xs mt-1">
@@ -675,7 +675,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-buyer">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-buyer">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Buyer", "खरीदार")}</div>
             <div className="text-xs mt-1">
@@ -691,7 +691,7 @@ export function DashboardTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card data-testid="chart-farmer-due-crop">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-farmer-due-crop">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Farmer Due by Crop", "फसल के अनुसार किसान बकाया")}</CardTitle>
           </CardHeader>
@@ -723,7 +723,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="chart-buyer-due-name">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-buyer-due-name">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Buyer Due by Name", "नाम के अनुसार खरीदार बकाया")}</CardTitle>
           </CardHeader>
@@ -757,7 +757,7 @@ export function DashboardTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card data-testid="chart-farmer-due-line">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-farmer-due-line">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Farmer Due", "किसान बकाया")}</CardTitle>
           </CardHeader>
@@ -784,7 +784,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="chart-buyer-due-line">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-buyer-due-line">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Buyer Due", "खरीदार बकाया")}</CardTitle>
           </CardHeader>
@@ -813,7 +813,7 @@ export function DashboardTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card data-testid="chart-daily-volume">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-daily-volume">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Daily Volume (Kg)", "दैनिक मात्रा (किलो)")}</CardTitle>
           </CardHeader>
@@ -840,7 +840,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="chart-cumulative-pnl">
+        <Card className="border-green-300 dark:border-green-700" data-testid="chart-cumulative-pnl">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Cumulative P&L", "संचयी लाभ/हानि")}</CardTitle>
           </CardHeader>
