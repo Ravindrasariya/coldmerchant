@@ -188,7 +188,7 @@ export const transactionEditHistory = pgTable("transaction_edit_history", {
 export const cashEntries = pgTable("cash_entries", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  transactionCode: text("transaction_code"), // Unique per merchant: format TBD based on transaction type
+  transactionCode: text("transaction_code"), // Format: CFYYYYMMDD{seq} - unique per merchant
   direction: text("direction").notNull(), // "inward", "outflow", or "transfer"
   receiptType: text("receipt_type"), // For inward: "cash_received", "account_received"
   revenueType: text("revenue_type"), // For inward: "raw_potato", "seed_sale"
@@ -211,7 +211,9 @@ export const cashEntries = pgTable("cash_entries", {
   isReversed: boolean("is_reversed").default(false), // soft delete flag
   reversedAt: timestamp("reversed_at"), // when the entry was reversed
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  merchantTransactionCodeUnique: uniqueIndex("cash_entries_merchant_transaction_code_unique").on(table.merchantId, table.transactionCode),
+}));
 
 // Cash Entry Allocations - tracks which transactions a cash inward was applied to (FIFO)
 export const cashEntryAllocations = pgTable("cash_entry_allocations", {
