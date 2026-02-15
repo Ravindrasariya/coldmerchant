@@ -201,8 +201,11 @@ export const cashEntries = pgTable("cash_entries", {
   toBankAccountId: integer("to_bank_account_id"), // For transfer: destination bank account id (if to bank)
   partyName: text("party_name"), // For inward: buyer name from transactions
   partyVillage: text("party_village"), // For inward: buyer location
+  buyerId: integer("buyer_id").references(() => buyers.id), // resolved buyer ledger ID for reliable matching
   farmerName: text("farmer_name"), // For farmer outflow or seed sale inward
   farmerVillage: text("farmer_village"), // For farmer outflow or seed sale inward
+  farmerContact: text("farmer_contact"), // For farmer composite key matching
+  farmerId: integer("farmer_id").references(() => farmers.id), // resolved farmer ledger ID for reliable matching
   coldStoreName: text("cold_store_name"), // For cold store charge payment outflow
   supplierName: text("supplier_name"), // For supplier outflow (seed stock suppliers)
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),

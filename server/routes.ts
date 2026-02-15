@@ -1803,7 +1803,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, farmerName, farmerVillage, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, farmerName, farmerVillage, farmerContact, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -1905,6 +1905,36 @@ export async function registerRoutes(
         };
       }
 
+      // Resolve buyerId and farmerId from ledger for reliable matching
+      let resolvedBuyerId: number | null = null;
+      let resolvedFarmerId: number | null = null;
+      
+      if (partyName) {
+        try {
+          const { buyerId: bId } = await storage.lookupOrCreateBuyer(merchantId, {
+            name: titleCaseKeep(partyName),
+            contact: null,
+            address: titleCase(partyVillage) || null,
+          });
+          resolvedBuyerId = bId;
+        } catch (e) {
+          console.error("Failed to resolve buyerId for cash entry:", e);
+        }
+      }
+      
+      if (farmerName) {
+        try {
+          const { farmerId: fId } = await storage.lookupOrCreateFarmer(merchantId, {
+            name: titleCaseKeep(farmerName),
+            contact: farmerContact || null,
+            village: titleCase(farmerVillage) || null,
+          });
+          resolvedFarmerId = fId;
+        } catch (e) {
+          console.error("Failed to resolve farmerId for cash entry:", e);
+        }
+      }
+
       // Determine if FIFO should be applied
       const applyFIFO = (direction === "inward" && !!partyName) || 
                         (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
@@ -1936,8 +1966,11 @@ export async function registerRoutes(
             toBankAccountId: toBankAccountId || null,
             partyName: titleCase(partyName) || null,
             partyVillage: titleCase(partyVillage) || null,
+            buyerId: resolvedBuyerId,
             farmerName: titleCase(farmerName) || null,
             farmerVillage: titleCase(farmerVillage) || null,
+            farmerContact: farmerContact || null,
+            farmerId: resolvedFarmerId,
             coldStoreName: titleCase(coldStoreName) || null,
             supplierName: titleCase(supplierName) || null,
             amount: amount.toString(),
