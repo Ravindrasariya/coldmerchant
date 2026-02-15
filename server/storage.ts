@@ -55,20 +55,17 @@ function formatDateYYYYMMDD(date: Date = new Date()): string {
   return `${year}${month}${day}`;
 }
 
-// Helper function to generate next unique ID with prefix (e.g., HSE202602021)
-async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any): Promise<string> {
+async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any, retryOffset: number = 0): Promise<string> {
   const fullPrefix = `${prefix}${dateStr}`;
   const prefixLength = fullPrefix.length;
   
-  // Use database-side MAX extraction with CAST for efficient O(1) query
-  // Extract the numeric suffix and find the maximum in a single query
   const [result] = await db.select({
     maxSeq: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${uniqueIdColumn} FROM ${prefixLength + 1}) AS INTEGER)), 0)`
   })
     .from(table)
     .where(sql`${uniqueIdColumn} LIKE ${fullPrefix + '%'}`);
   
-  const nextSequence = (result?.maxSeq || 0) + 1;
+  const nextSequence = (result?.maxSeq || 0) + 1 + retryOffset;
   return `${fullPrefix}${nextSequence}`;
 }
 
@@ -489,7 +486,7 @@ export class DatabaseStorage implements IStorage {
     // Retry loop for handling concurrent unique ID collisions
     const maxRetries = 3;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const uniqueId = await generateUniqueId("HSE", dateStr, stockEntries, stockEntries.uniqueId);
+      const uniqueId = await generateUniqueId("HSE", dateStr, stockEntries, stockEntries.uniqueId, attempt);
       try {
         const [created] = await db.insert(stockEntries).values({
           ...entry,
@@ -499,9 +496,7 @@ export class DatabaseStorage implements IStorage {
         }).returning();
         return created;
       } catch (error: any) {
-        // Check if it's a unique constraint violation (PostgreSQL error code 23505)
         if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
-          // Retry with a new unique ID
           continue;
         }
         throw error;
@@ -665,7 +660,7 @@ export class DatabaseStorage implements IStorage {
     const maxRetries = 3;
     let created: Transaction | undefined;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const uniqueId = await generateUniqueId("HTE", dateStr, transactions, transactions.uniqueId);
+      const uniqueId = await generateUniqueId("HTE", dateStr, transactions, transactions.uniqueId, attempt);
       try {
         const [result] = await db.insert(transactions).values({ ...transaction, uniqueId }).returning();
         created = result;
@@ -2422,7 +2417,7 @@ export class DatabaseStorage implements IStorage {
     // Retry loop for handling concurrent unique ID collisions
     const maxRetries = 3;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId);
+      const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId, attempt);
       try {
         const [created] = await db.insert(seedStockEntries).values({
           ...entry,
@@ -2677,7 +2672,7 @@ export class DatabaseStorage implements IStorage {
     const maxRetries = 3;
     let createdTxn: any;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const uniqueId = await generateUniqueId("STE", dateStr, seedTransactions, seedTransactions.uniqueId);
+      const uniqueId = await generateUniqueId("STE", dateStr, seedTransactions, seedTransactions.uniqueId, attempt);
       try {
         const [result] = await db.insert(seedTransactions).values({ ...transaction, uniqueId }).returning();
         createdTxn = result;
