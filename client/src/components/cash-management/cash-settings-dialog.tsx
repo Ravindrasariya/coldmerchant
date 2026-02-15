@@ -462,6 +462,9 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setShowAddForm(false);
       setFormData({ name: "", contactNumber: "", address: "", pendingDues: "" });
       toast({ title: t("Buyer added", "खरीदार जोड़ा गया"), variant: "success" });
@@ -477,6 +480,9 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setEditingId(null);
       toast({ title: t("Buyer updated", "खरीदार अपडेट किया गया"), variant: "success" });
     },
@@ -491,6 +497,9 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       toast({ title: t("Buyer deleted", "खरीदार हटाया गया"), variant: "success" });
     },
     onError: () => {
@@ -782,6 +791,10 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setShowAddForm(false);
       setFormData(emptyFormData);
       toast({ title: t("Farmer added", "किसान जोड़ा गया"), variant: "success" });
@@ -797,6 +810,10 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setEditingId(null);
       toast({ title: t("Farmer updated", "किसान अपडेट किया गया"), variant: "success" });
     },
@@ -811,6 +828,10 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       toast({ title: t("Farmer deleted", "किसान हटाया गया"), variant: "success" });
     },
     onError: () => {
