@@ -748,8 +748,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <FormItem>
                         <FormLabel>{t("Amount Received", "प्राप्त राशि")} (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-amount-received" />
+                          <Input type="number" step="any" placeholder="0" {...field} readOnly className="bg-muted cursor-not-allowed" data-testid="input-amount-received" />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground">{t("Managed via Cash tab", "कैश टैब से प्रबंधित")}</p>
                         <FormMessage />
                       </FormItem>
                     )}
