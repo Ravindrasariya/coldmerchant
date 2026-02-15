@@ -310,7 +310,7 @@ export default function AdminPage() {
   );
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-6xl">
+    <div className="container mx-auto py-6 px-4 max-w-6xl" data-no-capitalize>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Admin Panel</h1>
