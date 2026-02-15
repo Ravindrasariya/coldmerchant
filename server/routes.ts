@@ -88,6 +88,10 @@ export async function registerRoutes(
 
       const farmerDueMap = new Map<string, number>();
       const volumeMap = new Map<string, number>();
+      const perFarmerHarvestDue = new Map<string, number>();
+      const cropDuesMap: Record<string, number> = {};
+      let summaryColdStoreTotalCharges = 0;
+      let summaryColdStoreDue = 0;
 
       for (const entry of filteredEntries) {
         const dateKey = entry.purchaseDate;
@@ -132,6 +136,14 @@ export async function registerRoutes(
           const dynamicCharges = (lot.charges || []).reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
           entryDeductions += hammaliGradingCharges + dynamicCharges;
 
+          const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+          const lotColdCharges = (lot.charges || [])
+            .filter((c: any) => c && coldStoreChargeTypes.includes(c.type))
+            .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+          const lotColdPaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
+          summaryColdStoreTotalCharges += lotColdCharges;
+          summaryColdStoreDue += Math.max(lotColdCharges - lotColdPaid, 0);
+
           const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
           const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
           const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
@@ -160,6 +172,13 @@ export async function registerRoutes(
 
         farmerDueMap.set(dateKey, (farmerDueMap.get(dateKey) || 0) + farmerDue);
         volumeMap.set(dateKey, (volumeMap.get(dateKey) || 0) + entryVolume);
+
+        const farmerId = entry.farmerId ? String(entry.farmerId) : `name:${(entry.farmerName || "").toLowerCase().trim()}`;
+        const prev = perFarmerHarvestDue.get(farmerId) || 0;
+        perFarmerHarvestDue.set(farmerId, prev + farmerDue);
+
+        const entryCrop = entry.crop || "potato";
+        cropDuesMap[entryCrop] = (cropDuesMap[entryCrop] || 0) + farmerDue;
       }
 
       const filteredTransactions = allTransactions.filter(tx => {
@@ -170,6 +189,9 @@ export async function registerRoutes(
 
       const buyerDueMap = new Map<string, number>();
       const pnlMap = new Map<string, number>();
+      let summaryBuyerTotalRevenue = 0;
+      let summaryBuyerTotalDue = 0;
+      const buyerDueByNameMap = new Map<string, number>();
 
       for (const tx of filteredTransactions) {
         const dateKey = tx.dateOfLoading!;
@@ -177,17 +199,46 @@ export async function registerRoutes(
         const amountReceived = tx.amountReceived ? parseFloat(tx.amountReceived) : 0;
         const buyerDue = Math.max(revenue - amountReceived, 0);
         buyerDueMap.set(dateKey, (buyerDueMap.get(dateKey) || 0) + buyerDue);
+        summaryBuyerTotalRevenue += revenue;
+        summaryBuyerTotalDue += buyerDue;
+
+        const buyerName = tx.partyName || "Unknown";
+        buyerDueByNameMap.set(buyerName, (buyerDueByNameMap.get(buyerName) || 0) + buyerDue);
 
         const profitLoss = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
         pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
       }
 
+      const perFarmerSeedDue = new Map<string, number>();
       for (const seedTx of allSeedTransactions) {
         if (!seedTx.createdAt) continue;
+        if (crop === "onion") continue;
         const dateKey = new Date(seedTx.createdAt).toISOString().split("T")[0];
         if (!matchesDateFilter(dateKey)) continue;
         const totalPL = seedTx.totalProfitLoss ? parseFloat(seedTx.totalProfitLoss) : 0;
         pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + totalPL);
+
+        const totalDueToFarmer = seedTx.totalDueToFarmer ? parseFloat(seedTx.totalDueToFarmer) : 0;
+        const seedDue = Math.max(totalDueToFarmer, 0);
+        const farmerId = seedTx.farmerId ? String(seedTx.farmerId) : `name:${(seedTx.farmerName || "").toLowerCase().trim()}`;
+        perFarmerSeedDue.set(farmerId, (perFarmerSeedDue.get(farmerId) || 0) + seedDue);
+      }
+
+      const allFarmerIdsArr = Array.from(new Set([...Array.from(perFarmerHarvestDue.keys()), ...Array.from(perFarmerSeedDue.keys())]));
+      let summaryFarmerHarvestPayable = 0;
+      let summaryFarmerSeedPayable = 0;
+      let summaryFarmerHarvestDue = 0;
+      let summaryFarmerSeedDue = 0;
+      for (const fId of allFarmerIdsArr) {
+        const hDue = perFarmerHarvestDue.get(fId) || 0;
+        const sDue = perFarmerSeedDue.get(fId) || 0;
+        summaryFarmerHarvestPayable += hDue;
+        summaryFarmerSeedPayable += sDue;
+        if (hDue >= sDue) {
+          summaryFarmerHarvestDue += (hDue - sDue);
+        } else {
+          summaryFarmerSeedDue += (sDue - hDue);
+        }
       }
 
       const farmerDueTimeSeries = Array.from(farmerDueMap.entries())
@@ -209,11 +260,36 @@ export async function registerRoutes(
         return { date, pnl: Math.round(cumulative * 100) / 100 };
       });
 
+      const farmerDueByCrop = Object.entries(cropDuesMap)
+        .filter(([, v]) => v > 0)
+        .map(([name, value]) => ({ name, value: Math.round(value) }));
+
+      const buyerDueByName = Array.from(buyerDueByNameMap.entries())
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, value]) => {
+          const total = Array.from(buyerDueByNameMap.values()).reduce((s, v) => s + v, 0);
+          return { name: name.length > 12 ? name.substring(0, 12) + "..." : name, value: Math.round(value), percentage: total > 0 ? Math.round((value / total) * 100) : 0 };
+        });
+
       res.json({
         farmerDueTimeSeries,
         buyerDueTimeSeries,
         dailyVolumeTimeSeries,
         cumulativePnlTimeSeries,
+        summary: {
+          farmerHarvestPayable: Math.round(summaryFarmerHarvestPayable),
+          farmerHarvestDue: Math.round(summaryFarmerHarvestDue),
+          farmerSeedPayable: Math.round(summaryFarmerSeedPayable),
+          farmerSeedDue: Math.round(summaryFarmerSeedDue),
+          coldStoreTotalCharges: Math.round(summaryColdStoreTotalCharges),
+          coldStoreDue: Math.round(summaryColdStoreDue),
+          buyerTotalRevenue: Math.round(summaryBuyerTotalRevenue),
+          buyerTotalDue: Math.round(summaryBuyerTotalDue),
+        },
+        farmerDueByCrop,
+        buyerDueByName,
       });
     } catch (error) {
       console.error("Error fetching dashboard timeseries:", error);

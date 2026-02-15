@@ -108,6 +108,18 @@ interface TimeseriesData {
   buyerDueTimeSeries: Array<{ date: string; amount: number }>;
   dailyVolumeTimeSeries: Array<{ date: string; volume: number }>;
   cumulativePnlTimeSeries: Array<{ date: string; pnl: number }>;
+  summary: {
+    farmerHarvestPayable: number;
+    farmerHarvestDue: number;
+    farmerSeedPayable: number;
+    farmerSeedDue: number;
+    coldStoreTotalCharges: number;
+    coldStoreDue: number;
+    buyerTotalRevenue: number;
+    buyerTotalDue: number;
+  };
+  farmerDueByCrop: Array<{ name: string; value: number }>;
+  buyerDueByName: Array<{ name: string; value: number; percentage: number }>;
 }
 
 function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
@@ -283,17 +295,6 @@ export function DashboardTab() {
     queryKey: ["/api/seed-stock-entries"],
   });
 
-  const { data: farmers, isLoading: farmersLoading } = useQuery<FarmerWithDues[]>({
-    queryKey: ["/api/farmers"],
-  });
-
-  const { data: buyers, isLoading: buyersLoading } = useQuery<BuyerWithDues[]>({
-    queryKey: ["/api/buyers"],
-  });
-
-  const { data: coldStores, isLoading: coldStoresLoading } = useQuery<ColdStoreWithDue[]>({
-    queryKey: ["/api/cash/cold-stores"],
-  });
 
   const { data: timeseries, isLoading: timeseriesLoading } = useQuery<TimeseriesData>({
     queryKey: ["/api/dashboard/timeseries", cropFilter, yearsParam, monthsParam, daysParam],
@@ -347,6 +348,7 @@ export function DashboardTab() {
     let totalCost = 0;
 
     seedEntries.forEach(entry => {
+      if (cropFilter === "onion") return;
       if (!matchesFilter(entry.purchaseDate)) return;
       (entry.seedLots || []).forEach(lot => {
         totalBags += lot.originalBags;
@@ -359,103 +361,45 @@ export function DashboardTab() {
   }, [seedEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
 
   const farmerSummary = useMemo(() => {
-    if (!farmers) return { harvestPayable: 0, harvestDue: 0, seedPayable: 0, seedDue: 0 };
-    let totalHarvestDue = 0;
-    let totalSeedDue = 0;
-
-    farmers.forEach(f => {
-      const hDue = f.harvestDue || 0;
-      const sDue = f.seedDue || 0;
-
-      if (hDue >= sDue) {
-        totalHarvestDue += (hDue - sDue);
-      } else {
-        totalSeedDue += (sDue - hDue);
-      }
-    });
-
+    if (!timeseries?.summary) return { harvestPayable: 0, harvestDue: 0, seedPayable: 0, seedDue: 0 };
     return {
-      harvestPayable: farmers.reduce((sum, f) => sum + (f.harvestDue || 0), 0),
-      harvestDue: totalHarvestDue,
-      seedPayable: farmers.reduce((sum, f) => sum + (f.seedDue || 0), 0),
-      seedDue: totalSeedDue,
+      harvestPayable: timeseries.summary.farmerHarvestPayable,
+      harvestDue: timeseries.summary.farmerHarvestDue,
+      seedPayable: timeseries.summary.farmerSeedPayable,
+      seedDue: timeseries.summary.farmerSeedDue,
     };
-  }, [farmers]);
+  }, [timeseries]);
 
   const coldStoreSummary = useMemo(() => {
-    if (!stockEntries) return { totalCharges: 0, totalDue: 0 };
-    const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
-    let totalCharges = 0;
-    stockEntries.forEach(entry => {
-      (entry.lots || []).forEach(lot => {
-        const charges = (lot.charges || [])
-          .filter(c => c && coldStoreTypes.includes(c.type))
-          .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
-        totalCharges += charges;
-      });
-    });
-    const totalDue = coldStores ? coldStores.reduce((sum, cs) => sum + (cs.totalDue || 0), 0) : 0;
-    return { totalCharges, totalDue };
-  }, [stockEntries, coldStores]);
+    if (!timeseries?.summary) return { totalCharges: 0, totalDue: 0 };
+    return {
+      totalCharges: timeseries.summary.coldStoreTotalCharges,
+      totalDue: timeseries.summary.coldStoreDue,
+    };
+  }, [timeseries]);
 
   const buyerSummary = useMemo(() => {
-    if (!buyers) return { totalRevenue: 0, totalDue: 0 };
-    const totalDue = buyers.reduce((sum, b) => sum + (b.overallDue || 0), 0);
-    const totalReceivables = buyers.reduce((sum, b) => sum + (b.receivables || 0), 0);
-    const totalRevenue = totalDue + totalReceivables;
-    return { totalRevenue, totalDue };
-  }, [buyers]);
+    if (!timeseries?.summary) return { totalRevenue: 0, totalDue: 0 };
+    return {
+      totalRevenue: timeseries.summary.buyerTotalRevenue,
+      totalDue: timeseries.summary.buyerTotalDue,
+    };
+  }, [timeseries]);
 
   const farmerDueByCrop = useMemo(() => {
-    if (!stockEntries) return [];
-    const cropDues: Record<string, number> = {};
-
-    stockEntries.forEach(entry => {
-      const entryCrop = entry.crop || "potato";
-      let entryTotalAmount = 0;
-      let entryDeductions = 0;
-      let entryAdjustment = 0;
-
-      (entry.lots || []).forEach(lot => {
-        const metrics = computeLotMetrics(lot);
-        if (metrics.totalAmount !== null) entryTotalAmount += metrics.totalAmount;
-        entryDeductions += metrics.totalDeductions;
-        if (metrics.adjustedAmount > 0 && metrics.adjustedAmountType) {
-          if (metrics.adjustedAmountType === "debit") entryAdjustment -= metrics.adjustedAmount;
-          else if (metrics.adjustedAmountType === "credit") entryAdjustment += metrics.adjustedAmount;
-        }
-      });
-
-      const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
-      const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      const due = Math.max(netPayable - amountPaid, 0);
-      cropDues[entryCrop] = (cropDues[entryCrop] || 0) + due;
-    });
-
-    return Object.entries(cropDues)
-      .filter(([, v]) => v > 0)
-      .map(([name, value]) => ({
-        name: name === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज"),
-        value: Math.round(value),
-      }));
-  }, [stockEntries, t]);
+    if (!timeseries?.farmerDueByCrop) return [];
+    return timeseries.farmerDueByCrop.map(item => ({
+      name: item.name === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज"),
+      value: item.value,
+    }));
+  }, [timeseries, t]);
 
   const buyerDueByName = useMemo(() => {
-    if (!buyers) return [];
-    const sorted = [...buyers]
-      .filter(b => b.overallDue > 0)
-      .sort((a, b) => b.overallDue - a.overallDue)
-      .slice(0, 8);
+    if (!timeseries?.buyerDueByName) return [];
+    return timeseries.buyerDueByName;
+  }, [timeseries]);
 
-    const total = sorted.reduce((sum, b) => sum + b.overallDue, 0);
-    return sorted.map(b => ({
-      name: b.name.length > 12 ? b.name.substring(0, 12) + "..." : b.name,
-      value: Math.round(b.overallDue),
-      percentage: total > 0 ? Math.round((b.overallDue / total) * 100) : 0,
-    }));
-  }, [buyers]);
-
-  const isLoading = stockLoading || seedLoading || farmersLoading || buyersLoading || coldStoresLoading;
+  const isLoading = stockLoading || seedLoading || timeseriesLoading;
 
   const yearLabel = allYearsSelected ? t("All Years", "सभी वर्ष") : selectedYears.length === 1 ? selectedYears[0].toString() : `${selectedYears.length} ${t("Years", "वर्ष")}`;
   const monthLabel = allMonthsSelected ? t("All", "सभी") : selectedMonths.length === 1 ? MONTHS[selectedMonths[0] - 1] : `${selectedMonths.length} ${t("Mon", "माह")}`;
