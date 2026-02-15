@@ -34,7 +34,7 @@ interface FarmerWithDues extends Farmer {
   seedDue: number;
   netDue: number;
   coldDue: number;
-  receivables: number;
+  pyReceivableWithInterest: number;
 }
 
 type SortOption = 'farmerId' | 'harvestDue' | 'seedDue' | 'coldDue' | 'pyReceivable' | 'netDue';
@@ -381,8 +381,8 @@ export function FarmerLedgerTab() {
           comparison = a.coldDue - b.coldDue;
           break;
         case 'pyReceivable':
-          const aPyReceivable = parseFloat(a.pyReceivable || "0") + (a.receivables || 0);
-          const bPyReceivable = parseFloat(b.pyReceivable || "0") + (b.receivables || 0);
+          const aPyReceivable = a.pyReceivableWithInterest || 0;
+          const bPyReceivable = b.pyReceivableWithInterest || 0;
           comparison = aPyReceivable - bPyReceivable;
           break;
         case 'netDue':
@@ -408,7 +408,7 @@ export function FarmerLedgerTab() {
   const summary = useMemo(() => {
     const displayedFarmers = [...activeFarmers, ...(showArchived ? archivedFarmers : [])];
     return {
-      totalPyReceivable: displayedFarmers.reduce((sum, f) => sum + parseFloat(f.pyReceivable || "0") + (f.receivables || 0), 0),
+      totalPyReceivable: displayedFarmers.reduce((sum, f) => sum + (f.pyReceivableWithInterest || 0), 0),
       totalHarvestDue: displayedFarmers.reduce((sum, f) => sum + f.harvestDue, 0),
       totalSeedDue: displayedFarmers.reduce((sum, f) => sum + f.seedDue, 0),
       totalColdDue: displayedFarmers.reduce((sum, f) => sum + f.coldDue, 0),
@@ -501,7 +501,7 @@ export function FarmerLedgerTab() {
                 <td>${f.name}${f.negativeFlag ? ' (Flagged)' : ''}</td>
                 <td>${f.village || '-'}</td>
                 <td>${f.contact || '-'}</td>
-                <td class="text-right">${formatCurrency(parseFloat(f.pyReceivable || "0") + (f.receivables || 0))}</td>
+                <td class="text-right">${formatCurrency(f.pyReceivableWithInterest || 0)}</td>
                 <td class="text-right text-green">${formatCurrency(f.harvestDue)}</td>
                 <td class="text-right text-red">${formatCurrency(f.seedDue)}</td>
                 <td class="text-right ${f.netDue >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(f.netDue)}</td>
@@ -555,7 +555,7 @@ export function FarmerLedgerTab() {
         <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-village-${farmer.id}`}>{farmer.village || "-"}</td>
         <td className="p-2 text-xs text-muted-foreground" data-testid={`text-farmer-contact-${farmer.id}`}>{farmer.contact || "-"}</td>
         <td className="p-2 text-right text-xs font-medium" data-testid={`text-py-receivable-${farmer.id}`}>
-          {formatCurrency(parseFloat(farmer.pyReceivable || "0") + (farmer.receivables || 0))}
+          {formatCurrency(farmer.pyReceivableWithInterest || 0)}
         </td>
         <td className="p-2 text-right text-xs font-medium text-green-600 dark:text-green-400" data-testid={`text-harvest-due-${farmer.id}`}>
           {formatCurrency(farmer.harvestDue)}

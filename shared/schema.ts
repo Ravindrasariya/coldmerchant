@@ -302,6 +302,7 @@ export const buyers = pgTable("buyers", {
   address: text("address").notNull(),
   mandiCode: text("mandi_code"),
   contact: text("contact"),
+  receivableBalance: decimal("receivable_balance", { precision: 12, scale: 2 }).default("0"),
   negativeFlag: boolean("negative_flag").default(false),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -336,7 +337,9 @@ export const farmers = pgTable("farmers", {
   district: text("district"),
   state: text("state"),
   pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"), // Previous year payable (owed to farmer)
-  pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"), // Previous year receivable (owed by farmer)
+  pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"), // Previous year receivable (owed by farmer) - synced from Cash Settings, reduced by payments
+  receivableInterestRate: decimal("receivable_interest_rate", { precision: 5, scale: 2 }).default("0"),
+  receivableEffectiveDate: date("receivable_effective_date"),
   negativeFlag: boolean("negative_flag").default(false),
   isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),

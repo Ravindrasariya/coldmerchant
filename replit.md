@@ -88,14 +88,28 @@ When paying a supplier:
 - **Default Password**: New users created with password "password123" and mustChangePassword=true
 - **First Login**: Users with mustChangePassword flag are prompted to set a new password on first login
 
+### Cash Settings / Ledger Decoupled Architecture
+- **Cash Settings** = Input-only form. Stores original amounts (pendingDues for buyers, pendingDueToBePaid for farmers)
+- **Ledger fields** = Source of truth for running balances:
+  - `buyer.receivableBalance`: Tracks buyer's receivable, reduced by payments
+  - `farmer.pyReceivable`: Tracks farmer's PY receivable, reduced by payments
+  - `farmer.receivableInterestRate` + `receivableEffectiveDate`: Interest computed on remaining pyReceivable
+- **Delta-based sync**: Cash Settings create/update/delete apply deltas to ledger fields (not overwrites)
+  - CREATE: Adds new amount to ledger balance
+  - UPDATE: Applies (newAmount - oldAmount) delta to ledger balance
+  - DELETE: Subtracts deleted amount from ledger balance (min 0)
+  - Balance reaching 0 clears interest rate and effective date
+- **Payment FIFO**: STEP 1 reduce ledger receivable, STEP 2 FIFO to transactions/seed transactions
+- **Reversals**: Restore transaction allocations first, then add back receivable reduction to ledger fields
+
 ### Buyer Management System
-- **Buyers Table**: Stores buyer information per merchant with fields: name, address, mandiCode, contact, negativeFlag, isActive
+- **Buyers Table**: Stores buyer information per merchant with fields: name, address, mandiCode, contact, negativeFlag, isActive, receivableBalance
 - **API Routes**: Full CRUD operations at /api/buyers with Zod validation using insertBuyerSchema
 - **UI Pattern**: Editable table rows with localRows state management:
   - `localRows = null`: Displaying server data (no edits)
   - `localRows = [...]`: User has unsaved local edits
 - **Delete Preservation**: Delete operations preserve unsaved edits on other rows
-- **Receivables Column**: Displays receivables from linked Cash Management parties (pendingDueToBePaid)
+- **Receivables Column**: Displays receivables from buyer.receivableBalance (ledger field, not Cash Settings)
 - **Party-Buyer Linking**: When creating managed parties in Cash Management, buyers are auto-created/linked using lookupOrCreateBuyer function (case-insensitive name matching, auto-generates BYYYYYMMDD# codes for new buyers)
 - **Accessible via**: User dropdown menu > "Buyers" link
 

@@ -2101,6 +2101,16 @@ export async function registerRoutes(
         address: titleCase(address) || null,
         pendingDues: pendingDues?.toString() || "0",
       });
+
+      if (buyerId && pendingDues !== undefined) {
+        const newAmount = parseFloat(pendingDues?.toString() || "0");
+        if (newAmount > 0) {
+          const existingBuyer = await storage.getBuyerById(buyerId, merchantId);
+          const currentBalance = parseFloat(existingBuyer?.receivableBalance || "0");
+          await storage.updateBuyer(buyerId, merchantId, { receivableBalance: (currentBalance + newAmount).toFixed(2) });
+        }
+      }
+
       res.status(201).json(party);
     } catch (error) {
       console.error("Error creating party:", error);
@@ -2126,6 +2136,10 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const { name, contactNumber, address, pendingDues } = req.body;
 
+      const allParties = await storage.getPartiesByMerchant(merchantId);
+      const oldParty = allParties.find(p => p.id === id);
+      const oldAmount = parseFloat(oldParty?.pendingDues || "0");
+
       const party = await storage.updateParty(id, merchantId, {
         ...(name && { name }),
         ...(contactNumber !== undefined && { contactNumber }),
@@ -2136,6 +2150,18 @@ export async function registerRoutes(
       if (!party) {
         return res.status(404).json({ message: "Party not found" });
       }
+
+      if (party.buyerId && pendingDues !== undefined) {
+        const newAmount = parseFloat(pendingDues?.toString() || "0");
+        const delta = newAmount - oldAmount;
+        if (delta !== 0) {
+          const existingBuyer = await storage.getBuyerById(party.buyerId, merchantId);
+          const currentBalance = parseFloat(existingBuyer?.receivableBalance || "0");
+          const newBalance = Math.max(0, currentBalance + delta);
+          await storage.updateBuyer(party.buyerId, merchantId, { receivableBalance: newBalance.toFixed(2) });
+        }
+      }
+
       res.json(party);
     } catch (error) {
       console.error("Error updating party:", error);
@@ -2147,7 +2173,20 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
+      const allParties = await storage.getPartiesByMerchant(merchantId);
+      const deletedParty = allParties.find(p => p.id === id);
       await storage.deleteParty(id, merchantId);
+
+      if (deletedParty?.buyerId) {
+        const removedAmount = parseFloat(deletedParty.pendingDues || "0");
+        if (removedAmount > 0) {
+          const existingBuyer = await storage.getBuyerById(deletedParty.buyerId, merchantId);
+          const currentBalance = parseFloat(existingBuyer?.receivableBalance || "0");
+          const newBalance = Math.max(0, currentBalance - removedAmount);
+          await storage.updateBuyer(deletedParty.buyerId, merchantId, { receivableBalance: newBalance.toFixed(2) });
+        }
+      }
+
       res.json({ message: "Party deleted successfully" });
     } catch (error) {
       console.error("Error deleting party:", error);
@@ -2191,7 +2230,7 @@ export async function registerRoutes(
         state: titleCase(state) || null,
       });
 
-      const farmer = await storage.createCashFarmer({
+      const cashFarmer = await storage.createCashFarmer({
         merchantId,
         farmerId,
         name: tcName,
@@ -2204,7 +2243,21 @@ export async function registerRoutes(
         rateOfInterest: rateOfInterest?.toString() || "0",
         effectiveDate: effectiveDate || new Date().toISOString().split('T')[0],
       });
-      res.status(201).json(farmer);
+
+      if (farmerId) {
+        const addedAmount = parseFloat(pendingDueToBePaid?.toString() || "0");
+        const roi = parseFloat(rateOfInterest?.toString() || "0");
+        const effDate = effectiveDate || new Date().toISOString().split('T')[0];
+        const existingFarmer = await storage.getFarmerById(farmerId, merchantId);
+        const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
+        await storage.updateFarmer(farmerId, merchantId, {
+          pyReceivable: (currentPyReceivable + addedAmount).toFixed(2),
+          receivableInterestRate: roi.toFixed(2),
+          receivableEffectiveDate: effDate,
+        });
+      }
+
+      res.status(201).json(cashFarmer);
     } catch (error) {
       console.error("Error creating farmer:", error);
       res.status(500).json({ message: "Failed to create farmer" });
@@ -2217,7 +2270,13 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const { name, contactNumber, village, tehsil, district, state, pendingDueToBePaid, rateOfInterest, effectiveDate } = req.body;
 
-      const farmer = await storage.updateCashFarmer(id, merchantId, {
+      const allCashFarmers = await storage.getCashFarmersByMerchant(merchantId);
+      const oldCashFarmer = allCashFarmers.find(f => f.id === id);
+      if (!oldCashFarmer) {
+        return res.status(404).json({ message: "Farmer not found" });
+      }
+
+      const updatedCashFarmer = await storage.updateCashFarmer(id, merchantId, {
         ...(name && { name: titleCaseKeep(name) }),
         ...(contactNumber !== undefined && { contactNumber }),
         ...(village !== undefined && { village: titleCase(village) }),
@@ -2229,10 +2288,39 @@ export async function registerRoutes(
         ...(effectiveDate !== undefined && { effectiveDate }),
       });
       
-      if (!farmer) {
+      if (!updatedCashFarmer) {
         return res.status(404).json({ message: "Farmer not found" });
       }
-      res.json(farmer);
+
+      if (updatedCashFarmer.farmerId) {
+        const syncData: any = {};
+        if (pendingDueToBePaid !== undefined) {
+          const newAmount = parseFloat(pendingDueToBePaid?.toString() || "0");
+          const oldAmount = parseFloat(oldCashFarmer.pendingDueToBePaid || "0");
+          const delta = newAmount - oldAmount;
+          if (delta !== 0) {
+            const existingFarmer = await storage.getFarmerById(updatedCashFarmer.farmerId, merchantId);
+            const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
+            const newBalance = Math.max(0, currentPyReceivable + delta);
+            syncData.pyReceivable = newBalance.toFixed(2);
+            if (newBalance <= 0) {
+              syncData.receivableInterestRate = "0";
+              syncData.receivableEffectiveDate = null;
+            }
+          }
+        }
+        if (rateOfInterest !== undefined) {
+          syncData.receivableInterestRate = parseFloat(rateOfInterest?.toString() || "0").toFixed(2);
+        }
+        if (effectiveDate !== undefined) {
+          syncData.receivableEffectiveDate = effectiveDate;
+        }
+        if (Object.keys(syncData).length > 0) {
+          await storage.updateFarmer(updatedCashFarmer.farmerId, merchantId, syncData);
+        }
+      }
+
+      res.json(updatedCashFarmer);
     } catch (error) {
       console.error("Error updating farmer:", error);
       res.status(500).json({ message: "Failed to update farmer" });
@@ -2243,7 +2331,25 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
+      const allCashFarmers = await storage.getCashFarmersByMerchant(merchantId);
+      const deletedCashFarmer = allCashFarmers.find(f => f.id === id);
       await storage.deleteCashFarmer(id, merchantId);
+
+      if (deletedCashFarmer?.farmerId) {
+        const removedAmount = parseFloat(deletedCashFarmer.pendingDueToBePaid || "0");
+        const existingFarmer = await storage.getFarmerById(deletedCashFarmer.farmerId, merchantId);
+        if (existingFarmer) {
+          const currentPyReceivable = parseFloat(existingFarmer.pyReceivable || "0");
+          const newBalance = Math.max(0, currentPyReceivable - removedAmount);
+          const updateData: any = { pyReceivable: newBalance.toFixed(2) };
+          if (newBalance <= 0) {
+            updateData.receivableInterestRate = "0";
+            updateData.receivableEffectiveDate = null;
+          }
+          await storage.updateFarmer(deletedCashFarmer.farmerId, merchantId, updateData);
+        }
+      }
+
       res.json({ message: "Farmer deleted successfully" });
     } catch (error) {
       console.error("Error deleting farmer:", error);
@@ -2262,14 +2368,11 @@ export async function registerRoutes(
       // Get all transactions for this merchant to calculate buyer dues
       const transactionList = await storage.getTransactionsByMerchant(merchantId);
       
-      // Get all parties to include receivables from linked parties
-      const partyList = await storage.getPartiesByMerchant(merchantId);
-      
       // Calculate dues for each buyer: revenue - amountReceived for all transactions with that buyerId
-      // Plus receivables from linked parties (pendingDueToBePaid where buyerId matches)
+      // Plus receivableBalance from buyer record (synced from Cash Settings)
       const buyersWithDues = buyerList.map(buyer => {
         let totalDue = 0;
-        let receivables = 0;
+        const receivables = parseFloat(buyer.receivableBalance || "0");
         
         for (const txn of transactionList) {
           if (txn.buyerId === buyer.id) {
@@ -2279,17 +2382,9 @@ export async function registerRoutes(
           }
         }
         
-        // Add receivables from linked parties (pending dues)
-        for (const party of partyList) {
-          if (party.buyerId === buyer.id) {
-            const parsedDue = parseFloat(party.pendingDues || "0");
-            receivables += isNaN(parsedDue) ? 0 : parsedDue;
-          }
-        }
-        
         return {
           ...buyer,
-          overallDue: totalDue + receivables, // Include receivables in overall due
+          overallDue: totalDue + receivables,
           receivables: receivables,
         };
       });
@@ -2531,25 +2626,6 @@ export async function registerRoutes(
       // Get all bag breakdowns for harvest due calculation
       const allBreakdowns = await storage.getAllBagBreakdownsByMerchant(merchantId);
       
-      // Get managed farmers (cash farmers) for receivables
-      const managedFarmerList = await storage.getCashFarmersByMerchant(merchantId);
-      
-      // Build maps for receivables - one by farmerId (primary) and one by composite key (fallback)
-      const receivablesByFarmerId = new Map<number, number>();
-      const receivablesByCompositeKey = new Map<string, number>();
-      for (const mf of managedFarmerList) {
-        const receivables = getReceivableWithInterest(mf);
-        if (receivables > 0) {
-          if (mf.farmerId) {
-            const existing = receivablesByFarmerId.get(mf.farmerId) || 0;
-            receivablesByFarmerId.set(mf.farmerId, existing + receivables);
-          } else if (mf.name) {
-            const key = mf.name.trim().toLowerCase() + "|" + (mf.contactNumber?.trim().toLowerCase() || "");
-            const existing = receivablesByCompositeKey.get(key) || 0;
-            receivablesByCompositeKey.set(key, existing + receivables);
-          }
-        }
-      }
       
       // Build a map of stockEntryId -> lots for cold charges calculation
       const lotsByEntryId = new Map<number, typeof allLots>();
@@ -2716,19 +2792,16 @@ export async function registerRoutes(
           }
         }
         
-        const pyReceivable = parseFloat(farmer.pyReceivable || "0");
-        
-        // Get receivables from managed farmers (cash farmers with pendingDueToBePaid)
-        // Match by farmerId first, then fall back to composite key
-        let receivables = receivablesByFarmerId.get(farmer.id) || 0;
-        if (receivables === 0) {
-          const farmerKey = normalizedFarmerName + "|" + (normalizedFarmerContact || "");
-          receivables = receivablesByCompositeKey.get(farmerKey) || 0;
+        // PY Receivable with compound interest from farmer's own fields
+        const pyPrincipal = parseFloat(farmer.pyReceivable || "0");
+        const pyRoi = parseFloat(farmer.receivableInterestRate || "0");
+        let pyReceivableWithInterest = pyPrincipal;
+        if (pyPrincipal > 0 && pyRoi > 0 && farmer.receivableEffectiveDate) {
+          pyReceivableWithInterest = computeCompoundInterestDue(pyPrincipal, pyRoi, farmer.receivableEffectiveDate);
         }
         
-        // Net Due = PY Receivables + Harvest Due - Seed Due - Receivables
-        // (Receivables are amounts farmer owes to merchant, so they offset what merchant owes to farmer)
-        const netDue = pyReceivable + harvestDue - seedDue - receivables;
+        // Net Due = PY Receivable (with interest) + Harvest Due - Seed Due
+        const netDue = pyReceivableWithInterest + harvestDue - seedDue;
         
         return {
           ...farmer,
@@ -2736,7 +2809,7 @@ export async function registerRoutes(
           seedDue,
           netDue,
           coldDue,
-          receivables,
+          pyReceivableWithInterest,
         };
       });
       

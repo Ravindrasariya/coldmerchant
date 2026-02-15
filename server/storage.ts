@@ -176,6 +176,7 @@ export interface IStorage {
   
   // Farmer Ledger operations
   getFarmersByMerchant(merchantId: number): Promise<Farmer[]>;
+  getFarmerById(id: number, merchantId: number): Promise<Farmer | undefined>;
   getMaxFarmerCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createFarmer(farmer: InsertFarmer): Promise<Farmer>;
   updateFarmer(id: number, merchantId: number, data: Partial<Farmer>): Promise<Farmer | undefined>;
@@ -1161,9 +1162,9 @@ export class DatabaseStorage implements IStorage {
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
     
-    // Get all managed farmers (cash farmers) with receivables
-    const managedFarmers = await db.select().from(cashFarmers)
-      .where(eq(cashFarmers.merchantId, merchantId));
+    // Get all farmers from the farmer ledger for receivable balances
+    const allFarmerRecords = await db.select().from(farmers)
+      .where(eq(farmers.merchantId, merchantId));
     
     // Note: seed_sale cash entries are already applied via FIFO to reduce totalDueToFarmer,
     // so we don't need to subtract them again here. Just use totalDueToFarmer directly.
@@ -1207,35 +1208,31 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Add receivables from managed farmers (cash farmers with pendingDueToBePaid + interest)
-    for (const farmer of managedFarmers) {
-      const principal = parseFloat(farmer.pendingDueToBePaid || "0");
-      const roi = parseFloat(farmer.rateOfInterest || "0");
+    // Add receivables from farmer ledger (pyReceivable with interest)
+    for (const farmerRecord of allFarmerRecords) {
+      const principal = parseFloat(farmerRecord.pyReceivable || "0");
+      if (principal <= 0) continue;
+      const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
       let receivables = principal;
-      if (roi > 0 && principal > 0 && farmer.effectiveDate) {
-        const diffMs = new Date().getTime() - new Date(farmer.effectiveDate).getTime();
+      if (roi > 0 && farmerRecord.receivableEffectiveDate) {
+        const diffMs = new Date().getTime() - new Date(farmerRecord.receivableEffectiveDate).getTime();
         if (diffMs > 0) {
           const days = diffMs / (1000 * 60 * 60 * 24);
           receivables = principal * Math.pow(1 + roi / 100, days / 365);
         }
       }
-      if (receivables <= 0) continue;
       
-      const key = getSeedFarmerKey(farmer.farmerId, farmer.name, farmer.contactNumber, farmer.village);
-      if (!key) continue;
+      const key = `id:${farmerRecord.id}`;
       
       const existing = farmerMap.get(key);
       if (existing) {
         existing.receivables += receivables;
         existing.totalDue += receivables;
-        if (!existing.village && farmer.village) {
-          existing.village = farmer.village;
-        }
       } else {
         farmerMap.set(key, {
-          displayName: farmer.name.trim(),
-          farmerContact: farmer.contactNumber || null,
-          village: farmer.village || null,
+          displayName: farmerRecord.name.trim(),
+          farmerContact: farmerRecord.contact || null,
+          village: farmerRecord.village || null,
           totalDue: receivables,
           transactionCount: 0,
           receivables: receivables,
@@ -1342,7 +1339,32 @@ export class DatabaseStorage implements IStorage {
         const entryBuyerId = entry.buyerId || null;
         const normalizedPartyName = normalizeName(entry.partyName);
         
-        // Apply amount to transactions using FIFO (oldest first)
+        // Resolve buyerId if not directly available
+        let matchedBuyerId = entryBuyerId;
+        if (!matchedBuyerId) {
+          const allBuyers = await tx.select().from(buyers)
+            .where(eq(buyers.merchantId, entry.merchantId));
+          const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizedPartyName);
+          matchedBuyerId = matchedBuyer?.id || null;
+        }
+        
+        // STEP 1: First reduce buyer's receivableBalance in buyer ledger
+        if (matchedBuyerId && remainingAmount > 0) {
+          const [matchedBuyer] = await tx.select().from(buyers).where(eq(buyers.id, matchedBuyerId));
+          if (matchedBuyer) {
+            const currentReceivable = parseFloat(matchedBuyer.receivableBalance || "0");
+            if (currentReceivable > 0) {
+              const toApply = Math.min(remainingAmount, currentReceivable);
+              const newReceivable = currentReceivable - toApply;
+              await tx.update(buyers)
+                .set({ receivableBalance: newReceivable.toFixed(2), updatedAt: new Date() })
+                .where(eq(buyers.id, matchedBuyerId));
+              remainingAmount -= toApply;
+            }
+          }
+        }
+        
+        // STEP 2: Apply remaining to transactions using FIFO (oldest first)
         if (remainingAmount > 0) {
           const txns = await tx.select().from(transactions)
             .where(eq(transactions.merchantId, entry.merchantId))
@@ -1406,7 +1428,35 @@ export class DatabaseStorage implements IStorage {
           return true;
         };
         
-        // Apply amount to seed transactions using FIFO (oldest first)
+        // Resolve farmerId
+        let matchedFarmerId = entryFarmerId;
+        if (!matchedFarmerId) {
+          const allFarmerRecords = await tx.select().from(farmers)
+            .where(eq(farmers.merchantId, entry.merchantId));
+          const matchedFarmer = allFarmerRecords.find(f => farmerCompositeMatch(f.name, f.contact, f.village));
+          matchedFarmerId = matchedFarmer?.id || null;
+        }
+        
+        // STEP 1: First reduce farmer's pyReceivable in farmer ledger
+        if (matchedFarmerId && remainingAmount > 0) {
+          const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
+          if (matchedFarmer) {
+            const currentPyReceivable = parseFloat(matchedFarmer.pyReceivable || "0");
+            if (currentPyReceivable > 0) {
+              const toApply = Math.min(remainingAmount, currentPyReceivable);
+              const newPyReceivable = currentPyReceivable - toApply;
+              await tx.update(farmers)
+                .set({ 
+                  pyReceivable: newPyReceivable.toFixed(2),
+                  receivableEffectiveDate: newPyReceivable > 0 ? new Date().toISOString().split('T')[0] : null,
+                })
+                .where(eq(farmers.id, matchedFarmerId));
+              remainingAmount -= toApply;
+            }
+          }
+        }
+        
+        // STEP 2: Apply remaining to seed transactions using FIFO (oldest first)
         if (remainingAmount > 0) {
           const allSeedTxns = await tx.select().from(seedTransactions)
             .where(eq(seedTransactions.merchantId, entry.merchantId))
@@ -1913,6 +1963,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(farmers)
       .where(eq(farmers.merchantId, merchantId))
       .orderBy(asc(farmers.isArchived), desc(farmers.dateAdded));
+  }
+
+  async getFarmerById(id: number, merchantId: number): Promise<Farmer | undefined> {
+    const [farmer] = await db.select().from(farmers).where(and(eq(farmers.id, id), eq(farmers.merchantId, merchantId)));
+    return farmer;
   }
 
   async getMaxFarmerCodeSequence(merchantId: number, prefix: string): Promise<number> {
@@ -3162,7 +3217,23 @@ export class DatabaseStorage implements IStorage {
           matchedBuyerId = matchedBuyer?.id || null;
         }
         
-        // Apply to transactions FIFO
+        // STEP 1: First reduce buyer's receivableBalance in buyer ledger
+        if (matchedBuyerId && remainingAmount > 0) {
+          const [matchedBuyer] = await tx.select().from(buyers).where(eq(buyers.id, matchedBuyerId));
+          if (matchedBuyer) {
+            const currentReceivable = parseFloat(matchedBuyer.receivableBalance || "0");
+            if (currentReceivable > 0) {
+              const toApply = Math.min(remainingAmount, currentReceivable);
+              const newReceivable = currentReceivable - toApply;
+              await tx.update(buyers)
+                .set({ receivableBalance: newReceivable.toFixed(2), updatedAt: new Date() })
+                .where(eq(buyers.id, matchedBuyerId));
+              remainingAmount -= toApply;
+            }
+          }
+        }
+        
+        // STEP 2: Apply remaining to transactions FIFO
         if (remainingAmount > 0) {
           const txns = await tx.select().from(transactions)
             .where(eq(transactions.merchantId, entry.merchantId))
@@ -3240,7 +3311,26 @@ export class DatabaseStorage implements IStorage {
             matchedFarmerId = matchedFarmer?.id || null;
           }
           
-          // Apply to seed transactions FIFO
+          // STEP 1: First reduce farmer's pyReceivable in farmer ledger
+          if (matchedFarmerId && remainingAmount > 0) {
+            const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
+            if (matchedFarmer) {
+              const currentPyReceivable = parseFloat(matchedFarmer.pyReceivable || "0");
+              if (currentPyReceivable > 0) {
+                const toApply = Math.min(remainingAmount, currentPyReceivable);
+                const newPyReceivable = currentPyReceivable - toApply;
+                await tx.update(farmers)
+                  .set({ 
+                    pyReceivable: newPyReceivable.toFixed(2),
+                    receivableEffectiveDate: newPyReceivable > 0 ? new Date().toISOString().split('T')[0] : null,
+                  })
+                  .where(eq(farmers.id, matchedFarmerId));
+                remainingAmount -= toApply;
+              }
+            }
+          }
+          
+          // STEP 2: Apply remaining to seed transactions FIFO
           if (remainingAmount > 0) {
             const allSeedTxns = await tx.select().from(seedTransactions)
               .where(eq(seedTransactions.merchantId, entry.merchantId))
@@ -3504,17 +3594,41 @@ export class DatabaseStorage implements IStorage {
       
       // 4a. Reverse party payment allocations (buyer receipts for raw_potato)
       if (entry.direction === "inward" && entry.revenueType === "raw_potato") {
+        let totalAllocated = 0;
         for (const alloc of entryAllocations) {
           const [txn] = await tx.select().from(transactions)
             .where(eq(transactions.id, alloc.transactionId));
           
           if (txn) {
+            const appliedAmt = parseFloat(alloc.appliedAmount);
             const currentReceived = parseFloat(txn.amountReceived || "0");
-            const newReceived = Math.max(0, currentReceived - parseFloat(alloc.appliedAmount));
+            const newReceived = Math.max(0, currentReceived - appliedAmt);
             
             await tx.update(transactions)
               .set({ amountReceived: newReceived.toString() })
               .where(eq(transactions.id, txn.id));
+            totalAllocated += appliedAmt;
+          }
+        }
+        
+        // Restore receivable: whatever was applied to receivables (total payment - allocations to transactions)
+        const totalPayment = parseFloat(entry.amount);
+        const receivableReduction = totalPayment - totalAllocated;
+        if (receivableReduction > 0) {
+          let buyerIdToRestore = entry.buyerId;
+          if (!buyerIdToRestore && entry.partyName) {
+            const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
+            const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizeName(entry.partyName!));
+            buyerIdToRestore = matchedBuyer?.id || null;
+          }
+          if (buyerIdToRestore) {
+            const [buyer] = await tx.select().from(buyers).where(eq(buyers.id, buyerIdToRestore));
+            if (buyer) {
+              const currentReceivable = parseFloat(buyer.receivableBalance || "0");
+              await tx.update(buyers)
+                .set({ receivableBalance: (currentReceivable + receivableReduction).toFixed(2), updatedAt: new Date() })
+                .where(eq(buyers.id, buyerIdToRestore));
+            }
           }
         }
       }
@@ -3552,6 +3666,17 @@ export class DatabaseStorage implements IStorage {
               .where(eq(seedTransactions.id, txn.id));
             
             amountToRestore -= toRestore;
+          }
+        }
+        
+        // Restore farmer receivable for any amount that was originally applied to pyReceivable
+        if (amountToRestore > 0 && entryFarmerId) {
+          const [farmer] = await tx.select().from(farmers).where(eq(farmers.id, entryFarmerId));
+          if (farmer) {
+            const currentPyReceivable = parseFloat(farmer.pyReceivable || "0");
+            await tx.update(farmers)
+              .set({ pyReceivable: (currentPyReceivable + amountToRestore).toFixed(2) })
+              .where(eq(farmers.id, entryFarmerId));
           }
         }
       }
