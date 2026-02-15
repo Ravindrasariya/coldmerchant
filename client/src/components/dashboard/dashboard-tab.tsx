@@ -341,19 +341,21 @@ export function DashboardTab() {
   }, [stockEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
 
   const seedSummary = useMemo(() => {
-    if (!seedEntries) return { totalBags: 0, remainingBags: 0 };
+    if (!seedEntries) return { totalBags: 0, remainingBags: 0, totalCost: 0 };
     let totalBags = 0;
     let remainingBags = 0;
+    let totalCost = 0;
 
     seedEntries.forEach(entry => {
       if (!matchesFilter(entry.purchaseDate)) return;
       (entry.seedLots || []).forEach(lot => {
         totalBags += lot.originalBags;
         remainingBags += lot.remainingBags;
+        totalCost += lot.originalBags * parseFloat(lot.pricePerBag || "0");
       });
     });
 
-    return { totalBags, remainingBags };
+    return { totalBags, remainingBags, totalCost };
   }, [seedEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
 
   const farmerSummary = useMemo(() => {
@@ -381,19 +383,27 @@ export function DashboardTab() {
   }, [farmers]);
 
   const coldStoreSummary = useMemo(() => {
-    if (!coldStores) return { totalDue: 0, count: 0 };
-    return {
-      totalDue: coldStores.reduce((sum, cs) => sum + (cs.totalDue || 0), 0),
-      count: coldStores.length,
-    };
-  }, [coldStores]);
+    if (!stockEntries) return { totalCharges: 0, totalDue: 0 };
+    const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+    let totalCharges = 0;
+    stockEntries.forEach(entry => {
+      (entry.lots || []).forEach(lot => {
+        const charges = (lot.charges || [])
+          .filter(c => c && coldStoreTypes.includes(c.type))
+          .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+        totalCharges += charges;
+      });
+    });
+    const totalDue = coldStores ? coldStores.reduce((sum, cs) => sum + (cs.totalDue || 0), 0) : 0;
+    return { totalCharges, totalDue };
+  }, [stockEntries, coldStores]);
 
   const buyerSummary = useMemo(() => {
-    if (!buyers) return { totalDue: 0, count: 0 };
-    return {
-      totalDue: buyers.reduce((sum, b) => sum + (b.overallDue || 0), 0),
-      count: buyers.length,
-    };
+    if (!buyers) return { totalRevenue: 0, totalDue: 0 };
+    const totalDue = buyers.reduce((sum, b) => sum + (b.overallDue || 0), 0);
+    const totalReceivables = buyers.reduce((sum, b) => sum + (b.receivables || 0), 0);
+    const totalRevenue = totalDue + totalReceivables;
+    return { totalRevenue, totalDue };
   }, [buyers]);
 
   const farmerDueByCrop = useMemo(() => {
@@ -618,8 +628,9 @@ export function DashboardTab() {
             <div className="text-sm font-bold mt-1" data-testid="text-harvest-bags">
               {harvestSummary.totalBags} / {harvestSummary.remainingBags} {t("bags", "बैग")}
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5" data-testid="text-harvest-amount">
-              {formatINR(harvestSummary.totalAmount)}
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-harvest-amount">{formatINR(harvestSummary.totalAmount)}</span>
             </div>
           </CardContent>
         </Card>
@@ -629,6 +640,10 @@ export function DashboardTab() {
             <div className="text-xs text-muted-foreground font-medium">{t("Seed", "बीज")}</div>
             <div className="text-sm font-bold mt-1" data-testid="text-seed-bags">
               {seedSummary.totalBags} / {seedSummary.remainingBags} {t("bags", "बैग")}
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-seed-amount">{formatINR(seedSummary.totalCost)}</span>
             </div>
           </CardContent>
         </Card>
@@ -665,8 +680,8 @@ export function DashboardTab() {
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
             <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Stores", "भंडार")}: </span>
-              <span className="font-medium" data-testid="text-cold-total">{coldStoreSummary.count}</span>
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-cold-total">{formatINR(coldStoreSummary.totalCharges)}</span>
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
@@ -679,8 +694,8 @@ export function DashboardTab() {
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Buyer", "खरीदार")}</div>
             <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Count", "संख्या")}: </span>
-              <span className="font-medium" data-testid="text-buyer-count">{buyerSummary.count}</span>
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-buyer-total">{formatINR(buyerSummary.totalRevenue)}</span>
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
