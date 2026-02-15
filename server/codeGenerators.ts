@@ -1,3 +1,5 @@
+import { getISTDateYYYYMMDD } from './ist-utils';
+
 /**
  * Code generation utilities for unique business IDs
  * Format patterns:
@@ -8,8 +10,12 @@
 
 /**
  * Format a date as YYYYMMDD string with proper zero-padding
+ * Uses IST when no date is provided
  */
-export function formatDateForCode(date: Date = new Date()): string {
+export function formatDateForCode(date?: Date): string {
+  if (!date) {
+    return getISTDateYYYYMMDD();
+  }
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -57,6 +63,5 @@ export function parseDateToCodeFormat(input: string | Date): string {
     const [year, month, day] = parts;
     return `${year}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
   }
-  // Fallback to today
-  return formatDateForCode(new Date());
+  return getISTDateYYYYMMDD();
 }

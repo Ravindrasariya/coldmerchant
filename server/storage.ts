@@ -34,6 +34,7 @@ import {
   type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -48,7 +49,8 @@ function normalizeName(name: string | null | undefined): string {
 }
 
 // Helper function to format date as YYYYMMDD
-function formatDateYYYYMMDD(date: Date = new Date()): string {
+function formatDateYYYYMMDD(date?: Date): string {
+  if (!date) return getISTDateYYYYMMDD();
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -482,7 +484,7 @@ export class DatabaseStorage implements IStorage {
     const crop = entry.crop || "potato";
     const serialNumber = await this.getNextSerialNumber(entry.merchantId, crop);
     // Use purchaseDate for unique ID generation (not current date)
-    const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : new Date();
+    const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : undefined;
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
     
     // Retry loop for handling concurrent unique ID collisions
@@ -516,7 +518,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSerialNumber(merchantId: number, crop: string = "potato"): Promise<number> {
-    const currentYear = new Date().getFullYear();
+    const currentYear = getISTYear();
     const [result] = await db.select({ maxSerial: stockEntries.serialNumber })
       .from(stockEntries)
       .where(and(
@@ -656,7 +658,7 @@ export class DatabaseStorage implements IStorage {
     transaction: Omit<InsertTransaction, 'uniqueId'> & { transactionNumber: number }, 
     items: Omit<InsertTransactionItem, 'transactionId'>[]
   ): Promise<Transaction & { items: TransactionItem[] }> {
-    const dateStr = formatDateYYYYMMDD(new Date());
+    const dateStr = getISTDateYYYYMMDD();
     
     // Retry loop for handling concurrent unique ID collisions
     const maxRetries = 3;
@@ -716,7 +718,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextTransactionNumber(merchantId: number, crop: string = "potato"): Promise<number> {
-    const currentYear = new Date().getFullYear();
+    const currentYear = getISTYear();
     const [result] = await db.select()
       .from(transactions)
       .where(and(
@@ -1215,9 +1217,8 @@ export class DatabaseStorage implements IStorage {
       const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
       let receivables = principal;
       if (roi > 0 && farmerRecord.receivableEffectiveDate) {
-        const diffMs = new Date().getTime() - new Date(farmerRecord.receivableEffectiveDate).getTime();
-        if (diffMs > 0) {
-          const days = diffMs / (1000 * 60 * 60 * 24);
+        const days = dateDiffInDaysIST(farmerRecord.receivableEffectiveDate);
+        if (days > 0) {
           receivables = principal * Math.pow(1 + roi / 100, days / 365);
         }
       }
@@ -1447,11 +1448,8 @@ export class DatabaseStorage implements IStorage {
             const effDate = matchedFarmer.receivableEffectiveDate;
             let accruedAmount = principal;
             if (principal > 0 && roi > 0 && effDate) {
-              const today = new Date();
-              const startDate = new Date(effDate);
-              const diffMs = today.getTime() - startDate.getTime();
-              if (diffMs > 0) {
-                const days = diffMs / (1000 * 60 * 60 * 24);
+              const days = dateDiffInDaysIST(effDate);
+              if (days > 0) {
                 accruedAmount = principal * Math.pow(1 + roi / 100, days / 365);
               }
             }
@@ -1461,7 +1459,7 @@ export class DatabaseStorage implements IStorage {
               await tx.update(farmers)
                 .set({ 
                   pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
-                  receivableEffectiveDate: newAccrued > 0 ? new Date().toISOString().split('T')[0] : null,
+                  receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
                   receivableInterestRate: newAccrued > 0 ? matchedFarmer.receivableInterestRate : "0.00",
                 })
                 .where(eq(farmers.id, matchedFarmerId));
@@ -1884,8 +1882,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Create new buyer with ID format: BYYYYYMMDD# (with retry for collision handling)
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    const dateStr = getISTDateYYYYMMDD();
     const prefix = `BY${dateStr}`;
     
     const maxRetries = 3;
@@ -1896,7 +1893,7 @@ export class DatabaseStorage implements IStorage {
         const newBuyer = await this.createBuyer({
           merchantId,
           buyerCode,
-          dateAdded: today.toISOString().split('T')[0],
+          dateAdded: getISTDateString(),
           name: buyerData.name,
           contact: buyerData.contact || null,
           address: buyerData.address || "",
@@ -2065,8 +2062,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Create new farmer with retry for collision handling
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    const dateStr = getISTDateYYYYMMDD();
     const prefix = `FM${dateStr}`;
     
     const maxRetries = 3;
@@ -2077,7 +2073,7 @@ export class DatabaseStorage implements IStorage {
         const newFarmer = await this.createFarmer({
           merchantId,
           farmerCode,
-          dateAdded: today.toISOString().split('T')[0],
+          dateAdded: getISTDateString(),
           name: farmerData.name,
           contact: farmerData.contact || null,
           village: farmerData.village || null,
@@ -2550,7 +2546,7 @@ export class DatabaseStorage implements IStorage {
   async createSeedEntry(entry: Omit<InsertSeedStockEntry, 'uniqueId'> & { merchantId: number }): Promise<SeedStockEntry> {
     const serialNumber = await this.getNextSeedSerialNumber(entry.merchantId);
     // Use purchaseDate for unique ID generation (not current date)
-    const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : new Date();
+    const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : undefined;
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
     
     // Retry loop for handling concurrent unique ID collisions
@@ -2583,7 +2579,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSeedSerialNumber(merchantId: number): Promise<number> {
-    const currentYear = new Date().getFullYear();
+    const currentYear = getISTYear();
     const [result] = await db.select({ maxSerial: seedStockEntries.serialNumber })
       .from(seedStockEntries)
       .where(and(
@@ -2805,7 +2801,7 @@ export class DatabaseStorage implements IStorage {
     transaction: Omit<InsertSeedTransaction, 'uniqueId'> & { transactionNumber: number },
     items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
   ): Promise<SeedTransactionWithItems> {
-    const dateStr = formatDateYYYYMMDD(new Date());
+    const dateStr = getISTDateYYYYMMDD();
     
     // Retry loop for handling concurrent unique ID collisions
     const maxRetries = 3;
@@ -2844,7 +2840,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSeedTransactionNumber(merchantId: number): Promise<number> {
-    const currentYear = new Date().getFullYear();
+    const currentYear = getISTYear();
     const [result] = await db.select({ maxNum: seedTransactions.transactionNumber })
       .from(seedTransactions)
       .where(and(
@@ -3335,11 +3331,8 @@ export class DatabaseStorage implements IStorage {
               const effDate = matchedFarmer.receivableEffectiveDate;
               let accruedAmount = principal;
               if (principal > 0 && roi > 0 && effDate) {
-                const today = new Date();
-                const startDate = new Date(effDate);
-                const diffMs = today.getTime() - startDate.getTime();
-                if (diffMs > 0) {
-                  const days = diffMs / (1000 * 60 * 60 * 24);
+                const days = dateDiffInDaysIST(effDate);
+                if (days > 0) {
                   accruedAmount = principal * Math.pow(1 + roi / 100, days / 365);
                 }
               }
@@ -3349,7 +3342,7 @@ export class DatabaseStorage implements IStorage {
                 await tx.update(farmers)
                   .set({ 
                     pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
-                    receivableEffectiveDate: newAccrued > 0 ? new Date().toISOString().split('T')[0] : null,
+                    receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
                     receivableInterestRate: newAccrued > 0 ? matchedFarmer.receivableInterestRate : "0.00",
                   })
                   .where(eq(farmers.id, matchedFarmerId));

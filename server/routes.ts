@@ -5,6 +5,7 @@ import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
 
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
@@ -43,11 +44,8 @@ function computeCompoundInterestDue(principal: number, rateOfInterest: number, e
   if (!effectiveDate || !rateOfInterest || rateOfInterest <= 0 || principal <= 0) {
     return principal;
   }
-  const today = new Date();
-  const startDate = new Date(effectiveDate);
-  const diffMs = today.getTime() - startDate.getTime();
-  if (diffMs <= 0) return principal;
-  const days = diffMs / (1000 * 60 * 60 * 24);
+  const days = dateDiffInDaysIST(effectiveDate);
+  if (days <= 0) return principal;
   return principal * Math.pow(1 + rateOfInterest / 100, days / 365);
 }
 
@@ -183,9 +181,7 @@ export async function registerRoutes(
 
           let finalAdj = 0;
           if (rawAdjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
-            const effectiveDate = new Date(adjustedAmountEffectiveDate);
-            const today = new Date();
-            const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+            const days = Math.max(0, dateDiffInDaysIST(adjustedAmountEffectiveDate));
             const years = days / 365;
             finalAdj = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
           }
@@ -248,7 +244,7 @@ export async function registerRoutes(
       for (const seedTx of allSeedTransactions) {
         if (!seedTx.createdAt) continue;
         if (crop === "onion") continue;
-        const dateKey = new Date(seedTx.createdAt).toISOString().split("T")[0];
+        const dateKey = dateToISTString(new Date(seedTx.createdAt));
         if (!matchesDateFilter(dateKey)) continue;
         const totalPL = seedTx.totalProfitLoss ? parseFloat(seedTx.totalProfitLoss) : 0;
         pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + totalPL);
@@ -854,7 +850,7 @@ export async function registerRoutes(
       }
 
       // Generate merchant code: MRYYYYMMDD{seq}
-      const dateStr = formatDateForCode(new Date());
+      const dateStr = formatDateForCode();
       const codePrefix = `MR${dateStr}`;
       const existingCount = await storage.countMerchantsByCodePrefix(codePrefix);
       const merchantCode = generateMerchantCode(dateStr, existingCount);
@@ -2242,13 +2238,13 @@ export async function registerRoutes(
         state: titleCase(state) || null,
         pendingDueToBePaid: pendingDueToBePaid?.toString() || "0",
         rateOfInterest: rateOfInterest?.toString() || "0",
-        effectiveDate: effectiveDate || new Date().toISOString().split('T')[0],
+        effectiveDate: effectiveDate || getISTDateString(),
       });
 
       if (farmerId) {
         const addedAmount = parseFloat(pendingDueToBePaid?.toString() || "0");
         const roi = parseFloat(rateOfInterest?.toString() || "0");
-        const effDate = effectiveDate || new Date().toISOString().split('T')[0];
+        const effDate = effectiveDate || getISTDateString();
         const existingFarmer = await storage.getFarmerById(farmerId, merchantId);
         const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
         await storage.updateFarmer(farmerId, merchantId, {
@@ -2413,7 +2409,7 @@ export async function registerRoutes(
       const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
 
       // Generate buyer code: BYYYYYMMDD{seq} - unique per merchant (MAX-based with retry)
-      const effectiveDateAdded = dateAdded || new Date().toISOString().split('T')[0];
+      const effectiveDateAdded = dateAdded || getISTDateString();
       const dateStr = parseDateToCodeFormat(effectiveDateAdded);
       const codePrefix = `BY${dateStr}`;
       
@@ -2731,9 +2727,7 @@ export async function registerRoutes(
                   
                   let interestAmount = 0;
                   if (principal > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
-                    const effectiveDate = new Date(adjustedAmountEffectiveDate);
-                    const today = new Date();
-                    const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
+                    const days = Math.max(0, dateDiffInDaysIST(adjustedAmountEffectiveDate));
                     const years = days / 365;
                     interestAmount = Math.round((principal * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
                   }
@@ -2922,7 +2916,7 @@ export async function registerRoutes(
       // Create or update farmers
       let createdCount = 0;
       let linkedCount = 0;
-      const today = new Date().toISOString().split('T')[0];
+      const today = getISTDateString();
       const dateStr = parseDateToCodeFormat(today);
       
       // Build a map of composite key (name+contact+village) -> farmerId for linking

@@ -1,13 +1,9 @@
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-
-export function getISTNow(): Date {
-  const now = new Date();
-  return new Date(now.getTime() + IST_OFFSET_MS);
-}
+const IST_TZ = 'Asia/Kolkata';
 
 export function getISTDateString(): string {
-  const ist = getISTNow();
-  return ist.toISOString().split('T')[0];
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  return parts;
 }
 
 export function getISTDateYYYYMMDD(): string {
@@ -15,31 +11,19 @@ export function getISTDateYYYYMMDD(): string {
 }
 
 export function getISTYear(): number {
-  return getISTNow().getUTCFullYear();
-}
-
-export function getISTMidnight(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day) - IST_OFFSET_MS);
-}
-
-export function getISTTodayMidnight(): Date {
-  return getISTMidnight(getISTDateString());
+  const now = new Date();
+  return parseInt(new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric' }).format(now));
 }
 
 export function dateDiffInDaysIST(startDateStr: string, endDateStr?: string): number {
   const endStr = endDateStr || getISTDateString();
-  const start = getISTMidnight(startDateStr);
-  const end = getISTMidnight(endStr);
-  const diffMs = end.getTime() - start.getTime();
-  return Math.round(diffMs / (1000 * 60 * 60 * 24));
-}
-
-export function toISTTimestamp(): Date {
-  return getISTNow();
+  const [sy, sm, sd] = startDateStr.split('-').map(Number);
+  const [ey, em, ed] = endStr.split('-').map(Number);
+  const startMs = Date.UTC(sy, sm - 1, sd);
+  const endMs = Date.UTC(ey, em - 1, ed);
+  return Math.floor((endMs - startMs) / (1000 * 60 * 60 * 24));
 }
 
 export function dateToISTString(date: Date): string {
-  const istDate = new Date(date.getTime() + IST_OFFSET_MS);
-  return istDate.toISOString().split('T')[0];
+  return new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
