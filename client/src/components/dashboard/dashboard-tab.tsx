@@ -674,33 +674,9 @@ export function DashboardTab() {
               <span className="text-muted-foreground">{t("Net Due", "शुद्ध बकाया")}: </span>
               <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-farmer-seed-due">{formatINR(farmerSummary.seedDue)}</span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-300 dark:border-purple-700" data-testid="card-farmer-py-receivable">
-          <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("PY Receivable - Farmer", "PY प्राप्य - किसान")}</div>
-            <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
-              <span className="font-medium" data-testid="text-farmer-py-total">{formatINR(farmerPyReceivable.total)}</span>
-            </div>
             <div className="text-xs">
-              <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
+              <span className="text-muted-foreground">{t("PY Due", "PY बकाया")}: </span>
               <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-farmer-py-due">{formatINR(farmerPyReceivable.due)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-300 dark:border-purple-700" data-testid="card-buyer-py-receivable">
-          <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("PY Receivable - Buyer", "PY प्राप्य - खरीदार")}</div>
-            <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
-              <span className="font-medium" data-testid="text-buyer-py-total">{formatINR(buyerPyReceivable.total)}</span>
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
-              <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-buyer-py-due">{formatINR(buyerPyReceivable.due)}</span>
             </div>
           </CardContent>
         </Card>
@@ -728,7 +704,11 @@ export function DashboardTab() {
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
-              <span className="font-bold text-orange-600 dark:text-orange-400" data-testid="text-buyer-due">{formatINR(buyerSummary.totalDue)}</span>
+              <span className="font-bold text-orange-600 dark:text-orange-400" data-testid="text-buyer-due">{formatINR(Math.max(0, buyerSummary.totalDue - buyerPyReceivable.due))}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("PY Due", "PY बकाया")}: </span>
+              <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-buyer-py-due">{formatINR(buyerPyReceivable.due)}</span>
             </div>
           </CardContent>
         </Card>
