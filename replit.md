@@ -137,16 +137,6 @@ When paying a supplier:
 - **Farmer IDs Never Reassigned**: Unique farmer codes (FMYYYYMMDD#) are permanent and never recycled
 - **Accessible via**: User dropdown menu > "Farmer Ledger" link
 
-### Cross-Module Farmer Settlement System
-- **Purpose**: Automatically offset payments between Raw Potato dues (merchant owes farmer) and Seed Transaction dues (farmer owes merchant)
-- **Farmer Identity Matching**: Uses composite key of normalized name (case-insensitive, trimmed) + optional village + optional contact
-- **Settlement Directions**:
-  - `raw_to_seed`: When paying farmer for raw potatoes, auto-offset their seed purchase dues
-  - `seed_to_raw`: When receiving seed sale payment, auto-offset raw potato dues owed to farmer
-- **Audit Trail**: `farmerSettlements` table stores affected stock entry IDs and seed transaction IDs as JSON arrays
-- **UI**: Shows preview cards in Cash Management with separate enable/disable toggles for inward and outflow forms
-- **FIFO Allocation**: Settlement amounts are applied in order to oldest outstanding dues first
-
 ### Key Design Patterns
 - Shared schema in `/shared/schema.ts` used by both client and server
 - Form schemas defined with Zod and validated on both ends
