@@ -688,7 +688,7 @@ export default function AdminPage() {
       </Tabs>
 
       <Dialog open={merchantDialogOpen} onOpenChange={setMerchantDialogOpen}>
-        <DialogContent>
+        <DialogContent data-no-capitalize>
           <DialogHeader>
             <DialogTitle>{editingMerchant ? "Edit Merchant" : "Add New Merchant"}</DialogTitle>
           </DialogHeader>
@@ -743,7 +743,7 @@ export default function AdminPage() {
       </Dialog>
 
       <Dialog open={userDialogOpen} onOpenChange={setUserDialogOpen}>
-        <DialogContent>
+        <DialogContent data-no-capitalize>
           <DialogHeader>
             <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
           </DialogHeader>
@@ -843,7 +843,7 @@ export default function AdminPage() {
       </Dialog>
 
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
-        <DialogContent>
+        <DialogContent data-no-capitalize>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className={`h-5 w-5 ${statusDialogAction === "archived" ? "text-destructive" : "text-yellow-600"}`} />
@@ -898,7 +898,7 @@ export default function AdminPage() {
       </Dialog>
 
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <DialogContent>
+        <DialogContent data-no-capitalize>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
