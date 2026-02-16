@@ -943,7 +943,6 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     const rows = filteredFarmers.map((f) => {
       const principal = parseFloat(f.pendingDueToBePaid || "0");
       const roi = parseFloat(f.rateOfInterest || "0");
-      const finalDue = (f as any).finalDue ? parseFloat((f as any).finalDue) : principal;
       return {
         Name: f.name,
         Contact: f.contactNumber || "",
@@ -954,7 +953,6 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
         "Due Amount": principal.toFixed(2),
         "Rate of Interest (%)": roi.toFixed(2),
         "Effective Date": f.effectiveDate || "",
-        "Final Due (with Interest)": finalDue.toFixed(2),
       };
     });
     if (rows.length === 0) return;

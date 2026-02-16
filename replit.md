@@ -92,15 +92,18 @@ When paying a supplier:
 - **Cash Settings** = Input-only form. Stores original amounts (pendingDues for buyers, pendingDueToBePaid for farmers)
 - **Ledger fields** = Source of truth for running balances:
   - `buyer.receivableBalance`: Tracks buyer's receivable, reduced by payments
-  - `farmer.pyReceivable`: Tracks farmer's PY receivable, reduced by payments
-  - `farmer.receivableInterestRate` + `receivableEffectiveDate`: Interest computed on remaining pyReceivable
-- **Delta-based sync**: Cash Settings create/update/delete apply deltas to ledger fields (not overwrites)
-  - CREATE: Adds new amount to ledger balance
-  - UPDATE: Applies (newAmount - oldAmount) delta to ledger balance
-  - DELETE: Subtracts deleted amount from ledger balance (min 0)
+  - `farmer.pyReceivable`: Original principal amount (never changes after initial set)
+  - `farmer.pyReceivableFinalAmount`: Cumulative amount = original principal + all accrued interest (never reduced by payments)
+  - `farmer.remainingReceivable`: Actual amount owed = pyReceivableFinalAmount - payments made (this is the source of truth for dues)
+  - `farmer.receivableInterestRate` + `receivableEffectiveDate`: Interest accrued daily on remainingReceivable
+- **Simple Interest Model**: Daily interest = remainingReceivable × rate / (365 × 100), added to both pyReceivableFinalAmount and remainingReceivable at midnight IST
+- **Delta-based sync**: Cash Settings create/update/delete apply deltas to all three fields (pyReceivable, pyReceivableFinalAmount, remainingReceivable) together
+  - CREATE: Adds new amount to all three ledger balance fields
+  - UPDATE: Applies (newAmount - oldAmount) delta to all three fields
+  - DELETE: Subtracts deleted amount from all three fields (min 0)
   - Balance reaching 0 clears interest rate and effective date
-- **Payment FIFO**: STEP 1 reduce ledger receivable, STEP 2 FIFO to transactions/seed transactions
-- **Reversals**: Restore transaction allocations first, then add back receivable reduction to ledger fields
+- **Payment FIFO**: STEP 1 reduce only remainingReceivable (pyReceivable and pyReceivableFinalAmount stay unchanged), STEP 2 FIFO to transactions/seed transactions
+- **Reversals**: Restore transaction allocations first, then add back to remainingReceivable only
 
 ### Buyer Management System
 - **Buyers Table**: Stores buyer information per merchant with fields: name, address, mandiCode, contact, negativeFlag, isActive, receivableBalance
@@ -125,9 +128,10 @@ When paying a supplier:
   - Keeps farmer with lower ID
   - Transfers all linked records (stockEntries, seedTransactions, cashFarmers)
   - Aggregates pyPayable and pyReceivable balances
+  - Aggregates remainingReceivable balances
   - Deletes higher ID farmer
 - **Due Calculations**:
-  - PY Receivable: Combined pyReceivable + receivables from managed cash farmers (pendingDueToBePaid)
+  - PY Receivable: farmer.remainingReceivable (actual amount owed after payments and interest)
   - Harvest Due: Sum of totalDueToFarmer from matching stock entries
   - Seed Due: Sum of totalDueFromFarmer from matching seed transactions
   - Net Due = Harvest Due - PY Receivable - Seed Due

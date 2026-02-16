@@ -13,19 +13,26 @@ export async function accrueInterestForAll(): Promise<void> {
   const allFarmers = await db.select().from(farmers).where(
     and(
       gt(sql`CAST(${farmers.receivableInterestRate} AS numeric)`, 0),
-      gt(sql`CAST(${farmers.pyReceivable} AS numeric)`, 0),
+      gt(sql`CAST(${farmers.remainingReceivable} AS numeric)`, 0),
       isNotNull(farmers.receivableEffectiveDate)
     )
   );
 
   for (const farmer of allFarmers) {
-    const principal = parseFloat(farmer.pyReceivable || "0");
+    const remaining = parseFloat(farmer.remainingReceivable || "0");
     const rate = parseFloat(farmer.receivableInterestRate || "0");
-    if (principal <= 0 || rate <= 0 || !farmer.receivableEffectiveDate) continue;
+    if (remaining <= 0 || rate <= 0) continue;
 
-    const finalAmount = calculateSimpleInterest(principal, rate, farmer.receivableEffectiveDate);
+    const dailyInterest = remaining * rate / (365 * 100);
+    const currentFinal = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
+    const newFinalAmount = currentFinal + dailyInterest;
+    const newRemaining = remaining + dailyInterest;
+
     await db.update(farmers)
-      .set({ pyReceivableFinalAmount: finalAmount.toFixed(2) })
+      .set({
+        pyReceivableFinalAmount: newFinalAmount.toFixed(2),
+        remainingReceivable: newRemaining.toFixed(2),
+      })
       .where(sql`${farmers.id} = ${farmer.id}`);
     farmerCount++;
   }

@@ -157,7 +157,6 @@ interface ManagedFarmer {
   pendingDueToBePaid: string;
   rateOfInterest: string | null;
   effectiveDate: string | null;
-  finalDue: string;
 }
 
 interface CashSettings {
@@ -580,7 +579,7 @@ export function CashManagementTab() {
         name: f.name,
         contact: f.contactNumber || existing?.contact || null,
         address: f.address || existing?.address || null,
-        pendingDues: parseFloat(f.finalDue || f.pendingDueToBePaid || "0") + (existing?.pendingDues || 0),
+        pendingDues: parseFloat(f.pendingDueToBePaid || "0") + (existing?.pendingDues || 0),
       });
     });
     

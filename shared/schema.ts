@@ -339,7 +339,8 @@ export const farmers = pgTable("farmers", {
   state: text("state"),
   pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"), // Previous year payable (owed to farmer)
   pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"), // Previous year receivable (owed by farmer) - synced from Cash Settings, reduced by payments
-  pyReceivableFinalAmount: decimal("py_receivable_final_amount", { precision: 12, scale: 2 }).default("0"), // pyReceivable + accrued simple interest (updated daily by midnight job)
+  pyReceivableFinalAmount: decimal("py_receivable_final_amount", { precision: 12, scale: 2 }).default("0"), // pyReceivable + all accrued simple interest ever (cumulative, updated daily by midnight job)
+  remainingReceivable: decimal("remaining_receivable", { precision: 12, scale: 2 }).default("0"), // pyReceivableFinalAmount - total payments made (what's actually still owed)
   receivableInterestRate: decimal("receivable_interest_rate", { precision: 5, scale: 2 }).default("0"),
   receivableEffectiveDate: date("receivable_effective_date"),
   negativeFlag: boolean("negative_flag").default(false),

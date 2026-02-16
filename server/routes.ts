@@ -5,7 +5,7 @@ import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
-import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
 
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
@@ -38,12 +38,6 @@ function requireSystemAdmin(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();
-}
-
-function getReceivableWithInterest(farmer: { pendingDueToBePaid: string | null; rateOfInterest: string | null; effectiveDate: string | null }): number {
-  const principal = parseFloat(farmer.pendingDueToBePaid || "0");
-  const roi = parseFloat(farmer.rateOfInterest || "0");
-  return calculateSimpleInterest(principal, roi, farmer.effectiveDate);
 }
 
 export async function registerRoutes(
@@ -317,10 +311,10 @@ export async function registerRoutes(
       let farmerPyReceivableTotal = 0;
       let farmerPyReceivableDue = 0;
       for (const farmer of allFarmers) {
-        const pyFinal = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
-        if (pyFinal > 0) {
-          farmerPyReceivableTotal += pyFinal;
-          farmerPyReceivableDue += pyFinal;
+        const remaining = parseFloat(farmer.remainingReceivable || "0");
+        if (remaining > 0) {
+          farmerPyReceivableTotal += remaining;
+          farmerPyReceivableDue += remaining;
         }
       }
 
@@ -2186,11 +2180,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const farmers = await storage.getCashFarmersByMerchant(merchantId);
-      const farmersWithFinalDue = farmers.map(f => ({
-        ...f,
-        finalDue: getReceivableWithInterest(f).toFixed(2),
-      }));
-      res.json(farmersWithFinalDue);
+      res.json(farmers);
     } catch (error) {
       console.error("Error fetching managed farmers:", error);
       res.status(500).json({ message: "Failed to fetch managed farmers" });
@@ -2238,11 +2228,14 @@ export async function registerRoutes(
         const existingFarmer = await storage.getFarmerById(farmerId, merchantId);
         const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
         const currentFinal = parseFloat(existingFarmer?.pyReceivableFinalAmount || existingFarmer?.pyReceivable || "0");
+        const currentRemaining = parseFloat(existingFarmer?.remainingReceivable || "0");
         const newPyReceivable = (currentPyReceivable + addedAmount).toFixed(2);
         const newFinal = (currentFinal + addedAmount).toFixed(2);
+        const newRemaining = (currentRemaining + addedAmount).toFixed(2);
         await storage.updateFarmer(farmerId, merchantId, {
           pyReceivable: newPyReceivable,
           pyReceivableFinalAmount: newFinal,
+          remainingReceivable: newRemaining,
           receivableInterestRate: roi.toFixed(2),
           receivableEffectiveDate: effDate,
         });
@@ -2293,10 +2286,13 @@ export async function registerRoutes(
             const existingFarmer = await storage.getFarmerById(updatedCashFarmer.farmerId, merchantId);
             const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
             const currentFinal = parseFloat(existingFarmer?.pyReceivableFinalAmount || existingFarmer?.pyReceivable || "0");
+            const currentRemaining = parseFloat(existingFarmer?.remainingReceivable || "0");
             const newBalance = Math.max(0, currentPyReceivable + delta);
             const newFinalBalance = Math.max(0, currentFinal + delta);
+            const newRemainingBalance = Math.max(0, currentRemaining + delta);
             syncData.pyReceivable = newBalance.toFixed(2);
             syncData.pyReceivableFinalAmount = newFinalBalance.toFixed(2);
+            syncData.remainingReceivable = newRemainingBalance.toFixed(2);
             if (newBalance <= 0) {
               syncData.receivableInterestRate = "0";
               syncData.receivableEffectiveDate = null;
@@ -2310,13 +2306,6 @@ export async function registerRoutes(
           syncData.receivableEffectiveDate = effectiveDate;
         }
         if (Object.keys(syncData).length > 0) {
-          if ((rateOfInterest !== undefined || effectiveDate !== undefined) && !syncData.pyReceivableFinalAmount) {
-            const existingFarmer = await storage.getFarmerById(updatedCashFarmer.farmerId, merchantId);
-            const principal = parseFloat(syncData.pyReceivable || existingFarmer?.pyReceivable || "0");
-            const rate = parseFloat(syncData.receivableInterestRate || existingFarmer?.receivableInterestRate || "0");
-            const effDate = syncData.receivableEffectiveDate !== undefined ? syncData.receivableEffectiveDate : existingFarmer?.receivableEffectiveDate;
-            syncData.pyReceivableFinalAmount = calculateSimpleInterest(principal, rate, effDate || null).toFixed(2);
-          }
           await storage.updateFarmer(updatedCashFarmer.farmerId, merchantId, syncData);
         }
       }
@@ -2342,9 +2331,11 @@ export async function registerRoutes(
         if (existingFarmer) {
           const currentPyReceivable = parseFloat(existingFarmer.pyReceivable || "0");
           const currentFinal = parseFloat(existingFarmer.pyReceivableFinalAmount || existingFarmer.pyReceivable || "0");
+          const currentRemaining = parseFloat(existingFarmer.remainingReceivable || "0");
           const newBalance = Math.max(0, currentPyReceivable - removedAmount);
           const newFinalBalance = Math.max(0, currentFinal - removedAmount);
-          const updateData: any = { pyReceivable: newBalance.toFixed(2), pyReceivableFinalAmount: newFinalBalance.toFixed(2) };
+          const newRemainingBalance = Math.max(0, currentRemaining - removedAmount);
+          const updateData: any = { pyReceivable: newBalance.toFixed(2), pyReceivableFinalAmount: newFinalBalance.toFixed(2), remainingReceivable: newRemainingBalance.toFixed(2) };
           if (newBalance <= 0) {
             updateData.receivableInterestRate = "0";
             updateData.receivableEffectiveDate = null;
@@ -2789,8 +2780,8 @@ export async function registerRoutes(
           }
         }
         
-        // PY Receivable with interest from pre-calculated finalAmount field (updated daily by midnight job)
-        const pyReceivableWithInterest = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
+        // PY Receivable: use remainingReceivable (finalAmount minus payments made)
+        const pyReceivableWithInterest = parseFloat(farmer.remainingReceivable || "0");
         
         // Net Due = Harvest Due - PY Receivables - Seed Due
         const netDue = harvestDue - pyReceivableWithInterest - seedDue;
