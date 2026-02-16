@@ -1,0 +1,214 @@
+Files
+Commands
+.config
+.git
+attached_assets
+client
+public
+src
+components
+buyers
+cash-management
+dashboard
+farmer-ledger
+seed
+seed-stock-entry
+seed-stock-register
+stock-entry
+stock-register
+bill-print-dialog.tsx
+stock-entry-edit-dialog.tsx
+stock-register-card.tsx
+stock-register-table.tsx
+transactions
+edit-seed-transaction-dialog.tsx
+edit-transaction-dialog.tsx
+load-seed-truck-dialog.tsx
+load-truck-dialog.tsx
+sales-receipt.tsx
+seed-sales-receipt.tsx
+seed-transactions-content.tsx
+transactions-tab.tsx
+ui
+accordion.tsx
+alert-dialog.tsx
+alert.tsx
+aspect-ratio.tsx
+avatar.tsx
+badge.tsx
+breadcrumb.tsx
+button.tsx
+calendar.tsx
+card.tsx
+carousel.tsx
+chart.tsx
+checkbox.tsx
+collapsible.tsx
+command.tsx
+context-menu.tsx
+dialog.tsx
+drawer.tsx
+dropdown-menu.tsx
+form.tsx
+hover-card.tsx
+input-otp.tsx
+input.tsx
+label.tsx
+menubar.tsx
+navigation-menu.tsx
+pagination.tsx
+popover.tsx
+progress.tsx
+radio-group.tsx
+resizable.tsx
+scroll-area.tsx
+select.tsx
+separator.tsx
+sheet.tsx
+sidebar.tsx
+skeleton.tsx
+slider.tsx
+switch.tsx
+table.tsx
+tabs.tsx
+textarea.tsx
+toast.tsx
+toaster.tsx
+toggle-group.tsx
+toggle.tsx
+tooltip.tsx
+crop-toggle.tsx
+language-toggle.tsx
+theme-toggle.tsx
+hooks
+lib
+pages
+App.tsx
+index.css
+main.tsx
+index.html
+script
+server
+shared
+.gitignore
+components.json
+design_guidelines.md
+drizzle.config.ts
+postcss.config.js
+replit.md
+tailwind.config.ts
+tsconfig.json
+vite.config.ts
+Packager files
+node_modules
+package-lock.json
+package.json
+Config files
+.replit
+npm run dev
+6m • 7 minutes ago
+Remote Updates
+origin/main•upstreamlast fetched 6 hours ago
+Commit
+There are no changes to commit.
+Saved progress at the end of the loop
+
+I've fixed the Buyer Management table - now it has a proper scrollable container that stays within its box, with aligned columns. The table scrolls horizontally on tablets. Does this look better now?
+
+    Header font size is not consistent across columns in buyer ledger
+    Please revert to previous lables. current labels are not clear
+    in tab view, too much blank space left in right end and actual box is covering less space, hence not able to cover all the columns
+
+    Header font size is not consistent across columns in buyer ledger
+    Please revert to previous header lables. current labels are not clear
+    in tab view, too much blank space left in right end and actual box is covering less space, hence not able to cover all the columns
+
+I've fixed the Buyer Management table - restored the original labels (Buyer ID, Name, Address, Mandi Code, Contact, Negative, Active, Overall Due, Receivables), made all header text the same size, and the table now uses flexible widths that fill the available space. Does it look better now?
+
+still there is the issue in tablet view
+
+I've adjusted the table to use proportional column widths so they fill the space evenly across all screen sizes. Does the tablet view look better now?
+
+can you double check how exactly the raw due coming as 415000?
+
+yes please do that
+
+not sure how are you idntifying entry 9 and 10, please use Sr number to identify each lot entry in the stock register
+
+i think we should remove this cross settlemet feature completely. and show just net amount from farmer leadger. if the net amount in farmer ledger is positive then we should show the net due in expense under farmer drop down with names. If net due is negative, then show absolute amount with farmer name in seed drop down of inward cash. Please scrap this cross settlement feature currently in cash tab in both the side of inward and expense
+
+please note +ve means harvest sale due is higher comapred to seed bought by farmer. Hnece we if positive we owe to farmer.
+If negative that means farmer ows to us and that's why shall come unde inward cash
+
+Got it, thank you for the clarification:
+
+    Positive Net Due (e.g., ₹1,22,338 for Ravish) = We owe the farmer → Show in Expense → Farmer dropdown (paying them)
+    Negative Net Due (e.g., -₹3,00,000 for Manohar) = Farmer owes us → Show in Inward Cash → Seed Sale dropdown (receiving payment)
+
+Start building
+
+I'll start implementing the changes to remove the cross-settlement feature and update the dropdowns to show farmers based on their Net Due.
+
+Now I understand the structure. Let me remove the cross-settlement feature from both forms and update the dropdowns. I'll start by removing the cross-settlement state, queries, and UI components.
+
+Now let me remove the cross-settlement feature. I'll start by removing the state, queries, and UI components:
+
+I need to remove the UI components that reference cross-settlement. Let me find and remove them:
+
+Now let me find and remove the cross-settlement UI from the expense/outflow form:
+
+Now let me find the setSelectedOutflowFarmerName call and remove it:
+
+Now I need to remove the unused CrossSettlementEligibility interface and any unused import like RefreshCw. Let me also update the farmer dropdowns to filter based on Net Due. First, let me check the current state of the farmer filtering logic and then update it:
+
+Now let me find and update the farmer dropdown filtering. For the Expense form, I need to show farmers with positive Net Due (we owe them). For Seed Sale inward, I need to show farmers with negative Net Due (they owe us):
+
+Now I need to understand how the Farmer Ledger calculates Net Due. Let me check:
+
+So netDue = pyReceivable + harvestDue - seedDue - receivables.
+
+    Positive Net Due: We owe the farmer (harvest dues > seed dues) → Show in Expense dropdown
+    Negative Net Due: Farmer owes us (seed dues > harvest dues) → Show in Inward Seed Sale dropdown
+
+Now let me update the filtering logic. First, let me find where the seed farmer dropdown is being filtered:
+
+Now I need to change the filter for the seed sale farmer dropdown. Instead of showing farmers with seed dues, I need to show farmers with negative Net Due (they owe us). The netDue = pyReceivable + harvestDue - seedDue. So negative netDue means seedDue > (pyReceivable + harvestDue).
+
+Now let me update the Expense farmer dropdown to show only farmers with positive Net Due (we owe them). First, I need to find the mergedFarmers definition and update it to include the Net Due calculation:
+
+For the Expense farmer dropdown, I need to use ledgerFarmers (which has full Net Due information) instead of mergedFarmers. Let me update the Expense farmer dropdown to filter for positive Net Due:
+
+Now let me check the LSP diagnostics and clean up any unused imports:
+Checked code issues
+
+Now let me update the task list and continue with the remaining tasks. I need to also check if RefreshCw import is still needed:
+
+Good, RefreshCw is still being used elsewhere. Now let me update the task list and make sure the app restarts:
+
+The app is running. Now let me call the architect to review all changes:
+
+The architect has approved the changes. Let me update the task list and complete the review:
+
+I've updated the farmer dropdowns in Cash Management. The Expense form now shows farmers we owe money to (positive Net Due), and the Seed Sale form shows farmers who owe us (negative Net Due). Does this work correctly for you?
+
+The simple interest system is now fully in place. Does everything look correct in your dashboard and farmer ledger calculations?
+
+some clarification needed
+
+    "Dashboard and Farmer Ledger: Already reading from stored finalAmount values" - i hope when we sayPY receivable due then it subtract paymnet from final amount. Same for Farmer ledger, it shall show the difference of Final amount - paid
+    Cash Setting tables shall have onlt the amount, ROI and effective date along with other farmer level details. It wont have anu due calculation, accrued or final amount calcuation logged
+    The point which i had was that cash inward/expense tab fields which will bring farmers with dues shall use ledger amount directly
+
+Thanks for the clarifications. Let me make sure I understand each point correctly:
+
+    PY Receivable / Farmer Ledger: When showing "PY Receivable" dues, it should be pyReceivableFinalAmount - payments already made (i.e., the final amount with interest minus what's been paid). Same in the Farmer Ledger - show the net remaining after payments.
+
+    Cash Settings table: This is purely an input form - it stores only the raw amount, ROI, and effective date along with farmer details. No calculated fields like "accrued interest" or "final amount" should appear in the Cash Settings UI or be stored on the cash farmer record.
+
+    Cash Inward/Expense tab: When showing farmers with dues (e.g., in dropdowns or lists), it should pull the due amounts directly from the farmer ledger fields (pyReceivableFinalAmount on the farmer record), not compute them from Cash Settings.
+
+Let me quickly check how these are currently working to plan the fixes.
+
+Now I have a clear picture. Here's what I see and what needs to change:
+
+Point 1 - PY Receivable dues: 
