@@ -229,8 +229,10 @@ export async function registerRoutes(
         const buyerKey = tx.buyerId ? String(tx.buyerId) : `name:${(tx.partyName || "Unknown").toLowerCase().trim()}`;
         buyerDueByNameMap.set(buyerKey, (buyerDueByNameMap.get(buyerKey) || 0) + buyerDue);
 
-        const profitLoss = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
-        pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
+        if (revenue > 0) {
+          const profitLoss = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
+          pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
+        }
       }
 
       for (const buyer of allBuyers) {
