@@ -217,15 +217,15 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{t("Seed Sales Receipt", "बीज बिक्री रसीद")}</span>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle>Seed Sales Receipt</DialogTitle>
             <Button onClick={handlePrint} size="sm" data-testid="button-print-seed-receipt">
               <Printer className="h-4 w-4 mr-2" />
-              {t("Print", "प्रिंट")}
+              Print
             </Button>
-          </DialogTitle>
+          </div>
           <DialogDescription>
-            {t("Preview and print the seed sales receipt", "बीज बिक्री रसीद का पूर्वावलोकन और प्रिंट करें")}
+            Preview and print the seed sales receipt
           </DialogDescription>
         </DialogHeader>
 

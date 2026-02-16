@@ -382,11 +382,11 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Bill Preview / बिल पूर्वावलोकन</DialogTitle>
-            <Button onClick={handlePrint} data-testid="button-print-bill">
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle>Bill Preview</DialogTitle>
+            <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
               <Printer className="h-4 w-4 mr-2" />
-              Print Bill / प्रिंट करें
+              Print Bill
             </Button>
           </div>
         </DialogHeader>
