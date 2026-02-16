@@ -96,8 +96,9 @@ export const lots = pgTable("lots", {
   hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // legacy: hammali and grading charges
   coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges
   adjustedAmount: decimal("adjusted_amount", { precision: 12, scale: 2 }), // adjustment amount for farmer due (principal if rate is used)
+  adjustedAmountFinal: decimal("adjusted_amount_final", { precision: 12, scale: 2 }), // adjustedAmount + accrued simple interest (updated daily by midnight job)
   adjustedAmountType: text("adjusted_amount_type"), // "debit" or "credit"
-  adjustedAmountRate: decimal("adjusted_amount_rate", { precision: 6, scale: 2 }), // annual rate % for compound interest
+  adjustedAmountRate: decimal("adjusted_amount_rate", { precision: 6, scale: 2 }), // annual rate % for simple interest
   adjustedAmountEffectiveDate: date("adjusted_amount_effective_date"), // effective date for interest calculation
   adjustedAmountRemark: text("adjusted_amount_remark"), // reason for adjustment
   remainingBags: integer("remaining_bags").notNull(),
@@ -338,6 +339,7 @@ export const farmers = pgTable("farmers", {
   state: text("state"),
   pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"), // Previous year payable (owed to farmer)
   pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"), // Previous year receivable (owed by farmer) - synced from Cash Settings, reduced by payments
+  pyReceivableFinalAmount: decimal("py_receivable_final_amount", { precision: 12, scale: 2 }).default("0"), // pyReceivable + accrued simple interest (updated daily by midnight job)
   receivableInterestRate: decimal("receivable_interest_rate", { precision: 5, scale: 2 }).default("0"),
   receivableEffectiveDate: date("receivable_effective_date"),
   negativeFlag: boolean("negative_flag").default(false),
@@ -438,7 +440,8 @@ export const seedTransactions = pgTable("seed_transactions", {
   totalDueToFarmer: decimal("total_due_to_farmer", { precision: 12, scale: 2 }), // Revenue + Transport + Other charges
   adjustmentType: text("adjustment_type"), // "debit" or "credit"
   adjustmentAmount: decimal("adjustment_amount", { precision: 12, scale: 2 }), // principal for interest calculation
-  adjustmentRate: decimal("adjustment_rate", { precision: 6, scale: 2 }), // annual rate % for compound interest
+  adjustmentAmountFinal: decimal("adjustment_amount_final", { precision: 12, scale: 2 }), // adjustmentAmount + accrued simple interest (updated daily by midnight job)
+  adjustmentRate: decimal("adjustment_rate", { precision: 6, scale: 2 }), // annual rate % for simple interest
   adjustmentEffectiveDate: date("adjustment_effective_date"), // effective date for interest calculation
   adjustmentReason: text("adjustment_reason"), // reason for adjustment
   createdAt: timestamp("created_at").defaultNow(),

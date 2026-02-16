@@ -5,7 +5,7 @@ import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
-import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, computeCompoundInterestDue } from './ist-utils';
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
 
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
@@ -43,7 +43,7 @@ function requireSystemAdmin(req: Request, res: Response, next: NextFunction) {
 function getReceivableWithInterest(farmer: { pendingDueToBePaid: string | null; rateOfInterest: string | null; effectiveDate: string | null }): number {
   const principal = parseFloat(farmer.pendingDueToBePaid || "0");
   const roi = parseFloat(farmer.rateOfInterest || "0");
-  return computeCompoundInterestDue(principal, roi, farmer.effectiveDate);
+  return calculateSimpleInterest(principal, roi, farmer.effectiveDate);
 }
 
 export async function registerRoutes(
@@ -169,15 +169,8 @@ export async function registerRoutes(
           summaryColdStoreDue += Math.max(lotColdCharges - lotColdPaid, 0);
 
           const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
-          const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
-          const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
-
-          let finalAdj = 0;
-          if (rawAdjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
-            const days = Math.max(0, dateDiffInDaysIST(adjustedAmountEffectiveDate));
-            const years = days / 365;
-            finalAdj = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
-          }
+          const finalAdjAmount = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : rawAdjustedAmount;
+          let finalAdj = Math.max(0, finalAdjAmount - rawAdjustedAmount);
 
           if (finalAdj > 0 && lot.adjustedAmountType) {
             if (lot.adjustedAmountType === "credit") {
@@ -324,15 +317,10 @@ export async function registerRoutes(
       let farmerPyReceivableTotal = 0;
       let farmerPyReceivableDue = 0;
       for (const farmer of allFarmers) {
-        const pyPrincipal = parseFloat(farmer.pyReceivable || "0");
-        const pyRoi = parseFloat(farmer.receivableInterestRate || "0");
-        let pyWithInterest = pyPrincipal;
-        if (pyPrincipal > 0 && pyRoi > 0 && farmer.receivableEffectiveDate) {
-          pyWithInterest = computeCompoundInterestDue(pyPrincipal, pyRoi, farmer.receivableEffectiveDate);
-        }
-        if (pyWithInterest > 0) {
-          farmerPyReceivableTotal += pyWithInterest;
-          farmerPyReceivableDue += pyWithInterest;
+        const pyFinal = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
+        if (pyFinal > 0) {
+          farmerPyReceivableTotal += pyFinal;
+          farmerPyReceivableDue += pyFinal;
         }
       }
 
@@ -640,6 +628,9 @@ export async function registerRoutes(
                 ? (lotData.hammaliGradingCharges ? lotData.hammaliGradingCharges.toString() : null)
                 : undefined,
               adjustedAmount: lotData.adjustedAmount !== undefined
+                ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
+                : undefined,
+              adjustedAmountFinal: lotData.adjustedAmount !== undefined
                 ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
                 : undefined,
               adjustedAmountType: lotData.adjustedAmountType !== undefined
@@ -2246,8 +2237,12 @@ export async function registerRoutes(
         const effDate = effectiveDate || getISTDateString();
         const existingFarmer = await storage.getFarmerById(farmerId, merchantId);
         const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
+        const currentFinal = parseFloat(existingFarmer?.pyReceivableFinalAmount || existingFarmer?.pyReceivable || "0");
+        const newPyReceivable = (currentPyReceivable + addedAmount).toFixed(2);
+        const newFinal = (currentFinal + addedAmount).toFixed(2);
         await storage.updateFarmer(farmerId, merchantId, {
-          pyReceivable: (currentPyReceivable + addedAmount).toFixed(2),
+          pyReceivable: newPyReceivable,
+          pyReceivableFinalAmount: newFinal,
           receivableInterestRate: roi.toFixed(2),
           receivableEffectiveDate: effDate,
         });
@@ -2297,8 +2292,11 @@ export async function registerRoutes(
           if (delta !== 0) {
             const existingFarmer = await storage.getFarmerById(updatedCashFarmer.farmerId, merchantId);
             const currentPyReceivable = parseFloat(existingFarmer?.pyReceivable || "0");
+            const currentFinal = parseFloat(existingFarmer?.pyReceivableFinalAmount || existingFarmer?.pyReceivable || "0");
             const newBalance = Math.max(0, currentPyReceivable + delta);
+            const newFinalBalance = Math.max(0, currentFinal + delta);
             syncData.pyReceivable = newBalance.toFixed(2);
+            syncData.pyReceivableFinalAmount = newFinalBalance.toFixed(2);
             if (newBalance <= 0) {
               syncData.receivableInterestRate = "0";
               syncData.receivableEffectiveDate = null;
@@ -2312,6 +2310,13 @@ export async function registerRoutes(
           syncData.receivableEffectiveDate = effectiveDate;
         }
         if (Object.keys(syncData).length > 0) {
+          if ((rateOfInterest !== undefined || effectiveDate !== undefined) && !syncData.pyReceivableFinalAmount) {
+            const existingFarmer = await storage.getFarmerById(updatedCashFarmer.farmerId, merchantId);
+            const principal = parseFloat(syncData.pyReceivable || existingFarmer?.pyReceivable || "0");
+            const rate = parseFloat(syncData.receivableInterestRate || existingFarmer?.receivableInterestRate || "0");
+            const effDate = syncData.receivableEffectiveDate !== undefined ? syncData.receivableEffectiveDate : existingFarmer?.receivableEffectiveDate;
+            syncData.pyReceivableFinalAmount = calculateSimpleInterest(principal, rate, effDate || null).toFixed(2);
+          }
           await storage.updateFarmer(updatedCashFarmer.farmerId, merchantId, syncData);
         }
       }
@@ -2336,8 +2341,10 @@ export async function registerRoutes(
         const existingFarmer = await storage.getFarmerById(deletedCashFarmer.farmerId, merchantId);
         if (existingFarmer) {
           const currentPyReceivable = parseFloat(existingFarmer.pyReceivable || "0");
+          const currentFinal = parseFloat(existingFarmer.pyReceivableFinalAmount || existingFarmer.pyReceivable || "0");
           const newBalance = Math.max(0, currentPyReceivable - removedAmount);
-          const updateData: any = { pyReceivable: newBalance.toFixed(2) };
+          const newFinalBalance = Math.max(0, currentFinal - removedAmount);
+          const updateData: any = { pyReceivable: newBalance.toFixed(2), pyReceivableFinalAmount: newFinalBalance.toFixed(2) };
           if (newBalance <= 0) {
             updateData.receivableInterestRate = "0";
             updateData.receivableEffectiveDate = null;
@@ -2723,15 +2730,8 @@ export async function registerRoutes(
                 // Apply interest-only adjustment (principal is already included in total amount)
                 if (lot.adjustedAmount && lot.adjustedAmountType) {
                   const principal = parseFloat(lot.adjustedAmount);
-                  const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
-                  const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
-                  
-                  let interestAmount = 0;
-                  if (principal > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
-                    const days = Math.max(0, dateDiffInDaysIST(adjustedAmountEffectiveDate));
-                    const years = days / 365;
-                    interestAmount = Math.round((principal * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
-                  }
+                  const finalAdjAmount = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : principal;
+                  const interestAmount = Math.max(0, finalAdjAmount - principal);
                   
                   if (interestAmount > 0) {
                     if (lot.adjustedAmountType === "debit") {
@@ -2789,13 +2789,8 @@ export async function registerRoutes(
           }
         }
         
-        // PY Receivable with compound interest from farmer's own fields
-        const pyPrincipal = parseFloat(farmer.pyReceivable || "0");
-        const pyRoi = parseFloat(farmer.receivableInterestRate || "0");
-        let pyReceivableWithInterest = pyPrincipal;
-        if (pyPrincipal > 0 && pyRoi > 0 && farmer.receivableEffectiveDate) {
-          pyReceivableWithInterest = computeCompoundInterestDue(pyPrincipal, pyRoi, farmer.receivableEffectiveDate);
-        }
+        // PY Receivable with interest from pre-calculated finalAmount field (updated daily by midnight job)
+        const pyReceivableWithInterest = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
         
         // Net Due = Harvest Due - PY Receivables - Seed Due
         const netDue = harvestDue - pyReceivableWithInterest - seedDue;
@@ -3683,6 +3678,7 @@ export async function registerRoutes(
           totalDueToFarmer: totalDueToFarmer.toString(),
           adjustmentType: adjustmentType || null,
           adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
+          adjustmentAmountFinal: adjustmentAmount ? adjustmentAmount.toString() : null,
           adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
           adjustmentEffectiveDate: adjustmentEffectiveDate || null,
           adjustmentReason: adjustmentReason || null,

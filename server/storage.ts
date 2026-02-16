@@ -33,7 +33,7 @@ import {
   type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
-import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, computeCompoundInterestDue } from './ist-utils';
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -1190,12 +1190,10 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Add receivables from farmer ledger (pyReceivable with interest)
+    // Add receivables from farmer ledger (pyReceivable with interest from pre-calculated finalAmount)
     for (const farmerRecord of allFarmerRecords) {
-      const principal = parseFloat(farmerRecord.pyReceivable || "0");
-      if (principal <= 0) continue;
-      const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
-      const receivables = computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate);
+      const receivables = parseFloat(farmerRecord.pyReceivableFinalAmount || farmerRecord.pyReceivable || "0");
+      if (receivables <= 0) continue;
       
       const key = `id:${farmerRecord.id}`;
       
@@ -1409,19 +1407,18 @@ export class DatabaseStorage implements IStorage {
         }
         
         // STEP 1: First reduce farmer's pyReceivable in farmer ledger
-        // Compute accrued amount (principal + compound interest to today) before deducting
+        // Use pre-calculated finalAmount (principal + accrued simple interest) before deducting
         if (matchedFarmerId && remainingAmount > 0) {
           const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
           if (matchedFarmer) {
-            const principal = parseFloat(matchedFarmer.pyReceivable || "0");
-            const roi = parseFloat(matchedFarmer.receivableInterestRate || "0");
-            const accruedAmount = computeCompoundInterestDue(principal, roi, matchedFarmer.receivableEffectiveDate);
+            const accruedAmount = parseFloat(matchedFarmer.pyReceivableFinalAmount || matchedFarmer.pyReceivable || "0");
             if (accruedAmount > 0) {
               const toApply = Math.min(remainingAmount, accruedAmount);
               const newAccrued = accruedAmount - toApply;
               await tx.update(farmers)
                 .set({ 
                   pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
+                  pyReceivableFinalAmount: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
                   receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
                   receivableInterestRate: newAccrued > 0 ? matchedFarmer.receivableInterestRate : "0.00",
                 })
@@ -2424,12 +2421,14 @@ export class DatabaseStorage implements IStorage {
     // Aggregate PY balances
     const newPyPayable = (parseFloat(survivingFarmer.pyPayable || "0") + parseFloat(mergingFarmer.pyPayable || "0")).toString();
     const newPyReceivable = (parseFloat(survivingFarmer.pyReceivable || "0") + parseFloat(mergingFarmer.pyReceivable || "0")).toString();
+    const newPyReceivableFinal = (parseFloat(survivingFarmer.pyReceivableFinalAmount || survivingFarmer.pyReceivable || "0") + parseFloat(mergingFarmer.pyReceivableFinalAmount || mergingFarmer.pyReceivable || "0")).toString();
     
     // Update surviving farmer with aggregated balances and better details
     const [updatedSurvivor] = await db.update(farmers)
       .set({
         pyPayable: newPyPayable,
         pyReceivable: newPyReceivable,
+        pyReceivableFinalAmount: newPyReceivableFinal,
         tehsil: survivingFarmer.tehsil || mergingFarmer.tehsil,
         district: survivingFarmer.district || mergingFarmer.district,
         state: survivingFarmer.state || mergingFarmer.state,
@@ -2986,19 +2985,18 @@ export class DatabaseStorage implements IStorage {
           }
           
           // STEP 1: First reduce farmer's pyReceivable in farmer ledger
-          // Compute accrued amount (principal + compound interest to today) before deducting
+          // Use pre-calculated finalAmount (principal + accrued simple interest) before deducting
           if (matchedFarmerId && remainingAmount > 0) {
             const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
             if (matchedFarmer) {
-              const principal = parseFloat(matchedFarmer.pyReceivable || "0");
-              const roi = parseFloat(matchedFarmer.receivableInterestRate || "0");
-              const accruedAmount = computeCompoundInterestDue(principal, roi, matchedFarmer.receivableEffectiveDate);
+              const accruedAmount = parseFloat(matchedFarmer.pyReceivableFinalAmount || matchedFarmer.pyReceivable || "0");
               if (accruedAmount > 0) {
                 const toApply = Math.min(remainingAmount, accruedAmount);
                 const newAccrued = accruedAmount - toApply;
                 await tx.update(farmers)
                   .set({ 
                     pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
+                    pyReceivableFinalAmount: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
                     receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
                     receivableInterestRate: newAccrued > 0 ? matchedFarmer.receivableInterestRate : "0.00",
                   })
@@ -3344,8 +3342,12 @@ export class DatabaseStorage implements IStorage {
           const [farmer] = await tx.select().from(farmers).where(eq(farmers.id, entryFarmerId));
           if (farmer) {
             const currentPyReceivable = parseFloat(farmer.pyReceivable || "0");
+            const currentFinal = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
             await tx.update(farmers)
-              .set({ pyReceivable: (currentPyReceivable + amountToRestore).toFixed(2) })
+              .set({ 
+                pyReceivable: (currentPyReceivable + amountToRestore).toFixed(2),
+                pyReceivableFinalAmount: (currentFinal + amountToRestore).toFixed(2),
+              })
               .where(eq(farmers.id, entryFarmerId));
           }
         }

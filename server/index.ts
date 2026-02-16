@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedAdminUser } from "./seed-admin";
+import { startInterestScheduler } from "./interest-scheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +64,9 @@ app.use((req, res, next) => {
 (async () => {
   // Seed admin user on startup if not exists
   await seedAdminUser();
+  
+  // Start daily midnight interest accrual scheduler
+  startInterestScheduler();
   
   await registerRoutes(httpServer, app);
 
