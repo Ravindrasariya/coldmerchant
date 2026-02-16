@@ -200,7 +200,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock-entries', entry.id, 'history'] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/cross-settlement-check"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       onOpenChange(false);

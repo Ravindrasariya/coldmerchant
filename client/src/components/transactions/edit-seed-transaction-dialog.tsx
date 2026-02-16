@@ -174,7 +174,6 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/cross-settlement-check"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       toast({

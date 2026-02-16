@@ -1773,49 +1773,20 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/cash/cross-settlement-check - Check cross-settlement eligibility for a farmer
-  app.get("/api/cash/cross-settlement-check", requireMerchant, async (req, res) => {
-    try {
-      const merchantId = req.user!.merchantId!;
-      const { farmerName, farmerVillage, farmerContact, farmerId } = req.query;
-      
-      if (!farmerName || typeof farmerName !== 'string') {
-        return res.status(400).json({ message: "Farmer name is required" });
-      }
-
-      const eligibility = await storage.checkCrossSettlementEligibility(
-        merchantId,
-        farmerName,
-        typeof farmerVillage === 'string' ? farmerVillage : null,
-        typeof farmerContact === 'string' ? farmerContact : null,
-        farmerId ? parseInt(farmerId as string, 10) : null
-      );
-      
-      res.json(eligibility);
-    } catch (error) {
-      console.error("Error checking cross-settlement eligibility:", error);
-      res.status(500).json({ message: "Failed to check cross-settlement eligibility" });
-    }
-  });
-
   // POST /api/cash/entries - Create a cash entry (inward, outflow, or transfer)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, amount, entryDate, remarks, crossSettlement } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, amount, entryDate, remarks } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
         return res.status(400).json({ message: "Valid direction (inward/outflow/transfer) is required" });
       }
-      // Amount can be 0 if cross-settlement is provided (the settlement is the main payment)
       const parsedAmount = parseFloat(amount);
-      if (isNaN(parsedAmount) || parsedAmount < 0) {
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
         return res.status(400).json({ message: "Valid amount is required" });
-      }
-      if (parsedAmount === 0 && !crossSettlement) {
-        return res.status(400).json({ message: "Amount must be greater than 0 when no cross-settlement" });
       }
       if (!entryDate) {
         return res.status(400).json({ message: "Entry date is required" });
@@ -1881,30 +1852,6 @@ export async function registerRoutes(
         }
       }
 
-      // Validate cross-settlement if provided
-      let validatedCrossSettlement: {
-        settledAmount: number;
-        direction: 'raw_to_seed' | 'seed_to_raw';
-        seedTransactionIds: number[];
-        rawPotatoEntryIds: number[];
-      } | undefined;
-      
-      if (crossSettlement) {
-        const { settledAmount, direction: settlementDirection, seedTransactionIds, rawPotatoEntryIds } = crossSettlement;
-        if (typeof settledAmount !== 'number' || settledAmount <= 0) {
-          return res.status(400).json({ message: "Cross-settlement amount must be a positive number" });
-        }
-        if (!['raw_to_seed', 'seed_to_raw'].includes(settlementDirection)) {
-          return res.status(400).json({ message: "Invalid cross-settlement direction" });
-        }
-        validatedCrossSettlement = {
-          settledAmount,
-          direction: settlementDirection,
-          seedTransactionIds: seedTransactionIds || [],
-          rawPotatoEntryIds: rawPotatoEntryIds || [],
-        };
-      }
-
       // Resolve buyerId and farmerId from ledger for reliable matching
       // If IDs are provided directly from the frontend (from ledger dropdowns), use them
       let resolvedBuyerId: number | null = requestBuyerId ? parseInt(requestBuyerId) : null;
@@ -1952,7 +1899,7 @@ export async function registerRoutes(
         const maxSeq = await storage.getMaxCashCodeSequence(merchantId, txCodePrefix);
         const transactionCode = `CF${txDateStr}${maxSeq + 1 + attempt}`;
         try {
-          createdEntry = await storage.createCashEntryWithCrossSettlement({
+          createdEntry = await storage.createCashEntry({
             merchantId,
             transactionCode,
             direction,
@@ -1977,7 +1924,7 @@ export async function registerRoutes(
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,
-          }, applyFIFO, validatedCrossSettlement, userId);
+          }, applyFIFO, userId);
           break;
         } catch (error: any) {
           if (error?.code === '23505' && error?.constraint?.includes('transaction_code') && attempt < maxRetries - 1) {

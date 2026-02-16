@@ -6,7 +6,6 @@ import {
   buyerEditHistory,
   seedStockEntries, seedLots, seedStockEntryEditHistory,
   seedTransactions, seedTransactionItems, seedTransactionEditHistory,
-  farmerSettlements,
   type User, type InsertUser, type Merchant, type InsertMerchant,
   type StockEntry, type InsertStockEntry, type Lot, type InsertLot,
   type BagBreakdown, type InsertBagBreakdown,
@@ -228,28 +227,7 @@ export interface IStorage {
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
   
-  // Cross-Settlement operations (farmer identity matching across Raw Potato and Seed modules)
-  checkCrossSettlementEligibility(merchantId: number, farmerName: string, farmerVillage?: string | null, farmerContact?: string | null, farmerId?: number | null): Promise<{
-    hasSeedDues: boolean;
-    seedDueAmount: number;
-    seedTransactionIds: number[];
-    hasRawPotatoDues: boolean;
-    rawPotatoDueAmount: number;
-    rawPotatoEntryIds: number[];
-    receivableWithInterest: number;
-    totalSettleableAgainstHarvest: number;
-  }>;
-  createCashEntryWithCrossSettlement(
-    entry: InsertCashEntry, 
-    applyFIFO: boolean, 
-    crossSettlement?: { 
-      settledAmount: number; 
-      direction: 'raw_to_seed' | 'seed_to_raw';
-      seedTransactionIds: number[];
-      rawPotatoEntryIds: number[];
-    },
-    userId?: number
-  ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[]; crossSettlementId?: number }>;
+  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
   // Season Reset operations
   checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
@@ -389,7 +367,6 @@ export class DatabaseStorage implements IStorage {
     // First delete allocations and settlements
     await db.delete(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, id));
     await db.delete(cashEntryAllocations).where(eq(cashEntryAllocations.merchantId, id));
-    await db.delete(farmerSettlements).where(eq(farmerSettlements.merchantId, id));
     
     // Delete edit histories
     await db.delete(stockEntryEditHistory).where(eq(stockEntryEditHistory.merchantId, id));
@@ -1238,7 +1215,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Return farmers with remaining due (already reduced by FIFO payments and cross-settlements)
+    // Return farmers with remaining due (already reduced by FIFO payments)
     return Array.from(farmerMap.entries())
       .filter(([_, data]) => data.totalDue > 0)
       .map(([_, data]) => ({
@@ -2893,412 +2870,18 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  // Cross-Settlement: Check if farmer has dues in the opposite module
-  async checkCrossSettlementEligibility(
-    merchantId: number, 
-    farmerName: string, 
-    farmerVillage?: string | null, 
-    farmerContact?: string | null,
-    farmerId?: number | null
-  ): Promise<{
-    hasSeedDues: boolean;
-    seedDueAmount: number;
-    seedTransactionIds: number[];
-    hasRawPotatoDues: boolean;
-    rawPotatoDueAmount: number;
-    rawPotatoEntryIds: number[];
-    receivableWithInterest: number;
-    totalSettleableAgainstHarvest: number;
-  }> {
-    const entryFarmerId = farmerId || null;
-    const normalizedName = normalizeName(farmerName);
-    const normalizedVillage = normalizeName(farmerVillage);
-    const normalizedContact = normalizeName(farmerContact);
-
-    const matchesFarmer = (
-      recordFarmerId: number | null | undefined,
-      name: string | null | undefined,
-      contact: string | null | undefined,
-      village: string | null | undefined
-    ): boolean => {
-      if (entryFarmerId) return recordFarmerId === entryFarmerId;
-      if (normalizeName(name) !== normalizedName) return false;
-      if (normalizedContact && normalizeName(contact) && normalizeName(contact) !== normalizedContact) return false;
-      if (normalizedVillage && normalizeName(village) && normalizeName(village) !== normalizedVillage) return false;
-      return true;
-    };
-
-    // Check for seed transaction dues (farmer owes money to merchant)
-    const allSeedTxns = await db.select().from(seedTransactions)
-      .where(eq(seedTransactions.merchantId, merchantId));
-
-    let seedDueAmount = 0;
-    const seedTransactionIdsWithDue: number[] = [];
-    
-    for (const txn of allSeedTxns) {
-      if (!matchesFarmer(txn.farmerId, txn.farmerName, txn.farmerContact, txn.village)) continue;
-      
-      const totalDue = parseFloat(txn.totalDueToFarmer || "0");
-      if (totalDue > 0) {
-        seedDueAmount += totalDue;
-        seedTransactionIdsWithDue.push(txn.id);
-      }
-    }
-    
-    // Also subtract cross-settlements (raw_to_seed) that offset seed dues
-    const rawToSeedSettlements = await db.select().from(farmerSettlements)
-      .where(and(
-        eq(farmerSettlements.merchantId, merchantId),
-        eq(farmerSettlements.settlementDirection, "raw_to_seed")
-      ));
-    
-    for (const settlement of rawToSeedSettlements) {
-      const settlementMatches = entryFarmerId
-        ? (settlement.farmerId === entryFarmerId)
-        : (normalizeName(settlement.farmerName) === normalizedName &&
-           normalizeName(settlement.farmerContact) === normalizedContact &&
-           normalizeName(settlement.farmerVillage) === normalizedVillage);
-      if (settlementMatches) {
-        seedDueAmount = Math.max(0, seedDueAmount - parseFloat(settlement.settledAmount || "0"));
-      }
-    }
-
-    // Check for raw potato dues (merchant owes money to farmer)
-    const allStockEntries = await db.select().from(stockEntries)
-      .where(and(
-        eq(stockEntries.merchantId, merchantId),
-        or(eq(stockEntries.paymentStatus, "due"), eq(stockEntries.paymentStatus, "partial"))
-      ));
-
-    let rawPotatoDueAmount = 0;
-    const rawPotatoEntryIdsWithDue: number[] = [];
-
-    for (const entry of allStockEntries) {
-      if (!matchesFarmer(entry.farmerId, entry.farmerName, entry.farmerContact, entry.village)) continue;
-      
-      // Calculate total cost for this entry from lots and breakdowns
-      const entryLots = await db.select().from(lots)
-        .where(eq(lots.stockEntryId, entry.id));
-      
-      let entryTotalCost = 0;
-      for (const lot of entryLots) {
-        const breakdownList = await db.select().from(bagBreakdowns)
-          .where(eq(bagBreakdowns.lotId, lot.id));
-        
-        if (breakdownList.length > 0) {
-          entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-        } else if (lot.pricePerKg) {
-          entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
-        }
-        
-        // Subtract adjustments
-        const adjustedAmount = parseFloat(lot.adjustedAmount || "0");
-        if (lot.adjustedAmountType === "debit") {
-          entryTotalCost -= adjustedAmount;
-        } else if (lot.adjustedAmountType === "credit") {
-          entryTotalCost += adjustedAmount;
-        }
-      }
-      
-      const currentPaid = parseFloat(entry.amountPaid || "0");
-      const due = entryTotalCost - currentPaid;
-      
-      if (due > 0) {
-        rawPotatoDueAmount += due;
-        rawPotatoEntryIdsWithDue.push(entry.id);
-      }
-    }
-
-    let receivableWithInterest = 0;
-    if (entryFarmerId) {
-      const [farmerRecord] = await db.select().from(farmers)
-        .where(and(eq(farmers.id, entryFarmerId), eq(farmers.merchantId, merchantId)));
-      if (farmerRecord) {
-        const principal = parseFloat(farmerRecord.pyReceivable || "0");
-        const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
-        receivableWithInterest = principal > 0 
-          ? computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate)
-          : 0;
-      }
-    }
-
-    const totalSettleableAgainstHarvest = receivableWithInterest + seedDueAmount;
-
-    return {
-      hasSeedDues: seedDueAmount > 0,
-      seedDueAmount,
-      seedTransactionIds: seedTransactionIdsWithDue,
-      hasRawPotatoDues: rawPotatoDueAmount > 0,
-      rawPotatoDueAmount,
-      rawPotatoEntryIds: rawPotatoEntryIdsWithDue,
-      receivableWithInterest,
-      totalSettleableAgainstHarvest,
-    };
-  }
-
-  // Create cash entry with cross-settlement support
-  async createCashEntryWithCrossSettlement(
+  async createCashEntry(
     entry: InsertCashEntry, 
     applyFIFO: boolean, 
-    crossSettlement?: { 
-      settledAmount: number; 
-      direction: 'raw_to_seed' | 'seed_to_raw';
-      seedTransactionIds: number[];
-      rawPotatoEntryIds: number[];
-    },
     userId?: number
-  ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[]; crossSettlementId?: number }> {
+  ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     
     return await db.transaction(async (tx) => {
-      // Create the base cash entry
       const [createdEntry] = await tx.insert(cashEntries).values(entry).returning();
       const allocations: CashEntryAllocation[] = [];
       const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
-      let crossSettlementId: number | undefined;
 
-      // Handle cross-settlement if provided
-      if (crossSettlement && crossSettlement.settledAmount > 0) {
-        // Pre-compute receivable vs seed due breakdown for audit trail
-        let precomputedReceivableApplied = 0;
-        const cssFarmerId = entry.farmerId || null;
-        if (cssFarmerId) {
-          const [fr] = await tx.select().from(farmers).where(eq(farmers.id, cssFarmerId));
-          if (fr) {
-            const principal = parseFloat(fr.pyReceivable || "0");
-            const roi = parseFloat(fr.receivableInterestRate || "0");
-            const accrued = computeCompoundInterestDue(principal, roi, fr.receivableEffectiveDate);
-            precomputedReceivableApplied = Math.min(crossSettlement.settledAmount, Math.max(0, accrued));
-          }
-        }
-        const precomputedSeedDueApplied = Math.max(0, crossSettlement.settledAmount - precomputedReceivableApplied);
-
-        const [settlement] = await tx.insert(farmerSettlements).values({
-          merchantId: entry.merchantId,
-          userId: userId || null,
-          settlementDirection: crossSettlement.direction,
-          settledAmount: crossSettlement.settledAmount.toString(),
-          receivableApplied: precomputedReceivableApplied.toFixed(2),
-          seedDueApplied: precomputedSeedDueApplied.toFixed(2),
-          farmerId: entry.farmerId || null,
-          farmerName: entry.farmerName || "",
-          farmerVillage: entry.farmerVillage,
-          farmerContact: entry.farmerContact || null,
-          rawPotatoStockEntryIds: crossSettlement.rawPotatoEntryIds,
-          seedTransactionIds: crossSettlement.seedTransactionIds,
-          cashEntryId: createdEntry.id,
-          remarks: `Auto cross-settlement: ${crossSettlement.direction === 'raw_to_seed' ? 'Adjusted seed dues against farmer payment' : 'Adjusted raw potato dues against seed payment'}${precomputedReceivableApplied > 0 ? ` (Receivable: ₹${precomputedReceivableApplied.toFixed(2)}, Seed Due: ₹${precomputedSeedDueApplied.toFixed(2)})` : ''}`,
-        }).returning();
-        
-        crossSettlementId = settlement.id;
-
-        // Apply the cross-settlement based on direction
-        if (crossSettlement.direction === 'raw_to_seed') {
-          // Paying farmer for raw potatoes via cross-settlement (offsetting seed dues)
-          // 1. Update stock register amountPaid by settlement amount (farmer is effectively paid)
-          // 2. Update seed transactions totalDueToFarmer directly (reduce seed dues)
-          let remainingSettlement = crossSettlement.settledAmount;
-          
-          // Step 1: Update raw potato stock entries (farmer is paid)
-          for (const entryId of crossSettlement.rawPotatoEntryIds) {
-            if (remainingSettlement <= 0) break;
-            
-            const [stockEntry] = await tx.select().from(stockEntries)
-              .where(eq(stockEntries.id, entryId));
-            
-            if (!stockEntry) continue;
-            
-            // Calculate total cost for this entry
-            const entryLots = await tx.select().from(lots)
-              .where(eq(lots.stockEntryId, stockEntry.id));
-            
-            let entryTotalCost = 0;
-            for (const lot of entryLots) {
-              const breakdownList = await tx.select().from(bagBreakdowns)
-                .where(eq(bagBreakdowns.lotId, lot.id));
-              
-              if (breakdownList.length > 0) {
-                entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-              } else if (lot.pricePerKg) {
-                entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
-              }
-            }
-            
-            const currentPaid = parseFloat(stockEntry.amountPaid || "0");
-            const due = entryTotalCost - currentPaid;
-            
-            if (due <= 0) continue;
-            
-            const toApply = Math.min(remainingSettlement, due);
-            const newPaid = currentPaid + toApply;
-            const newDue = entryTotalCost - newPaid;
-            const newStatus = newDue <= 0 ? "paid" : "partial";
-            
-            await tx.update(stockEntries)
-              .set({ 
-                amountPaid: newPaid.toString(),
-                paymentStatus: newStatus
-              })
-              .where(eq(stockEntries.id, stockEntry.id));
-            
-            remainingSettlement -= toApply;
-          }
-          
-          // Step 2: Reduce farmer's receivable (pyReceivable with interest) FIRST
-          let remainingOffsetSettlement = crossSettlement.settledAmount;
-          let receivableApplied = 0;
-          
-          const settlementFarmerId = entry.farmerId || null;
-          if (settlementFarmerId && remainingOffsetSettlement > 0) {
-            const [farmerRecord] = await tx.select().from(farmers)
-              .where(eq(farmers.id, settlementFarmerId));
-            if (farmerRecord) {
-              const principal = parseFloat(farmerRecord.pyReceivable || "0");
-              const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
-              const accruedAmount = computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate);
-              if (accruedAmount > 0) {
-                const toApply = Math.min(remainingOffsetSettlement, accruedAmount);
-                const newAccrued = accruedAmount - toApply;
-                await tx.update(farmers)
-                  .set({
-                    pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
-                    receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
-                    receivableInterestRate: newAccrued > 0 ? farmerRecord.receivableInterestRate : "0.00",
-                  })
-                  .where(eq(farmers.id, settlementFarmerId));
-                remainingOffsetSettlement -= toApply;
-                receivableApplied = toApply;
-              }
-            }
-          }
-          
-          // Step 3: Apply remaining to seed transactions FIFO
-          let remainingSeedSettlement = remainingOffsetSettlement;
-          
-          for (const txnId of crossSettlement.seedTransactionIds) {
-            if (remainingSeedSettlement <= 0) break;
-            
-            const [seedTxn] = await tx.select().from(seedTransactions)
-              .where(eq(seedTransactions.id, txnId));
-            
-            if (!seedTxn) continue;
-            
-            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-            if (currentDue <= 0) continue;
-            
-            const toApply = Math.min(remainingSeedSettlement, currentDue);
-            const newDue = Math.max(0, currentDue - toApply);
-            
-            await tx.update(seedTransactions)
-              .set({ 
-                totalDueToFarmer: newDue.toString()
-              })
-              .where(eq(seedTransactions.id, txnId));
-            
-            remainingSeedSettlement -= toApply;
-          }
-        } else if (crossSettlement.direction === 'seed_to_raw') {
-          // Receiving seed payment, offset against raw potato dues
-          // Step 1: Update raw potato stock entries (reduce harvest dues)
-          let remainingSettlement = crossSettlement.settledAmount;
-          
-          for (const entryId of crossSettlement.rawPotatoEntryIds) {
-            if (remainingSettlement <= 0) break;
-            
-            const [stockEntry] = await tx.select().from(stockEntries)
-              .where(eq(stockEntries.id, entryId));
-            
-            if (!stockEntry) continue;
-            
-            const entryLots = await tx.select().from(lots)
-              .where(eq(lots.stockEntryId, stockEntry.id));
-            
-            let entryTotalCost = 0;
-            for (const lot of entryLots) {
-              const breakdownList = await tx.select().from(bagBreakdowns)
-                .where(eq(bagBreakdowns.lotId, lot.id));
-              
-              if (breakdownList.length > 0) {
-                entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-              } else if (lot.pricePerKg) {
-                entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
-              }
-            }
-            
-            const currentPaid = parseFloat(stockEntry.amountPaid || "0");
-            const due = entryTotalCost - currentPaid;
-            
-            if (due <= 0) continue;
-            
-            const toApply = Math.min(remainingSettlement, due);
-            const newPaid = currentPaid + toApply;
-            const newDue = entryTotalCost - newPaid;
-            const newStatus = newDue <= 0 ? "paid" : "partial";
-            
-            await tx.update(stockEntries)
-              .set({ 
-                amountPaid: newPaid.toString(),
-                paymentStatus: newStatus
-              })
-              .where(eq(stockEntries.id, stockEntry.id));
-            
-            remainingSettlement -= toApply;
-          }
-          
-          // Step 2: Reduce farmer's receivable FIRST
-          let remainingOffsetSeedToRaw = crossSettlement.settledAmount;
-          
-          const seedToRawFarmerId = entry.farmerId || null;
-          if (seedToRawFarmerId && remainingOffsetSeedToRaw > 0) {
-            const [farmerRecord] = await tx.select().from(farmers)
-              .where(eq(farmers.id, seedToRawFarmerId));
-            if (farmerRecord) {
-              const principal = parseFloat(farmerRecord.pyReceivable || "0");
-              const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
-              const accruedAmount = computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate);
-              if (accruedAmount > 0) {
-                const toApply = Math.min(remainingOffsetSeedToRaw, accruedAmount);
-                const newAccrued = accruedAmount - toApply;
-                await tx.update(farmers)
-                  .set({
-                    pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
-                    receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
-                    receivableInterestRate: newAccrued > 0 ? farmerRecord.receivableInterestRate : "0.00",
-                  })
-                  .where(eq(farmers.id, seedToRawFarmerId));
-                remainingOffsetSeedToRaw -= toApply;
-              }
-            }
-          }
-          
-          // Step 3: Apply remaining to seed transactions FIFO
-          let remainingSeedSettlement = remainingOffsetSeedToRaw;
-          
-          for (const txnId of crossSettlement.seedTransactionIds) {
-            if (remainingSeedSettlement <= 0) break;
-            
-            const [seedTxn] = await tx.select().from(seedTransactions)
-              .where(eq(seedTransactions.id, txnId));
-            
-            if (!seedTxn) continue;
-            
-            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-            if (currentDue <= 0) continue;
-            
-            const toApply = Math.min(remainingSeedSettlement, currentDue);
-            const newDue = Math.max(0, currentDue - toApply);
-            
-            await tx.update(seedTransactions)
-              .set({ 
-                totalDueToFarmer: newDue.toString()
-              })
-              .where(eq(seedTransactions.id, txnId));
-            
-            remainingSeedSettlement -= toApply;
-          }
-        }
-      }
-
-      // Apply standard FIFO logic for the remaining cash (after cross-settlement)
+      // Apply standard FIFO logic
       // Party/Buyer payment FIFO
       if (applyFIFO && entry.direction === "inward" && entry.revenueType === "raw_potato" && entry.partyName) {
         let remainingAmount = parseFloat(entry.amount);
@@ -3379,9 +2962,6 @@ export class DatabaseStorage implements IStorage {
       // Seed sale FIFO - update totalDueToFarmer on seed transactions
       if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
         let remainingAmount = parseFloat(entry.amount);
-        if (crossSettlement && crossSettlement.direction === 'seed_to_raw') {
-          remainingAmount -= crossSettlement.settledAmount;
-        }
         
         if (remainingAmount > 0) {
           const entryFarmerId = entry.farmerId || null;
@@ -3464,9 +3044,6 @@ export class DatabaseStorage implements IStorage {
       // Farmer payment FIFO (for raw potatoes)
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
         let remainingAmount = parseFloat(entry.amount);
-        if (crossSettlement && crossSettlement.direction === 'raw_to_seed') {
-          remainingAmount -= crossSettlement.settledAmount;
-        }
         
         if (remainingAmount > 0) {
           const entryFarmerId = entry.farmerId || null;
@@ -3599,7 +3176,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      return { ...createdEntry, allocations, coldStoreAllocations, crossSettlementId };
+      return { ...createdEntry, allocations, coldStoreAllocations };
     });
   }
 
@@ -3670,10 +3247,6 @@ export class DatabaseStorage implements IStorage {
       
       const coldStoreAllocs = await tx.select().from(coldStoreChargeAllocations)
         .where(eq(coldStoreChargeAllocations.cashEntryId, cashEntryId));
-      
-      // 3. Get related cross-settlement if any
-      const [settlement] = await tx.select().from(farmerSettlements)
-        .where(eq(farmerSettlements.cashEntryId, cashEntryId));
 
       const entryFarmerId = entry.farmerId || null;
       const normalizedFarmerName = entry.farmerName ? normalizeName(entry.farmerName) : null;
@@ -3742,9 +3315,6 @@ export class DatabaseStorage implements IStorage {
         const matchingTxns = allSeedTxns.filter(txn => matchesFarmerForReversal(txn));
         
         let amountToRestore = parseFloat(entry.amount);
-        if (settlement && settlement.settlementDirection === 'seed_to_raw') {
-          amountToRestore -= parseFloat(settlement.settledAmount);
-        }
         
         // Restore dues in reverse FIFO order (most recent first, distributed across transactions)
         for (const txn of matchingTxns.reverse()) {
@@ -3789,11 +3359,7 @@ export class DatabaseStorage implements IStorage {
         
         const matchingEntries = farmerStockEntries.filter(se => matchesFarmerForReversal(se));
         
-        // Calculate total amount to reverse (excluding cross-settlement if any)
         let amountToReverse = parseFloat(entry.amount);
-        if (settlement && settlement.settlementDirection === 'raw_to_seed') {
-          amountToReverse -= parseFloat(settlement.settledAmount);
-        }
         
         // Reverse from most recent entries first (reverse FIFO order)
         for (const se of matchingEntries.reverse()) {
@@ -3870,111 +3436,7 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // 5. Reverse cross-settlement if any
-      if (settlement) {
-        const settledAmount = parseFloat(settlement.settledAmount);
-        const seedTxnIds = (settlement.seedTransactionIds as number[]) || [];
-        const rawEntryIds = (settlement.rawPotatoStockEntryIds as number[]) || [];
-        
-        if (settlement.settlementDirection === 'raw_to_seed') {
-          // Reverse: Add back dues to seedTransactions, reduce amountPaid on stockEntries
-          
-          // Add back seed dues
-          let remainingToRestore = settledAmount;
-          for (const txnId of seedTxnIds) {
-            if (remainingToRestore <= 0) break;
-            
-            const [seedTxn] = await tx.select().from(seedTransactions)
-              .where(eq(seedTransactions.id, txnId));
-            
-            if (seedTxn) {
-              const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-              // Restore the due (add it back)
-              const newDue = currentDue + remainingToRestore;
-              
-              await tx.update(seedTransactions)
-                .set({ totalDueToFarmer: newDue.toString() })
-                .where(eq(seedTransactions.id, txnId));
-              
-              remainingToRestore = 0; // Applied all
-            }
-          }
-          
-          // Reduce amountPaid on raw potato entries (reverse the settlement payment)
-          let remainingToReduce = settledAmount;
-          for (const entryId of rawEntryIds.reverse()) {
-            if (remainingToReduce <= 0) break;
-            
-            const [se] = await tx.select().from(stockEntries)
-              .where(eq(stockEntries.id, entryId));
-            
-            if (se) {
-              const currentPaid = parseFloat(se.amountPaid || "0");
-              const toReduce = Math.min(remainingToReduce, currentPaid);
-              const newPaid = currentPaid - toReduce;
-              const newStatus = newPaid <= 0 ? "due" : "partial";
-              
-              await tx.update(stockEntries)
-                .set({ 
-                  amountPaid: newPaid.toString(),
-                  paymentStatus: newStatus
-                })
-                .where(eq(stockEntries.id, se.id));
-              
-              remainingToReduce -= toReduce;
-            }
-          }
-        } else if (settlement.settlementDirection === 'seed_to_raw') {
-          // Reverse: Add back dues to seedTransactions, reduce amountPaid on stockEntries
-          
-          // Add back seed dues
-          let remainingToRestore = settledAmount;
-          for (const txnId of seedTxnIds) {
-            if (remainingToRestore <= 0) break;
-            
-            const [seedTxn] = await tx.select().from(seedTransactions)
-              .where(eq(seedTransactions.id, txnId));
-            
-            if (seedTxn) {
-              const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-              const newDue = currentDue + remainingToRestore;
-              
-              await tx.update(seedTransactions)
-                .set({ totalDueToFarmer: newDue.toString() })
-                .where(eq(seedTransactions.id, txnId));
-              
-              remainingToRestore = 0;
-            }
-          }
-          
-          // Reduce amountPaid on raw potato entries
-          let remainingToReduce = settledAmount;
-          for (const entryId of rawEntryIds.reverse()) {
-            if (remainingToReduce <= 0) break;
-            
-            const [se] = await tx.select().from(stockEntries)
-              .where(eq(stockEntries.id, entryId));
-            
-            if (se) {
-              const currentPaid = parseFloat(se.amountPaid || "0");
-              const toReduce = Math.min(remainingToReduce, currentPaid);
-              const newPaid = currentPaid - toReduce;
-              const newStatus = newPaid <= 0 ? "due" : "partial";
-              
-              await tx.update(stockEntries)
-                .set({ 
-                  amountPaid: newPaid.toString(),
-                  paymentStatus: newStatus
-                })
-                .where(eq(stockEntries.id, se.id));
-              
-              remainingToReduce -= toReduce;
-            }
-          }
-        }
-      }
-
-      // 6. Mark the entry as reversed
+      // 5. Mark the entry as reversed
       const [reversedEntry] = await tx.update(cashEntries)
         .set({ 
           isReversed: true, 
