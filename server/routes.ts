@@ -5,7 +5,7 @@ import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
-import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, computeCompoundInterestDue } from './ist-utils';
 
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
@@ -38,15 +38,6 @@ function requireSystemAdmin(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ message: "Admin access required" });
   }
   next();
-}
-
-function computeCompoundInterestDue(principal: number, rateOfInterest: number, effectiveDate: string | null): number {
-  if (!effectiveDate || !rateOfInterest || rateOfInterest <= 0 || principal <= 0) {
-    return principal;
-  }
-  const days = dateDiffInDaysIST(effectiveDate);
-  if (days <= 0) return principal;
-  return principal * Math.pow(1 + rateOfInterest / 100, days / 365);
 }
 
 function getReceivableWithInterest(farmer: { pendingDueToBePaid: string | null; rateOfInterest: string | null; effectiveDate: string | null }): number {
@@ -2640,10 +2631,11 @@ export async function registerRoutes(
         breakdownsByLotId.set(breakdown.lotId, existing);
       }
       
-      // Calculate dues for each farmer - match by farmerId first, then fall back to composite key (name+contact)
+      // Calculate dues for each farmer - match by farmerId first, then fall back to composite key (name+contact+village)
       const farmersWithDues = farmerList.map(farmer => {
         const normalizedFarmerName = farmer.name.trim().toLowerCase();
         const normalizedFarmerContact = farmer.contact?.trim().toLowerCase() || null;
+        const normalizedFarmerVillage = farmer.village?.trim().toLowerCase() || null;
         
         // Calculate Harvest Due (sum of bag breakdown amounts - amount paid, from stock entries with status due/partial)
         let harvestDue = 0;
@@ -2655,7 +2647,8 @@ export async function registerRoutes(
           const matchesByFarmerId = entry.farmerId === farmer.id;
           const entryName = entry.farmerName?.trim().toLowerCase() || "";
           const entryContact = entry.farmerContact?.trim().toLowerCase() || null;
-          const matchesByCompositeKey = !entry.farmerId && entryName === normalizedFarmerName && entryContact === normalizedFarmerContact;
+          const entryVillage = (entry as any).village?.trim().toLowerCase() || null;
+          const matchesByCompositeKey = !entry.farmerId && entryName === normalizedFarmerName && entryContact === normalizedFarmerContact && entryVillage === normalizedFarmerVillage;
           
           if (matchesByFarmerId || matchesByCompositeKey) {
             // Only calculate harvest due for entries with "due" or "partial" payment status
@@ -2780,7 +2773,8 @@ export async function registerRoutes(
           const matchesByFarmerId = txn.farmerId === farmer.id;
           const txnName = txn.farmerName?.trim().toLowerCase() || "";
           const txnContact = txn.farmerContact?.trim().toLowerCase() || null;
-          const matchesByCompositeKey = !txn.farmerId && txnName === normalizedFarmerName && txnContact === normalizedFarmerContact;
+          const txnVillage = (txn as any).village?.trim().toLowerCase() || null;
+          const matchesByCompositeKey = !txn.farmerId && txnName === normalizedFarmerName && txnContact === normalizedFarmerContact && txnVillage === normalizedFarmerVillage;
           
           if (matchesByFarmerId || matchesByCompositeKey) {
             seedDue += parseFloat(txn.totalDueToFarmer || "0");

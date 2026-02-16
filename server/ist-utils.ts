@@ -27,3 +27,12 @@ export function dateDiffInDaysIST(startDateStr: string, endDateStr?: string): nu
 export function dateToISTString(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
+
+export function computeCompoundInterestDue(principal: number, rateOfInterest: number, effectiveDate: string | null): number {
+  if (!effectiveDate || !rateOfInterest || rateOfInterest <= 0 || principal <= 0) {
+    return principal;
+  }
+  const days = dateDiffInDaysIST(effectiveDate);
+  if (days <= 0) return principal;
+  return principal * Math.pow(1 + rateOfInterest / 100, days / 365);
+}

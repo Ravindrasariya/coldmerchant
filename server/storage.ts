@@ -34,7 +34,7 @@ import {
   type SeedTransactionEditHistory
 } from "@shared/schema";
 import { db } from "./db";
-import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, computeCompoundInterestDue } from './ist-utils';
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -236,6 +236,8 @@ export interface IStorage {
     hasRawPotatoDues: boolean;
     rawPotatoDueAmount: number;
     rawPotatoEntryIds: number[];
+    receivableWithInterest: number;
+    totalSettleableAgainstHarvest: number;
   }>;
   createCashEntryWithCrossSettlement(
     entry: InsertCashEntry, 
@@ -1216,13 +1218,7 @@ export class DatabaseStorage implements IStorage {
       const principal = parseFloat(farmerRecord.pyReceivable || "0");
       if (principal <= 0) continue;
       const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
-      let receivables = principal;
-      if (roi > 0 && farmerRecord.receivableEffectiveDate) {
-        const days = dateDiffInDaysIST(farmerRecord.receivableEffectiveDate);
-        if (days > 0) {
-          receivables = principal * Math.pow(1 + roi / 100, days / 365);
-        }
-      }
+      const receivables = computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate);
       
       const key = `id:${farmerRecord.id}`;
       
@@ -1442,14 +1438,7 @@ export class DatabaseStorage implements IStorage {
           if (matchedFarmer) {
             const principal = parseFloat(matchedFarmer.pyReceivable || "0");
             const roi = parseFloat(matchedFarmer.receivableInterestRate || "0");
-            const effDate = matchedFarmer.receivableEffectiveDate;
-            let accruedAmount = principal;
-            if (principal > 0 && roi > 0 && effDate) {
-              const days = dateDiffInDaysIST(effDate);
-              if (days > 0) {
-                accruedAmount = principal * Math.pow(1 + roi / 100, days / 365);
-              }
-            }
+            const accruedAmount = computeCompoundInterestDue(principal, roi, matchedFarmer.receivableEffectiveDate);
             if (accruedAmount > 0) {
               const toApply = Math.min(remainingAmount, accruedAmount);
               const newAccrued = accruedAmount - toApply;
@@ -2918,6 +2907,8 @@ export class DatabaseStorage implements IStorage {
     hasRawPotatoDues: boolean;
     rawPotatoDueAmount: number;
     rawPotatoEntryIds: number[];
+    receivableWithInterest: number;
+    totalSettleableAgainstHarvest: number;
   }> {
     const entryFarmerId = farmerId || null;
     const normalizedName = normalizeName(farmerName);
@@ -3018,6 +3009,21 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    let receivableWithInterest = 0;
+    if (entryFarmerId) {
+      const [farmerRecord] = await db.select().from(farmers)
+        .where(and(eq(farmers.id, entryFarmerId), eq(farmers.merchantId, merchantId)));
+      if (farmerRecord) {
+        const principal = parseFloat(farmerRecord.pyReceivable || "0");
+        const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
+        receivableWithInterest = principal > 0 
+          ? computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate)
+          : 0;
+      }
+    }
+
+    const totalSettleableAgainstHarvest = receivableWithInterest + seedDueAmount;
+
     return {
       hasSeedDues: seedDueAmount > 0,
       seedDueAmount,
@@ -3025,6 +3031,8 @@ export class DatabaseStorage implements IStorage {
       hasRawPotatoDues: rawPotatoDueAmount > 0,
       rawPotatoDueAmount,
       rawPotatoEntryIds: rawPotatoEntryIdsWithDue,
+      receivableWithInterest,
+      totalSettleableAgainstHarvest,
     };
   }
 
@@ -3050,12 +3058,27 @@ export class DatabaseStorage implements IStorage {
 
       // Handle cross-settlement if provided
       if (crossSettlement && crossSettlement.settledAmount > 0) {
-        // Record the cross-settlement for audit trail
+        // Pre-compute receivable vs seed due breakdown for audit trail
+        let precomputedReceivableApplied = 0;
+        const cssFarmerId = entry.farmerId || null;
+        if (cssFarmerId) {
+          const [fr] = await tx.select().from(farmers).where(eq(farmers.id, cssFarmerId));
+          if (fr) {
+            const principal = parseFloat(fr.pyReceivable || "0");
+            const roi = parseFloat(fr.receivableInterestRate || "0");
+            const accrued = computeCompoundInterestDue(principal, roi, fr.receivableEffectiveDate);
+            precomputedReceivableApplied = Math.min(crossSettlement.settledAmount, Math.max(0, accrued));
+          }
+        }
+        const precomputedSeedDueApplied = Math.max(0, crossSettlement.settledAmount - precomputedReceivableApplied);
+
         const [settlement] = await tx.insert(farmerSettlements).values({
           merchantId: entry.merchantId,
           userId: userId || null,
           settlementDirection: crossSettlement.direction,
           settledAmount: crossSettlement.settledAmount.toString(),
+          receivableApplied: precomputedReceivableApplied.toFixed(2),
+          seedDueApplied: precomputedSeedDueApplied.toFixed(2),
           farmerId: entry.farmerId || null,
           farmerName: entry.farmerName || "",
           farmerVillage: entry.farmerVillage,
@@ -3063,7 +3086,7 @@ export class DatabaseStorage implements IStorage {
           rawPotatoStockEntryIds: crossSettlement.rawPotatoEntryIds,
           seedTransactionIds: crossSettlement.seedTransactionIds,
           cashEntryId: createdEntry.id,
-          remarks: `Auto cross-settlement: ${crossSettlement.direction === 'raw_to_seed' ? 'Adjusted seed dues against farmer payment' : 'Adjusted raw potato dues against seed payment'}`,
+          remarks: `Auto cross-settlement: ${crossSettlement.direction === 'raw_to_seed' ? 'Adjusted seed dues against farmer payment' : 'Adjusted raw potato dues against seed payment'}${precomputedReceivableApplied > 0 ? ` (Receivable: ₹${precomputedReceivableApplied.toFixed(2)}, Seed Due: ₹${precomputedSeedDueApplied.toFixed(2)})` : ''}`,
         }).returning();
         
         crossSettlementId = settlement.id;
@@ -3120,8 +3143,36 @@ export class DatabaseStorage implements IStorage {
             remainingSettlement -= toApply;
           }
           
-          // Step 2: Update seed transactions (reduce seed dues by full settlement amount)
-          let remainingSeedSettlement = crossSettlement.settledAmount;
+          // Step 2: Reduce farmer's receivable (pyReceivable with interest) FIRST
+          let remainingOffsetSettlement = crossSettlement.settledAmount;
+          let receivableApplied = 0;
+          
+          const settlementFarmerId = entry.farmerId || null;
+          if (settlementFarmerId && remainingOffsetSettlement > 0) {
+            const [farmerRecord] = await tx.select().from(farmers)
+              .where(eq(farmers.id, settlementFarmerId));
+            if (farmerRecord) {
+              const principal = parseFloat(farmerRecord.pyReceivable || "0");
+              const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
+              const accruedAmount = computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate);
+              if (accruedAmount > 0) {
+                const toApply = Math.min(remainingOffsetSettlement, accruedAmount);
+                const newAccrued = accruedAmount - toApply;
+                await tx.update(farmers)
+                  .set({
+                    pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
+                    receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
+                    receivableInterestRate: newAccrued > 0 ? farmerRecord.receivableInterestRate : "0.00",
+                  })
+                  .where(eq(farmers.id, settlementFarmerId));
+                remainingOffsetSettlement -= toApply;
+                receivableApplied = toApply;
+              }
+            }
+          }
+          
+          // Step 3: Apply remaining to seed transactions FIFO
+          let remainingSeedSettlement = remainingOffsetSettlement;
           
           for (const txnId of crossSettlement.seedTransactionIds) {
             if (remainingSeedSettlement <= 0) break;
@@ -3147,11 +3198,9 @@ export class DatabaseStorage implements IStorage {
           }
         } else if (crossSettlement.direction === 'seed_to_raw') {
           // Receiving seed payment, offset against raw potato dues
-          // 1. The settled amount reduces what we owe farmer for raw potatoes (update stock entries)
-          // 2. Also update seed transactions to reduce seed dues (farmer is paying for seeds via offset)
+          // Step 1: Update raw potato stock entries (reduce harvest dues)
           let remainingSettlement = crossSettlement.settledAmount;
           
-          // Step 1: Update raw potato stock entries
           for (const entryId of crossSettlement.rawPotatoEntryIds) {
             if (remainingSettlement <= 0) break;
             
@@ -3160,7 +3209,6 @@ export class DatabaseStorage implements IStorage {
             
             if (!stockEntry) continue;
             
-            // Calculate total cost for this entry
             const entryLots = await tx.select().from(lots)
               .where(eq(lots.stockEntryId, stockEntry.id));
             
@@ -3196,8 +3244,34 @@ export class DatabaseStorage implements IStorage {
             remainingSettlement -= toApply;
           }
           
-          // Step 2: Update seed transactions (reduce seed dues by full settlement amount)
-          let remainingSeedSettlement = crossSettlement.settledAmount;
+          // Step 2: Reduce farmer's receivable FIRST
+          let remainingOffsetSeedToRaw = crossSettlement.settledAmount;
+          
+          const seedToRawFarmerId = entry.farmerId || null;
+          if (seedToRawFarmerId && remainingOffsetSeedToRaw > 0) {
+            const [farmerRecord] = await tx.select().from(farmers)
+              .where(eq(farmers.id, seedToRawFarmerId));
+            if (farmerRecord) {
+              const principal = parseFloat(farmerRecord.pyReceivable || "0");
+              const roi = parseFloat(farmerRecord.receivableInterestRate || "0");
+              const accruedAmount = computeCompoundInterestDue(principal, roi, farmerRecord.receivableEffectiveDate);
+              if (accruedAmount > 0) {
+                const toApply = Math.min(remainingOffsetSeedToRaw, accruedAmount);
+                const newAccrued = accruedAmount - toApply;
+                await tx.update(farmers)
+                  .set({
+                    pyReceivable: newAccrued > 0 ? newAccrued.toFixed(2) : "0.00",
+                    receivableEffectiveDate: newAccrued > 0 ? getISTDateString() : null,
+                    receivableInterestRate: newAccrued > 0 ? farmerRecord.receivableInterestRate : "0.00",
+                  })
+                  .where(eq(farmers.id, seedToRawFarmerId));
+                remainingOffsetSeedToRaw -= toApply;
+              }
+            }
+          }
+          
+          // Step 3: Apply remaining to seed transactions FIFO
+          let remainingSeedSettlement = remainingOffsetSeedToRaw;
           
           for (const txnId of crossSettlement.seedTransactionIds) {
             if (remainingSeedSettlement <= 0) break;
@@ -3338,14 +3412,7 @@ export class DatabaseStorage implements IStorage {
             if (matchedFarmer) {
               const principal = parseFloat(matchedFarmer.pyReceivable || "0");
               const roi = parseFloat(matchedFarmer.receivableInterestRate || "0");
-              const effDate = matchedFarmer.receivableEffectiveDate;
-              let accruedAmount = principal;
-              if (principal > 0 && roi > 0 && effDate) {
-                const days = dateDiffInDaysIST(effDate);
-                if (days > 0) {
-                  accruedAmount = principal * Math.pow(1 + roi / 100, days / 365);
-                }
-              }
+              const accruedAmount = computeCompoundInterestDue(principal, roi, matchedFarmer.receivableEffectiveDate);
               if (accruedAmount > 0) {
                 const toApply = Math.min(remainingAmount, accruedAmount);
                 const newAccrued = accruedAmount - toApply;
