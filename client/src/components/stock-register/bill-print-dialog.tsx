@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { calculateInterestOnly } from "@/lib/interest-utils";
 import {
   Dialog,
   DialogContent,
@@ -121,17 +122,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
     const rate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
-    
-    let interestDays = 0;
-    let interest = 0;
-    if (principal > 0 && rate > 0 && lot.adjustedAmountEffectiveDate) {
-      const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
-      const today = new Date();
-      interestDays = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const years = interestDays / 365;
-      // Apply only interest portion (not principal+interest) since principal is already in overall calculation
-      interest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
-    }
+    const { interest, days: interestDays } = calculateInterestOnly(principal, rate, lot.adjustedAmountEffectiveDate || null);
     
     let adjustedValue = 0;
     if (interest > 0 && lot.adjustedAmountType) {

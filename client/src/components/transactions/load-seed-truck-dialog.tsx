@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,24 +215,14 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     return unsoldInventory?.find(lot => lot.id === lotId);
   };
 
-  // Calculate adjustment with compound interest
   const calculatedAdjustment = useMemo(() => {
     const principal = parseFloat(adjustmentAmount) || 0;
     const rate = parseFloat(adjustmentRate) || 0;
     
     if (principal <= 0) return { finalAmount: 0, interest: 0, days: 0 };
     
-    if (rate > 0 && adjustmentEffectiveDate) {
-      const effectiveDate = new Date(adjustmentEffectiveDate);
-      const today = new Date();
-      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const years = days / 365;
-      // Apply only interest portion (not principal+interest) since principal is already in overall calculation
-      const interest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
-      return { finalAmount: interest, interest, days };
-    }
-    
-    return { finalAmount: 0, interest: 0, days: 0 };
+    const { interest, days } = calculateInterestOnly(principal, rate, adjustmentEffectiveDate || null);
+    return { finalAmount: interest, interest, days };
   }, [adjustmentAmount, adjustmentRate, adjustmentEffectiveDate]);
 
   const totals = useMemo(() => {

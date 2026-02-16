@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { calculateInterestOnly, calculateSimpleInterest } from "@/lib/interest-utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -762,12 +763,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       (() => {
                         const principal = lot.adjustedAmount;
                         const rate = lot.adjustedAmountRate;
-                        const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
-                        const today = new Date();
-                        const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-                        const years = days / 365;
-                        const finalAmount = Math.round((principal * Math.pow(1 + rate / 100, years)) * 100) / 100;
-                        const interest = Math.round((finalAmount - principal) * 100) / 100;
+                        const { interest, days, finalAmount } = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate || null);
                         return (
                           <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
@@ -890,18 +886,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       }, 0);
                     const totalDeductions = hammali + dynamicCharges;
                     
-                    // Handle adjustment - calculate compound interest if rate-based
                     const principal = lot.adjustedAmount || 0;
-                    let interestOnly = 0;
-                    
-                    // Calculate compound interest only (not principal+interest) since principal is already in overall calculation
-                    if (principal > 0 && lot.adjustedAmountRate && lot.adjustedAmountRate > 0 && lot.adjustedAmountEffectiveDate) {
-                      const effectiveDate = new Date(lot.adjustedAmountEffectiveDate);
-                      const today = new Date();
-                      const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-                      const years = days / 365;
-                      interestOnly = Math.round((principal * (Math.pow(1 + lot.adjustedAmountRate / 100, years) - 1)) * 100) / 100;
-                    }
+                    const { interest: interestOnly } = calculateInterestOnly(
+                      principal,
+                      lot.adjustedAmountRate || 0,
+                      lot.adjustedAmountEffectiveDate || null
+                    );
                     
                     let adjustedValue = 0;
                     if (interestOnly > 0 && lot.adjustedAmountType) {

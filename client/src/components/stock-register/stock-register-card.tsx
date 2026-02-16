@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -137,20 +138,10 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
   const adjustedAmountType = lot.adjustedAmountType;
   
-  // Calculate compound interest if rate and effective date are provided
-  // Interest-only: adjustment is 0 if no rate/date provided (principal is already in overall calculation)
   const adjustedAmountRate = (lot as any).adjustedAmountRate ? parseFloat((lot as any).adjustedAmountRate) : 0;
   const adjustedAmountEffectiveDate = (lot as any).adjustedAmountEffectiveDate;
   
-  let finalAdjustment = 0; // Default to 0 (interest-only means no rate/date = no adjustment)
-  if (rawAdjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
-    const effectiveDate = new Date(adjustedAmountEffectiveDate);
-    const today = new Date();
-    const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const years = days / 365;
-    // Apply only interest portion: P × ((1 + r)^t - 1)
-    finalAdjustment = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
-  }
+  const { interest: finalAdjustment } = calculateInterestOnly(rawAdjustedAmount, adjustedAmountRate, adjustedAmountEffectiveDate || null);
   
   // Calculate total deductions: hammali/grading + dynamic charges
   // For Farm Gate lots, exclude Cold Charges and Ware House Charges from farmer deductions
@@ -501,18 +492,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const farmerColdCharges = csvIsFarmGate ? 0 : coldCharges;
         const totalDeductions = farmerColdCharges + hammaliGrading + advanceCharges + otherCharges;
         
-        // Calculate dynamic interest (interest-only formula)
-        let lotInterest = 0;
         const principal = parseFloat(lot.adjustedAmount || "0");
         const rate = parseFloat(lot.adjustedAmountRate || "0");
-        const effectiveDate = lot.adjustedAmountEffectiveDate;
-        if (principal > 0 && rate > 0 && effectiveDate) {
-          const startDate = new Date(effectiveDate);
-          const today = new Date();
-          const days = Math.max(0, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-          const years = days / 365;
-          lotInterest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
-        }
+        const { interest: lotInterest } = calculateInterestOnly(principal, rate, lot.adjustedAmountEffectiveDate || null);
         
         // Apply interest based on adjustment type
         const adjustmentType = lot.adjustedAmountType;

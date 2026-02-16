@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -168,21 +169,11 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
     setFilterPaymentDue("all");
   };
 
-  // Helper function to calculate dynamic interest adjustment for a transaction
-  // Interest-only: returns 0 if no rate/date, otherwise calculates P × ((1 + r)^t - 1)
   const calculateDynamicAdjustment = (txn: SeedTransaction): number => {
     const principal = parseFloat(txn.adjustmentAmount || "0");
     const rate = parseFloat(txn.adjustmentRate || "0");
-    const effectiveDate = txn.adjustmentEffectiveDate;
-    
-    if (principal <= 0 || rate <= 0 || !effectiveDate) return 0;
-    
-    const startDate = new Date(effectiveDate);
-    const today = new Date();
-    const days = Math.max(0, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const years = days / 365;
-    // Interest-only formula
-    const interest = Math.round((principal * (Math.pow(1 + rate / 100, years) - 1)) * 100) / 100;
+    const { interest } = calculateInterestOnly(principal, rate, txn.adjustmentEffectiveDate || null);
+    if (interest <= 0) return 0;
     return txn.adjustmentType === "credit" ? interest : -interest;
   };
 

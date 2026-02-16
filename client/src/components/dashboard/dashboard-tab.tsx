@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
@@ -180,16 +181,8 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
   const adjustedAmountType = lot.adjustedAmountType;
   const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
-  const adjustedAmountEffectiveDate = lot.adjustedAmountEffectiveDate;
 
-  let finalAdjustment = 0;
-  if (rawAdjustedAmount > 0 && adjustedAmountRate > 0 && adjustedAmountEffectiveDate) {
-    const effectiveDate = new Date(adjustedAmountEffectiveDate);
-    const today = new Date();
-    const days = Math.max(0, Math.floor((today.getTime() - effectiveDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const years = days / 365;
-    finalAdjustment = Math.round((rawAdjustedAmount * (Math.pow(1 + adjustedAmountRate / 100, years) - 1)) * 100) / 100;
-  }
+  const { interest: finalAdjustment } = calculateInterestOnly(rawAdjustedAmount, adjustedAmountRate, lot.adjustedAmountEffectiveDate || null);
 
   return {
     actualSellableBags,
