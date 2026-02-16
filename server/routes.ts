@@ -250,8 +250,11 @@ export async function registerRoutes(
         if (crop === "onion") continue;
         const dateKey = dateToISTString(new Date(seedTx.createdAt));
         if (!matchesDateFilter(dateKey)) continue;
-        const totalPL = seedTx.totalProfitLoss ? parseFloat(seedTx.totalProfitLoss) : 0;
-        pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + totalPL);
+        const seedRevenue = seedTx.totalRevenue ? parseFloat(seedTx.totalRevenue) : 0;
+        if (seedRevenue > 0) {
+          const totalPL = seedTx.totalProfitLoss ? parseFloat(seedTx.totalProfitLoss) : 0;
+          pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + totalPL);
+        }
 
         const totalDueToFarmer = seedTx.totalDueToFarmer ? parseFloat(seedTx.totalDueToFarmer) : 0;
         const seedDue = Math.max(totalDueToFarmer, 0);
