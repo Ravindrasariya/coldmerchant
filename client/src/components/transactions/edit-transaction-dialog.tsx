@@ -84,6 +84,7 @@ interface EditHistoryEntry {
 interface TransactionWithHistory {
   id: number;
   transactionNumber: number;
+  buyerId: number | null;
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
@@ -164,6 +165,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [newItemWeight, setNewItemWeight] = useState<number>(0);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
+  const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers"],
@@ -204,6 +206,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
         remarks: transaction.remarks || "",
       });
+      setSelectedBuyerId(transaction.buyerId || null);
       setEditableItems(transaction.items.map(item => ({
         id: item.id,
         lotId: item.lotId,
@@ -226,7 +229,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   }, [transaction, form]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: EditTransactionFormData) => {
+    mutationFn: async (data: EditTransactionFormData & { buyerId?: number | null }) => {
       return apiRequest("PATCH", `/api/transactions/${transactionId}`, data);
     },
     onSuccess: () => {
@@ -417,8 +420,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const hasItemChanges = editableItems.some(item => item.action !== 'keep');
 
   const onSubmit = (data: EditTransactionFormData) => {
-    // Update main transaction data
-    updateMutation.mutate(data);
+    updateMutation.mutate({ ...data, buyerId: selectedBuyerId });
     // Also update items (bags, weights, revenue) if there are any changes
     if (hasItemChanges) {
       updateItemsMutation.mutate();
@@ -688,6 +690,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                                       value={buyer.name}
                                       onSelect={() => {
                                         field.onChange(buyer.name);
+                                        setSelectedBuyerId(buyer.id);
                                         setBuyerPopoverOpen(false);
                                       }}
                                     >

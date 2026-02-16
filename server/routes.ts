@@ -1341,7 +1341,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks } = req.body;
+      const { partyName, partyAddress, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -1377,6 +1377,15 @@ export async function registerRoutes(
       if (remarks !== undefined && (remarks || null) !== (existingTxn.remarks || null)) {
         changes.push({ field: "remarks", oldValue: existingTxn.remarks, newValue: remarks || null });
       }
+      if (buyerId !== undefined && buyerId !== existingTxn.buyerId) {
+        if (buyerId !== null) {
+          const buyer = await storage.getBuyerById(buyerId, merchantId);
+          if (!buyer) {
+            return res.status(400).json({ message: "Invalid buyer" });
+          }
+        }
+        changes.push({ field: "buyerId", oldValue: existingTxn.buyerId?.toString() || null, newValue: buyerId?.toString() || null });
+      }
       // Revenue is now calculated from item-level revenues, so we don't update it directly
       // Calculate new profit/loss using existing transaction revenue (aggregated from items)
       const existingRevenueNum = parseFloat(existingTxn.revenue || "0");
@@ -1400,6 +1409,7 @@ export async function registerRoutes(
         otherCharges: otherCharges ? otherCharges.toString() : null,
         remarks: remarks !== undefined ? (remarks || null) : existingTxn.remarks,
         profitLoss: newProfitLoss.toString(),
+        ...(buyerId !== undefined ? { buyerId } : {}),
       });
       
       // Record edit history if there are changes
