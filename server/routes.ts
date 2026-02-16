@@ -324,13 +324,6 @@ export async function registerRoutes(
           farmerPyReceivableDue += pyWithInterest;
         }
       }
-      for (const cf of allCashFarmers) {
-        const cfReceivable = getReceivableWithInterest(cf);
-        if (cfReceivable > 0) {
-          farmerPyReceivableTotal += cfReceivable;
-          farmerPyReceivableDue += cfReceivable;
-        }
-      }
 
       let buyerPyReceivableTotal = 0;
       let buyerPyReceivableDue = 0;
