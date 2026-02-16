@@ -137,7 +137,7 @@ export interface IStorage {
   createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
   getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
-  getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]>;
+  getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
   getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]>;
   getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
@@ -978,38 +978,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]> {
-    // Get all transactions with party name
     const txns = await db.select().from(transactions)
       .where(eq(transactions.merchantId, merchantId));
     
-    // Group by normalized partyName (case-insensitive, trimmed) and calculate dues
+    const getPartyKey = (txn: typeof txns[0]): string | null => {
+      if (txn.buyerId) return `id:${txn.buyerId}`;
+      const n = normalizeName(txn.partyName);
+      if (!n) return null;
+      return `name:${n}`;
+    };
+    
     const partyMap = new Map<string, { displayName: string; partyAddress: string | null; totalDue: number; transactionCount: number }>();
     
     for (const txn of txns) {
-      if (!txn.partyName) continue;
+      const key = getPartyKey(txn);
+      if (!key) continue;
       
-      const normalizedName = normalizeName(txn.partyName);
-      if (!normalizedName) continue;
-      
-      // Calculate revenue from transaction items (more accurate than header)
       const items = await db.select().from(transactionItems)
         .where(eq(transactionItems.transactionId, txn.id));
       
       const itemsRevenue = items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
-      // Use items revenue if available, otherwise fall back to header revenue
       const revenue = itemsRevenue > 0 ? itemsRevenue : parseFloat(txn.revenue || "0");
       const received = parseFloat(txn.amountReceived || "0");
       const due = Math.max(0, revenue - received);
       
-      if (due <= 0) continue; // Only include parties with pending dues
+      if (due <= 0) continue;
       
-      const existing = partyMap.get(normalizedName);
+      const existing = partyMap.get(key);
       if (existing) {
         existing.totalDue += due;
         existing.transactionCount += 1;
       } else {
-        partyMap.set(normalizedName, {
-          displayName: txn.partyName.trim(), // Keep original casing but trim spaces
+        partyMap.set(key, {
+          displayName: (txn.partyName || "").trim(),
           partyAddress: txn.partyAddress,
           totalDue: due,
           transactionCount: 1,
@@ -1305,17 +1306,16 @@ export class DatabaseStorage implements IStorage {
     })).sort((a, b) => b.totalDue - a.totalDue);
   }
 
-  async getTransactionsWithDueByParty(merchantId: number, partyName: string): Promise<Transaction[]> {
-    // Get transactions for this party that still have due amount, ordered by creation date (FIFO)
+  async getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]> {
     const txns = await db.select().from(transactions)
-      .where(and(
-        eq(transactions.merchantId, merchantId),
-        eq(transactions.partyName, partyName)
-      ))
+      .where(eq(transactions.merchantId, merchantId))
       .orderBy(asc(transactions.createdAt));
     
-    // Filter to only those with remaining due
     return txns.filter(txn => {
+      const matchesBuyer = buyerId
+        ? (txn.buyerId === buyerId)
+        : (txn.partyName && normalizeName(txn.partyName) === normalizeName(partyName));
+      if (!matchesBuyer) return false;
       const revenue = parseFloat(txn.revenue || "0");
       const received = parseFloat(txn.amountReceived || "0");
       return revenue > received;
@@ -1372,13 +1372,10 @@ export class DatabaseStorage implements IStorage {
             .orderBy(asc(transactions.createdAt));
           
           const transactionsWithDue = txns.filter(txn => {
-            if (entryBuyerId && txn.buyerId === entryBuyerId) {
-              const revenue = parseFloat(txn.revenue || "0");
-              const received = parseFloat(txn.amountReceived || "0");
-              return revenue > received;
-            }
-            if (!txn.partyName) return false;
-            if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
+            const matchesBuyer = matchedBuyerId
+              ? (txn.buyerId === matchedBuyerId)
+              : (txn.partyName && normalizeName(txn.partyName) === normalizedPartyName);
+            if (!matchesBuyer) return false;
             const revenue = parseFloat(txn.revenue || "0");
             const received = parseFloat(txn.amountReceived || "0");
             return revenue > received;
@@ -3250,13 +3247,10 @@ export class DatabaseStorage implements IStorage {
             .orderBy(asc(transactions.createdAt));
           
           const transactionsWithDue = txns.filter(txn => {
-            if (matchedBuyerId && txn.buyerId === matchedBuyerId) {
-              const revenue = parseFloat(txn.revenue || "0");
-              const received = parseFloat(txn.amountReceived || "0");
-              return revenue > received;
-            }
-            if (!txn.partyName) return false;
-            if (normalizeName(txn.partyName) !== normalizedPartyName) return false;
+            const matchesBuyer = matchedBuyerId
+              ? (txn.buyerId === matchedBuyerId)
+              : (txn.partyName && normalizeName(txn.partyName) === normalizedPartyName);
+            if (!matchesBuyer) return false;
             const revenue = parseFloat(txn.revenue || "0");
             const received = parseFloat(txn.amountReceived || "0");
             return revenue > received;
