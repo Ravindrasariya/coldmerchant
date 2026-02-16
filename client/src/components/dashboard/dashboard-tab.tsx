@@ -117,6 +117,10 @@ interface TimeseriesData {
     coldStoreDue: number;
     buyerTotalRevenue: number;
     buyerTotalDue: number;
+    farmerPyReceivableTotal: number;
+    farmerPyReceivableDue: number;
+    buyerPyReceivableTotal: number;
+    buyerPyReceivableDue: number;
   };
   farmerDueByCrop: Array<{ name: string; value: number }>;
   buyerDueByName: Array<{ name: string; value: number; percentage: number }>;
@@ -393,6 +397,22 @@ export function DashboardTab() {
     };
   }, [timeseries]);
 
+  const farmerPyReceivable = useMemo(() => {
+    if (!timeseries?.summary) return { total: 0, due: 0 };
+    return {
+      total: timeseries.summary.farmerPyReceivableTotal,
+      due: timeseries.summary.farmerPyReceivableDue,
+    };
+  }, [timeseries]);
+
+  const buyerPyReceivable = useMemo(() => {
+    if (!timeseries?.summary) return { total: 0, due: 0 };
+    return {
+      total: timeseries.summary.buyerPyReceivableTotal,
+      due: timeseries.summary.buyerPyReceivableDue,
+    };
+  }, [timeseries]);
+
   const farmerDueByCrop = useMemo(() => {
     if (!timeseries?.farmerDueByCrop) return [];
     return timeseries.farmerDueByCrop.map(item => ({
@@ -647,12 +667,40 @@ export function DashboardTab() {
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Seed", "किसान - बीज")}</div>
             <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Payable", "देय")}: </span>
+              <span className="text-muted-foreground">{t("Receivable", "प्राप्य")}: </span>
               <span className="font-medium" data-testid="text-farmer-seed-payable">{formatINR(farmerSummary.seedPayable)}</span>
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Net Due", "शुद्ध बकाया")}: </span>
               <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-farmer-seed-due">{formatINR(farmerSummary.seedDue)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-300 dark:border-purple-700" data-testid="card-farmer-py-receivable">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("PY Receivable - Farmer", "PY प्राप्य - किसान")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-farmer-py-total">{formatINR(farmerPyReceivable.total)}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
+              <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-farmer-py-due">{formatINR(farmerPyReceivable.due)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-300 dark:border-purple-700" data-testid="card-buyer-py-receivable">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("PY Receivable - Buyer", "PY प्राप्य - खरीदार")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-buyer-py-total">{formatINR(buyerPyReceivable.total)}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
+              <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-buyer-py-due">{formatINR(buyerPyReceivable.due)}</span>
             </div>
           </CardContent>
         </Card>

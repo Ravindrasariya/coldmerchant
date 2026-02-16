@@ -74,13 +74,15 @@ export async function registerRoutes(
         return true;
       };
 
-      const [allEntries, allLots, allBreakdowns, allTransactions, allSeedTransactions, allBuyers] = await Promise.all([
+      const [allEntries, allLots, allBreakdowns, allTransactions, allSeedTransactions, allBuyers, allFarmers, allCashFarmers] = await Promise.all([
         storage.getStockEntriesByMerchant(merchantId),
         storage.getAllLotsByMerchant(merchantId),
         storage.getAllBagBreakdownsByMerchant(merchantId),
         storage.getTransactionsByMerchant(merchantId),
         storage.getSeedTransactionsByMerchant(merchantId),
         storage.getBuyersByMerchant(merchantId),
+        storage.getFarmersByMerchant(merchantId),
+        storage.getCashFarmersByMerchant(merchantId),
       ]);
 
       const buyerIdToName = new Map<number, string>();
@@ -308,6 +310,38 @@ export async function registerRoutes(
           return { name: displayName.length > 12 ? displayName.substring(0, 12) + "..." : displayName, value: Math.round(value), percentage: total > 0 ? Math.round((value / total) * 100) : 0 };
         });
 
+      let farmerPyReceivableTotal = 0;
+      let farmerPyReceivableDue = 0;
+      for (const farmer of allFarmers) {
+        const pyPrincipal = parseFloat(farmer.pyReceivable || "0");
+        const pyRoi = parseFloat(farmer.receivableInterestRate || "0");
+        let pyWithInterest = pyPrincipal;
+        if (pyPrincipal > 0 && pyRoi > 0 && farmer.receivableEffectiveDate) {
+          pyWithInterest = computeCompoundInterestDue(pyPrincipal, pyRoi, farmer.receivableEffectiveDate);
+        }
+        if (pyWithInterest > 0) {
+          farmerPyReceivableTotal += pyWithInterest;
+          farmerPyReceivableDue += pyWithInterest;
+        }
+      }
+      for (const cf of allCashFarmers) {
+        const cfReceivable = getReceivableWithInterest(cf);
+        if (cfReceivable > 0) {
+          farmerPyReceivableTotal += cfReceivable;
+          farmerPyReceivableDue += cfReceivable;
+        }
+      }
+
+      let buyerPyReceivableTotal = 0;
+      let buyerPyReceivableDue = 0;
+      for (const buyer of allBuyers) {
+        const receivable = parseFloat(buyer.receivableBalance || "0");
+        if (receivable > 0) {
+          buyerPyReceivableTotal += receivable;
+          buyerPyReceivableDue += receivable;
+        }
+      }
+
       res.json({
         farmerDueTimeSeries,
         buyerDueTimeSeries,
@@ -322,6 +356,10 @@ export async function registerRoutes(
           coldStoreDue: Math.round(summaryColdStoreDue),
           buyerTotalRevenue: Math.round(summaryBuyerTotalRevenue),
           buyerTotalDue: Math.round(summaryBuyerTotalDue),
+          farmerPyReceivableTotal: Math.round(farmerPyReceivableTotal),
+          farmerPyReceivableDue: Math.round(farmerPyReceivableDue),
+          buyerPyReceivableTotal: Math.round(buyerPyReceivableTotal),
+          buyerPyReceivableDue: Math.round(buyerPyReceivableDue),
         },
         farmerDueByCrop,
         buyerDueByName,
