@@ -276,13 +276,19 @@ export async function registerRoutes(
         }
       }
 
-      const farmerDueTimeSeries = Array.from(farmerDueMap.entries())
-        .map(([date, amount]) => ({ date, amount: Math.round(amount * 100) / 100 }))
-        .sort((a, b) => a.date.localeCompare(b.date));
+      const sortedFarmerDueDates = Array.from(farmerDueMap.keys()).sort();
+      let cumulativeFarmerDue = 0;
+      const farmerDueTimeSeries = sortedFarmerDueDates.map(date => {
+        cumulativeFarmerDue += farmerDueMap.get(date)!;
+        return { date, amount: Math.round(cumulativeFarmerDue * 100) / 100 };
+      });
 
-      const buyerDueTimeSeries = Array.from(buyerDueMap.entries())
-        .map(([date, amount]) => ({ date, amount: Math.round(amount * 100) / 100 }))
-        .sort((a, b) => a.date.localeCompare(b.date));
+      const sortedBuyerDueDates = Array.from(buyerDueMap.keys()).sort();
+      let cumulativeBuyerDue = 0;
+      const buyerDueTimeSeries = sortedBuyerDueDates.map(date => {
+        cumulativeBuyerDue += buyerDueMap.get(date)!;
+        return { date, amount: Math.round(cumulativeBuyerDue * 100) / 100 };
+      });
 
       const dailyVolumeTimeSeries = Array.from(volumeMap.entries())
         .map(([date, volume]) => ({ date, volume: Math.round(volume * 100) / 100 }))
