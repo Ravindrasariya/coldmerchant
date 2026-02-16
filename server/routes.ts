@@ -231,6 +231,15 @@ export async function registerRoutes(
         pnlMap.set(dateKey, (pnlMap.get(dateKey) || 0) + profitLoss);
       }
 
+      for (const buyer of allBuyers) {
+        const receivable = parseFloat(buyer.receivableBalance || "0");
+        if (receivable > 0) {
+          summaryBuyerTotalDue += receivable;
+          const buyerKey = String(buyer.id);
+          buyerDueByNameMap.set(buyerKey, (buyerDueByNameMap.get(buyerKey) || 0) + receivable);
+        }
+      }
+
       const perFarmerSeedDue = new Map<string, number>();
       for (const seedTx of allSeedTransactions) {
         if (!seedTx.createdAt) continue;
