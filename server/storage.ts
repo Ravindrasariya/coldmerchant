@@ -2961,16 +2961,13 @@ export class DatabaseStorage implements IStorage {
         eq(farmerSettlements.settlementDirection, "raw_to_seed")
       ));
     
-    let resolvedFarmerNameForSettlement = normalizedName;
-    if (entryFarmerId) {
-      const [farmerRecord] = await db.select().from(farmers).where(eq(farmers.id, entryFarmerId));
-      if (farmerRecord) {
-        resolvedFarmerNameForSettlement = normalizeName(farmerRecord.name);
-      }
-    }
-    
     for (const settlement of rawToSeedSettlements) {
-      if (normalizeName(settlement.farmerName) === resolvedFarmerNameForSettlement) {
+      const settlementMatches = entryFarmerId
+        ? (settlement.farmerId === entryFarmerId)
+        : (normalizeName(settlement.farmerName) === normalizedName &&
+           normalizeName(settlement.farmerContact) === normalizedContact &&
+           normalizeName(settlement.farmerVillage) === normalizedVillage);
+      if (settlementMatches) {
         seedDueAmount = Math.max(0, seedDueAmount - parseFloat(settlement.settledAmount || "0"));
       }
     }
@@ -3059,6 +3056,7 @@ export class DatabaseStorage implements IStorage {
           userId: userId || null,
           settlementDirection: crossSettlement.direction,
           settledAmount: crossSettlement.settledAmount.toString(),
+          farmerId: entry.farmerId || null,
           farmerName: entry.farmerName || "",
           farmerVillage: entry.farmerVillage,
           farmerContact: entry.farmerContact || null,

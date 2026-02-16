@@ -482,6 +482,7 @@ export const farmerSettlements = pgTable("farmer_settlements", {
   settlementDirection: text("settlement_direction").notNull(), // "raw_to_seed" (paying farmer, offset seed dues) or "seed_to_raw" (receiving seed payment, offset raw potato dues)
   settledAmount: decimal("settled_amount", { precision: 12, scale: 2 }).notNull(),
   // Farmer identity for matching
+  farmerId: integer("farmer_id").references(() => farmers.id),
   farmerName: text("farmer_name").notNull(),
   farmerVillage: text("farmer_village"),
   farmerContact: text("farmer_contact"),
