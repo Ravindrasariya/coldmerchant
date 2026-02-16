@@ -1472,10 +1472,10 @@ export class DatabaseStorage implements IStorage {
             .orderBy(asc(seedTransactions.createdAt));
           
           const seedTxnsWithDue = allSeedTxns.filter(txn => {
-            const matches = entryFarmerId && txn.farmerId === entryFarmerId
-              ? true
+            const matchesFarmer = matchedFarmerId
+              ? (txn.farmerId === matchedFarmerId)
               : farmerCompositeMatch(txn.farmerName, txn.farmerContact || null, txn.village);
-            if (!matches) return false;
+            if (!matchesFarmer) return false;
             const totalDue = parseFloat(txn.totalDueToFarmer || "0");
             return totalDue > 0;
           });
@@ -1507,6 +1507,21 @@ export class DatabaseStorage implements IStorage {
         const normalizedFarmerContact = entry.farmerContact ? normalizeName(entry.farmerContact) : null;
         const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
         
+        const farmerCompositeMatchSE = (name: string | null, contact: string | null, village: string | null) => {
+          if (normalizeName(name) !== normalizedFarmerName) return false;
+          if (normalizeName(contact) !== normalizedFarmerContact) return false;
+          if (normalizeName(village) !== normalizedFarmerVillage) return false;
+          return true;
+        };
+        
+        let matchedFarmerId = entryFarmerId;
+        if (!matchedFarmerId) {
+          const allFarmerRecords = await tx.select().from(farmers)
+            .where(eq(farmers.merchantId, entry.merchantId));
+          const matchedFarmer = allFarmerRecords.find(f => farmerCompositeMatchSE(f.name, f.contact, f.village));
+          matchedFarmerId = matchedFarmer?.id || null;
+        }
+        
         // Get stock entries with due amount (FIFO order by createdAt)
         const allFarmerEntries = await tx.select().from(stockEntries)
           .where(and(
@@ -1515,16 +1530,11 @@ export class DatabaseStorage implements IStorage {
           ))
           .orderBy(asc(stockEntries.createdAt));
         
-        const farmerCompositeMatchSE = (name: string | null, contact: string | null, village: string | null) => {
-          if (normalizeName(name) !== normalizedFarmerName) return false;
-          if (normalizeName(contact) !== normalizedFarmerContact) return false;
-          if (normalizeName(village) !== normalizedFarmerVillage) return false;
-          return true;
-        };
-        
         const farmerEntries = allFarmerEntries.filter(se => {
-          if (entryFarmerId && se.farmerId === entryFarmerId) return true;
-          return farmerCompositeMatchSE(se.farmerName, se.farmerContact, se.village);
+          const matches = matchedFarmerId
+            ? (se.farmerId === matchedFarmerId)
+            : farmerCompositeMatchSE(se.farmerName, se.farmerContact, se.village);
+          return matches;
         });
         
         for (const stockEntry of farmerEntries) {
@@ -2920,7 +2930,7 @@ export class DatabaseStorage implements IStorage {
       contact: string | null | undefined,
       village: string | null | undefined
     ): boolean => {
-      if (entryFarmerId && recordFarmerId === entryFarmerId) return true;
+      if (entryFarmerId) return recordFarmerId === entryFarmerId;
       if (normalizeName(name) !== normalizedName) return false;
       if (normalizedContact && normalizeName(contact) && normalizeName(contact) !== normalizedContact) return false;
       if (normalizedVillage && normalizeName(village) && normalizeName(village) !== normalizedVillage) return false;
@@ -2951,8 +2961,16 @@ export class DatabaseStorage implements IStorage {
         eq(farmerSettlements.settlementDirection, "raw_to_seed")
       ));
     
+    let resolvedFarmerNameForSettlement = normalizedName;
+    if (entryFarmerId) {
+      const [farmerRecord] = await db.select().from(farmers).where(eq(farmers.id, entryFarmerId));
+      if (farmerRecord) {
+        resolvedFarmerNameForSettlement = normalizeName(farmerRecord.name);
+      }
+    }
+    
     for (const settlement of rawToSeedSettlements) {
-      if (normalizeName(settlement.farmerName) === normalizedName) {
+      if (normalizeName(settlement.farmerName) === resolvedFarmerNameForSettlement) {
         seedDueAmount = Math.max(0, seedDueAmount - parseFloat(settlement.settledAmount || "0"));
       }
     }
@@ -3352,10 +3370,10 @@ export class DatabaseStorage implements IStorage {
               .orderBy(asc(seedTransactions.createdAt));
             
             const seedTxnsWithDue = allSeedTxns.filter(txn => {
-              const matches = matchedFarmerId && txn.farmerId === matchedFarmerId
-                ? true
+              const matchesFarmer = matchedFarmerId
+                ? (txn.farmerId === matchedFarmerId)
                 : farmerCompositeMatch(txn.farmerName, txn.farmerContact || null, txn.village);
-              if (!matches) return false;
+              if (!matchesFarmer) return false;
               const totalDue = parseFloat(txn.totalDueToFarmer || "0");
               return totalDue > 0;
             });
@@ -3415,8 +3433,10 @@ export class DatabaseStorage implements IStorage {
             .orderBy(asc(stockEntries.createdAt));
           
           const farmerEntries = allFarmerEntries.filter(se => {
-            if (matchedFarmerId && se.farmerId === matchedFarmerId) return true;
-            return farmerCompositeMatch(se.farmerName, se.farmerContact, se.village);
+            const matches = matchedFarmerId
+              ? (se.farmerId === matchedFarmerId)
+              : farmerCompositeMatch(se.farmerName, se.farmerContact, se.village);
+            return matches;
           });
           
           for (const stockEntry of farmerEntries) {
@@ -3598,7 +3618,7 @@ export class DatabaseStorage implements IStorage {
       const matchesFarmerForReversal = (
         record: { farmerId?: number | null; farmerName: string; farmerContact?: string | null; village?: string | null }
       ) => {
-        if (entryFarmerId && record.farmerId === entryFarmerId) return true;
+        if (entryFarmerId) return record.farmerId === entryFarmerId;
         if (normalizeName(record.farmerName) !== normalizedFarmerName) return false;
         if (normalizeName(record.farmerContact) !== normalizedFarmerContact) return false;
         if (normalizeName(record.village) !== normalizedFarmerVillage) return false;
