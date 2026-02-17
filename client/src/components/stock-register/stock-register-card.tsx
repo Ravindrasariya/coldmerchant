@@ -628,12 +628,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Dialog>
 
       <Card className="border-border">
-        <CardContent className="py-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-
+        <CardContent className="py-3 px-3 sm:px-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground mt-2.5" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2 flex-1">
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger className="w-[90px]" data-testid="filter-year">
+              <SelectTrigger className="text-sm" data-testid="filter-year">
                 <SelectValue placeholder={t("Year", "वर्ष")} />
               </SelectTrigger>
               <SelectContent>
@@ -644,7 +644,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Select>
 
             <Select value={filterSerial} onValueChange={setFilterSerial}>
-              <SelectTrigger className="w-[100px]" data-testid="filter-serial">
+              <SelectTrigger className="text-sm" data-testid="filter-serial">
                 <SelectValue placeholder={t("Serial #", "क्रमांक")} />
               </SelectTrigger>
               <SelectContent>
@@ -661,7 +661,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                   role="combobox"
                   aria-expanded={farmerPopoverOpen}
                   className={cn(
-                    "w-[160px] justify-between h-9 font-normal",
+                    "justify-between font-normal text-sm",
                     !filterFarmer && "text-muted-foreground"
                   )}
                   data-testid="filter-farmer"
@@ -669,10 +669,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                   <span className="truncate">
                     {filterFarmer || t("Farmer", "किसान")}
                   </span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[200px] p-0">
+              <PopoverContent className="w-[220px] p-0">
                 <Command>
                   <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
                   <CommandList>
@@ -707,7 +707,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Popover>
 
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
-              <SelectTrigger className="w-[120px]" data-testid="filter-payment-status">
+              <SelectTrigger className="text-sm" data-testid="filter-payment-status">
                 <SelectValue placeholder={t("Payment", "भुगतान")} />
               </SelectTrigger>
               <SelectContent>
@@ -717,7 +717,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Select>
 
             <Select value={filterQuality} onValueChange={setFilterQuality}>
-              <SelectTrigger className="w-[120px]" data-testid="filter-quality">
+              <SelectTrigger className="text-sm" data-testid="filter-quality">
                 <SelectValue placeholder={t("Quality", "गुणवत्ता")} />
               </SelectTrigger>
               <SelectContent>
@@ -730,7 +730,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Select>
 
             <Select value={filterColdStore} onValueChange={setFilterColdStore}>
-              <SelectTrigger className="w-[140px]" data-testid="filter-cold-store">
+              <SelectTrigger className="text-sm" data-testid="filter-cold-store">
                 <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
               </SelectTrigger>
               <SelectContent>
@@ -741,7 +741,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                 ))}
               </SelectContent>
             </Select>
+            </div>
+          </div>
 
+          <div className="flex flex-wrap items-center gap-2 pl-6">
             <Button
               variant={filterUnsold ? "default" : "outline"}
               size="sm"
@@ -758,7 +761,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                 onClick={clearFilters}
                 data-testid="button-clear-filters"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="h-3.5 w-3.5 mr-1" />
                 {t("Clear", "साफ़ करें")}
               </Button>
             )}
@@ -767,78 +770,86 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card data-testid="card-bags-summary">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Boxes className="h-4 w-4 text-blue-600" />
-              <span className="text-xs font-medium">{t("Bags", "बैग")}</span>
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="border-border shadow-sm" data-testid="card-bags-summary">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950">
+                <Boxes className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <span className="text-sm font-semibold">{t("Bags", "बैग")}</span>
             </div>
-            <div className="flex justify-between items-baseline">
+            <div className="flex justify-between items-end gap-2">
               <div>
-                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-xs font-bold" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}</span>
+                <p className="text-base font-bold leading-tight" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
               </div>
               <div className="text-right">
-                <span className="text-xs text-muted-foreground">{t("Remaining (Unsold)", "बचे (अनबिके)")}</span>
-                <p className="text-xs font-bold text-amber-600" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Remaining", "बचे")}<br className="sm:hidden" /><span className="hidden sm:inline"> </span>{t("(Unsold)", "(अनबिके)")}</span>
+                <p className="text-base font-bold text-amber-600 leading-tight" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card data-testid="card-cost-summary">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <IndianRupee className="h-4 w-4 text-orange-600" />
-              <span className="text-xs font-medium">{t("Total Cost", "कुल लागत")}</span>
+        <Card className="border-border shadow-sm" data-testid="card-cost-summary">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-md bg-orange-50 dark:bg-orange-950">
+                <IndianRupee className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              </div>
+              <span className="text-sm font-semibold">{t("Total Cost", "कुल लागत")}</span>
             </div>
-            <div className="flex justify-between items-baseline">
+            <div className="flex justify-between items-end gap-2">
               <div>
-                <span className="text-xs text-muted-foreground">{t("Total Payable", "कुल देय")}</span>
-                <p className="text-xs font-bold" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total Payable", "कुल देय")}</span>
+                <p className="text-sm font-bold leading-tight" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
-                <span className="text-xs text-muted-foreground">{t("Total Deductions", "कुल कटौती")}</span>
-                <p className="text-xs font-bold text-red-600" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}<br className="sm:hidden" /><span className="hidden sm:inline"> </span>{t("Deductions", "कटौती")}</span>
+                <p className="text-sm font-bold text-red-600 leading-tight" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card data-testid="card-farmer-summary">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="h-4 w-4 text-green-600" />
-              <span className="text-xs font-medium">{t("Farmer", "किसान")}</span>
+        <Card className="border-border shadow-sm" data-testid="card-farmer-summary">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-md bg-green-50 dark:bg-green-950">
+                <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+              <span className="text-sm font-semibold">{t("Farmer", "किसान")}</span>
             </div>
-            <div className="flex justify-between items-baseline">
+            <div className="flex justify-between items-end gap-2">
               <div>
-                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-xs font-bold" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}</span>
+                <p className="text-sm font-bold leading-tight" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
-                <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-xs font-bold text-red-600" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Due", "बाकी")}</span>
+                <p className="text-sm font-bold text-red-600 leading-tight" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card data-testid="card-cold-store-summary">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Building2 className="h-4 w-4 text-purple-600" />
-              <span className="text-xs font-medium">{t("Cold Store", "कोल्ड स्टोर")}</span>
+        <Card className="border-border shadow-sm" data-testid="card-cold-store-summary">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 rounded-md bg-purple-50 dark:bg-purple-950">
+                <Building2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              <span className="text-sm font-semibold">{t("Cold Store", "कोल्ड स्टोर")}</span>
             </div>
-            <div className="flex justify-between items-baseline">
+            <div className="flex justify-between items-end gap-2">
               <div>
-                <span className="text-xs text-muted-foreground">{t("Total", "कुल")}</span>
-                <p className="text-xs font-bold" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}</span>
+                <p className="text-sm font-bold leading-tight" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
               <div className="text-right">
-                <span className="text-xs text-muted-foreground">{t("Due", "बाकी")}</span>
-                <p className="text-xs font-bold text-red-600" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                <span className="text-[11px] text-muted-foreground leading-tight">{t("Due", "बाकी")}</span>
+                <p className="text-sm font-bold text-red-600 leading-tight" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
               </div>
             </div>
           </CardContent>
