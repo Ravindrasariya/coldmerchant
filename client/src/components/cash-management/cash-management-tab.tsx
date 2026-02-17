@@ -1136,7 +1136,7 @@ export function CashManagementTab() {
       
       {/* Summary Cards - Order: Cash Received, Cash Expense, Net Cash in Hand, Account Received, Account Expense, Net in Accounts */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Card data-testid="card-cash-received">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-cash-received">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-green-600 mb-1">
               <Banknote className="h-4 w-4" />
@@ -1146,7 +1146,7 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-cash-expense">
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-cash-expense">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-amber-600 mb-1">
               <ArrowUpRight className="h-4 w-4" />
@@ -1156,7 +1156,7 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-net-cash">
+        <Card className="border-teal-300 dark:border-teal-700" data-testid="card-net-cash">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-teal-600 mb-1">
               <Wallet className="h-4 w-4" />
@@ -1168,7 +1168,7 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-account-received">
+        <Card className="border-blue-300 dark:border-blue-700" data-testid="card-account-received">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-blue-600 mb-1">
               <Building2 className="h-4 w-4" />
@@ -1194,7 +1194,7 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-account-expense">
+        <Card className="border-orange-300 dark:border-orange-700" data-testid="card-account-expense">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-orange-600 mb-1">
               <CreditCard className="h-4 w-4" />
@@ -1220,7 +1220,7 @@ export function CashManagementTab() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-net-account">
+        <Card className="border-indigo-300 dark:border-indigo-700" data-testid="card-net-account">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-indigo-600 mb-1">
               <Building2 className="h-4 w-4" />

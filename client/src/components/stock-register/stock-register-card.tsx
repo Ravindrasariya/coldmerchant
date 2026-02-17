@@ -627,7 +627,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         </DialogContent>
       </Dialog>
 
-      <Card className="border-border">
+      <Card className="border-green-300 dark:border-green-700">
         <CardContent className="py-3 px-3 sm:px-4 space-y-3">
           <div className="flex items-start gap-2">
             <Filter className="h-4 w-4 text-muted-foreground mt-2.5" />
@@ -892,7 +892,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             const isColdStorePaid = coldStoreRemainingDue <= 0 && entryColdStoreTotalCharges > 0;
 
             return (
-              <Card key={entry.id} className="border border-gray-300 dark:border-gray-600 shadow-sm hover-elevate" data-testid={`card-entry-${entry.id}`}>
+              <Card key={entry.id} className="border border-green-300 dark:border-green-700 shadow-sm hover-elevate" data-testid={`card-entry-${entry.id}`}>
                 <CardHeader className="py-3 px-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">

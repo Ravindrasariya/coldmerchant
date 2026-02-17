@@ -316,7 +316,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         </DialogContent>
       </Dialog>
 
-      <Card className="border-border">
+      <Card className="border-green-300 dark:border-green-700">
         <CardContent className="py-3">
           {/* Desktop/Tablet: Single row layout */}
           <div className="hidden md:flex flex-wrap items-center gap-3">
@@ -472,7 +472,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <Card data-testid="card-seed-bags-summary">
+        <Card className="border-blue-300 dark:border-blue-700" data-testid="card-seed-bags-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Boxes className="h-4 w-4 text-blue-600" />
@@ -491,7 +491,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           </CardContent>
         </Card>
 
-        <Card data-testid="card-seed-supplier-summary">
+        <Card className="border-orange-300 dark:border-orange-700" data-testid="card-seed-supplier-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Users className="h-4 w-4 text-green-600" />
@@ -510,7 +510,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           </CardContent>
         </Card>
 
-        <Card data-testid="card-seed-cold-store-summary">
+        <Card className="border-purple-300 dark:border-purple-700" data-testid="card-seed-cold-store-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Building2 className="h-4 w-4 text-purple-600" />
@@ -529,7 +529,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           </CardContent>
         </Card>
 
-        <Card data-testid="card-seed-extra-cost-summary">
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-seed-extra-cost-summary">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-4 w-4 text-orange-600" />
@@ -578,7 +578,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             });
             
             return (
-              <Card key={entry.id} className="border-border/60 shadow-sm hover-elevate" data-testid={`seed-entry-card-${entry.id}`}>
+              <Card key={entry.id} className="border border-green-300 dark:border-green-700 shadow-sm hover-elevate" data-testid={`seed-entry-card-${entry.id}`}>
                 <CardHeader className="py-3 px-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">

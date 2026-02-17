@@ -362,7 +362,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
           {t("Load Seed Truck", "बीज ट्रक लोड करें")}
         </Button>
 
-        <Card className="flex-1">
+        <Card className="flex-1 border-orange-300 dark:border-orange-700">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -490,7 +490,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Card>
+        <Card className="border-blue-300 dark:border-blue-700">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <FileText className="h-3.5 w-3.5" />
@@ -506,7 +506,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-green-300 dark:border-green-700">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <IndianRupee className="h-3.5 w-3.5" />
@@ -515,7 +515,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             <div className="text-lg font-semibold text-green-600">₹{summary.totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-orange-300 dark:border-orange-700">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Receipt className="h-3.5 w-3.5" />
@@ -524,7 +524,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             <div className="text-lg font-semibold">₹{summary.totalCost.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-teal-300 dark:border-teal-700">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               {summary.totalProfitLoss >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
@@ -535,7 +535,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-purple-300 dark:border-purple-700">
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Clock className="h-3.5 w-3.5" />
@@ -575,7 +575,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             const potatoTypes = Array.from(new Set(txn.items.map(item => item.potatoType).filter(Boolean))) as string[];
             
             return (
-              <Card key={txn.id} className="hover-elevate" data-testid={`seed-txn-card-${txn.id}`}>
+              <Card key={txn.id} className="border border-orange-300 dark:border-orange-700 hover-elevate" data-testid={`seed-txn-card-${txn.id}`}>
                 <CardContent className="p-4">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="flex-1 min-w-0 space-y-3">

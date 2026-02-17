@@ -326,7 +326,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
 
-        <Card className="flex-1">
+        <Card className="flex-1 border-orange-300 dark:border-orange-700">
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -403,7 +403,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       {/* Summary Cards */}
       {filteredTransactions && filteredTransactions.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Card>
+          <Card className="border-blue-300 dark:border-blue-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                 <IndianRupee className="h-4 w-4" />
@@ -419,7 +419,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-orange-300 dark:border-orange-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                 <Receipt className="h-4 w-4" />
@@ -430,7 +430,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-green-300 dark:border-green-700">
             <CardContent className="p-4">
               {(() => {
                 const totalPL = filteredTransactions.reduce((sum, txn) => {
@@ -460,7 +460,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               })()}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-teal-300 dark:border-teal-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                 <Wallet className="h-4 w-4" />
@@ -471,7 +471,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-purple-300 dark:border-purple-700">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
                 <CreditCard className="h-4 w-4" />
@@ -570,7 +570,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   const bagTypes = Array.from(new Set(transaction.items.map(item => item.potatoType).filter(Boolean))) as string[];
 
   return (
-    <Card className="border border-gray-300 dark:border-gray-600 hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
+    <Card className="border border-orange-300 dark:border-orange-700 hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
       <CardContent className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-3">

@@ -609,27 +609,27 @@ export function FarmerLedgerTab() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
-        <Card className="p-4">
+        <Card className="border-blue-300 dark:border-blue-700 p-4">
           <div className="text-xs text-muted-foreground">{t("Farmers", "किसान")}</div>
           <div className="text-sm font-bold mt-1" data-testid="summary-farmer-count">{summary.count}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="border-purple-300 dark:border-purple-700 p-4">
           <div className="text-xs text-muted-foreground">{t("PY Receivable", "पिछले वर्ष प्राप्य")}</div>
           <div className="text-sm font-bold mt-1" data-testid="summary-py-receivable">{formatCurrency(summary.totalPyReceivable)}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="border-green-300 dark:border-green-700 p-4">
           <div className="text-xs text-muted-foreground">{t("Harvest Due", "फसल बकाया")}</div>
           <div className="text-sm font-bold mt-1 text-green-600 dark:text-green-400" data-testid="summary-harvest-due">{formatCurrency(summary.totalHarvestDue)}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="border-red-300 dark:border-red-700 p-4">
           <div className="text-xs text-muted-foreground">{t("Seed Due", "बीज बकाया")}</div>
           <div className="text-sm font-bold mt-1 text-red-600 dark:text-red-400" data-testid="summary-seed-due">{formatCurrency(summary.totalSeedDue)}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="border-cyan-300 dark:border-cyan-700 p-4">
           <div className="text-xs text-muted-foreground">{t("Cold Due", "कोल्ड बकाया")}</div>
           <div className="text-sm font-bold mt-1 text-blue-600 dark:text-blue-400" data-testid="summary-cold-due">{formatCurrency(summary.totalColdDue)}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="border-orange-300 dark:border-orange-700 p-4">
           <div className="text-xs text-muted-foreground">{t("Net Due", "शुद्ध बकाया")}</div>
           <div className={`text-sm font-bold mt-1 ${summary.totalNetDue >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} data-testid="summary-net-due">
             {formatCurrency(summary.totalNetDue)}
