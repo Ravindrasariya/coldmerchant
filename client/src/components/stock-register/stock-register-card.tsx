@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Boxes, Users, Building2, Download, Check, ChevronsUpDown, IndianRupee } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, Check, ChevronsUpDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -770,87 +770,58 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card className="border-border shadow-sm" data-testid="card-bags-summary">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950">
-                <Boxes className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              </div>
-              <span className="text-sm font-semibold">{t("Bags", "बैग")}</span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <Card className="border-blue-300 dark:border-blue-700" data-testid="card-bags-summary">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
+            <div className="text-sm font-bold mt-1" data-testid="text-bags-total">
+              {summaryTotals.bagsTotal.toLocaleString()} / {summaryTotals.bagsRemaining.toLocaleString()} {t("bags", "बैग")}
             </div>
-            <div className="flex justify-between items-end gap-2">
-              <div>
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}</span>
-                <p className="text-base font-bold leading-tight" data-testid="text-bags-total">{summaryTotals.bagsTotal.toLocaleString()}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Remaining", "बचे")}<br className="sm:hidden" /><span className="hidden sm:inline"> </span>{t("(Unsold)", "(अनबिके)")}</span>
-                <p className="text-base font-bold text-amber-600 leading-tight" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</p>
-              </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
+              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-sm" data-testid="card-cost-summary">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-md bg-orange-50 dark:bg-orange-950">
-                <IndianRupee className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-              </div>
-              <span className="text-sm font-semibold">{t("Total Cost", "कुल लागत")}</span>
+        <Card className="border-orange-300 dark:border-orange-700" data-testid="card-cost-summary">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Total Cost", "कुल लागत")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Payable", "देय")}: </span>
+              <span className="font-medium" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
-            <div className="flex justify-between items-end gap-2">
-              <div>
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total Payable", "कुल देय")}</span>
-                <p className="text-sm font-bold leading-tight" data-testid="text-cost-payable">₹{summaryTotals.totalPayable.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}<br className="sm:hidden" /><span className="hidden sm:inline"> </span>{t("Deductions", "कटौती")}</span>
-                <p className="text-sm font-bold text-red-600 leading-tight" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-              </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Deductions", "कटौती")}: </span>
+              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-cost-deductions">₹{summaryTotals.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-sm" data-testid="card-farmer-summary">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-md bg-green-50 dark:bg-green-950">
-                <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
-              </div>
-              <span className="text-sm font-semibold">{t("Farmer", "किसान")}</span>
+        <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-summary">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Farmer", "किसान")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
-            <div className="flex justify-between items-end gap-2">
-              <div>
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold leading-tight" data-testid="text-farmer-total">₹{summaryTotals.farmerTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Due", "बाकी")}</span>
-                <p className="text-sm font-bold text-red-600 leading-tight" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-              </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
+              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-farmer-due">₹{summaryTotals.farmerDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-sm" data-testid="card-cold-store-summary">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="p-1.5 rounded-md bg-purple-50 dark:bg-purple-950">
-                <Building2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              </div>
-              <span className="text-sm font-semibold">{t("Cold Store", "कोल्ड स्टोर")}</span>
+        <Card className="border-purple-300 dark:border-purple-700" data-testid="card-cold-store-summary">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
-            <div className="flex justify-between items-end gap-2">
-              <div>
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Total", "कुल")}</span>
-                <p className="text-sm font-bold leading-tight" data-testid="text-cold-total">₹{summaryTotals.coldStoreTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-[11px] text-muted-foreground leading-tight">{t("Due", "बाकी")}</span>
-                <p className="text-sm font-bold text-red-600 leading-tight" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-              </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
+              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
           </CardContent>
         </Card>
