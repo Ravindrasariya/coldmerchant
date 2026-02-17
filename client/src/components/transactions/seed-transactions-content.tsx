@@ -363,119 +363,122 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
         </Button>
 
         <Card className="flex-1 border-orange-300 dark:border-orange-700">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-              </div>
-              
-              <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger className="w-24 h-9" data-testid="filter-seed-year">
-                  <SelectValue placeholder={t("Year", "वर्ष")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableYears.map(year => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Input
-                placeholder={t("Transaction #", "लेनदेन #")}
-                value={filterTxnNumber}
-                onChange={(e) => setFilterTxnNumber(e.target.value)}
-                className="w-28 h-9"
-                data-testid="filter-seed-txn-number"
-              />
-
-              <Input
-                placeholder={t("Serial #", "सीरियल #")}
-                value={filterSerialNumber}
-                onChange={(e) => setFilterSerialNumber(e.target.value)}
-                className="w-24 h-9"
-                data-testid="filter-seed-serial-number"
-              />
+          <CardContent className="py-3 px-3 sm:px-4">
+            <div className="flex items-start gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground mt-2.5" />
+              <div className="grid grid-cols-2 gap-2 flex-1 sm:flex sm:flex-wrap sm:items-center">
+                <Select value={filterYear} onValueChange={setFilterYear}>
+                  <SelectTrigger className="text-sm sm:w-[100px]" data-testid="filter-seed-year">
+                    <SelectValue placeholder={t("Year", "वर्ष")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map(year => (
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 
-              <Popover open={farmerDropdownOpen} onOpenChange={setFarmerDropdownOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={farmerDropdownOpen}
-                    className="w-44 h-9 justify-between font-normal"
-                    data-testid="filter-seed-farmer"
-                  >
-                    {filterFarmer || t("Farmer", "किसान")}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <Input
+                  placeholder={t("Transaction #", "लेनदेन #")}
+                  value={filterTxnNumber}
+                  onChange={(e) => setFilterTxnNumber(e.target.value)}
+                  className="text-sm sm:w-[120px]"
+                  data-testid="filter-seed-txn-number"
+                />
+
+                <Input
+                  placeholder={t("Serial #", "सीरियल #")}
+                  value={filterSerialNumber}
+                  onChange={(e) => setFilterSerialNumber(e.target.value)}
+                  className="text-sm sm:w-[100px]"
+                  data-testid="filter-seed-serial-number"
+                />
+                  
+                <Popover open={farmerDropdownOpen} onOpenChange={setFarmerDropdownOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={farmerDropdownOpen}
+                      className={cn(
+                        "justify-between font-normal text-sm sm:w-[130px]",
+                        !filterFarmer && "text-muted-foreground"
+                      )}
+                      data-testid="filter-seed-farmer"
+                    >
+                      <span className="truncate">
+                        {filterFarmer || t("Farmer", "किसान")}
+                      </span>
+                      <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[220px] p-0">
+                    <Command>
+                      <CommandInput 
+                        placeholder={t("Search farmer...", "किसान खोजें...")} 
+                        value={filterFarmer}
+                        onValueChange={setFilterFarmer}
+                      />
+                      <CommandList>
+                        <CommandEmpty>{t("No farmer found", "कोई किसान नहीं मिला")}</CommandEmpty>
+                        <CommandGroup>
+                          {farmerOptions
+                            .filter(f => f.name.toLowerCase().includes(filterFarmer.toLowerCase()))
+                            .map(farmer => (
+                              <CommandItem
+                                key={farmer.name}
+                                value={farmer.name}
+                                onSelect={(value) => {
+                                  setFilterFarmer(value === filterFarmer ? "" : value);
+                                  setFarmerDropdownOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", filterFarmer === farmer.name ? "opacity-100" : "opacity-0")} />
+                                <div className="flex flex-col flex-1">
+                                  <span className="font-medium">{farmer.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {farmer.village || ""}
+                                    {farmer.village && farmer.contact && " • "}
+                                    {farmer.contact || ""}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+
+                <Select value={filterPaymentDue} onValueChange={setFilterPaymentDue}>
+                  <SelectTrigger className="text-sm sm:w-[110px]" data-testid="filter-seed-payment-due">
+                    <SelectValue placeholder={t("Payment", "भुगतान")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("All", "सभी")}</SelectItem>
+                    <SelectItem value="due">{t("Due", "बकाया")}</SelectItem>
+                    <SelectItem value="paid">{t("Paid", "भुगतान")}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
+                    <X className="h-4 w-4 mr-1" />
+                    {t("Clear", "साफ़ करें")}
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-44 p-0">
-                  <Command>
-                    <CommandInput 
-                      placeholder={t("Search farmer...", "किसान खोजें...")} 
-                      value={filterFarmer}
-                      onValueChange={setFilterFarmer}
-                    />
-                    <CommandList>
-                      <CommandEmpty>{t("No farmer found", "कोई किसान नहीं मिला")}</CommandEmpty>
-                      <CommandGroup>
-                        {farmerOptions
-                          .filter(f => f.name.toLowerCase().includes(filterFarmer.toLowerCase()))
-                          .map(farmer => (
-                            <CommandItem
-                              key={farmer.name}
-                              value={farmer.name}
-                              onSelect={(value) => {
-                                setFilterFarmer(value === filterFarmer ? "" : value);
-                                setFarmerDropdownOpen(false);
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", filterFarmer === farmer.name ? "opacity-100" : "opacity-0")} />
-                              <div className="flex flex-col flex-1">
-                                <span className="font-medium">{farmer.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {farmer.village || ""}
-                                  {farmer.village && farmer.contact && " • "}
-                                  {farmer.contact || ""}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                )}
 
-              <Select value={filterPaymentDue} onValueChange={setFilterPaymentDue}>
-                <SelectTrigger className="w-32 h-9" data-testid="filter-seed-payment-due">
-                  <SelectValue placeholder={t("Payment", "भुगतान")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("All", "सभी")}</SelectItem>
-                  <SelectItem value="due">{t("Due", "बकाया")}</SelectItem>
-                  <SelectItem value="paid">{t("Paid", "भुगतान")}</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-seed-filters">
-                  <X className="h-4 w-4 mr-1" />
-                  {t("Clear", "साफ़ करें")}
-                </Button>
-              )}
-
-              {/* Desktop/Tablet: Download button at end of filter row */}
-              <div className="hidden md:flex flex-1 justify-end">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDownloadDialogOpen(true)}
-                  title={t("Download CSV", "CSV डाउनलोड")}
-                  data-testid="button-seed-txn-download-filter-row"
-                >
-                  <Download className="h-5 w-5" />
-                </Button>
+                <div className="hidden md:flex flex-1 justify-end">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDownloadDialogOpen(true)}
+                    title={t("Download CSV", "CSV डाउनलोड")}
+                    data-testid="button-seed-txn-download-filter-row"
+                  >
+                    <Download className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
