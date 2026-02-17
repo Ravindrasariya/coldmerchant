@@ -132,7 +132,6 @@ export interface IStorage {
   getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]>;
   countCashEntriesByCodePrefix(merchantId: number, prefix: string): Promise<number>;
   getMaxCashCodeSequence(merchantId: number, prefix: string): Promise<number>;
-  createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
   getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
@@ -944,11 +943,6 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return maxSeq;
-  }
-
-  async createCashEntry(entry: InsertCashEntry): Promise<CashEntry> {
-    const [created] = await db.insert(cashEntries).values(entry).returning();
-    return created;
   }
 
   async createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation> {
