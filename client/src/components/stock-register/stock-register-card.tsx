@@ -631,9 +631,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <CardContent className="py-3 px-3 sm:px-4 space-y-3">
           <div className="flex items-start gap-2">
             <Filter className="h-4 w-4 text-muted-foreground mt-2.5" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2 flex-1">
+            <div className="grid grid-cols-2 gap-2 flex-1 sm:flex sm:flex-wrap sm:items-center">
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger className="text-sm" data-testid="filter-year">
+              <SelectTrigger className="text-sm sm:w-[100px]" data-testid="filter-year">
                 <SelectValue placeholder={t("Year", "वर्ष")} />
               </SelectTrigger>
               <SelectContent>
@@ -644,7 +644,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Select>
 
             <Select value={filterSerial} onValueChange={setFilterSerial}>
-              <SelectTrigger className="text-sm" data-testid="filter-serial">
+              <SelectTrigger className="text-sm sm:w-[100px]" data-testid="filter-serial">
                 <SelectValue placeholder={t("Serial #", "क्रमांक")} />
               </SelectTrigger>
               <SelectContent>
@@ -661,7 +661,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                   role="combobox"
                   aria-expanded={farmerPopoverOpen}
                   className={cn(
-                    "justify-between font-normal text-sm",
+                    "justify-between font-normal text-sm sm:w-[130px]",
                     !filterFarmer && "text-muted-foreground"
                   )}
                   data-testid="filter-farmer"
@@ -707,7 +707,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Popover>
 
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
-              <SelectTrigger className="text-sm" data-testid="filter-payment-status">
+              <SelectTrigger className="text-sm sm:w-[110px]" data-testid="filter-payment-status">
                 <SelectValue placeholder={t("Payment", "भुगतान")} />
               </SelectTrigger>
               <SelectContent>
@@ -717,7 +717,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Select>
 
             <Select value={filterQuality} onValueChange={setFilterQuality}>
-              <SelectTrigger className="text-sm" data-testid="filter-quality">
+              <SelectTrigger className="text-sm sm:w-[100px]" data-testid="filter-quality">
                 <SelectValue placeholder={t("Quality", "गुणवत्ता")} />
               </SelectTrigger>
               <SelectContent>
@@ -730,7 +730,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             </Select>
 
             <Select value={filterColdStore} onValueChange={setFilterColdStore}>
-              <SelectTrigger className="text-sm" data-testid="filter-cold-store">
+              <SelectTrigger className="text-sm sm:w-[120px]" data-testid="filter-cold-store">
                 <SelectValue placeholder={t("Cold Store", "कोल्ड स्टोर")} />
               </SelectTrigger>
               <SelectContent>
@@ -741,10 +741,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                 ))}
               </SelectContent>
             </Select>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2 pl-6">
             <Button
               variant={filterUnsold ? "default" : "outline"}
               size="sm"
@@ -765,6 +762,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                 {t("Clear", "साफ़ करें")}
               </Button>
             )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -775,7 +773,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
             <div className="text-sm font-bold mt-1" data-testid="text-bags-total">
-              {summaryTotals.bagsTotal.toLocaleString()} / {summaryTotals.bagsRemaining.toLocaleString()} {t("bags", "बैग")}
+              {summaryTotals.bagsTotal.toLocaleString()} {t("bags", "बैग")}
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
