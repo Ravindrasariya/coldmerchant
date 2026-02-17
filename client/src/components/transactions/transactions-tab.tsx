@@ -409,7 +409,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 <IndianRupee className="h-4 w-4" />
                 {t("Total Revenue", "कुल राजस्व")}
               </div>
-              <p className="text-lg font-bold">
+              <p className="text-sm sm:text-lg font-bold">
                 ₹{filteredTransactions.reduce((sum, txn) => {
                   const rev = txn.revenue 
                     ? parseFloat(txn.revenue) 
@@ -425,7 +425,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 <Receipt className="h-4 w-4" />
                 {t("Total Cost", "कुल लागत")}
               </div>
-              <p className="text-lg font-bold">
+              <p className="text-sm sm:text-lg font-bold">
                 ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
@@ -452,7 +452,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                       )}
                       {t("Total P&L", "कुल लाभ/हानि")}
                     </div>
-                    <p className={`text-lg font-bold ${totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <p className={`text-sm sm:text-lg font-bold ${totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {totalPL >= 0 ? "+" : ""}₹{Math.abs(totalPL).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </p>
                   </>
@@ -466,7 +466,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 <Wallet className="h-4 w-4" />
                 {t("Total Paid", "कुल भुगतान")}
               </div>
-              <p className="text-lg font-bold text-green-600">
+              <p className="text-sm sm:text-lg font-bold text-green-600">
                 ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.amountReceived || "0")), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
@@ -477,7 +477,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 <CreditCard className="h-4 w-4" />
                 {t("Total Due", "कुल बकाया")}
               </div>
-              <p className="text-lg font-bold text-orange-600">
+              <p className="text-sm sm:text-lg font-bold text-orange-600">
                 ₹{Math.max(0, filteredTransactions.reduce((sum, txn) => {
                   const rev = txn.revenue 
                     ? parseFloat(txn.revenue) 
