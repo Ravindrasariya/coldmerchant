@@ -1083,11 +1083,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]> {
-    // Get all lots with cold store charges that have not been fully paid
-    const allLots = await db.select().from(lots)
-      .where(eq(lots.merchantId, merchantId));
+    const [allHarvestLots, allSeedLots] = await Promise.all([
+      db.select().from(lots).where(eq(lots.merchantId, merchantId)),
+      db.select().from(seedLots).where(eq(seedLots.merchantId, merchantId)),
+    ]);
     
-    // Helper to calculate cold store related charges from the charges array
     const getColdStoreChargesFromArray = (charges: unknown): number => {
       if (!Array.isArray(charges)) return 0;
       const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
@@ -1096,34 +1096,39 @@ export class DatabaseStorage implements IStorage {
         .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
     };
     
-    // Group by normalized coldStoreName (case-insensitive, trimmed) and calculate dues
     const coldStoreMap = new Map<string, { displayName: string; totalDue: number; lotCount: number }>();
     
-    for (const lot of allLots) {
-      const normalizedName = normalizeName(lot.coldStoreName || "");
-      if (!normalizedName) continue;
-      
-      // Get cold store charges from the charges array
-      const totalCharges = getColdStoreChargesFromArray(lot.charges);
-      
-      // Skip lots with no charges at all
-      if (totalCharges <= 0) continue;
-      const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
-      const due = totalCharges - paidAmount;
-      
-      if (due <= 0) continue; // Skip fully paid lots
-      
+    const addToMap = (normalizedName: string, displayName: string, due: number) => {
       const existing = coldStoreMap.get(normalizedName);
       if (existing) {
         existing.totalDue += due;
         existing.lotCount += 1;
       } else {
-        coldStoreMap.set(normalizedName, {
-          displayName: (lot.coldStoreName || "").trim(), // Keep original casing but trim spaces
-          totalDue: due,
-          lotCount: 1,
-        });
+        coldStoreMap.set(normalizedName, { displayName, totalDue: due, lotCount: 1 });
       }
+    };
+    
+    for (const lot of allHarvestLots) {
+      const normalizedName = normalizeName(lot.coldStoreName || "");
+      if (!normalizedName) continue;
+      const totalCharges = getColdStoreChargesFromArray(lot.charges);
+      if (totalCharges <= 0) continue;
+      const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+      const due = totalCharges - paidAmount;
+      if (due <= 0) continue;
+      addToMap(normalizedName, (lot.coldStoreName || "").trim(), due);
+    }
+    
+    for (const sLot of allSeedLots) {
+      const normalizedName = normalizeName(sLot.coldStoreName || "");
+      if (!normalizedName) continue;
+      const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+      const totalCharges = chargesPerBag * (sLot.originalBags || 0);
+      if (totalCharges <= 0) continue;
+      const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
+      const due = totalCharges - paidAmount;
+      if (due <= 0) continue;
+      addToMap(normalizedName, (sLot.coldStoreName || "").trim(), due);
     }
     
     return Array.from(coldStoreMap.entries()).map(([_, data]) => ({
