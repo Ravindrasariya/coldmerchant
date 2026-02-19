@@ -496,7 +496,7 @@ export async function registerRoutes(
       const { paymentStatus, remarks, lots } = req.body;
 
       // Validate charges in lots if present using CHARGE_TYPES
-      const validChargeTypes = ["Advance", "Bag Charges", "Cold Charges", "Freight Charges", "Grading Charges", "Hammali Charges", "Kata Charges", "Other Charges", "Ware House Charges"];
+      const validChargeTypes = ["Advance", "Bag Charges", "Cold Charges", "Freight Charges", "Grading Charges", "Hammali Charges", "Kata Charges", "Other Charges", "Pesticide Charges", "Ware House Charges"];
       if (lots && Array.isArray(lots)) {
         for (const lot of lots) {
           if (lot.charges && Array.isArray(lot.charges)) {
@@ -610,6 +610,30 @@ export async function registerRoutes(
             }
             if (existingLot && lotData.coldStoreLotNumber !== undefined) {
               compareField('coldStoreLotNumber', existingLot.coldStoreLotNumber, lotData.coldStoreLotNumber, lotLabel, 'lot', lotData.id);
+            }
+
+            // Track charges array changes
+            if (existingLot && lotData.charges !== undefined) {
+              const oldCharges: Array<{type: string; amount: number}> = (existingLot.charges as any) || [];
+              const newCharges: Array<{type: string; amount: number}> = lotData.charges || [];
+              const oldMap = new Map(oldCharges.map(c => [c.type, c.amount]));
+              const newMap = new Map(newCharges.map(c => [c.type, c.amount]));
+
+              // Detect added or modified charges
+              for (const nc of newCharges) {
+                const oldAmt = oldMap.get(nc.type);
+                if (oldAmt === undefined) {
+                  compareField(`charge:${nc.type}`, null, nc.amount, lotLabel, 'lot', lotData.id);
+                } else if (oldAmt !== nc.amount) {
+                  compareField(`charge:${nc.type}`, oldAmt, nc.amount, lotLabel, 'lot', lotData.id);
+                }
+              }
+              // Detect removed charges
+              for (const oc of oldCharges) {
+                if (!newMap.has(oc.type)) {
+                  compareField(`charge:${oc.type}`, oc.amount, null, lotLabel, 'lot', lotData.id);
+                }
+              }
             }
 
             // Update existing lot

@@ -1019,7 +1019,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                             <ul className="ml-4 mt-1 space-y-0.5">
                               {change.changes.map((fc, fIdx) => (
                                 <li key={fIdx} className="text-muted-foreground">
-                                  {t(fc.field, fc.field)}: 
+                                  {fc.field.startsWith('charge:') ? fc.field.replace('charge:', '') : t(fc.field, fc.field)}: 
                                   <span className="line-through text-destructive/70 mx-1">{fc.oldValue || '—'}</span>
                                   →
                                   <span className="text-primary ml-1">{fc.newValue || '—'}</span>

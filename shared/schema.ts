@@ -70,6 +70,7 @@ export const CHARGE_TYPES = [
   "Hammali Charges",
   "Kata Charges",
   "Other Charges",
+  "Pesticide Charges",
   "Ware House Charges",
 ] as const;
 
