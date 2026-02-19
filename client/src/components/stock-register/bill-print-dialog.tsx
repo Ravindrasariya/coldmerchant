@@ -362,13 +362,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
 
             <!-- Footer -->
             <div style="margin-top: 16px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center;">
-              <p style="font-size: 11px; color: #666; margin: 0 0 6px 0;">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
-              <p style="font-size: 11px; color: #888; font-style: italic; margin: 0 0 4px 0;">
-                This receipt is generated online and does not require any company stamp.
-              </p>
-              <p style="font-size: 11px; color: #888; font-style: italic; margin: 0;">
-                यह रसीद ऑनलाइन जनरेट की गई है और इसे किसी कंपनी की मुहर की आवश्यकता नहीं है।
-              </p>
+              <p style="font-size: 11px; color: #666; margin: 0;">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
             </div>
           </div>
         </body>
@@ -584,12 +578,6 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
 
             <div className="mt-4 pt-2 border-t border-gray-300 text-center">
               <p className="text-xs text-gray-600">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
-              <p className="text-xs text-gray-500 mt-2 italic">
-                This receipt is generated online and does not require any company stamp.
-              </p>
-              <p className="text-xs text-gray-500 italic">
-                यह रसीद ऑनलाइन जनरेट की गई है और इसे किसी कंपनी की मुहर की आवश्यकता नहीं है।
-              </p>
             </div>
           </div>
         </div>
