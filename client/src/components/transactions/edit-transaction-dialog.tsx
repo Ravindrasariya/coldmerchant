@@ -450,7 +450,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {t("Edit Transaction", "लेनदेन संपादित करें")} #{transaction?.transactionNumber}
@@ -542,8 +542,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </div>
               )}
 
-              {/* Header row */}
-              <div className="grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
+              {/* Desktop header row - hidden on mobile */}
+              <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
                 <span>{t("Lot Details", "लॉट विवरण")}</span>
                 <span className="text-right">{t("Bags", "बोरी")}</span>
                 <span className="text-right">{t("Net Weight", "शुद्ध वजन")}</span>
@@ -558,63 +558,140 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 const itemCost = item.netWeight * item.pricePerKg;
                 const itemPL = item.revenue - itemCost;
                 return (
-                  <div key={item.id || `new-${index}`} className="grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
-                    <span className="truncate text-xs">
-                      S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
-                    </span>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.bagsMoved || ""}
-                      onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
-                      className="h-8 text-right no-spinner"
-                      data-testid={`input-item-bags-${index}`}
-                    />
-                    <Input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={item.netWeight || ""}
-                      onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
-                      className="h-8 text-right no-spinner"
-                      placeholder="0"
-                      data-testid={`input-item-weight-${index}`}
-                    />
-                    <div 
-                      className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
-                      data-testid={`text-item-price-${index}`}
-                    >
-                      {item.pricePerKg || 0}
+                  <div key={item.id || `new-${index}`}>
+                    {/* Desktop row */}
+                    <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
+                      <span className="truncate text-xs">
+                        S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
+                      </span>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.bagsMoved || ""}
+                        onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
+                        className="h-8 text-right no-spinner"
+                        data-testid={`input-item-bags-${index}`}
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.netWeight || ""}
+                        onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
+                        className="h-8 text-right no-spinner"
+                        placeholder="0"
+                        data-testid={`input-item-weight-${index}`}
+                      />
+                      <div 
+                        className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                        data-testid={`text-item-price-${index}`}
+                      >
+                        {item.pricePerKg || 0}
+                      </div>
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={item.revenue || ""}
+                        onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
+                        className="h-8 text-right no-spinner"
+                        placeholder="₹0"
+                        data-testid={`input-item-revenue-${index}`}
+                      />
+                      <span className={`text-right text-xs font-medium ${itemPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        {itemPL >= 0 ? "+" : ""}₹{parseFloat(itemPL.toFixed(1)).toLocaleString('en-IN')}
+                      </span>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => handleRemoveItem(index)}
+                        data-testid={`button-remove-item-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={item.revenue || ""}
-                      onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
-                      className="h-8 text-right no-spinner"
-                      placeholder="₹0"
-                      data-testid={`input-item-revenue-${index}`}
-                    />
-                    <span className={`text-right text-xs font-medium ${itemPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                      {itemPL >= 0 ? "+" : ""}₹{parseFloat(itemPL.toFixed(1)).toLocaleString('en-IN')}
-                    </span>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => handleRemoveItem(index)}
-                      data-testid={`button-remove-item-${index}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {/* Mobile card */}
+                    <div className="md:hidden border rounded-md p-3 space-y-2 mb-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs font-medium flex-1">
+                          S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
+                        </span>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-destructive shrink-0"
+                          onClick={() => handleRemoveItem(index)}
+                          data-testid={`button-remove-item-mobile-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">{t("Bags", "बोरी")}</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.bagsMoved || ""}
+                            onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
+                            className="h-8 text-center no-spinner"
+                            data-testid={`input-item-bags-m-${index}`}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">{t("Net Wt", "शुद्ध वजन")}</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={item.netWeight || ""}
+                            onChange={(e) => handleNetWeightChange(index, parseFloat(e.target.value) || 0)}
+                            className="h-8 text-center no-spinner"
+                            placeholder="0"
+                            data-testid={`input-item-weight-m-${index}`}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">{t("Price/kg", "मूल्य/किग्रा")}</Label>
+                          <div 
+                            className="h-8 flex items-center justify-center px-2 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                            data-testid={`text-item-price-m-${index}`}
+                          >
+                            {item.pricePerKg || 0}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">{t("Revenue", "राजस्व")}</Label>
+                          <Input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={item.revenue || ""}
+                            onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
+                            className="h-8 text-center no-spinner"
+                            placeholder="₹0"
+                            data-testid={`input-item-revenue-m-${index}`}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">{t("P&L", "लाभ/हानि")}</Label>
+                          <div className={`h-8 flex items-center justify-center rounded-md text-sm font-medium ${itemPL >= 0 ? "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30" : "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30"}`}>
+                            {itemPL >= 0 ? "+" : ""}₹{parseFloat(itemPL.toFixed(1)).toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
 
-              {/* Totals row - aligned with inputs */}
-              <div className="grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
+              {/* Desktop totals row */}
+              <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
                 <span>{t("Total", "कुल")}</span>
                 <span className="text-right h-8 flex items-center justify-end">
                   {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)}
@@ -636,6 +713,30 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </span>
                 <span></span>
               </div>
+              {/* Mobile totals */}
+              <div className="md:hidden border-t pt-2 mt-2">
+                <div className="grid grid-cols-4 gap-2 text-xs font-medium">
+                  <div className="text-center">
+                    <span className="text-muted-foreground block">{t("Bags", "बोरी")}</span>
+                    <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-muted-foreground block">{t("Weight", "वजन")}</span>
+                    <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-muted-foreground block">{t("Revenue", "राजस्व")}</span>
+                    <span>₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-muted-foreground block">{t("P&L", "लाभ/हानि")}</span>
+                    <span className={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "+" : ""}
+                      ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0).toFixed(1)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               {hasItemChanges && (
                 <Button 
@@ -653,7 +754,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="partyName"
@@ -729,7 +830,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="advancePayment"
@@ -768,7 +869,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="transportationCharges"

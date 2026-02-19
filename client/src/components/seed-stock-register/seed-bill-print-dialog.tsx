@@ -161,7 +161,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Seed Purchase Receipt / बीज खरीद रसीद #{entry.serialNumber}</DialogTitle>
         </DialogHeader>

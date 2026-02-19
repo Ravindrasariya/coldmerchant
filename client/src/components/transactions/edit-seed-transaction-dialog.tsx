@@ -352,7 +352,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {t("Edit Seed Transaction", "बीज लेनदेन संपादित करें")} #{transaction?.transactionNumber}

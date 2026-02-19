@@ -177,7 +177,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {t("Edit Seed Stock Entry", "बीज स्टॉक एंट्री संपादित करें")} #{entry.serialNumber}
