@@ -215,7 +215,7 @@ const renderOuterLabel = (formatter: (v: number) => string, colors: string[]) =>
     cx: number; cy: number; midAngle: number; outerRadius: number;
     index: number; name: string; value: number;
   }) => {
-    const radius = outerRadius + 18;
+    const radius = outerRadius + 20;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     const anchor = midAngle > 90 && midAngle < 270 ? "end" : "start";
@@ -226,6 +226,19 @@ const renderOuterLabel = (formatter: (v: number) => string, colors: string[]) =>
         <tspan x={x} dy="1.15em" style={{ fontSize: "10px", fontWeight: 500 }}>{shortName(name)}</tspan>
       </text>
     );
+  };
+
+const renderShortLabelLine = (colors: string[]) =>
+  ({ cx, cy, midAngle, outerRadius, index }: {
+    cx: number; cy: number; midAngle: number; outerRadius: number; index: number;
+  }) => {
+    const startR = outerRadius + 2;
+    const endR = outerRadius + 12;
+    const x1 = cx + startR * Math.cos(-midAngle * RADIAN);
+    const y1 = cy + startR * Math.sin(-midAngle * RADIAN);
+    const x2 = cx + endR * Math.cos(-midAngle * RADIAN);
+    const y2 = cy + endR * Math.sin(-midAngle * RADIAN);
+    return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={colors[index % colors.length]} strokeWidth={1.5} />;
   };
 
 export function DashboardTab() {
@@ -748,7 +761,7 @@ export function DashboardTab() {
                     cx="50%"
                     cy="50%"
                     outerRadius={55}
-                    labelLine={false}
+                    labelLine={renderShortLabelLine(PIE_COLORS)}
                     label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
                   >
                     {coldStoreBagsSplit.total.map((_, i) => (
@@ -781,7 +794,7 @@ export function DashboardTab() {
                     cx="50%"
                     cy="50%"
                     outerRadius={55}
-                    labelLine={false}
+                    labelLine={renderShortLabelLine(PIE_COLORS)}
                     label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
                   >
                     {coldStoreBagsSplit.remaining.map((_, i) => (
@@ -816,7 +829,7 @@ export function DashboardTab() {
                     cx="50%"
                     cy="50%"
                     outerRadius={55}
-                    labelLine={false}
+                    labelLine={renderShortLabelLine(PIE_COLORS)}
                     label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
                   >
                     {farmerDueByCrop.map((_, i) => (
@@ -849,7 +862,7 @@ export function DashboardTab() {
                     cx="50%"
                     cy="50%"
                     outerRadius={55}
-                    labelLine={false}
+                    labelLine={renderShortLabelLine(PIE_COLORS)}
                     label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
                   >
                     {buyerDueByName.map((_, i) => (
