@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { ChevronDown, Loader2 } from "lucide-react";
 import type { ChartConfig } from "@/components/ui/chart";
 
@@ -202,6 +202,19 @@ const MONTHS_HI = ["जन", "फर", "मार्च", "अप्रै", "�
 const formatINR = (value: number) => `₹${new Intl.NumberFormat('en-IN').format(Math.round(value))}`;
 
 const PIE_COLORS = ["#2563eb", "#f97316", "#dc2626", "#059669", "#7c3aed", "#0891b2", "#be185d", "#4f46e5", "#ca8a04", "#0d9488"];
+
+const shortName = (name: string) => {
+  const words = name.split(/\s+/);
+  return words.length > 2 ? words.slice(0, 2).join(" ") : name;
+};
+
+const renderTwoLineLabel = (formatter: (v: number) => string) =>
+  ({ x, y, name, value }: { x: number; y: number; name: string; value: number }) => (
+    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: "11px", fill: "var(--foreground)" }}>
+      <tspan x={x} dy="-0.4em">{formatter(value)}</tspan>
+      <tspan x={x} dy="1.2em" style={{ fontSize: "10px" }}>{shortName(name)}</tspan>
+    </text>
+  );
 
 export function DashboardTab() {
   const { user } = useAuth();
@@ -714,28 +727,22 @@ export function DashboardTab() {
           </CardHeader>
           <CardContent className="p-3">
             {coldStoreBagsSplit.total.length > 0 ? (
-              <ChartContainer config={coldStoreTotalPieConfig} className="h-[250px] w-full">
+              <ChartContainer config={coldStoreTotalPieConfig} className="h-[200px] w-full">
                 <PieChart>
                   <Pie
                     data={coldStoreBagsSplit.total}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
-                    cy="40%"
+                    cy="50%"
                     outerRadius={65}
-                    label={({ value }) => `${value}`}
+                    label={renderTwoLineLabel((v) => `${v}`)}
                   >
                     {coldStoreBagsSplit.total.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    wrapperStyle={{ fontSize: "11px", lineHeight: "18px" }}
-                    formatter={(value: string) => <span style={{ color: "var(--foreground)" }}>{value}</span>}
-                  />
                 </PieChart>
               </ChartContainer>
             ) : (
@@ -752,28 +759,22 @@ export function DashboardTab() {
           </CardHeader>
           <CardContent className="p-3">
             {coldStoreBagsSplit.remaining.length > 0 ? (
-              <ChartContainer config={coldStoreRemPieConfig} className="h-[250px] w-full">
+              <ChartContainer config={coldStoreRemPieConfig} className="h-[200px] w-full">
                 <PieChart>
                   <Pie
                     data={coldStoreBagsSplit.remaining}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
-                    cy="40%"
+                    cy="50%"
                     outerRadius={65}
-                    label={({ value }) => `${value}`}
+                    label={renderTwoLineLabel((v) => `${v}`)}
                   >
                     {coldStoreBagsSplit.remaining.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    wrapperStyle={{ fontSize: "11px", lineHeight: "18px" }}
-                    formatter={(value: string) => <span style={{ color: "var(--foreground)" }}>{value}</span>}
-                  />
                 </PieChart>
               </ChartContainer>
             ) : (
@@ -792,28 +793,22 @@ export function DashboardTab() {
           </CardHeader>
           <CardContent className="p-3">
             {farmerDueByCrop.length > 0 ? (
-              <ChartContainer config={pieChartConfig} className="h-[250px] w-full">
+              <ChartContainer config={pieChartConfig} className="h-[200px] w-full">
                 <PieChart>
                   <Pie
                     data={farmerDueByCrop}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
-                    cy="40%"
+                    cy="50%"
                     outerRadius={65}
-                    label={({ value }) => `${formatINR(value)}`}
+                    label={renderTwoLineLabel((v) => formatINR(v))}
                   >
                     {farmerDueByCrop.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    wrapperStyle={{ fontSize: "11px", lineHeight: "18px" }}
-                    formatter={(value: string) => <span style={{ color: "var(--foreground)" }}>{value}</span>}
-                  />
                 </PieChart>
               </ChartContainer>
             ) : (
@@ -830,28 +825,22 @@ export function DashboardTab() {
           </CardHeader>
           <CardContent className="p-3">
             {buyerDueByName.length > 0 ? (
-              <ChartContainer config={buyerPieConfig} className="h-[250px] w-full">
+              <ChartContainer config={buyerPieConfig} className="h-[200px] w-full">
                 <PieChart>
                   <Pie
                     data={buyerDueByName}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
-                    cy="40%"
+                    cy="50%"
                     outerRadius={65}
-                    label={({ percentage }) => `${percentage}%`}
+                    label={renderTwoLineLabel((v) => formatINR(v))}
                   >
                     {buyerDueByName.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    wrapperStyle={{ fontSize: "11px", lineHeight: "18px" }}
-                    formatter={(value: string) => <span style={{ color: "var(--foreground)" }}>{value}</span>}
-                  />
                 </PieChart>
               </ChartContainer>
             ) : (
