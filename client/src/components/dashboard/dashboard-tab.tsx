@@ -208,13 +208,25 @@ const shortName = (name: string) => {
   return words.length > 2 ? words.slice(0, 2).join(" ") : name;
 };
 
-const renderTwoLineLabel = (formatter: (v: number) => string) =>
-  ({ x, y, name, value }: { x: number; y: number; name: string; value: number }) => (
-    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" style={{ fontSize: "11px", fill: "var(--foreground)" }}>
-      <tspan x={x} dy="-0.4em">{formatter(value)}</tspan>
-      <tspan x={x} dy="1.2em" style={{ fontSize: "10px" }}>{shortName(name)}</tspan>
-    </text>
-  );
+const RADIAN = Math.PI / 180;
+
+const renderOuterLabel = (formatter: (v: number) => string, colors: string[]) =>
+  ({ cx, cy, midAngle, outerRadius, index, name, value }: {
+    cx: number; cy: number; midAngle: number; outerRadius: number;
+    index: number; name: string; value: number;
+  }) => {
+    const radius = outerRadius + 18;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    const anchor = midAngle > 90 && midAngle < 270 ? "end" : "start";
+    const fill = colors[index % colors.length];
+    return (
+      <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" style={{ fontSize: "11px", fontWeight: 600, fill }}>
+        <tspan x={x} dy="-0.5em">{formatter(value)}</tspan>
+        <tspan x={x} dy="1.15em" style={{ fontSize: "10px", fontWeight: 500 }}>{shortName(name)}</tspan>
+      </text>
+    );
+  };
 
 export function DashboardTab() {
   const { user } = useAuth();
@@ -735,8 +747,9 @@ export function DashboardTab() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={65}
-                    label={renderTwoLineLabel((v) => `${v}`)}
+                    outerRadius={55}
+                    labelLine={false}
+                    label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
                   >
                     {coldStoreBagsSplit.total.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -767,8 +780,9 @@ export function DashboardTab() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={65}
-                    label={renderTwoLineLabel((v) => `${v}`)}
+                    outerRadius={55}
+                    labelLine={false}
+                    label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
                   >
                     {coldStoreBagsSplit.remaining.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -801,8 +815,9 @@ export function DashboardTab() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={65}
-                    label={renderTwoLineLabel((v) => formatINR(v))}
+                    outerRadius={55}
+                    labelLine={false}
+                    label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
                   >
                     {farmerDueByCrop.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -833,8 +848,9 @@ export function DashboardTab() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={65}
-                    label={renderTwoLineLabel((v) => formatINR(v))}
+                    outerRadius={55}
+                    labelLine={false}
+                    label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
                   >
                     {buyerDueByName.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
