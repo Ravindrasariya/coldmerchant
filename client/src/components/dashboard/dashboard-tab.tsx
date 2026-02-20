@@ -389,26 +389,19 @@ export function DashboardTab() {
 
   const seedSummary = useMemo(() => {
     if (!seedEntries || !Array.isArray(seedEntries)) {
-      console.log("[Dashboard] seedEntries not available:", seedEntries);
       return { totalBags: 0, remainingBags: 0, totalCost: 0 };
     }
     let totalBags = 0;
     let remainingBags = 0;
     let totalCost = 0;
 
-    console.log("[Dashboard] seedEntries count:", seedEntries.length, "cropFilter:", cropFilter, "years:", selectedYears, "months:", selectedMonths);
-
     seedEntries.forEach(entry => {
       if (cropFilter === "onion") return;
       const dateStr = entry.purchaseDate || (entry as any).purchase_date;
       if (!dateStr || !matchesFilter(dateStr)) {
-        console.log("[Dashboard] Seed entry filtered out:", entry.id, "date:", dateStr);
         return;
       }
       const lots = entry.seedLots || (entry as any).seed_lots || [];
-      if (lots.length === 0) {
-        console.log("[Dashboard] Seed entry has no lots:", entry.id, "keys:", Object.keys(entry));
-      }
       lots.forEach((lot: any) => {
         const origBags = lot.originalBags ?? lot.original_bags ?? 0;
         const remBags = lot.remainingBags ?? lot.remaining_bags ?? 0;
@@ -425,7 +418,6 @@ export function DashboardTab() {
       });
     });
 
-    console.log("[Dashboard] seedSummary result:", { totalBags, remainingBags, totalCost });
     return { totalBags, remainingBags, totalCost };
   }, [seedEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
 
