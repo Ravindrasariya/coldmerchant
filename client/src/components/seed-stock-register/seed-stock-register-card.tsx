@@ -36,6 +36,11 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   const totalExtraCost = hammaliCharges + gradingCharges + transportCharges;
   const soldBags = lot.originalBags - lot.remainingBags;
   
+  // Calculate avgCostPerBag
+  const avgCostPerBag = lot.originalBags > 0
+    ? pricePerBag + coldStoreChargesPerBag + (totalExtraCost / lot.originalBags)
+    : pricePerBag;
+  
   return {
     originalBags: lot.originalBags,
     remainingBags: lot.remainingBags,
@@ -50,6 +55,7 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
     gradingCharges,
     transportCharges,
     totalExtraCost,
+    avgCostPerBag,
   };
 }
 
@@ -208,6 +214,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
       t("Hammali ₹", "हम्माली ₹"),
       t("Grading ₹", "ग्रेडिंग ₹"),
       t("Transport ₹", "परिवहन ₹"),
+      t("Avg Cost/Bag ₹", "औसत लागत/बोरी ₹"),
     ];
 
     const rows: string[][] = [];
@@ -235,6 +242,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           parseFloat(metrics.hammaliCharges.toFixed(1)).toLocaleString('en-IN'),
           parseFloat(metrics.gradingCharges.toFixed(1)).toLocaleString('en-IN'),
           parseFloat(metrics.transportCharges.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(metrics.avgCostPerBag.toFixed(1)).toLocaleString('en-IN'),
         ]);
       });
     });
@@ -718,6 +726,10 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                             <div className="flex items-center gap-1">
                               <span className="text-muted-foreground">{t("Total", "कुल")}:</span>
                               <span className="font-medium">₹{metrics.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-muted-foreground">{t("Avg Cost/Bag", "औसत लागत/बोरी")}:</span>
+                              <span className="font-medium text-blue-600 dark:text-blue-400">₹{metrics.avgCostPerBag.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                             </div>
                             {metrics.coldStoreTotal > 0 && (
                               <div className="flex items-center gap-1">

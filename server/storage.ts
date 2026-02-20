@@ -2832,10 +2832,20 @@ export class DatabaseStorage implements IStorage {
       const [entry] = await db.select().from(seedStockEntries)
         .where(eq(seedStockEntries.id, lot.seedEntryId));
       
+      // Calculate avgCostPerBag
+      const ppb = parseFloat(lot.pricePerBag) || 0;
+      const coldPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+      const hammali = parseFloat(lot.hammaliCharges || "0");
+      const grading = parseFloat(lot.gradingCharges || "0");
+      const transport = parseFloat(lot.transportCharges || "0");
+      const bags = lot.originalBags || 1;
+      const avgCostPerBag = (ppb + coldPerBag + (hammali + grading + transport) / bags).toFixed(2);
+      
       return {
         ...lot,
         serialNumber: entry?.serialNumber || 0,
         supplierName: entry?.supplierName || '',
+        avgCostPerBag,
       };
     }));
 

@@ -27,6 +27,7 @@ interface SeedLotOption {
   bagType: string;
   remainingBags: number;
   pricePerBag: string;
+  avgCostPerBag: string;
 }
 
 interface SeedLotSelection {
@@ -238,6 +239,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
         bagType: item.bagType,
         remainingBags: item.bagsMoved,
         pricePerBag: item.costPerBag,
+        avgCostPerBag: item.costPerBag,
       }));
     
     return [...lotsWithCurrentBags, ...lotsFromTxn];
@@ -265,7 +267,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     selectedLots.forEach(selection => {
       if (selection.seedLotId && selection.bagsMoved > 0) {
         const lotInfo = getLotInfo(selection.seedLotId);
-        const costPerBag = lotInfo ? parseFloat(lotInfo.pricePerBag) : 0;
+        const costPerBag = lotInfo ? parseFloat(lotInfo.avgCostPerBag || lotInfo.pricePerBag) : 0;
         const bags = selection.bagsMoved;
         const revenue = bags * selection.pricePerBag;
         const cost = bags * costPerBag;
@@ -448,13 +450,13 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
               {selectedLots.map((selection, index) => {
                 const lotInfo = getLotInfo(selection.seedLotId);
                 const lineRevenue = selection.bagsMoved * selection.pricePerBag;
-                const lineCost = selection.bagsMoved * (lotInfo ? parseFloat(lotInfo.pricePerBag) : 0);
+                const lineCost = selection.bagsMoved * (lotInfo ? parseFloat(lotInfo.avgCostPerBag || lotInfo.pricePerBag) : 0);
                 const linePL = lineRevenue - lineCost;
 
                 return (
                   <Card key={index}>
                     <CardContent className="p-4">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                         <div className="md:col-span-2 space-y-2">
                           <Label>{t("Select Seed Lot", "बीज लॉट चुनें")}</Label>
                           <Select
@@ -490,27 +492,33 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                         </div>
                         <div className="space-y-2">
                           <Label>{t("Price/Bag", "मूल्य/बैग")}</Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              step="any"
-                              value={selection.pricePerBag || ""}
-                              onChange={(e) => updateLotSelection(index, "pricePerBag", parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              data-testid={`input-edit-seed-price-${index}`}
-                            />
-                            {selectedLots.length > 1 && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeLotSelection(index)}
-                                data-testid={`button-edit-remove-seed-lot-${index}`}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            )}
+                          <Input
+                            type="number"
+                            step="any"
+                            value={selection.pricePerBag || ""}
+                            onChange={(e) => updateLotSelection(index, "pricePerBag", parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                            data-testid={`input-edit-seed-price-${index}`}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground">{t("Cost/Bag", "लागत/बैग")}</Label>
+                          <div className="h-9 flex items-center px-3 rounded-md bg-muted text-sm">
+                            ₹{(lotInfo ? parseFloat(lotInfo.avgCostPerBag || lotInfo.pricePerBag) : 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                           </div>
                         </div>
+                        {selectedLots.length > 1 && (
+                          <div className="flex items-end">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeLotSelection(index)}
+                              data-testid={`button-edit-remove-seed-lot-${index}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                       {selection.seedLotId > 0 && selection.bagsMoved > 0 && (
                         <div className="flex gap-4 mt-3 text-sm">

@@ -35,6 +35,7 @@ interface SeedLotOption {
   bagType: string;
   remainingBags: number;
   pricePerBag: string;
+  avgCostPerBag: string;
 }
 
 interface SeedLotSelection {
@@ -233,7 +234,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     selectedLots.forEach(selection => {
       if (selection.seedLotId && selection.bagsMoved > 0) {
         const lotInfo = getLotInfo(selection.seedLotId);
-        const costPerBag = lotInfo ? parseFloat(lotInfo.pricePerBag) : 0;
+        const costPerBag = lotInfo ? parseFloat(lotInfo.avgCostPerBag || lotInfo.pricePerBag) : 0;
         const bags = selection.bagsMoved;
         const revenue = bags * selection.pricePerBag;
         const cost = bags * costPerBag;
@@ -555,7 +556,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
 
             {selectedLots.map((selection, index) => {
               const lotInfo = getLotInfo(selection.seedLotId);
-              const costPerBag = lotInfo ? parseFloat(lotInfo.pricePerBag) : 0;
+              const costPerBag = lotInfo ? parseFloat(lotInfo.avgCostPerBag || lotInfo.pricePerBag) : 0;
               const revenue = selection.bagsMoved * selection.pricePerBag;
               const cost = selection.bagsMoved * costPerBag;
               const profitLoss = revenue - cost;

@@ -357,7 +357,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
           {/* Payment Summary - read-only based on cash expenses */}
           <Card>
             <CardHeader className="py-3">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2">
                 {t("Payment Summary", "भुगतान सारांश")}
                 {(() => {
                   const status = remainingDue <= 0 ? "paid" : amountPaid > 0 ? "partial" : "due";
@@ -372,23 +372,23 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs">{t("Total Value", "कुल मूल्य")}</span>
-                  <div className="font-semibold text-lg">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                  <div className="font-semibold text-base">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs">{t("Amount Paid", "भुगतान राशि")}</span>
-                  <div className="font-semibold text-lg text-green-600 dark:text-green-400">₹{amountPaid.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                  <div className="font-semibold text-base text-green-600 dark:text-green-400">₹{amountPaid.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-muted-foreground text-xs">{t("Remaining Due", "बाकी राशि")}</span>
-                  <div className={`font-semibold text-lg ${remainingDue > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                  <div className={`font-semibold text-base ${remainingDue > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
                     ₹{remainingDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-3">
+              <p className="text-xs text-muted-foreground mt-2">
                 {t("Amount paid is updated from Cash Management expenses to this supplier.", "भुगतान राशि इस आपूर्तिकर्ता को किए गए खर्चों से अपडेट होती है।")}
               </p>
             </CardContent>
@@ -399,6 +399,24 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
             <span className="text-sm font-semibold">
               ₹{totalAdditionalCharges.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              <span className="text-sm font-medium">{t("Total Cost", "कुल लागत")}</span>
+              <span className="text-sm font-semibold" data-testid="text-seed-total-cost">
+                ₹{(totalValue + totalAdditionalCharges).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+              </span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              <span className="text-sm font-medium">{t("Avg Cost/Bag", "औसत लागत/बोरी")}</span>
+              <span className="text-sm font-semibold" data-testid="text-seed-avg-cost-per-bag">
+                ₹{(() => {
+                  const totalBags = seedLots.reduce((sum, lot) => sum + (lot.originalBags || 0), 0);
+                  return totalBags > 0 ? ((totalValue + totalAdditionalCharges) / totalBags).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 }) : "0";
+                })()}
+              </span>
+            </div>
           </div>
 
           <div className="space-y-2">
