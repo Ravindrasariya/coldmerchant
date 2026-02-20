@@ -1142,7 +1142,7 @@ export function CashManagementTab() {
               <Banknote className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Cash Received", "नकद प्राप्त")}</span>
             </div>
-            <p className="text-lg font-bold text-green-600">₹{totalCashReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="text-base font-bold text-green-600">₹{totalCashReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </CardContent>
         </Card>
 
@@ -1152,7 +1152,7 @@ export function CashManagementTab() {
               <ArrowUpRight className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Cash Expense", "नकद खर्च")}</span>
             </div>
-            <p className="text-lg font-bold text-amber-600">₹{totalCashExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="text-base font-bold text-amber-600">₹{totalCashExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </CardContent>
         </Card>
 
@@ -1162,7 +1162,7 @@ export function CashManagementTab() {
               <Wallet className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Net Cash in Hand", "हाथ में शुद्ध नकद")}</span>
             </div>
-            <p className={`text-lg font-bold ${netCashInHand >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
+            <p className={`text-base font-bold ${netCashInHand >= 0 ? 'text-teal-600' : 'text-red-600'}`}>
               ₹{netCashInHand.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </p>
           </CardContent>
@@ -1174,7 +1174,7 @@ export function CashManagementTab() {
               <Building2 className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Account Received", "खाते में प्राप्त")}</span>
             </div>
-            <p className="text-lg font-bold text-blue-600">₹{totalAccountReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="text-base font-bold text-blue-600">₹{totalAccountReceived.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             {accountWiseBreakdown.length > 0 && (
               <div className="mt-2 pt-2 border-t border-blue-200 space-y-1">
                 {accountWiseBreakdown.filter(a => a.inward > 0).map(account => (
@@ -1200,7 +1200,7 @@ export function CashManagementTab() {
               <CreditCard className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Account Expense", "खाता खर्च")}</span>
             </div>
-            <p className="text-lg font-bold text-orange-600">₹{totalAccountExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="text-base font-bold text-orange-600">₹{totalAccountExpense.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             {accountWiseBreakdown.length > 0 && (
               <div className="mt-2 pt-2 border-t border-orange-200 space-y-1">
                 {accountWiseBreakdown.filter(a => a.outflow > 0).map(account => (
@@ -1226,7 +1226,7 @@ export function CashManagementTab() {
               <Building2 className="h-4 w-4" />
               <span className="text-xs font-medium">{t("Net in Accounts", "खातों में शुद्ध")}</span>
             </div>
-            <p className={`text-lg font-bold ${netCashInAccount >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+            <p className={`text-base font-bold ${netCashInAccount >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
               ₹{netCashInAccount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
             </p>
             {accountWiseBreakdown.length > 0 && (
@@ -2266,7 +2266,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
             ) : (
               <ArrowUpRight className="h-4 w-4 text-amber-600 shrink-0" />
             )}
-            <span className={cn("font-semibold truncate", isReversed && "line-through text-muted-foreground")} data-testid={`text-entry-name-${entry.id}`}>
+            <span className={cn("text-sm font-semibold truncate", isReversed && "line-through text-muted-foreground")} data-testid={`text-entry-name-${entry.id}`}>
               {isTransfer 
                 ? getTransferLabel()
                 : isInward 
@@ -2299,7 +2299,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className={cn(
-              "font-bold",
+              "text-sm font-bold",
               isReversed ? "text-muted-foreground line-through" : isInward ? 'text-green-600' : 'text-amber-600'
             )}>
               {isInward ? '+' : '-'}₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
