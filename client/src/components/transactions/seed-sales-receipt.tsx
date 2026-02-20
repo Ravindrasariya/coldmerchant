@@ -267,7 +267,8 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
             <Skeleton className="h-20 w-full" />
           </div>
         ) : transaction && merchant ? (
-          <div ref={printRef} className="space-y-2 p-3 bg-white text-black text-xs">
+          <div className="overflow-x-auto -mx-4 px-4">
+          <div ref={printRef} className="space-y-2 p-3 bg-white text-black text-xs min-w-[600px]">
             <div className="header text-center border-b border-black pb-2">
               <h1 className="text-base font-bold">{merchant.name}</h1>
               {merchant.address && <p className="text-[10px] text-gray-600">{merchant.address}</p>}
@@ -371,6 +372,7 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
             <div className="disclaimer border border-dashed border-gray-400 p-1 text-center text-[8px] text-gray-500">
               <p>No signature/stamp required for online receipt | ऑनलाइन रसीद पर हस्ताक्षर/मुहर आवश्यक नहीं</p>
             </div>
+          </div>
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">

@@ -85,7 +85,7 @@ export async function shareReceiptAsPdf(
     const pdfBlob = pdf.output("blob");
     const pdfFile = new File([pdfBlob], `${filename}.pdf`, { type: "application/pdf" });
 
-    const downloadFallback = () => {
+    const downloadPdf = () => {
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = url;
@@ -104,11 +104,19 @@ export async function shareReceiptAsPdf(
         });
       } catch (shareErr: any) {
         if (shareErr?.name !== "AbortError") {
-          downloadFallback();
+          downloadPdf();
+          setTimeout(() => {
+            window.open("https://wa.me/", "_blank");
+          }, 500);
         }
       }
+    } else if (isMobileDevice) {
+      downloadPdf();
+      setTimeout(() => {
+        window.open("https://wa.me/", "_blank");
+      }, 500);
     } else {
-      downloadFallback();
+      downloadPdf();
     }
   } finally {
     contentElement.style.width = origStyles.elWidth;

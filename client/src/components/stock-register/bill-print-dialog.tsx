@@ -646,8 +646,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           </DialogHeader>
         )}
 
-        <div ref={billRef} className="bg-white p-4 rounded-lg text-black" data-testid="bill-preview">
-          {renderBillContent()}
+        <div className="overflow-x-auto -mx-4 px-4">
+          <div ref={billRef} className="bg-white p-4 rounded-lg text-black min-w-[700px]" data-testid="bill-preview">
+            {renderBillContent()}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

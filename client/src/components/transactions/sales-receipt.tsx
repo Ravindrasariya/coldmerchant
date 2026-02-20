@@ -214,7 +214,8 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
             <Skeleton className="h-20 w-full" />
           </div>
         ) : transaction && merchant ? (
-          <div ref={printRef} className="space-y-6 p-4 bg-white text-black">
+          <div className="overflow-x-auto -mx-4 px-4">
+          <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
               <h1 className="text-2xl font-bold">{merchant.name}</h1>
               {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
@@ -298,6 +299,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               <p>No need to sign/stamp the online generated receipt</p>
               <p className="hindi">ऑनलाइन जनरेट रसीद पर हस्ताक्षर/मुहर की आवश्यकता नहीं है</p>
             </div>
+          </div>
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">

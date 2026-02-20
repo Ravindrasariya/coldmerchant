@@ -289,30 +289,32 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
           </DialogHeader>
         )}
 
-        <div ref={billRef} className="space-y-3">
-          {renderBillContent()}
+        <div className="overflow-x-auto -mx-4 px-4">
+          <div ref={billRef} className="space-y-3 min-w-[600px]">
+            {renderBillContent()}
 
-          {!isAutoShare && (
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-print-close">
-              Close / बंद करें
-            </Button>
-            <Button onClick={handleShare} variant="outline" disabled={sharing} data-testid="button-seed-share">
-              {sharing ? (
-                <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : isMobile ? (
-                <Share2 className="h-4 w-4 mr-2" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              {sharing ? "..." : isMobile ? "Share" : "PDF"}
-            </Button>
-            <Button onClick={handlePrint} data-testid="button-seed-print-confirm">
-              <Printer className="h-4 w-4 mr-2" />
-              Print / प्रिंट
-            </Button>
+            {!isAutoShare && (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-print-close">
+                Close / बंद करें
+              </Button>
+              <Button onClick={handleShare} variant="outline" disabled={sharing} data-testid="button-seed-share">
+                {sharing ? (
+                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : isMobile ? (
+                  <Share2 className="h-4 w-4 mr-2" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {sharing ? "..." : isMobile ? "Share" : "PDF"}
+              </Button>
+              <Button onClick={handlePrint} data-testid="button-seed-print-confirm">
+                <Printer className="h-4 w-4 mr-2" />
+                Print / प्रिंट
+              </Button>
+            </div>
+            )}
           </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>
