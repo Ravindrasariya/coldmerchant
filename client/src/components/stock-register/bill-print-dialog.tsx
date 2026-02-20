@@ -84,8 +84,9 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     try {
       await shareReceiptAsPdf(billRef.current, `Purchase-Receipt-${entry.serialNumber}`);
     } catch (err: any) {
+      console.error("Share/PDF error:", err);
       if (err?.name !== "AbortError") {
-        toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
+        toast({ title: "PDF generation failed", description: String(err?.message || err), variant: "destructive" });
       }
     } finally {
       setSharing(false);
@@ -618,8 +619,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   return (
     <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto" style={isAutoShare ? { pointerEvents: "none" } : undefined}>
-        {!isAutoShare && (
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined} style={isAutoShare ? { pointerEvents: "none" } : undefined}>
+        {isAutoShare ? (
+          <DialogTitle className="sr-only">Generating PDF</DialogTitle>
+        ) : (
           <DialogHeader>
             <div className="flex items-center justify-between pr-8">
               <DialogTitle>Bill Preview</DialogTitle>

@@ -44,15 +44,25 @@ export async function shareReceiptAsPdf(
 
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
+  const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   try {
+    const contentRect = contentElement.getBoundingClientRect();
+    console.log("PDF capture: element rect", { w: contentRect.width, h: contentRect.height, top: contentRect.top, left: contentRect.left });
+
     const canvas = await html2canvas(contentElement, {
-      scale: 2,
+      scale: isMobileDevice ? 1.5 : 2,
       useCORS: true,
       backgroundColor: "#ffffff",
       logging: false,
       width: PDF_CAPTURE_WIDTH,
+      height: contentRect.height > 0 ? Math.ceil(contentRect.height) : undefined,
       windowWidth: PDF_CAPTURE_WIDTH + 64,
+      scrollX: 0,
+      scrollY: 0,
     });
+
+    console.log("PDF capture: canvas size", { w: canvas.width, h: canvas.height });
 
     const imgWidth = 210;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -75,14 +85,7 @@ export async function shareReceiptAsPdf(
     const pdfBlob = pdf.output("blob");
     const pdfFile = new File([pdfBlob], `${filename}.pdf`, { type: "application/pdf" });
 
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile && navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
-      await navigator.share({
-        files: [pdfFile],
-        title: filename,
-      });
-    } else {
+    const downloadFallback = () => {
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = url;
@@ -91,6 +94,21 @@ export async function shareReceiptAsPdf(
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+    };
+
+    if (isMobileDevice && navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: filename,
+        });
+      } catch (shareErr: any) {
+        if (shareErr?.name !== "AbortError") {
+          downloadFallback();
+        }
+      }
+    } else {
+      downloadFallback();
     }
   } finally {
     contentElement.style.width = origStyles.elWidth;
