@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import {
   Dialog,
@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Printer } from "lucide-react";
+import { Printer, Share2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { useToast } from "@/hooks/use-toast";
 
 interface StockEntryWithLots {
   id: number;
@@ -69,6 +71,24 @@ interface BillPrintDialogProps {
 
 export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const billRef = React.useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const handleShare = async () => {
+    if (!billRef.current) return;
+    setSharing(true);
+    try {
+      await shareReceiptAsPdf(billRef.current, `Purchase-Receipt-${entry.serialNumber}`);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const totalOriginalBags = entry.lots.reduce((sum, lot) => sum + lot.originalBags, 0);
   const totalRemainingBags = entry.lots.reduce((sum, lot) => sum + lot.remainingBags, 0);
@@ -378,14 +398,26 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
             <DialogTitle>Bill Preview</DialogTitle>
-            <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
-              <Printer className="h-4 w-4 mr-2" />
-              Print Bill
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing} data-testid="button-share-bill">
+                {sharing ? (
+                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : isMobile ? (
+                  <Share2 className="h-4 w-4 mr-2" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {sharing ? "..." : isMobile ? "Share" : "PDF"}
+              </Button>
+              <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
+                <Printer className="h-4 w-4 mr-2" />
+                Print Bill
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
-        <div className="bg-white p-4 rounded-lg text-black" data-testid="bill-preview">
+        <div ref={billRef} className="bg-white p-4 rounded-lg text-black" data-testid="bill-preview">
           <div className="bill-container">
             <div className="text-center mb-3 pb-2 border-b-2 border-black">
               {user?.merchantName && (

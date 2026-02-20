@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,9 +7,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Printer } from "lucide-react";
+import { Printer, Share2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { SeedStockEntryWithLots } from "@shared/schema";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { useToast } from "@/hooks/use-toast";
 
 interface SeedBillPrintDialogProps {
   entry: SeedStockEntryWithLots;
@@ -18,6 +21,24 @@ interface SeedBillPrintDialogProps {
 
 export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrintDialogProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const billRef = React.useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const handleShare = async () => {
+    if (!billRef.current) return;
+    setSharing(true);
+    try {
+      await shareReceiptAsPdf(billRef.current, `Seed-Purchase-Receipt-${entry.serialNumber}`);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const totalOriginalBags = entry.seedLots.reduce((sum, lot) => sum + lot.originalBags, 0);
   const totalRemainingBags = entry.seedLots.reduce((sum, lot) => sum + lot.remainingBags, 0);
@@ -166,7 +187,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
           <DialogTitle>Seed Purchase Receipt / बीज खरीद रसीद #{entry.serialNumber}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div ref={billRef} className="space-y-3">
           <div className="bg-muted/30 p-3 rounded-lg">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
@@ -231,6 +252,16 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-print-close">
               Close / बंद करें
+            </Button>
+            <Button onClick={handleShare} variant="outline" disabled={sharing} data-testid="button-seed-share">
+              {sharing ? (
+                <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : isMobile ? (
+                <Share2 className="h-4 w-4 mr-2" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {sharing ? "..." : isMobile ? "Share" : "PDF"}
             </Button>
             <Button onClick={handlePrint} data-testid="button-seed-print-confirm">
               <Printer className="h-4 w-4 mr-2" />

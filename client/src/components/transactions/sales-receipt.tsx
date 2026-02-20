@@ -1,10 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Printer } from "lucide-react";
+import { Printer, Share2, Download } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { useToast } from "@/hooks/use-toast";
 
 interface TransactionItem {
   id: number;
@@ -45,7 +47,24 @@ interface SalesReceiptDialogProps {
 
 export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChange }: SalesReceiptDialogProps) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
+  const [sharing, setSharing] = useState(false);
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const handleShare = async () => {
+    if (!printRef.current) return;
+    setSharing(true);
+    try {
+      await shareReceiptAsPdf(printRef.current, `Sales-Receipt-${transaction?.transactionNumber || ""}`);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
+      }
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const { data: transaction, isLoading: txnLoading } = useQuery<Transaction>({
     queryKey: ["/api/transactions", transactionId],
@@ -166,10 +185,22 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
             <DialogTitle>Sales Receipt</DialogTitle>
-            <Button onClick={handlePrint} size="sm" data-testid="button-print">
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-receipt">
+                {sharing ? (
+                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : isMobile ? (
+                  <Share2 className="h-4 w-4 mr-2" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {sharing ? "..." : isMobile ? "Share" : "PDF"}
+              </Button>
+              <Button onClick={handlePrint} size="sm" data-testid="button-print">
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            </div>
           </div>
           <DialogDescription>
             Preview and print the sales receipt
