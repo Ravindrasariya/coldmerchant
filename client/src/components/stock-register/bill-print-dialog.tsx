@@ -599,7 +599,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         }
         await handleShare();
         onOpenChange(false);
-      }, 500);
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [open, autoAction]);
@@ -614,40 +614,34 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return null;
   }
 
-  if (autoAction === "share") {
-    return (
-      <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, pointerEvents: "none", zIndex: -1 }}>
-        <div ref={billRef} className="bg-white p-4 rounded-lg text-black" style={{ width: 800 }}>
-          {renderBillContent()}
-        </div>
-      </div>
-    );
-  }
+  const isAutoShare = autoAction === "share";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between pr-8">
-            <DialogTitle>Bill Preview</DialogTitle>
-            <div className="flex gap-2">
-              <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing} data-testid="button-share-bill">
-                {sharing ? (
-                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : isMobile ? (
-                  <Share2 className="h-4 w-4 mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                {sharing ? "..." : isMobile ? "Share" : "PDF"}
-              </Button>
-              <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Bill
-              </Button>
+    <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto" style={isAutoShare ? { pointerEvents: "none" } : undefined}>
+        {!isAutoShare && (
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle>Bill Preview</DialogTitle>
+              <div className="flex gap-2">
+                <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing} data-testid="button-share-bill">
+                  {sharing ? (
+                    <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : isMobile ? (
+                    <Share2 className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  {sharing ? "..." : isMobile ? "Share" : "PDF"}
+                </Button>
+                <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Bill
+                </Button>
+              </div>
             </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
+        )}
 
         <div ref={billRef} className="bg-white p-4 rounded-lg text-black" data-testid="bill-preview">
           {renderBillContent()}

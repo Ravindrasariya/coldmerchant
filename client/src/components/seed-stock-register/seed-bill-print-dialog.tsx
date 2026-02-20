@@ -260,7 +260,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
         }
         await handleShare();
         onOpenChange(false);
-      }, 500);
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [open, autoAction]);
@@ -275,26 +275,21 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     return null;
   }
 
-  if (autoAction === "share") {
-    return (
-      <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, pointerEvents: "none", zIndex: -1 }}>
-        <div ref={billRef} className="bg-white p-4 rounded-lg text-black space-y-3" style={{ width: 800 }}>
-          {renderBillContent()}
-        </div>
-      </div>
-    );
-  }
+  const isAutoShare = autoAction === "share";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Seed Purchase Receipt / बीज खरीद रसीद #{entry.serialNumber}</DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto" style={isAutoShare ? { pointerEvents: "none" } : undefined}>
+        {!isAutoShare && (
+          <DialogHeader>
+            <DialogTitle>Seed Purchase Receipt / बीज खरीद रसीद #{entry.serialNumber}</DialogTitle>
+          </DialogHeader>
+        )}
 
         <div ref={billRef} className="space-y-3">
           {renderBillContent()}
 
+          {!isAutoShare && (
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-print-close">
               Close / बंद करें
@@ -314,6 +309,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
               Print / प्रिंट
             </Button>
           </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
