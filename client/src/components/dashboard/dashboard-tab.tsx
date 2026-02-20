@@ -205,7 +205,7 @@ const MONTHS_HI = ["जन", "फर", "मार्च", "अप्रै", "�
 
 const formatINR = (value: number) => `₹${new Intl.NumberFormat('en-IN').format(Math.round(value))}`;
 
-const PIE_COLORS = ["#2563eb", "#f97316", "#dc2626", "#059669", "#7c3aed", "#0891b2", "#be185d", "#4f46e5", "#ca8a04", "#0d9488"];
+const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14532d", "#dc2626", "#7c3aed", "#0891b2", "#ca8a04", "#be185d", "#334155"];
 
 const shortName = (name: string) => {
   const words = name.split(/\s+/);
