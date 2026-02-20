@@ -76,6 +76,10 @@ interface SeedStockEntry {
     originalBags: number;
     remainingBags: number;
     pricePerBag: string;
+    coldStoreChargesPerBag: string | null;
+    hammaliCharges: string | null;
+    gradingCharges: string | null;
+    transportCharges: string | null;
   }>;
 }
 
@@ -395,7 +399,14 @@ export function DashboardTab() {
       (entry.seedLots || []).forEach(lot => {
         totalBags += lot.originalBags;
         remainingBags += lot.remainingBags;
-        totalCost += lot.originalBags * parseFloat(lot.pricePerBag || "0");
+        const ppb = parseFloat(lot.pricePerBag || "0");
+        const coldPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
+        const hammali = parseFloat(lot.hammaliCharges || "0");
+        const grading = parseFloat(lot.gradingCharges || "0");
+        const transport = parseFloat(lot.transportCharges || "0");
+        const bags = lot.originalBags || 1;
+        const avgCostPerBag = ppb + coldPerBag + (hammali + grading + transport) / bags;
+        totalCost += lot.originalBags * avgCostPerBag;
       });
     });
 
