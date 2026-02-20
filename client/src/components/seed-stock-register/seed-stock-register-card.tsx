@@ -12,7 +12,13 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter } from "lucide-react";
+import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter, Share2, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
@@ -76,6 +82,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<SeedStockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<SeedStockEntryWithLots | null>(null);
+  const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
   
   const downloadDialogOpen = externalDownloadOpen ?? internalDownloadOpen;
   const setDownloadDialogOpen = (open: boolean) => {
@@ -661,16 +668,30 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                         <Edit className="h-3.5 w-3.5" />
                         {t("Edit", "संपादित")}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 gap-1.5 justify-start"
-                        onClick={() => setPrintEntry(entry)}
-                        data-testid={`button-seed-print-${entry.id}`}
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                        {t("Print", "प्रिंट")}
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-8 gap-1.5 justify-start"
+                            data-testid={`button-seed-print-${entry.id}`}
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            {t("Print", "प्रिंट")}
+                            <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => { setBillAction("print"); setPrintEntry(entry); }} data-testid={`button-seed-print-bill-${entry.id}`}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            {t("Print Bill", "बिल प्रिंट")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setBillAction("share"); setPrintEntry(entry); }} data-testid={`button-seed-share-bill-${entry.id}`}>
+                            <Share2 className="h-4 w-4 mr-2" />
+                            {t("Share (WhatsApp)", "शेयर (व्हाट्सएप)")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>
@@ -772,7 +793,8 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         <SeedBillPrintDialog
           entry={printEntry}
           open={!!printEntry}
-          onOpenChange={(open) => !open && setPrintEntry(null)}
+          onOpenChange={(open) => { if (!open) { setPrintEntry(null); setBillAction(undefined); } }}
+          autoAction={billAction}
         />
       )}
     </div>

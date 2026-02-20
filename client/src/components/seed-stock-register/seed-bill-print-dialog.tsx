@@ -17,14 +17,16 @@ interface SeedBillPrintDialogProps {
   entry: SeedStockEntryWithLots;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  autoAction?: "print" | "share";
 }
 
-export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrintDialogProps) {
+export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: SeedBillPrintDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const billRef = React.useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const autoActionDone = React.useRef(false);
 
   const handleShare = async () => {
     if (!billRef.current) return;
@@ -180,6 +182,105 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
     }, 250);
   };
 
+  const renderBillContent = () => (
+    <>
+      <div className="bg-muted/30 p-3 rounded-lg">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold">{entry.supplierName}</span>
+            {entry.supplierContact && (
+              <span className="text-sm text-muted-foreground">{entry.supplierContact}</span>
+            )}
+          </div>
+          <span className="text-sm">
+            {new Date(entry.purchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
+        </div>
+        {(entry.address || entry.district || entry.state) && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {[entry.address, entry.district, entry.state].filter(Boolean).join(", ")}
+          </p>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Seed Lots / बीज लॉट</p>
+        {entry.seedLots.map((lot, index) => {
+          const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
+          const lotTotal = lot.originalBags * pricePerBag;
+          return (
+            <div key={lot.id} className="border rounded-lg p-2.5">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">Lot {index + 1}</span>
+                  <span className="text-xs text-muted-foreground">{lot.potatoType} • {lot.bagType} • {lot.size}</span>
+                </div>
+                <span className="font-mono text-sm">
+                  <span className="font-semibold">{lot.remainingBags}</span>/{lot.originalBags}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-1">
+                <span className="text-muted-foreground">₹{pricePerBag}/bag</span>
+                <span className="font-medium">₹{lotTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Separator />
+
+      <div className="bg-primary/5 p-3 rounded-lg space-y-1.5">
+        <div className="flex justify-between text-sm">
+          <span>Total Bags / कुल बोरी</span>
+          <span className="font-mono font-medium">{totalRemainingBags}/{totalOriginalBags}</span>
+        </div>
+        <Separator />
+        <div className="flex justify-between font-semibold">
+          <span>Grand Total / कुल योग</span>
+          <span className="font-mono">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+        </div>
+      </div>
+    </>
+  );
+
+  React.useEffect(() => {
+    if (!open || !autoAction || autoActionDone.current) return;
+    autoActionDone.current = true;
+    if (autoAction === "print") {
+      handlePrint();
+      onOpenChange(false);
+    } else if (autoAction === "share") {
+      const timer = setTimeout(async () => {
+        await handleShare();
+        onOpenChange(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [open, autoAction]);
+
+  React.useEffect(() => {
+    if (!open) {
+      autoActionDone.current = false;
+    }
+  }, [open]);
+
+  if (autoAction === "print") {
+    return null;
+  }
+
+  if (autoAction === "share") {
+    return (
+      <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, visibility: "hidden" }}>
+        <div ref={billRef} className="bg-white p-4 rounded-lg text-black space-y-3" style={{ width: 800 }}>
+          {renderBillContent()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -188,66 +289,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange }: SeedBillPrint
         </DialogHeader>
 
         <div ref={billRef} className="space-y-3">
-          <div className="bg-muted/30 p-3 rounded-lg">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <span className="font-semibold">{entry.supplierName}</span>
-                {entry.supplierContact && (
-                  <span className="text-sm text-muted-foreground">{entry.supplierContact}</span>
-                )}
-              </div>
-              <span className="text-sm">
-                {new Date(entry.purchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-              </span>
-            </div>
-            {(entry.address || entry.district || entry.state) && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {[entry.address, entry.district, entry.state].filter(Boolean).join(", ")}
-              </p>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Seed Lots / बीज लॉट</p>
-            {entry.seedLots.map((lot, index) => {
-              const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
-              const lotTotal = lot.originalBags * pricePerBag;
-
-              return (
-                <div key={lot.id} className="border rounded-lg p-2.5">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">Lot {index + 1}</span>
-                      <span className="text-xs text-muted-foreground">{lot.potatoType} • {lot.bagType} • {lot.size}</span>
-                    </div>
-                    <span className="font-mono text-sm">
-                      <span className="font-semibold">{lot.remainingBags}</span>/{lot.originalBags}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm mt-1">
-                    <span className="text-muted-foreground">₹{pricePerBag}/bag</span>
-                    <span className="font-medium">₹{lotTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <Separator />
-
-          <div className="bg-primary/5 p-3 rounded-lg space-y-1.5">
-            <div className="flex justify-between text-sm">
-              <span>Total Bags / कुल बोरी</span>
-              <span className="font-mono font-medium">{totalRemainingBags}/{totalOriginalBags}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between font-semibold">
-              <span>Grand Total / कुल योग</span>
-              <span className="font-mono">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-            </div>
-          </div>
+          {renderBillContent()}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-print-close">

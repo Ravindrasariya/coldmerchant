@@ -67,14 +67,16 @@ interface BillPrintDialogProps {
   entry: StockEntryWithLots;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  autoAction?: "print" | "share";
 }
 
-export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogProps) {
+export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillPrintDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const billRef = React.useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const autoActionDone = React.useRef(false);
 
   const handleShare = async () => {
     if (!billRef.current) return;
@@ -392,6 +394,232 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
     printWindow.print();
   };
 
+  const renderBillContent = () => (
+    <div className="bill-container">
+      <div className="text-center mb-3 pb-2 border-b-2 border-black">
+        {user?.merchantName && (
+          <h1 className="text-2xl font-bold mb-2">{user.merchantName}</h1>
+        )}
+        <p className="text-lg font-semibold">Purchase Receipt / खरीद रसीद</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-3">
+        <div>
+          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Bill Details / बिल विवरण</h3>
+          <div className="space-y-1 text-sm">
+            <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span></p>
+            <p><span className="text-gray-600">Date / दिनांक:</span> <span className="font-medium">{new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
+            <p><span className="text-gray-600">Status / स्थिति:</span> <span className={`font-medium ${entry.paymentStatus === "paid" ? "text-green-700" : "text-orange-600"}`}>{entry.paymentStatus === "paid" ? "Paid / भुगतान हुआ" : "Due / बाकी"}</span></p>
+          </div>
+        </div>
+        <div>
+          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Farmer Details / किसान विवरण</h3>
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold">{entry.farmerName}</p>
+            {entry.farmerContact && <p className="text-gray-600">{entry.farmerContact}</p>}
+            <p className="text-gray-600">
+              {[entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ")}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Separator className="my-3 bg-gray-300" />
+
+      <div className="space-y-2">
+        <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">Lot Details / लॉट विवरण</h3>
+        {entry.lots.map((lot) => (
+          <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
+            <div className="flex justify-between items-start mb-1">
+              <div>
+                <p className="font-semibold">{lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.coldStoreName}</p>
+                <p className="text-xs text-gray-600">
+                  {lot.potatoType} • {lot.bagType} • {lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
+                </p>
+              </div>
+              <div className="text-right text-sm">
+                <p className="font-mono"><span className="font-semibold">{lot.remainingBags}</span>/{lot.originalBags} bags / बोरी</p>
+              </div>
+            </div>
+
+            {lot.bagBreakdowns.length > 0 ? (
+              <table className="w-full text-sm mt-1 border-collapse">
+                <thead>
+                  <tr className="border-b bg-gray-100">
+                    <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Size / आकार</th>
+                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
+                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
+                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lot.bagBreakdowns.map((bd, bdIndex) => {
+                    const weight = bd.weight ? parseFloat(bd.weight) : 0;
+                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+                    const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+                    const amount = netWeight * price;
+                    return (
+                      <tr key={bd.id || bdIndex} className="border-b border-gray-200">
+                        <td className="py-1 px-2">{getSizeBilingual(bd.size)}</td>
+                        <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
+                        <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
+                        <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
+                        <td className="py-1 px-2 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : lot.cutType === "gate_cut" && lot.size && (
+              <div className="text-sm bg-gray-100 rounded p-2">
+                <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
+                {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat((Math.trunc(parseFloat(lot.pricePerKg) * 100) / 100).toFixed(2))}</p>}
+              </div>
+            )}
+
+            {(() => {
+              const lotTotals = calculateLotTotals(lot);
+              const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
+              return (
+                <>
+                  {hasDeductions && (
+                    <div className="mt-2 p-2 bg-orange-50 rounded border-l-4 border-orange-400">
+                      <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Deductions / कटौती</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {lotTotals.hammali > 0 && (
+                          <>
+                            <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
+                            <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                          </>
+                        )}
+                        {lotTotals.charges.filter((c: any) => {
+                          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                          return amt > 0;
+                        }).map((c: any, i: number) => {
+                          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                          return (
+                            <React.Fragment key={i}>
+                              <span className="text-gray-600">{c.type || "Charge"}:</span>
+                              <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </React.Fragment>
+                          );
+                        })}
+                        {lotTotals.adjustedValue !== 0 && (
+                          <>
+                            <span className="text-gray-600">
+                              Adjustment / समायोजन
+                              {lotTotals.rate > 0 && lotTotals.interestDays > 0 
+                                ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
+                                : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
+                            </span>
+                            <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                              {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-2 p-2 bg-green-50 rounded border-l-4 border-green-500">
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div>
+                        <p className="text-gray-600 mb-1">Total Payable / कुल देय</p>
+                        <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 mb-1">Deductions / कटौती</p>
+                        <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 mb-1">Net Payable / शुद्ध देय</p>
+                        <p className="font-mono font-bold text-teal-700 text-sm">₹{lotTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
+            {lot.remarks && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{lot.remarks}</span></p>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
+        <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">Farmer Payment Summary / किसान भुगतान सारांश</h3>
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div>
+            <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
+            <p className="font-mono font-semibold text-base">{totalBagsExcludingWastage}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
+            <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
+            <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+          </div>
+          <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
+            <p className="text-xs opacity-90 mb-1">Net Due to Farmer / किसान को देय</p>
+            <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+          </div>
+        </div>
+      </div>
+
+      {entry.remarks && (
+        <div className="mt-3 pt-2 border-t border-gray-300">
+          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Remarks / टिप्पणी</h3>
+          <p className="text-sm">{entry.remarks}</p>
+        </div>
+      )}
+
+      <div className="mt-4 pt-2 border-t border-gray-300 text-center">
+        <p className="text-xs text-gray-600">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
+      </div>
+    </div>
+  );
+
+  React.useEffect(() => {
+    if (!open || !autoAction || autoActionDone.current) return;
+    autoActionDone.current = true;
+    if (autoAction === "print") {
+      handlePrint();
+      onOpenChange(false);
+    } else if (autoAction === "share") {
+      const timer = setTimeout(async () => {
+        await handleShare();
+        onOpenChange(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [open, autoAction]);
+
+  React.useEffect(() => {
+    if (!open) {
+      autoActionDone.current = false;
+    }
+  }, [open]);
+
+  if (autoAction === "print") {
+    return null;
+  }
+
+  if (autoAction === "share") {
+    return (
+      <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, visibility: "hidden" }}>
+        <div ref={billRef} className="bg-white p-4 rounded-lg text-black" style={{ width: 800 }}>
+          {renderBillContent()}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -418,200 +646,7 @@ export function BillPrintDialog({ entry, open, onOpenChange }: BillPrintDialogPr
         </DialogHeader>
 
         <div ref={billRef} className="bg-white p-4 rounded-lg text-black" data-testid="bill-preview">
-          <div className="bill-container">
-            <div className="text-center mb-3 pb-2 border-b-2 border-black">
-              {user?.merchantName && (
-                <h1 className="text-2xl font-bold mb-2">{user.merchantName}</h1>
-              )}
-              <p className="text-lg font-semibold">Purchase Receipt / खरीद रसीद</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-3">
-              <div>
-                <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Bill Details / बिल विवरण</h3>
-                <div className="space-y-1 text-sm">
-                  <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span></p>
-                  <p><span className="text-gray-600">Date / दिनांक:</span> <span className="font-medium">{new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
-                  <p><span className="text-gray-600">Status / स्थिति:</span> <span className={`font-medium ${entry.paymentStatus === "paid" ? "text-green-700" : "text-orange-600"}`}>{entry.paymentStatus === "paid" ? "Paid / भुगतान हुआ" : "Due / बाकी"}</span></p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Farmer Details / किसान विवरण</h3>
-                <div className="space-y-1 text-sm">
-                  <p className="font-semibold">{entry.farmerName}</p>
-                  {entry.farmerContact && <p className="text-gray-600">{entry.farmerContact}</p>}
-                  <p className="text-gray-600">
-                    {[entry.village, entry.tehsil, entry.district, entry.state]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Separator className="my-3 bg-gray-300" />
-
-            <div className="space-y-2">
-              <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">Lot Details / लॉट विवरण</h3>
-              
-              {entry.lots.map((lot) => (
-                <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-1">
-                    <div>
-                      <p className="font-semibold">{lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.coldStoreName}</p>
-                      <p className="text-xs text-gray-600">
-                        {lot.potatoType} • {lot.bagType} • {lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
-                      </p>
-                    </div>
-                    <div className="text-right text-sm">
-                      <p className="font-mono"><span className="font-semibold">{lot.remainingBags}</span>/{lot.originalBags} bags / बोरी</p>
-                    </div>
-                  </div>
-
-                  {lot.bagBreakdowns.length > 0 ? (
-                    <table className="w-full text-sm mt-1 border-collapse">
-                      <thead>
-                        <tr className="border-b bg-gray-100">
-                          <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Size / आकार</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lot.bagBreakdowns.map((bd, bdIndex) => {
-                          const weight = bd.weight ? parseFloat(bd.weight) : 0;
-                          const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-                          const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                          // Always use netWeight * price
-                          const amount = netWeight * price;
-                          return (
-                            <tr key={bd.id || bdIndex} className="border-b border-gray-200">
-                              <td className="py-1 px-2">{getSizeBilingual(bd.size)}</td>
-                              <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
-                              <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
-                              <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
-                              <td className="py-1 px-2 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  ) : lot.cutType === "gate_cut" && lot.size && (
-                    <div className="text-sm bg-gray-100 rounded p-2">
-                      <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
-                      {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat((Math.trunc(parseFloat(lot.pricePerKg) * 100) / 100).toFixed(2))}</p>}
-                    </div>
-                  )}
-
-                  {(() => {
-                    const lotTotals = calculateLotTotals(lot);
-                    const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
-                    return (
-                      <>
-                        {hasDeductions && (
-                          <div className="mt-2 p-2 bg-orange-50 rounded border-l-4 border-orange-400">
-                            <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Deductions / कटौती</p>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              {lotTotals.hammali > 0 && (
-                                <>
-                                  <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
-                                  <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                                </>
-                              )}
-                              {lotTotals.charges.filter(c => {
-                                const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                                return amt > 0;
-                              }).map((c, i) => {
-                                const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                                return (
-                                <React.Fragment key={i}>
-                                  <span className="text-gray-600">{c.type || "Charge"}:</span>
-                                  <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                                </React.Fragment>
-                                );
-                              })}
-                              {lotTotals.adjustedValue !== 0 && (
-                                <>
-                                  <span className="text-gray-600">
-                                    Adjustment / समायोजन
-                                    {lotTotals.rate > 0 && lotTotals.interestDays > 0 
-                                      ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
-                                      : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
-                                  </span>
-                                  <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                    {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        
-                        <div className="mt-2 p-2 bg-green-50 rounded border-l-4 border-green-500">
-                          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                            <div>
-                              <p className="text-gray-600 mb-1">Total Payable / कुल देय</p>
-                              <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 mb-1">Deductions / कटौती</p>
-                              <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600 mb-1">Net Payable / शुद्ध देय</p>
-                              <p className="font-mono font-bold text-teal-700 text-sm">₹{lotTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-
-                  {lot.remarks && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{lot.remarks}</span></p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
-              <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">Farmer Payment Summary / किसान भुगतान सारांश</h3>
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
-                  <p className="font-mono font-semibold text-base">{totalBagsExcludingWastage}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
-                  <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
-                  <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>
-                <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
-                  <p className="text-xs opacity-90 mb-1">Net Due to Farmer / किसान को देय</p>
-                  <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>
-              </div>
-            </div>
-
-            {entry.remarks && (
-              <div className="mt-3 pt-2 border-t border-gray-300">
-                <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Remarks / टिप्पणी</h3>
-                <p className="text-sm">{entry.remarks}</p>
-              </div>
-            )}
-
-            <div className="mt-4 pt-2 border-t border-gray-300 text-center">
-              <p className="text-xs text-gray-600">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
-            </div>
-          </div>
+          {renderBillContent()}
         </div>
       </DialogContent>
     </Dialog>

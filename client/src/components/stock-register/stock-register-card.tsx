@@ -14,7 +14,13 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, Check, ChevronsUpDown } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, Check, ChevronsUpDown, Share2, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -203,6 +209,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [farmerPopoverOpen, setFarmerPopoverOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<StockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
+  const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
   
   // Download dialog state (simplified - now uses filtered entries directly)
   const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
@@ -977,16 +984,30 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                         <Edit className="h-3.5 w-3.5" />
                         {t("Edit", "संपादित")}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 gap-1.5 justify-start"
-                        onClick={() => setPrintEntry(entry)}
-                        data-testid={`button-print-${entry.id}`}
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                        {t("Print", "प्रिंट")}
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-8 gap-1.5 justify-start"
+                            data-testid={`button-print-${entry.id}`}
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            {t("Print", "प्रिंट")}
+                            <ChevronDown className="h-3 w-3 ml-0.5 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => { setBillAction("print"); setPrintEntry(entry); }} data-testid={`button-print-bill-${entry.id}`}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            {t("Print Bill", "बिल प्रिंट")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setBillAction("share"); setPrintEntry(entry); }} data-testid={`button-share-bill-${entry.id}`}>
+                            <Share2 className="h-4 w-4 mr-2" />
+                            {t("Share (WhatsApp)", "शेयर (व्हाट्सएप)")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
                 </CardHeader>
@@ -1108,7 +1129,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         <BillPrintDialog
           entry={printEntry}
           open={!!printEntry}
-          onOpenChange={(open: boolean) => !open && setPrintEntry(null)}
+          onOpenChange={(open: boolean) => { if (!open) { setPrintEntry(null); setBillAction(undefined); } }}
+          autoAction={billAction}
         />
       )}
     </div>
