@@ -22,7 +22,6 @@ export async function shareReceiptAsPdf(
     dialogOverflow: dialog?.style.overflow || "",
     dialogPosition: dialog?.style.position || "",
     dialogLeft: dialog?.style.left || "",
-    dialogVisibility: dialog?.style.visibility || "",
   };
 
   contentElement.style.width = `${PDF_CAPTURE_WIDTH}px`;
@@ -41,7 +40,6 @@ export async function shareReceiptAsPdf(
     dialog.style.overflow = "visible";
     dialog.style.position = "fixed";
     dialog.style.left = "-9999px";
-    dialog.style.visibility = "hidden";
   }
 
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -111,7 +109,6 @@ export async function shareReceiptAsPdf(
       dialog.style.overflow = origStyles.dialogOverflow;
       dialog.style.position = origStyles.dialogPosition;
       dialog.style.left = origStyles.dialogLeft;
-      dialog.style.visibility = origStyles.dialogVisibility;
     }
   }
 }

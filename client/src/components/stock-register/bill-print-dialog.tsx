@@ -593,9 +593,13 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       onOpenChange(false);
     } else if (autoAction === "share") {
       const timer = setTimeout(async () => {
+        if (!billRef.current) {
+          onOpenChange(false);
+          return;
+        }
         await handleShare();
         onOpenChange(false);
-      }, 200);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [open, autoAction]);
@@ -612,7 +616,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   if (autoAction === "share") {
     return (
-      <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, visibility: "hidden" }}>
+      <div style={{ position: "fixed", left: "-9999px", top: 0, width: 800, pointerEvents: "none", zIndex: -1 }}>
         <div ref={billRef} className="bg-white p-4 rounded-lg text-black" style={{ width: 800 }}>
           {renderBillContent()}
         </div>
