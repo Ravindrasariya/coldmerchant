@@ -388,28 +388,44 @@ export function DashboardTab() {
   }, [stockEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
 
   const seedSummary = useMemo(() => {
-    if (!seedEntries) return { totalBags: 0, remainingBags: 0, totalCost: 0 };
+    if (!seedEntries || !Array.isArray(seedEntries)) {
+      console.log("[Dashboard] seedEntries not available:", seedEntries);
+      return { totalBags: 0, remainingBags: 0, totalCost: 0 };
+    }
     let totalBags = 0;
     let remainingBags = 0;
     let totalCost = 0;
 
+    console.log("[Dashboard] seedEntries count:", seedEntries.length, "cropFilter:", cropFilter, "years:", selectedYears, "months:", selectedMonths);
+
     seedEntries.forEach(entry => {
       if (cropFilter === "onion") return;
-      if (!matchesFilter(entry.purchaseDate)) return;
-      (entry.seedLots || []).forEach(lot => {
-        totalBags += lot.originalBags;
-        remainingBags += lot.remainingBags;
-        const ppb = parseFloat(lot.pricePerBag || "0");
-        const coldPerBag = parseFloat(lot.coldStoreChargesPerBag || "0");
-        const hammali = parseFloat(lot.hammaliCharges || "0");
-        const grading = parseFloat(lot.gradingCharges || "0");
-        const transport = parseFloat(lot.transportCharges || "0");
-        const bags = lot.originalBags || 1;
+      const dateStr = entry.purchaseDate || (entry as any).purchase_date;
+      if (!dateStr || !matchesFilter(dateStr)) {
+        console.log("[Dashboard] Seed entry filtered out:", entry.id, "date:", dateStr);
+        return;
+      }
+      const lots = entry.seedLots || (entry as any).seed_lots || [];
+      if (lots.length === 0) {
+        console.log("[Dashboard] Seed entry has no lots:", entry.id, "keys:", Object.keys(entry));
+      }
+      lots.forEach((lot: any) => {
+        const origBags = lot.originalBags ?? lot.original_bags ?? 0;
+        const remBags = lot.remainingBags ?? lot.remaining_bags ?? 0;
+        totalBags += origBags;
+        remainingBags += remBags;
+        const ppb = parseFloat(lot.pricePerBag || lot.price_per_bag || "0");
+        const coldPerBag = parseFloat(lot.coldStoreChargesPerBag || lot.cold_store_charges_per_bag || "0");
+        const hammali = parseFloat(lot.hammaliCharges || lot.hammali_charges || "0");
+        const grading = parseFloat(lot.gradingCharges || lot.grading_charges || "0");
+        const transport = parseFloat(lot.transportCharges || lot.transport_charges || "0");
+        const bags = origBags || 1;
         const avgCostPerBag = ppb + coldPerBag + (hammali + grading + transport) / bags;
-        totalCost += lot.originalBags * avgCostPerBag;
+        totalCost += origBags * avgCostPerBag;
       });
     });
 
+    console.log("[Dashboard] seedSummary result:", { totalBags, remainingBags, totalCost });
     return { totalBags, remainingBags, totalCost };
   }, [seedEntries, cropFilter, selectedYears, selectedMonths, selectedDays, allDays, allYearsSelected, allMonthsSelected]);
 
