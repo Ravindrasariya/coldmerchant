@@ -261,7 +261,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
         }
         await handleShare();
         onOpenChange(false);
-      }, 600);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [open, autoAction]);

@@ -600,7 +600,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         }
         await handleShare();
         onOpenChange(false);
-      }, 600);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [open, autoAction]);
