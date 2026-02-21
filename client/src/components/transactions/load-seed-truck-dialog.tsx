@@ -30,6 +30,7 @@ interface SeedLotOption {
   seedEntryId: number;
   serialNumber: number;
   supplierName: string;
+  place: string;
   coldStoreName: string;
   potatoType: string;
   size: string;
@@ -597,7 +598,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                         <SelectContent>
                           {unsoldInventory?.map((lot) => (
                             <SelectItem key={lot.id} value={lot.id.toString()}>
-                              S#{lot.serialNumber} - {lot.coldStoreName} - {lot.potatoType} - {lot.size} ({lot.remainingBags} bags)
+                              S#{lot.serialNumber} - {lot.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : lot.place === "mandi" ? t("Mandi", "मंडी") : lot.coldStoreName} - {lot.potatoType} - {lot.size} ({lot.remainingBags} bags)
                             </SelectItem>
                           ))}
                         </SelectContent>
