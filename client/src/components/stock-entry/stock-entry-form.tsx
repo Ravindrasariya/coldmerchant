@@ -224,27 +224,63 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     createMutation.mutate(data);
   };
 
+  const fieldLabels: Record<string, string> = {
+    purchaseDate: t("Purchase Date", "खरीद तिथि"),
+    farmerName: t("Farmer Name", "किसान का नाम"),
+    farmerContact: t("Phone Number", "फोन नंबर"),
+    village: t("Village", "गाँव"),
+    tehsil: t("Tehsil", "तहसील"),
+    district: t("District", "जिला"),
+    state: t("State", "राज्य"),
+    aadhatName: t("Aadhtiya", "आढ़तिया"),
+    originalBags: t("Total Bags", "कुल बोरी"),
+    quality: t("Quality", "गुणवत्ता"),
+    cutType: t("Delivery Type", "डिलीवरी प्रकार"),
+    coldStoreName: t("Cold Store Name", "कोल्ड स्टोर नाम"),
+    potatoType: t("Variety", "किस्म"),
+    size: t("Size", "साइज़"),
+    numberOfBags: t("Number of Bags", "बोरी की संख्या"),
+  };
+
   const onInvalid = (errors: any) => {
     const flatErrors: string[] = [];
-    const collectErrors = (obj: any, prefix = "") => {
-      for (const key in obj) {
-        const val = obj[key];
-        if (val?.message) {
-          flatErrors.push(val.message);
-        } else if (Array.isArray(val)) {
-          val.forEach((item: any, i: number) => {
-            if (item) collectErrors(item, `${prefix}Lot ${i + 1} > `);
-          });
-        } else if (typeof val === "object" && val !== null) {
-          collectErrors(val, `${prefix}${key} > `);
+    const getLabel = (key: string) => fieldLabels[key] || key;
+
+    if (errors.purchaseDate) flatErrors.push(`${getLabel("purchaseDate")}: ${errors.purchaseDate.message}`);
+    if (errors.farmerName) flatErrors.push(`${getLabel("farmerName")}: ${errors.farmerName.message}`);
+    if (errors.farmerContact) flatErrors.push(`${getLabel("farmerContact")}: ${errors.farmerContact.message}`);
+    if (errors.village) flatErrors.push(`${getLabel("village")}: ${errors.village.message}`);
+    if (errors.tehsil) flatErrors.push(`${getLabel("tehsil")}: ${errors.tehsil.message}`);
+    if (errors.district) flatErrors.push(`${getLabel("district")}: ${errors.district.message}`);
+    if (errors.state) flatErrors.push(`${getLabel("state")}: ${errors.state.message}`);
+    if (errors.aadhatName) flatErrors.push(`${getLabel("aadhatName")}: ${errors.aadhatName.message}`);
+
+    if (errors.lots && Array.isArray(errors.lots)) {
+      errors.lots.forEach((lotErr: any, i: number) => {
+        if (!lotErr) return;
+        const lotLabel = `${t("Lot", "लॉट")} ${i + 1}`;
+        for (const key in lotErr) {
+          if (key === "bagBreakdowns" && Array.isArray(lotErr[key])) {
+            lotErr[key].forEach((bdErr: any, j: number) => {
+              if (!bdErr) return;
+              for (const bk in bdErr) {
+                if (bdErr[bk]?.message) {
+                  flatErrors.push(`${lotLabel} > ${t("Breakdown", "ब्रेकडाउन")} ${j + 1} > ${getLabel(bk)}`);
+                }
+              }
+            });
+          } else if (lotErr[key]?.message) {
+            flatErrors.push(`${lotLabel} > ${getLabel(key)}`);
+          }
         }
-      }
-    };
-    collectErrors(errors);
+      });
+    }
+
     toast({
-      title: t("Please fix the following errors", "कृपया निम्नलिखित त्रुटियाँ ठीक करें"),
-      description: flatErrors.slice(0, 5).join("\n") + (flatErrors.length > 5 ? `\n...and ${flatErrors.length - 5} more` : ""),
+      title: t("Please fill required fields", "कृपया आवश्यक फ़ील्ड भरें"),
+      description: flatErrors.slice(0, 6).join(" • "),
       variant: "destructive",
+      duration: 8000,
     });
     const firstError = formContainerRef.current?.querySelector("[aria-invalid='true'], .text-destructive");
     if (firstError) {
