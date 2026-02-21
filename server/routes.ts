@@ -1983,6 +1983,24 @@ export async function registerRoutes(
       // Resolve aadhatDbId
       let resolvedAadhatDbId: number | null = requestAadhatDbId ? parseInt(requestAadhatDbId) : null;
 
+      // Resolve bank account names for history preservation
+      let resolvedBankAccountName: string | null = null;
+      let resolvedFromBankAccountName: string | null = null;
+      let resolvedToBankAccountName: string | null = null;
+      
+      if (bankAccountId || fromBankAccountId || toBankAccountId) {
+        const accounts = await storage.getBankAccountsByMerchant(merchantId);
+        if (bankAccountId) {
+          resolvedBankAccountName = accounts.find((a: any) => a.id === bankAccountId)?.name || null;
+        }
+        if (fromBankAccountId) {
+          resolvedFromBankAccountName = accounts.find((a: any) => a.id === fromBankAccountId)?.name || null;
+        }
+        if (toBankAccountId) {
+          resolvedToBankAccountName = accounts.find((a: any) => a.id === toBankAccountId)?.name || null;
+        }
+      }
+
       // Determine if FIFO should be applied
       const applyFIFO = (direction === "inward" && !!partyName) || 
                         (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
@@ -2009,10 +2027,13 @@ export async function registerRoutes(
             expenseType: expenseType || null,
             paymentMode: paymentMode || null,
             bankAccountId: bankAccountId || null,
+            bankAccountName: resolvedBankAccountName,
             fromAccountType: fromAccountType || null,
             fromBankAccountId: fromBankAccountId || null,
+            fromBankAccountName: resolvedFromBankAccountName,
             toAccountType: toAccountType || null,
             toBankAccountId: toBankAccountId || null,
+            toBankAccountName: resolvedToBankAccountName,
             partyName: titleCase(partyName) || null,
             partyVillage: titleCase(partyVillage) || null,
             buyerId: resolvedBuyerId,
@@ -3017,7 +3038,7 @@ export async function registerRoutes(
         
         // Store farmerId for linking using full composite key
         const key = makeKey(data.name, data.contact, data.village);
-        farmerIdMap.set(key, existing.id);
+        farmerIdMap.set(key, existing!.id);
       }
       
       // Link farmerId to stock entries that don't have one

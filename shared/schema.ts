@@ -197,10 +197,13 @@ export const cashEntries = pgTable("cash_entries", {
   expenseType: text("expense_type"), // For outflow: "salary", "general_expense", "grading", "hammali", "farmer", "cold_store_charge"
   paymentMode: text("payment_mode"), // For outflow: "cash", "account_transfer"
   bankAccountId: integer("bank_account_id"), // Reference to bank account when using account_transfer or account_received
+  bankAccountName: text("bank_account_name"), // Stored bank account name for history preservation
   fromAccountType: text("from_account_type"), // For transfer: "cash_in_hand" or "bank_account"
   fromBankAccountId: integer("from_bank_account_id"), // For transfer: source bank account id (if from bank)
+  fromBankAccountName: text("from_bank_account_name"), // Stored from bank account name for history preservation
   toAccountType: text("to_account_type"), // For transfer: "cash_in_hand" or "bank_account"
   toBankAccountId: integer("to_bank_account_id"), // For transfer: destination bank account id (if to bank)
+  toBankAccountName: text("to_bank_account_name"), // Stored to bank account name for history preservation
   partyName: text("party_name"), // For inward: buyer name from transactions
   partyVillage: text("party_village"), // For inward: buyer location
   buyerId: integer("buyer_id").references(() => buyers.id), // resolved buyer ledger ID for reliable matching

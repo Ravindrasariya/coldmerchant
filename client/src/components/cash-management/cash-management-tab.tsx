@@ -45,10 +45,13 @@ interface CashEntry {
   expenseType: string | null;
   paymentMode: string | null;
   bankAccountId: number | null;
+  bankAccountName: string | null;
   fromAccountType: string | null;
   fromBankAccountId: number | null;
+  fromBankAccountName: string | null;
   toAccountType: string | null;
   toBankAccountId: number | null;
+  toBankAccountName: string | null;
   partyName: string | null;
   partyVillage: string | null;
   farmerName: string | null;
@@ -921,8 +924,7 @@ export function CashManagementTab() {
       if (entry.direction !== "transfer") return "";
       if (entry.fromAccountType === "cash_in_hand") return t("Cash in Hand", "हाथ में नकद");
       if (entry.fromAccountType === "bank_account") {
-        const account = bankAccounts.find(a => a.id === entry.fromBankAccountId);
-        return account ? account.name : t("Bank Account", "बैंक खाता");
+        return entry.fromBankAccountName || t("Bank Account", "बैंक खाता");
       }
       return "";
     };
@@ -931,8 +933,7 @@ export function CashManagementTab() {
       if (entry.direction !== "transfer") return "";
       if (entry.toAccountType === "cash_in_hand") return t("Cash in Hand", "हाथ में नकद");
       if (entry.toAccountType === "bank_account") {
-        const account = bankAccounts.find(a => a.id === entry.toBankAccountId);
-        return account ? account.name : t("Bank Account", "बैंक खाता");
+        return entry.toBankAccountName || t("Bank Account", "बैंक खाता");
       }
       return "";
     };
@@ -945,6 +946,7 @@ export function CashManagementTab() {
       t("Revenue Type", "राजस्व प्रकार"),
       t("Expense Type", "खर्च प्रकार"),
       t("Payment Mode", "भुगतान माध्यम"),
+      t("Bank Account", "बैंक खाता"),
       t("Party Name", "पार्टी का नाम"),
       t("Party Village", "पार्टी का गाँव"),
       t("Farmer Name", "किसान का नाम"),
@@ -968,6 +970,7 @@ export function CashManagementTab() {
       entry.revenueType ? getRevenueTypeLabel(entry.revenueType) : "",
       entry.expenseType ? getExpenseTypeLabel(entry.expenseType) : "",
       entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "",
+      entry.bankAccountName || "",
       entry.partyName || "",
       entry.partyVillage || "",
       entry.farmerName || "",
@@ -1059,6 +1062,12 @@ export function CashManagementTab() {
                         </div>
                       )}
                     </div>
+                    {viewDetailsEntry.bankAccountName && (
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">{t("Bank Account", "बैंक खाता")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.bankAccountName}</p>
+                      </div>
+                    )}
                   </div>
                   
                   {viewDetailsEntry.partyName && (
@@ -1107,6 +1116,12 @@ export function CashManagementTab() {
                         <p className="font-medium">{getPaymentModeLabel(viewDetailsEntry.paymentMode || "")}</p>
                       </div>
                     </div>
+                    {viewDetailsEntry.bankAccountName && (
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">{t("Bank Account", "बैंक खाता")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.bankAccountName}</p>
+                      </div>
+                    )}
                   </div>
                   
                   {viewDetailsEntry.farmerName && (
@@ -1145,6 +1160,30 @@ export function CashManagementTab() {
                     </div>
                   )}
                 </>
+              )}
+
+              {viewDetailsEntry.direction === "transfer" && (
+                <div className="border-t pt-3">
+                  <h4 className="font-semibold text-sm mb-2">{t("Transfer Details", "ट्रांसफर विवरण")}</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">{t("From Account", "स्रोत खाता")}</Label>
+                      <p className="font-medium">
+                        {viewDetailsEntry.fromAccountType === "cash_in_hand" 
+                          ? t("Cash in Hand", "हाथ में नकद") 
+                          : (viewDetailsEntry.fromBankAccountName || t("Bank Account", "बैंक खाता"))}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">{t("To Account", "गंतव्य खाता")}</Label>
+                      <p className="font-medium">
+                        {viewDetailsEntry.toAccountType === "cash_in_hand" 
+                          ? t("Cash in Hand", "हाथ में नकद") 
+                          : (viewDetailsEntry.toBankAccountName || t("Bank Account", "बैंक खाता"))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {viewDetailsEntry.remarks && (
@@ -2388,10 +2427,10 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
   const getTransferLabel = () => {
     const fromLabel = entry.fromAccountType === "cash_in_hand" 
       ? t("Cash", "नकद") 
-      : t("Bank", "बैंक");
+      : (entry.fromBankAccountName || t("Bank", "बैंक"));
     const toLabel = entry.toAccountType === "cash_in_hand" 
       ? t("Cash", "नकद") 
-      : t("Bank", "बैंक");
+      : (entry.toBankAccountName || t("Bank", "बैंक"));
     return `${fromLabel} → ${toLabel}`;
   };
 
@@ -2507,12 +2546,19 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
           <span className={isReversed ? "line-through" : ""}>{format(new Date(entry.entryDate), "dd/MM/yyyy")}</span>
           {isInward && entry.receiptType && (
             <Badge variant="secondary" className="text-xs py-0">
-              {getReceiptTypeLabel(entry.receiptType)}
+              {entry.receiptType === "account_received" && entry.bankAccountName 
+                ? entry.bankAccountName 
+                : getReceiptTypeLabel(entry.receiptType)}
             </Badge>
           )}
-          {!isInward && entry.paymentMode && (
+          {!isInward && !isTransfer && entry.paymentMode && (
             <Badge variant="secondary" className="text-xs py-0">
-              {entry.paymentMode === "cash" ? t("Cash", "नकद") : t("Account", "खाता")}
+              {entry.paymentMode === "cash" ? t("Cash", "नकद") : (entry.bankAccountName || t("Account", "खाता"))}
+            </Badge>
+          )}
+          {isTransfer && (
+            <Badge variant="secondary" className="text-xs py-0">
+              {t("Transfer", "ट्रांसफर")}
             </Badge>
           )}
           {isInward && totalApplied > 0 && !isReversed && (
