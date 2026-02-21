@@ -126,9 +126,13 @@ interface TimeseriesData {
     farmerPyReceivableDue: number;
     buyerPyReceivableTotal: number;
     buyerPyReceivableDue: number;
+    mandiTotal: number;
+    mandiDue: number;
   };
   farmerDueByCrop: Array<{ name: string; value: number }>;
   buyerDueByName: Array<{ name: string; value: number; percentage: number }>;
+  aadhatBagsByName: Array<{ name: string; value: number }>;
+  aadhatDueByName: Array<{ name: string; value: number }>;
 }
 
 function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
@@ -463,6 +467,14 @@ export function DashboardTab() {
     };
   }, [timeseries]);
 
+  const mandiSummary = useMemo(() => {
+    if (!timeseries?.summary) return { total: 0, due: 0 };
+    return {
+      total: timeseries.summary.mandiTotal,
+      due: timeseries.summary.mandiDue,
+    };
+  }, [timeseries]);
+
   const farmerDueByCrop = useMemo(() => {
     if (!timeseries?.farmerDueByCrop) return [];
     return timeseries.farmerDueByCrop.map(item => ({
@@ -474,6 +486,16 @@ export function DashboardTab() {
   const buyerDueByName = useMemo(() => {
     if (!timeseries?.buyerDueByName) return [];
     return timeseries.buyerDueByName;
+  }, [timeseries]);
+
+  const aadhatBagsByName = useMemo(() => {
+    if (!timeseries?.aadhatBagsByName) return [];
+    return timeseries.aadhatBagsByName;
+  }, [timeseries]);
+
+  const aadhatDueByName = useMemo(() => {
+    if (!timeseries?.aadhatDueByName) return [];
+    return timeseries.aadhatDueByName;
   }, [timeseries]);
 
   const coldStoreBagsSplit = useMemo(() => {
@@ -522,6 +544,15 @@ export function DashboardTab() {
   const buyerPieConfig: ChartConfig = {};
   buyerDueByName.forEach((b, i) => {
     buyerPieConfig[b.name] = { label: b.name, color: PIE_COLORS[i % PIE_COLORS.length] };
+  });
+
+  const aadhatBagsPieConfig: ChartConfig = {};
+  aadhatBagsByName.forEach((a, i) => {
+    aadhatBagsPieConfig[a.name] = { label: a.name, color: PIE_COLORS[i % PIE_COLORS.length] };
+  });
+  const aadhatDuePieConfig: ChartConfig = {};
+  aadhatDueByName.forEach((a, i) => {
+    aadhatDuePieConfig[a.name] = { label: a.name, color: PIE_COLORS[i % PIE_COLORS.length] };
   });
 
   const lineChartConfig: ChartConfig = {
@@ -674,8 +705,8 @@ export function DashboardTab() {
         </Popover>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-        <Card className="border-green-300 dark:border-green-700" data-testid="card-harvest">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+        <Card className="border-blue-300 dark:border-blue-700" data-testid="card-harvest">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Harvest", "फसल")}</div>
             <div className="text-sm font-bold mt-1" data-testid="text-harvest-bags">
@@ -688,7 +719,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="card-seed">
+        <Card className="border-teal-300 dark:border-teal-700" data-testid="card-seed">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Seed", "बीज")}</div>
             <div className="text-sm font-bold mt-1" data-testid="text-seed-bags">
@@ -715,7 +746,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-seed">
+        <Card className="border-red-300 dark:border-red-700" data-testid="card-farmer-seed">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Seed", "किसान - बीज")}</div>
             <div className="text-xs mt-1">
@@ -733,7 +764,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="card-cold-store">
+        <Card className="border-sky-300 dark:border-sky-700" data-testid="card-cold-store">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
             <div className="text-xs mt-1">
@@ -747,7 +778,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="card-buyer">
+        <Card className="border-orange-300 dark:border-orange-700" data-testid="card-buyer">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Buyer", "खरीदार")}</div>
             <div className="text-xs mt-1">
@@ -764,10 +795,24 @@ export function DashboardTab() {
             </div>
           </CardContent>
         </Card>
+
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-mandi-total">{formatINR(mandiSummary.total)}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
+              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-mandi-due">{formatINR(mandiSummary.due)}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-cs-total-bags">
+        <Card className="border-sky-300 dark:border-sky-700" data-testid="chart-cs-total-bags">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Total Bags by Cold Store", "कोल्ड स्टोर के अनुसार कुल बैग")}</CardTitle>
           </CardHeader>
@@ -800,7 +845,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-cs-remaining-bags">
+        <Card className="border-sky-300 dark:border-sky-700" data-testid="chart-cs-remaining-bags">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Remaining Bags by Cold Store", "कोल्ड स्टोर के अनुसार शेष बैग")}</CardTitle>
           </CardHeader>
@@ -868,7 +913,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-buyer-due-name">
+        <Card className="border-orange-300 dark:border-orange-700" data-testid="chart-buyer-due-name">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Buyer Due by Name", "नाम के अनुसार खरीदार बकाया")}</CardTitle>
           </CardHeader>
@@ -887,6 +932,74 @@ export function DashboardTab() {
                     label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
                   >
                     {buyerDueByName.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                {t("No data", "कोई डेटा नहीं")}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="chart-aadhat-bags">
+          <CardHeader className="p-3 pb-0">
+            <CardTitle className="text-sm">{t("Bags by Aadhatiya", "आढ़तिया के अनुसार बैग")}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            {aadhatBagsByName.length > 0 ? (
+              <ChartContainer config={aadhatBagsPieConfig} className="h-[200px] w-full">
+                <PieChart>
+                  <Pie
+                    data={aadhatBagsByName}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={55}
+                    labelLine={renderShortLabelLine(PIE_COLORS)}
+                    label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
+                  >
+                    {aadhatBagsByName.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ChartContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
+                {t("No data", "कोई डेटा नहीं")}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="chart-aadhat-due">
+          <CardHeader className="p-3 pb-0">
+            <CardTitle className="text-sm">{t("Due by Aadhatiya", "आढ़तिया के अनुसार बकाया")}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            {aadhatDueByName.length > 0 ? (
+              <ChartContainer config={aadhatDuePieConfig} className="h-[200px] w-full">
+                <PieChart>
+                  <Pie
+                    data={aadhatDueByName}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={55}
+                    labelLine={renderShortLabelLine(PIE_COLORS)}
+                    label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
+                  >
+                    {aadhatDueByName.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
@@ -930,7 +1043,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-buyer-due-line">
+        <Card className="border-orange-300 dark:border-orange-700" data-testid="chart-buyer-due-line">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Buyer Due", "खरीदार बकाया")}</CardTitle>
           </CardHeader>
@@ -959,7 +1072,7 @@ export function DashboardTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-daily-volume">
+        <Card className="border-blue-300 dark:border-blue-700" data-testid="chart-daily-volume">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Daily Volume (Kg)", "दैनिक मात्रा (किलो)")}</CardTitle>
           </CardHeader>
@@ -986,7 +1099,7 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-cumulative-pnl">
+        <Card className="border-purple-300 dark:border-purple-700" data-testid="chart-cumulative-pnl">
           <CardHeader className="p-3 pb-0">
             <CardTitle className="text-sm">{t("Cumulative P&L", "संचयी लाभ/हानि")}</CardTitle>
           </CardHeader>

@@ -210,7 +210,7 @@ export async function registerRoutes(
         const arr = lotsMap.get(lot.stockEntryId) || [];
         arr.push(lot);
         lotsMap.set(lot.stockEntryId, arr);
-        if (lot.place === "Mandi") {
+        if (lot.place === "mandi") {
           mandiEntryIds.add(lot.stockEntryId);
         }
       }
@@ -234,9 +234,31 @@ export async function registerRoutes(
       const cropDuesMap: Record<string, number> = {};
       let summaryColdStoreTotalCharges = 0;
       let summaryColdStoreDue = 0;
+      let summaryMandiTotal = 0;
+      let summaryMandiDue = 0;
+      const aadhatBagsMap = new Map<string, number>();
+      const aadhatDueMap = new Map<string, number>();
 
       for (const entry of filteredEntries) {
-        if (mandiEntryIds.has(entry.id)) continue;
+        if (mandiEntryIds.has(entry.id)) {
+          const entryLots = lotsMap.get(entry.id) || [];
+          let entryNetPayable = 0;
+          let entryBags = 0;
+          for (const lot of entryLots) {
+            entryNetPayable += parseFloat(lot.netPayable || "0");
+            const lotBreakdowns = breakdownsMap.get(lot.id) || [];
+            entryBags += lotBreakdowns.reduce((s: number, bd: any) => s + (bd.numberOfBags || 0), 0);
+            if (entryBags === 0) entryBags += lot.originalBags;
+          }
+          const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
+          const entryDue = Math.max(entryNetPayable - amountPaid, 0);
+          summaryMandiTotal += entryNetPayable;
+          summaryMandiDue += entryDue;
+          const aadhatLabel = entry.aadhatName || "Unknown";
+          aadhatBagsMap.set(aadhatLabel, (aadhatBagsMap.get(aadhatLabel) || 0) + entryBags);
+          aadhatDueMap.set(aadhatLabel, (aadhatDueMap.get(aadhatLabel) || 0) + entryDue);
+          continue;
+        }
         const dateKey = entry.purchaseDate;
         const entryLots = lotsMap.get(entry.id) || [];
 
@@ -424,6 +446,16 @@ export async function registerRoutes(
         }
       }
 
+      const aadhatBagsByName = Array.from(aadhatBagsMap.entries())
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, value]) => ({ name: name.length > 15 ? name.substring(0, 15) + "..." : name, value }));
+
+      const aadhatDueByName = Array.from(aadhatDueMap.entries())
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, value]) => ({ name: name.length > 15 ? name.substring(0, 15) + "..." : name, value: Math.round(value) }));
+
       res.json({
         farmerDueTimeSeries,
         buyerDueTimeSeries,
@@ -442,9 +474,13 @@ export async function registerRoutes(
           farmerPyReceivableDue: Math.round(farmerPyReceivableDue),
           buyerPyReceivableTotal: Math.round(buyerPyReceivableTotal),
           buyerPyReceivableDue: Math.round(buyerPyReceivableDue),
+          mandiTotal: Math.round(summaryMandiTotal),
+          mandiDue: Math.round(summaryMandiDue),
         },
         farmerDueByCrop,
         buyerDueByName,
+        aadhatBagsByName,
+        aadhatDueByName,
       });
     } catch (error) {
       console.error("Error fetching dashboard timeseries:", error);
@@ -2888,7 +2924,7 @@ export async function registerRoutes(
         const existing = lotsByEntryId.get(lot.stockEntryId) || [];
         existing.push(lot);
         lotsByEntryId.set(lot.stockEntryId, existing);
-        if (lot.place === "Mandi") {
+        if (lot.place === "mandi") {
           mandiEntryIds.add(lot.stockEntryId);
         }
       }
@@ -3054,7 +3090,7 @@ export async function registerRoutes(
       const allLots = await storage.getAllLotsByMerchant(merchantId);
       const mandiEntryIds = new Set<number>();
       for (const lot of allLots) {
-        if (lot.place === "Mandi") {
+        if (lot.place === "mandi") {
           mandiEntryIds.add(lot.stockEntryId);
         }
       }
