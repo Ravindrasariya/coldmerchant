@@ -43,6 +43,9 @@ interface StockEntryWithLots {
   tehsil: string | null;
   district: string;
   state: string;
+  place: string | null;
+  aadhatDbId: number | null;
+  aadhatName: string | null;
   paymentStatus: string;
   amountPaid: string | null;
   remarks: string | null;
@@ -66,6 +69,10 @@ interface StockEntryWithLots {
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
     charges: Array<{ type: string; amount: number | string }> | null;
+    mandiCommissionPercent: string | null;
+    aadhatCommissionPercent: string | null;
+    hammaliPerBag: string | null;
+    mandiExtraCharges: string | null;
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -412,6 +419,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Serial #", "क्रमांक"),
       t("Lot #", "लॉट #"),
       t("Date", "तिथि"),
+      t("Place", "स्थान"),
       t("Farmer Name", "किसान का नाम"),
       t("Village", "गाँव"),
       t("Cold Store", "कोल्ड स्टोर"),
@@ -523,10 +531,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         // Cut type display - Bilty Cut for non-gate_cut
         const cutTypeDisplay = lot.cutType === "gate_cut" ? t("Gate Cut", "गेट कट") : t("Bilty Cut", "बिल्टी कट");
         
+        const placeLabel = (entry.place || lot.place || "cold_store") === "farm_gate" ? "Farm Gate" : (entry.place || lot.place || "cold_store") === "mandi" ? "Mandi" : "Cold Store";
         rows.push([
           entry.serialNumber.toString(),
           (lotIndex + 1).toString(),
           format(new Date(entry.purchaseDate), "dd/MM/yyyy"),
+          placeLabel,
           entry.farmerName,
           entry.village || "-",
           lot.place === "farm_gate" ? "Farm Gate" : (lot.coldStoreName || "-"),
@@ -911,6 +921,21 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                         <span className="font-semibold text-base" data-testid={`text-farmer-${entry.id}`}>
                           {entry.farmerName}
                         </span>
+                        
+                        {(() => {
+                          const p = entry.place || entry.lots[0]?.place || "cold_store";
+                          const label = p === "farm_gate" ? t("Farm Gate", "फार्म गेट") : p === "mandi" ? t("Mandi", "मंडी") : t("Cold Store", "कोल्ड स्टोर");
+                          const cls = p === "farm_gate"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                            : p === "mandi"
+                              ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+                          return (
+                            <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${cls}`} data-testid={`badge-place-${entry.id}`}>
+                              {label}
+                            </Badge>
+                          );
+                        })()}
                         
                         {potatoTypes.map((type, i) => (
                           <Badge 
