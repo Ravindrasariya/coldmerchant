@@ -58,11 +58,12 @@ export default function HomePage() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedCrop, setSelectedCropState] = useState<"potato" | "onion">(() => {
+  const [selectedCrop, setSelectedCropState] = useState<"potato" | "onion" | "garlic">(() => {
     const saved = localStorage.getItem("vyapar_selected_crop");
-    return saved === "onion" ? "onion" : "potato";
+    if (saved === "onion" || saved === "garlic") return saved;
+    return "potato";
   });
-  const setSelectedCrop = (crop: "potato" | "onion") => {
+  const setSelectedCrop = (crop: "potato" | "onion" | "garlic") => {
     setSelectedCropState(crop);
     localStorage.setItem("vyapar_selected_crop", crop);
   };
@@ -408,7 +409,9 @@ export default function HomePage() {
                   <p className="text-sm text-muted-foreground mt-1">
                     {selectedCrop === "potato"
                       ? t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")
-                      : t("View and manage your onion stock", "अपने प्याज स्टॉक को देखें और प्रबंधित करें")
+                      : selectedCrop === "onion"
+                      ? t("View and manage your onion stock", "अपने प्याज स्टॉक को देखें और प्रबंधित करें")
+                      : t("View and manage your garlic stock", "अपने लहसुन स्टॉक को देखें और प्रबंधित करें")
                     }
                   </p>
                 </div>

@@ -14,11 +14,11 @@ import { useLanguage } from "@/hooks/use-language";
 
 const STORAGE_KEY_PREFIX = "stock-entry-form-draft-";
 
-function getStorageKey(crop: "potato" | "onion") {
+function getStorageKey(crop: "potato" | "onion" | "garlic") {
   return `${STORAGE_KEY_PREFIX}${crop}`;
 }
 
-function getDefaultFormValues(selectedCrop: "potato" | "onion"): StockEntryFormType {
+function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic"): StockEntryFormType {
   return {
     purchaseDate: new Date().toISOString().split("T")[0],
     farmerName: "",
@@ -50,7 +50,7 @@ function getDefaultFormValues(selectedCrop: "potato" | "onion"): StockEntryFormT
   };
 }
 
-function loadSavedFormData(selectedCrop: "potato" | "onion"): StockEntryFormType {
+function loadSavedFormData(selectedCrop: "potato" | "onion" | "garlic"): StockEntryFormType {
   try {
     const saved = localStorage.getItem(getStorageKey(selectedCrop));
     if (saved) {
@@ -65,7 +65,7 @@ function loadSavedFormData(selectedCrop: "potato" | "onion"): StockEntryFormType
   return getDefaultFormValues(selectedCrop);
 }
 
-function saveFormData(data: StockEntryFormType, crop: "potato" | "onion") {
+function saveFormData(data: StockEntryFormType, crop: "potato" | "onion" | "garlic") {
   try {
     localStorage.setItem(getStorageKey(crop), JSON.stringify(data));
   } catch (e) {
@@ -73,7 +73,7 @@ function saveFormData(data: StockEntryFormType, crop: "potato" | "onion") {
   }
 }
 
-function clearSavedFormData(crop: "potato" | "onion") {
+function clearSavedFormData(crop: "potato" | "onion" | "garlic") {
   try {
     localStorage.removeItem(getStorageKey(crop));
   } catch (e) {
@@ -84,7 +84,7 @@ function clearSavedFormData(crop: "potato" | "onion") {
 interface StockEntryFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
-  selectedCrop?: "potato" | "onion";
+  selectedCrop?: "potato" | "onion" | "garlic";
 }
 
 export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }: StockEntryFormProps) {

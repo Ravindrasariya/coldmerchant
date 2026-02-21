@@ -396,7 +396,7 @@ export function DashboardTab() {
     let totalCost = 0;
 
     seedEntries.forEach(entry => {
-      if (cropFilter === "onion") return;
+      if (cropFilter === "onion" || cropFilter === "garlic") return;
       const dateStr = entry.purchaseDate || (entry as any).purchase_date;
       if (!dateStr || !matchesFilter(dateStr)) {
         return;
@@ -466,7 +466,7 @@ export function DashboardTab() {
   const farmerDueByCrop = useMemo(() => {
     if (!timeseries?.farmerDueByCrop) return [];
     return timeseries.farmerDueByCrop.map(item => ({
-      name: item.name === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज"),
+      name: item.name === "potato" ? t("Potato", "आलू") : item.name === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन"),
       value: item.value,
     }));
   }, [timeseries, t]);
@@ -502,11 +502,12 @@ export function DashboardTab() {
   const yearLabel = allYearsSelected ? t("All Years", "सभी वर्ष") : selectedYears.length === 1 ? selectedYears[0].toString() : `${selectedYears.length} ${t("Years", "वर्ष")}`;
   const monthLabel = allMonthsSelected ? t("All", "सभी") : selectedMonths.length === 1 ? MONTHS[selectedMonths[0] - 1] : `${selectedMonths.length} ${t("Mon", "माह")}`;
   const dayLabel = allDays ? t("All Days", "सभी दिन") : selectedDays.length === 0 ? t("None", "कोई नहीं") : selectedDays.length === 1 ? selectedDays[0].toString() : `${selectedDays.length} ${t("Days", "दिन")}`;
-  const cropLabel = cropFilter === "all" ? t("All Crops", "सभी फसल") : cropFilter === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज");
+  const cropLabel = cropFilter === "all" ? t("All Crops", "सभी फसल") : cropFilter === "potato" ? t("Potato", "आलू") : cropFilter === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन");
 
   const pieChartConfig: ChartConfig = {
     potato: { label: t("Potato", "आलू"), color: "#16a34a" },
     onion: { label: t("Onion", "प्याज"), color: "#f97316" },
+    garlic: { label: t("Garlic", "लहसुन"), color: "#8b5cf6" },
   };
 
   const coldStoreTotalPieConfig: ChartConfig = {};
@@ -558,6 +559,7 @@ export function DashboardTab() {
                 { value: "all", label: t("All Crops", "सभी फसल") },
                 { value: "potato", label: t("Potato", "आलू") },
                 { value: "onion", label: t("Onion", "प्याज") },
+                { value: "garlic", label: t("Garlic", "लहसुन") },
               ].map(opt => (
                 <Button
                   key={opt.value}

@@ -57,8 +57,8 @@ interface Transaction {
 }
 
 interface TransactionsTabProps {
-  selectedCrop?: "potato" | "onion";
-  onCropChange?: (crop: "potato" | "onion") => void;
+  selectedCrop?: "potato" | "onion" | "garlic";
+  onCropChange?: (crop: "potato" | "onion" | "garlic") => void;
 }
 
 export function TransactionsTab({ selectedCrop = "potato", onCropChange }: TransactionsTabProps) {
@@ -225,7 +225,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     link.href = URL.createObjectURL(blob);
     
     // Generate descriptive filename based on applied filters
-    const parts = [selectedCrop === "potato" ? "potato" : "onion", "transactions"];
+    const parts = [selectedCrop, "transactions"];
     if (filterYear) parts.push(filterYear);
     if (filterTxnNumber) parts.push(`txn${filterTxnNumber}`);
     if (filterSerialNumber) parts.push(`sr${filterSerialNumber}`);
@@ -272,7 +272,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               {t("Download will include transactions based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर लेनदेन शामिल होंगे:")}
             </p>
             <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज")}</p>
+              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : selectedCrop === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन")}</p>
               <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
               {filterTxnNumber && <p><strong>{t("Txn #:", "लेनदेन #:")}</strong> {filterTxnNumber}</p>}
               {filterSerialNumber && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerialNumber}</p>}
@@ -299,7 +299,9 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
           <p className="text-sm text-muted-foreground mt-1">
             {selectedCrop === "potato"
               ? t("Manage truck loading and sales transactions", "ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
-              : t("Manage onion truck loading and sales transactions", "प्याज ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
+              : selectedCrop === "onion"
+              ? t("Manage onion truck loading and sales transactions", "प्याज ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
+              : t("Manage garlic truck loading and sales transactions", "लहसुन ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
             }
           </p>
         </div>

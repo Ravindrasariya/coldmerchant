@@ -263,6 +263,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                   <SelectContent>
                     <SelectItem value="potato">{t("Potato", "आलू")}</SelectItem>
                     <SelectItem value="onion">{t("Onion", "प्याज")}</SelectItem>
+                    <SelectItem value="garlic">{t("Garlic", "लहसुन")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

@@ -192,7 +192,7 @@ function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnT
 interface StockRegisterCardProps {
   downloadDialogOpen?: boolean;
   onDownloadDialogClose?: () => void;
-  selectedCrop?: "potato" | "onion";
+  selectedCrop?: "potato" | "onion" | "garlic";
 }
 
 export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose, selectedCrop = "potato" }: StockRegisterCardProps) {
@@ -565,7 +565,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     link.href = URL.createObjectURL(blob);
     
     // Generate descriptive filename based on applied filters
-    const parts = [selectedCrop === "potato" ? "potato" : "onion", "stock_entries"];
+    const parts = [selectedCrop, "stock_entries"];
     if (filterYear) parts.push(filterYear);
     if (filterSerial) parts.push(`sr${filterSerial}`);
     if (filterFarmer) parts.push(filterFarmer.replace(/\s+/g, "_"));
@@ -611,7 +611,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               {t("Download will include entries based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर प्रविष्टियाँ शामिल होंगी:")}
             </p>
             <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : t("Onion", "प्याज")}</p>
+              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : selectedCrop === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन")}</p>
               <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
               {filterSerial && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerial}</p>}
               {filterFarmer && <p><strong>{t("Farmer:", "किसान:")}</strong> {filterFarmer}</p>}

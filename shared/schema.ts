@@ -955,7 +955,7 @@ export const lotFormSchema = z.object({
   place: z.enum(["farm_gate", "cold_store"]).default("cold_store"),
   coldStoreName: z.string().optional(), // required only for cold_store place
   coldStoreLotNumber: z.string().optional(), // lot number at cold store
-  crop: z.enum(["potato", "onion"]).default("potato"),
+  crop: z.enum(["potato", "onion", "garlic"]).default("potato"),
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
   potatoType: z.string().optional(), // variety - required only for potato crop
   harvestPotatoType: z.string().optional(), // Wafer, Ration, Seed - for potato crop only
@@ -1015,7 +1015,8 @@ export const DISTRICTS = ["Ujjain", "Shajapur", "Indore", "Dewas", "Agar Malwa"]
 export const SEED_DISTRICTS = ["Ujjain", "Agar Malwa", "Shajapur", "Dewas", "Indore", "Ratlam", "Rajgarh", "Other"] as const;
 export const STATES = ["Madhya Pradesh", "Gujarat"] as const;
 export const PLACE_OPTIONS = ["farm_gate", "cold_store"] as const;
-export const CROP_OPTIONS = ["potato", "onion"] as const;
+export const CROP_OPTIONS = ["potato", "onion", "garlic"] as const;
+export type CropType = typeof CROP_OPTIONS[number];
 export const POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "LR", "Torus", "CS1", "CS3", "Others"] as const;
 export const HARVEST_POTATO_TYPES = ["Wafer", "Ration", "Seed"] as const; // Potato type for harvest entries
 export const SEED_POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "CS1", "CS3", "Torus", "LR"] as const;
