@@ -23,6 +23,8 @@ import {
   type Buyer, type InsertBuyer,
   type BuyerEditHistory, type InsertBuyerEditHistory,
   type Farmer, type InsertFarmer, type FarmerEditHistory, type InsertFarmerEditHistory,
+  type Aadhat, type InsertAadhat, type AadhatEditHistory, type InsertAadhatEditHistory,
+  aadhats, aadhatEditHistory,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
   type SeedStockEntryWithLots,
@@ -191,6 +193,18 @@ export interface IStorage {
   updateFarmerWithPropagation(id: number, merchantId: number, userId: number | null, data: Partial<Farmer>): Promise<{ farmer: Farmer | undefined; changesLogged: number }>;
   mergeFarmers(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingFarmer: Farmer; mergedCount: number }>;
   
+  // Aadhat Ledger operations
+  getAadhatsByMerchant(merchantId: number): Promise<Aadhat[]>;
+  getAadhatById(id: number, merchantId: number): Promise<Aadhat | undefined>;
+  getMaxAadhatCodeSequence(merchantId: number, prefix: string): Promise<number>;
+  createAadhat(aadhat: InsertAadhat): Promise<Aadhat>;
+  updateAadhat(id: number, merchantId: number, data: Partial<Aadhat>): Promise<Aadhat | undefined>;
+
+  // Aadhat Edit History operations
+  getAadhatEditHistory(aadhatId: number, merchantId: number): Promise<AadhatEditHistory[]>;
+  getNextAadhatEditHistorySerialNumber(merchantId: number): Promise<number>;
+  createAadhatEditHistory(data: InsertAadhatEditHistory): Promise<AadhatEditHistory>;
+
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
   createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
@@ -3627,6 +3641,69 @@ export class DatabaseStorage implements IStorage {
     }
 
     return results;
+  }
+
+  // Aadhat Ledger operations
+  async getAadhatsByMerchant(merchantId: number): Promise<Aadhat[]> {
+    return await db.select().from(aadhats).where(eq(aadhats.merchantId, merchantId)).orderBy(desc(aadhats.createdAt));
+  }
+
+  async getAadhatById(id: number, merchantId: number): Promise<Aadhat | undefined> {
+    const [aadhat] = await db.select().from(aadhats).where(and(eq(aadhats.id, id), eq(aadhats.merchantId, merchantId)));
+    return aadhat;
+  }
+
+  async getMaxAadhatCodeSequence(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select({ aadhatId: aadhats.aadhatId })
+      .from(aadhats)
+      .where(and(
+        eq(aadhats.merchantId, merchantId),
+        sql`${aadhats.aadhatId} LIKE ${prefix + '%'}`
+      ));
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.aadhatId) {
+        const seq = parseInt(row.aadhatId.substring(prefix.length), 10);
+        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+      }
+    }
+    return maxSeq;
+  }
+
+  async createAadhat(aadhat: InsertAadhat): Promise<Aadhat> {
+    const [created] = await db.insert(aadhats).values(aadhat).returning();
+    return created;
+  }
+
+  async updateAadhat(id: number, merchantId: number, data: Partial<Aadhat>): Promise<Aadhat | undefined> {
+    const [updated] = await db.update(aadhats)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(aadhats.id, id), eq(aadhats.merchantId, merchantId)))
+      .returning();
+    return updated;
+  }
+
+  // Aadhat Edit History operations
+  async getAadhatEditHistory(aadhatId: number, merchantId: number): Promise<AadhatEditHistory[]> {
+    return await db.select()
+      .from(aadhatEditHistory)
+      .where(and(
+        eq(aadhatEditHistory.aadhatId, aadhatId),
+        eq(aadhatEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(aadhatEditHistory.changedAt));
+  }
+
+  async getNextAadhatEditHistorySerialNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: sql<number>`COALESCE(MAX(${aadhatEditHistory.serialNumber}), 0)` })
+      .from(aadhatEditHistory)
+      .where(eq(aadhatEditHistory.merchantId, merchantId));
+    return (result?.maxSerial || 0) + 1;
+  }
+
+  async createAadhatEditHistory(data: InsertAadhatEditHistory): Promise<AadhatEditHistory> {
+    const [created] = await db.insert(aadhatEditHistory).values(data).returning();
+    return created;
   }
 }
 

@@ -3972,5 +3972,189 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== AADHAT LEDGER ROUTES ====================
+
+  // GET /api/aadhats - Get all aadhats for the authenticated merchant
+  app.get("/api/aadhats", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const aadhatList = await storage.getAadhatsByMerchant(merchantId);
+      
+      const aadhatsWithDues = aadhatList.map(aadhat => {
+        const pyPayable = parseFloat(aadhat.pyPayable || "0");
+        return {
+          ...aadhat,
+          totalDue: pyPayable,
+        };
+      });
+      
+      res.json(aadhatsWithDues);
+    } catch (error) {
+      console.error("Error fetching aadhats:", error);
+      res.status(500).json({ message: "Failed to fetch aadhats" });
+    }
+  });
+
+  // POST /api/aadhats - Create a new aadhat
+  app.post("/api/aadhats", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      
+      const { name, address, contact, pyPayable, redFlag, isActive } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Aadhat name is required" });
+      }
+      if (!address || address.trim() === '') {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      const today = getISTDateString();
+      const dateStr = parseDateToCodeFormat(today);
+      const codePrefix = `AD${dateStr}`;
+      
+      const maxRetries = 3;
+      let aadhat: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxAadhatCodeSequence(merchantId, codePrefix);
+        const aadhatCode = `AD${dateStr}${maxSeq + 1 + attempt}`;
+        try {
+          aadhat = await storage.createAadhat({
+            merchantId,
+            aadhatId: aadhatCode,
+            dateAdded: today,
+            name: titleCaseKeep(name.trim()),
+            address: titleCase(address.trim()) || address.trim(),
+            contact: contact?.trim() || null,
+            pyPayable: pyPayable || "0",
+            redFlag: redFlag ?? false,
+            isActive: isActive ?? true,
+          });
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('aadhat_id') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!aadhat) throw new Error("Failed to generate unique aadhat code after multiple attempts");
+      res.status(201).json(aadhat);
+    } catch (error) {
+      console.error("Error creating aadhat:", error);
+      res.status(500).json({ message: "Failed to create aadhat" });
+    }
+  });
+
+  // PATCH /api/aadhats/:id - Update an aadhat (simple fields like isActive)
+  app.patch("/api/aadhats/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      const updated = await storage.updateAadhat(id, merchantId, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Aadhat not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating aadhat:", error);
+      res.status(500).json({ message: "Failed to update aadhat" });
+    }
+  });
+
+  // PATCH /api/aadhats/:id/details - Update aadhat details with edit history
+  app.patch("/api/aadhats/:id/details", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      const { name, address, contact, pyPayable, redFlag } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Aadhat name is required" });
+      }
+
+      const existingAadhat = await storage.getAadhatById(id, merchantId);
+      if (!existingAadhat) {
+        return res.status(404).json({ message: "Aadhat not found" });
+      }
+
+      const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
+      
+      const newName = name.trim();
+      const newAddress = address?.trim() || null;
+      const newContact = contact?.trim() || null;
+      const newPyPayable = pyPayable ?? "0";
+      const newRedFlag = redFlag ?? existingAadhat.redFlag;
+
+      if (existingAadhat.name !== newName) {
+        changes.push({ fieldName: "name", oldValue: existingAadhat.name, newValue: newName });
+      }
+      if (existingAadhat.address !== newAddress) {
+        changes.push({ fieldName: "address", oldValue: existingAadhat.address, newValue: newAddress });
+      }
+      if (existingAadhat.contact !== newContact) {
+        changes.push({ fieldName: "contact", oldValue: existingAadhat.contact, newValue: newContact });
+      }
+      if (existingAadhat.pyPayable !== newPyPayable) {
+        changes.push({ fieldName: "pyPayable", oldValue: existingAadhat.pyPayable, newValue: newPyPayable });
+      }
+      if (existingAadhat.redFlag !== newRedFlag) {
+        changes.push({ fieldName: "redFlag", oldValue: String(existingAadhat.redFlag), newValue: String(newRedFlag) });
+      }
+
+      if (changes.length > 0) {
+        const nextSerial = await storage.getNextAadhatEditHistorySerialNumber(merchantId);
+        for (const change of changes) {
+          await storage.createAadhatEditHistory({
+            serialNumber: nextSerial,
+            merchantId,
+            aadhatId: id,
+            changedBy: userId,
+            fieldName: change.fieldName,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          });
+        }
+      }
+
+      const updated = await storage.updateAadhat(id, merchantId, {
+        name: newName,
+        address: newAddress,
+        contact: newContact,
+        pyPayable: newPyPayable,
+        redFlag: newRedFlag,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Aadhat not found" });
+      }
+
+      res.json({
+        aadhat: updated,
+        changesRecorded: changes.length,
+        message: `Aadhat updated successfully.`
+      });
+    } catch (error) {
+      console.error("Error updating aadhat details:", error);
+      res.status(500).json({ message: "Failed to update aadhat" });
+    }
+  });
+
+  // GET /api/aadhats/:id/history - Get edit history for an aadhat
+  app.get("/api/aadhats/:id/history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const aadhatId = parseInt(req.params.id);
+      
+      const history = await storage.getAadhatEditHistory(aadhatId, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching aadhat edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
+    }
+  });
+
   return httpServer;
 }

@@ -781,6 +781,46 @@ export const insertBuyerEditHistorySchema = createInsertSchema(buyerEditHistory)
 export const insertFarmerSchema = createInsertSchema(farmers).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertFarmerEditHistorySchema = createInsertSchema(farmerEditHistory).omit({ id: true, changedAt: true });
 
+// Aadhat Ledger
+export const aadhats = pgTable("aadhats", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  aadhatId: text("aadhat_id"),
+  dateAdded: date("date_added").notNull(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  contact: text("contact"),
+  pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"),
+  redFlag: boolean("red_flag").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  merchantAadhatIdUnique: uniqueIndex("aadhats_merchant_aadhat_id_unique").on(table.merchantId, table.aadhatId),
+}));
+
+export const aadhatEditHistory = pgTable("aadhat_edit_history", {
+  id: serial("id").primaryKey(),
+  serialNumber: integer("serial_number").notNull(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  aadhatId: integer("aadhat_id").notNull().references(() => aadhats.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changedBy: integer("changed_by").references(() => users.id),
+  fieldName: text("field_name").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+});
+
+export const aadhatsRelations = relations(aadhats, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [aadhats.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const insertAadhatSchema = createInsertSchema(aadhats).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAadhatEditHistorySchema = createInsertSchema(aadhatEditHistory).omit({ id: true, changedAt: true });
+
 // Seed schemas
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
 export const insertSeedLotSchema = createInsertSchema(seedLots).omit({ id: true, createdAt: true });
@@ -849,6 +889,12 @@ export type InsertFarmer = z.infer<typeof insertFarmerSchema>;
 
 export type FarmerEditHistory = typeof farmerEditHistory.$inferSelect;
 export type InsertFarmerEditHistory = z.infer<typeof insertFarmerEditHistorySchema>;
+
+export type Aadhat = typeof aadhats.$inferSelect;
+export type InsertAadhat = z.infer<typeof insertAadhatSchema>;
+
+export type AadhatEditHistory = typeof aadhatEditHistory.$inferSelect;
+export type InsertAadhatEditHistory = z.infer<typeof insertAadhatEditHistorySchema>;
 
 export type SeedStockEntry = typeof seedStockEntries.$inferSelect;
 export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;
