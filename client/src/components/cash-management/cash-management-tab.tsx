@@ -291,6 +291,7 @@ export function CashManagementTab() {
   const [filterFarmerName, setFilterFarmerName] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
+  const [filterRemarks, setFilterRemarks] = useState<string>("");
 
   // Calculate current financial year
   const currentYear = new Date().getFullYear();
@@ -769,6 +770,7 @@ export function CashManagementTab() {
     if (filterFarmerName && filterFarmerName !== "all" && entry.farmerName !== filterFarmerName) return false;
     if (filterMonth && filterMonth !== "all" && entryMonth !== filterMonth) return false;
     if (filterYear && filterYear !== "all" && entryYear !== filterYear) return false;
+    if (filterRemarks && !(entry.remarks || "").toLowerCase().includes(filterRemarks.toLowerCase())) return false;
     return true;
   });
 
@@ -806,7 +808,8 @@ export function CashManagementTab() {
     (filterExpenseType && filterExpenseType !== "all") || 
     (filterFarmerName && filterFarmerName !== "all") || 
     (filterMonth && filterMonth !== "all") || 
-    (filterYear && filterYear !== "all");
+    (filterYear && filterYear !== "all") ||
+    !!filterRemarks;
 
   const clearFilters = () => {
     setFilterPartyName("");
@@ -814,6 +817,7 @@ export function CashManagementTab() {
     setFilterFarmerName("");
     setFilterMonth("");
     setFilterYear("");
+    setFilterRemarks("");
   };
 
   const getReceiptTypeLabel = (type: string) => {
@@ -1272,7 +1276,7 @@ export function CashManagementTab() {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_auto_1fr] gap-3">
             <Select value={filterPartyName} onValueChange={setFilterPartyName}>
               <SelectTrigger data-testid="filter-party-name" className="h-9">
                 <SelectValue placeholder={t("Party Name", "पार्टी का नाम")} />
@@ -1321,7 +1325,7 @@ export function CashManagementTab() {
             </Select>
 
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger data-testid="filter-month" className="h-9">
+              <SelectTrigger data-testid="filter-month" className="h-9 w-[110px]">
                 <SelectValue placeholder={t("Month", "महीना")} />
               </SelectTrigger>
               <SelectContent>
@@ -1342,7 +1346,7 @@ export function CashManagementTab() {
             </Select>
 
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger data-testid="filter-year" className="h-9">
+              <SelectTrigger data-testid="filter-year" className="h-9 w-[90px]">
                 <SelectValue placeholder={t("Year", "वर्ष")} />
               </SelectTrigger>
               <SelectContent>
@@ -1360,6 +1364,14 @@ export function CashManagementTab() {
                 )}
               </SelectContent>
             </Select>
+
+            <Input
+              placeholder={t("Remarks", "टिप्पणी")}
+              value={filterRemarks}
+              onChange={(e) => setFilterRemarks(e.target.value)}
+              className="h-9"
+              data-testid="filter-remarks"
+            />
           </div>
 
           {/* Filtered Summary */}
