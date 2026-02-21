@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/hooks/use-language";
 
 interface CropToggleProps {
@@ -10,27 +10,21 @@ export function CropToggle({ value, onChange }: CropToggleProps) {
   const { t } = useLanguage();
   
   return (
-    <div className="flex rounded-md border" data-testid="toggle-crop">
-      <Button
-        type="button"
-        variant={value === "potato" ? "default" : "ghost"}
-        size="sm"
-        onClick={() => onChange("potato")}
-        className="rounded-r-none border-0 px-3"
-        data-testid="toggle-crop-potato"
+    <Select value={value} onValueChange={(v) => onChange(v as "potato" | "onion")}>
+      <SelectTrigger 
+        className="bg-green-600 text-white border-green-600 focus:ring-green-500 [&>svg]:text-white"
+        data-testid="toggle-crop"
       >
-        {t("Potato", "आलू")}
-      </Button>
-      <Button
-        type="button"
-        variant={value === "onion" ? "default" : "ghost"}
-        size="sm"
-        onClick={() => onChange("onion")}
-        className="rounded-l-none border-0 px-3"
-        data-testid="toggle-crop-onion"
-      >
-        {t("Onion", "प्याज")}
-      </Button>
-    </div>
+        <SelectValue placeholder={t("Potato", "आलू")} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="potato" data-testid="toggle-crop-potato">
+          {t("Potato", "आलू")}
+        </SelectItem>
+        <SelectItem value="onion" data-testid="toggle-crop-onion">
+          {t("Onion", "प्याज")}
+        </SelectItem>
+      </SelectContent>
+    </Select>
   );
 }

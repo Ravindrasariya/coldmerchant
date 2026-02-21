@@ -58,7 +58,14 @@ export default function HomePage() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [isFirstLoginDialog, setIsFirstLoginDialog] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedCrop, setSelectedCrop] = useState<"potato" | "onion">("potato");
+  const [selectedCrop, setSelectedCropState] = useState<"potato" | "onion">(() => {
+    const saved = localStorage.getItem("vyapar_selected_crop");
+    return saved === "onion" ? "onion" : "potato";
+  });
+  const setSelectedCrop = (crop: "potato" | "onion") => {
+    setSelectedCropState(crop);
+    localStorage.setItem("vyapar_selected_crop", crop);
+  };
   const [passwordForm, setPasswordForm] = useState({
     mobileNumber: "",
     currentPassword: "",
