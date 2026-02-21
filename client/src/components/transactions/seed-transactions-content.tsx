@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock, Share2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -77,6 +77,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [receiptTransactionId, setReceiptTransactionId] = useState<number | null>(null);
+  const [shareTransactionId, setShareTransactionId] = useState<number | null>(null);
   
   // Download dialog state - can be controlled externally or internally
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
@@ -352,6 +353,14 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
         merchantId={transactions?.[0]?.merchantId || 0}
         open={receiptTransactionId !== null}
         onOpenChange={(open) => !open && setReceiptTransactionId(null)}
+      />
+
+      <SeedSalesReceiptDialog
+        transactionId={shareTransactionId}
+        merchantId={transactions?.[0]?.merchantId || 0}
+        open={shareTransactionId !== null}
+        onOpenChange={(open) => !open && setShareTransactionId(null)}
+        autoAction="share"
       />
 
       {/* Filters Row */}
@@ -704,6 +713,16 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                       >
                         <Printer className="h-3.5 w-3.5 mr-1.5" />
                         {t("Print", "प्रिंट")}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShareTransactionId(txn.id)}
+                        className="flex-1 sm:flex-none h-8 sm:h-9"
+                        data-testid={`button-share-seed-txn-${txn.id}`}
+                      >
+                        <Share2 className="h-3.5 w-3.5 mr-1.5" />
+                        {t("Share", "शेयर")}
                       </Button>
                     </div>
                   </div>

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2, Package, IndianRupee } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, IndianRupee, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -22,6 +22,7 @@ interface Farmer {
   tehsil: string | null;
   district: string | null;
   state: string | null;
+  redFlag: boolean | null;
 }
 
 interface SeedLotOption {
@@ -73,6 +74,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
   
+  const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
   const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const farmerInputRef = useRef<HTMLInputElement>(null);
@@ -145,6 +147,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     setTehsil(farmer.tehsil || "");
     setDistrict(farmer.district || "");
     setState(farmer.state || "");
+    if (farmer.redFlag) {
+      setRedFlagWarning(farmer.name);
+    } else {
+      setRedFlagWarning(null);
+    }
     setShowFarmerSuggestions(false);
   };
 
@@ -194,6 +201,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     setAdjustmentEffectiveDate("");
     setAdjustmentReason("");
     setSelectedLots([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
+    setRedFlagWarning(null);
   };
 
   const addLotSelection = () => {
@@ -403,7 +411,14 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                         className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
                         onClick={() => handleFarmerSelect(farmer)}
                       >
-                        <span className="font-medium">{farmer.name}</span>
+                        <span className="font-medium flex items-center">
+                          {farmer.name}
+                          {farmer.redFlag && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                              Red Flag
+                            </span>
+                          )}
+                        </span>
                         <span className="text-xs text-muted-foreground">
                           {farmer.contact && `${farmer.contact} `}
                           {farmer.village && `| ${farmer.village}`}
@@ -532,6 +547,12 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 </Select>
               </div>
             </div>
+            {redFlagWarning && (
+              <div className="flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm text-orange-700 dark:text-orange-400">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                <span>{redFlagWarning} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>{t("Vehicle Number", "वाहन नंबर")} ({t("Optional", "वैकल्पिक")})</Label>
               <Input

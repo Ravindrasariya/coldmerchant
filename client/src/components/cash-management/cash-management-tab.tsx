@@ -124,7 +124,7 @@ interface LedgerFarmer {
   netDue: number;
   coldDue: number;
   receivables: number;
-  negativeFlag: boolean | null;
+  redFlag: boolean | null;
   isArchived: boolean | null;
 }
 
@@ -135,7 +135,7 @@ interface LedgerBuyer {
   address: string | null;
   mandiCode: string | null;
   contact: string | null;
-  negativeFlag: boolean | null;
+  redFlag: boolean | null;
   isActive: boolean | null;
   overallDue: number; // Total due including receivables from linked Cash Management parties
   receivables: number; // Receivables breakdown from linked Cash Management parties

@@ -271,8 +271,8 @@ export function FarmerLedgerTab() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleToggleNegativeFlag = (id: number, currentValue: boolean) => {
-    updateMutation.mutate({ id, data: { negativeFlag: !currentValue } });
+  const handleToggleRedFlag = (id: number, currentValue: boolean) => {
+    updateMutation.mutate({ id, data: { redFlag: !currentValue } });
   };
 
   const handleToggleArchive = (id: number, currentValue: boolean) => {
@@ -498,7 +498,7 @@ export function FarmerLedgerTab() {
             ${displayedFarmers.map(f => `
               <tr>
                 <td>${f.farmerCode || '-'}</td>
-                <td>${f.name}${f.negativeFlag ? ' (Flagged)' : ''}</td>
+                <td>${f.name}${f.redFlag ? ' (Red Flag)' : ''}</td>
                 <td>${f.village || '-'}</td>
                 <td>${f.contact || '-'}</td>
                 <td class="text-right">${formatCurrency(f.pyReceivableWithInterest || 0)}</td>
@@ -544,10 +544,10 @@ export function FarmerLedgerTab() {
         <td className="p-2 text-xs" data-testid={`text-farmer-name-${farmer.id}`}>
           <div className="flex items-center gap-1">
             <span className="font-medium">{farmer.name}</span>
-            {farmer.negativeFlag && (
+            {farmer.redFlag && (
               <Badge variant="destructive" className="text-[10px] px-1 py-0">
                 <Flag className="h-2.5 w-2.5 mr-0.5" />
-                {t("Flagged", "चिह्नित")}
+                {t("Red Flag", "रेड फ्लैग")}
               </Badge>
             )}
           </div>
@@ -574,8 +574,8 @@ export function FarmerLedgerTab() {
         <td className="p-2">
           <div className="flex items-center gap-1 justify-end">
             <Switch
-              checked={farmer.negativeFlag ?? false}
-              onCheckedChange={() => handleToggleNegativeFlag(farmer.id, farmer.negativeFlag ?? false)}
+              checked={farmer.redFlag ?? false}
+              onCheckedChange={() => handleToggleRedFlag(farmer.id, farmer.redFlag ?? false)}
               disabled={isArchived}
               data-testid={`switch-negative-${farmer.id}`}
             />

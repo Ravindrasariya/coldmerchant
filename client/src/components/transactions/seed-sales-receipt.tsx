@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -56,13 +56,15 @@ interface SeedSalesReceiptDialogProps {
   merchantId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  autoAction?: "print" | "share";
 }
 
-export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpenChange }: SeedSalesReceiptDialogProps) {
+export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpenChange, autoAction }: SeedSalesReceiptDialogProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
+  const autoActionDone = useRef(false);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const handleShare = async () => {
@@ -227,38 +229,73 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
     printWindow.print();
   };
 
+  useEffect(() => {
+    if (!open || !autoAction || autoActionDone.current || isLoading) return;
+    autoActionDone.current = true;
+    if (autoAction === "print") {
+      handlePrint();
+      onOpenChange(false);
+    } else if (autoAction === "share") {
+      const timer = setTimeout(async () => {
+        if (!printRef.current) {
+          onOpenChange(false);
+          return;
+        }
+        await handleShare();
+        onOpenChange(false);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [open, autoAction, isLoading]);
+
+  useEffect(() => {
+    if (!open) {
+      autoActionDone.current = false;
+    }
+  }, [open]);
+
   if (!open) return null;
+
+  if (autoAction === "print") {
+    return null;
+  }
+
+  const isAutoShare = autoAction === "share";
 
   const transportCharges = parseFloat(transaction?.transportCharges || "0");
   const otherCharges = parseFloat(transaction?.otherCharges || "0");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between pr-8">
-            <DialogTitle>Seed Sales Receipt</DialogTitle>
-            <div className="flex gap-2">
-              <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-seed-receipt">
-                {sharing ? (
-                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : isMobile ? (
-                  <Share2 className="h-4 w-4 mr-2" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                {sharing ? "..." : isMobile ? "Share" : "PDF"}
-              </Button>
-              <Button onClick={handlePrint} size="sm" data-testid="button-print-seed-receipt">
-                <Printer className="h-4 w-4 mr-2" />
-                Print
-              </Button>
+    <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined} style={isAutoShare ? { pointerEvents: "none" } : undefined}>
+        {isAutoShare ? (
+          <DialogTitle className="sr-only">Generating PDF</DialogTitle>
+        ) : (
+          <DialogHeader>
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle>Seed Sales Receipt</DialogTitle>
+              <div className="flex gap-2">
+                <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-seed-receipt">
+                  {sharing ? (
+                    <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : isMobile ? (
+                    <Share2 className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  {sharing ? "..." : isMobile ? "Share" : "PDF"}
+                </Button>
+                <Button onClick={handlePrint} size="sm" data-testid="button-print-seed-receipt">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+              </div>
             </div>
-          </div>
-          <DialogDescription>
-            Preview and print the seed sales receipt
-          </DialogDescription>
-        </DialogHeader>
+            <DialogDescription>
+              Preview and print the seed sales receipt
+            </DialogDescription>
+          </DialogHeader>
+        )}
 
         {isLoading ? (
           <div className="space-y-4">

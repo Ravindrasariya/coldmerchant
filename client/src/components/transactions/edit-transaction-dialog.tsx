@@ -803,6 +803,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                                       />
                                       {buyer.name}
                                       {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
+                                      {buyer.redFlag && (
+                                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                          Red Flag
+                                        </span>
+                                      )}
                                     </CommandItem>
                                   ))}
                                 </CommandGroup>

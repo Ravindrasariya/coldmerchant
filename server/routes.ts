@@ -2427,7 +2427,7 @@ export async function registerRoutes(
         });
       }
       
-      const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
+      const { dateAdded, name, address, mandiCode, contact, redFlag, isActive } = validationResult.data;
 
       // Generate buyer code: BYYYYYMMDD{seq} - unique per merchant (MAX-based with retry)
       const effectiveDateAdded = dateAdded || getISTDateString();
@@ -2448,7 +2448,7 @@ export async function registerRoutes(
             address: titleCase(address) || address,
             mandiCode: mandiCode || null,
             contact: contact || null,
-            negativeFlag: negativeFlag ?? false,
+            redFlag: redFlag ?? false,
             isActive: isActive ?? true,
           });
           break;
@@ -2483,7 +2483,7 @@ export async function registerRoutes(
         });
       }
       
-      const { dateAdded, name, address, mandiCode, contact, negativeFlag, isActive } = validationResult.data;
+      const { dateAdded, name, address, mandiCode, contact, redFlag, isActive } = validationResult.data;
 
       const buyer = await storage.updateBuyer(id, merchantId, {
         ...(dateAdded !== undefined && { dateAdded }),
@@ -2491,7 +2491,7 @@ export async function registerRoutes(
         ...(address !== undefined && { address: titleCase(address) || address }),
         ...(mandiCode !== undefined && { mandiCode }),
         ...(contact !== undefined && { contact }),
-        ...(negativeFlag !== undefined && { negativeFlag }),
+        ...(redFlag !== undefined && { redFlag }),
         ...(isActive !== undefined && { isActive }),
       });
       
@@ -2524,7 +2524,7 @@ export async function registerRoutes(
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
       const id = parseInt(req.params.id);
-      const { name, address, mandiCode, contact, negativeFlag } = req.body;
+      const { name, address, mandiCode, contact, redFlag } = req.body;
 
       if (!name || name.trim() === '') {
         return res.status(400).json({ message: "Buyer name is required" });
@@ -2543,7 +2543,7 @@ export async function registerRoutes(
       const newAddress = address?.trim() || null;
       const newMandiCode = mandiCode?.trim() || null;
       const newContact = contact?.trim() || null;
-      const newNegativeFlag = negativeFlag ?? existingBuyer.negativeFlag;
+      const newRedFlag = redFlag ?? existingBuyer.redFlag;
 
       if (existingBuyer.name !== newName) {
         changes.push({ fieldName: "name", oldValue: existingBuyer.name, newValue: newName });
@@ -2557,8 +2557,8 @@ export async function registerRoutes(
       if (existingBuyer.contact !== newContact) {
         changes.push({ fieldName: "contact", oldValue: existingBuyer.contact, newValue: newContact });
       }
-      if (existingBuyer.negativeFlag !== newNegativeFlag) {
-        changes.push({ fieldName: "negativeFlag", oldValue: String(existingBuyer.negativeFlag), newValue: String(newNegativeFlag) });
+      if (existingBuyer.redFlag !== newRedFlag) {
+        changes.push({ fieldName: "redFlag", oldValue: String(existingBuyer.redFlag), newValue: String(newRedFlag) });
       }
 
       // If there are changes, record them
@@ -2584,9 +2584,9 @@ export async function registerRoutes(
         contact: newContact,
       });
 
-      // Also update negativeFlag if changed
-      if (existingBuyer.negativeFlag !== newNegativeFlag) {
-        await storage.updateBuyer(id, merchantId, { negativeFlag: newNegativeFlag });
+      // Also update redFlag if changed
+      if (existingBuyer.redFlag !== newRedFlag) {
+        await storage.updateBuyer(id, merchantId, { redFlag: newRedFlag });
       }
 
       if (!result.buyer) {
@@ -2842,6 +2842,7 @@ export async function registerRoutes(
         tehsil: farmer.tehsil || "",
         district: farmer.district || "",
         state: farmer.state || "",
+        redFlag: farmer.redFlag || false,
       }));
       
       res.json(suggestions);
@@ -2957,7 +2958,7 @@ export async function registerRoutes(
                 district: data.district,
                 state: data.state,
                 pyReceivable: "0",
-                negativeFlag: false,
+                redFlag: false,
                 isArchived: false,
               });
               break;
@@ -3064,10 +3065,10 @@ export async function registerRoutes(
         });
       }
       
-      const { negativeFlag, isArchived, pyReceivable } = validationResult.data;
+      const { redFlag, isArchived, pyReceivable } = validationResult.data;
 
       const farmer = await storage.updateFarmer(id, merchantId, {
-        ...(negativeFlag !== undefined && { negativeFlag }),
+        ...(redFlag !== undefined && { redFlag }),
         ...(isArchived !== undefined && { isArchived }),
         ...(pyReceivable !== undefined && { pyReceivable }),
       });

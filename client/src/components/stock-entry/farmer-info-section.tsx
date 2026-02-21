@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User } from "lucide-react";
+import { User, AlertTriangle } from "lucide-react";
 import { StockEntryForm, DISTRICTS, STATES } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ interface FarmerSuggestion {
   tehsil: string | null;
   district: string;
   state: string;
+  redFlag: boolean | null;
   source: 'stock_entry' | 'seed_transaction';
 }
 
@@ -42,6 +43,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const searchFarmers = useCallback(async (query: string) => {
@@ -120,6 +122,11 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
     }
     
     setHighlightedFields(fieldsToHighlight);
+    if (farmer.redFlag) {
+      setRedFlagWarning(farmer.farmerName);
+    } else {
+      setRedFlagWarning(null);
+    }
     setShowSuggestions(false);
     setSuggestions([]);
     setSearchQuery("");
@@ -212,7 +219,14 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                         }}
                         data-testid={`suggestion-farmer-${index}`}
                       >
-                        <div className="text-sm font-medium">{farmer.farmerName}</div>
+                        <div className="text-sm font-medium flex items-center">
+                          {farmer.farmerName}
+                          {farmer.redFlag && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                              Red Flag
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-muted-foreground">
                           {farmer.village && <span>{farmer.village}</span>}
                           {farmer.village && farmer.farmerContact && <span> • </span>}
@@ -423,6 +437,12 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             )}
           />
         </div>
+        {redFlagWarning && (
+          <div className="mt-2 flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm text-orange-700 dark:text-orange-400">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span>{redFlagWarning} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

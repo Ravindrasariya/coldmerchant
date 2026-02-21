@@ -40,11 +40,11 @@ export default function BuyersTab() {
   
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", address: "", mandiCode: "", contact: "", negativeFlag: false });
+  const [editForm, setEditForm] = useState({ name: "", address: "", mandiCode: "", contact: "", redFlag: false });
   const [showHistory, setShowHistory] = useState(false);
   
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ name: "", address: "", mandiCode: "", contact: "", negativeFlag: false });
+  const [addForm, setAddForm] = useState({ name: "", address: "", mandiCode: "", contact: "", redFlag: false });
 
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [nameFilter, setNameFilter] = useState("");
@@ -76,7 +76,7 @@ export default function BuyersTab() {
         address: buyer.address,
         mandiCode: buyer.mandiCode || null,
         contact: buyer.contact || null,
-        negativeFlag: buyer.negativeFlag,
+        redFlag: buyer.redFlag,
         isActive: true,
       });
       return response.json();
@@ -85,7 +85,7 @@ export default function BuyersTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setAddDialogOpen(false);
-      setAddForm({ name: "", address: "", mandiCode: "", contact: "", negativeFlag: false });
+      setAddForm({ name: "", address: "", mandiCode: "", contact: "", redFlag: false });
       toast({ title: t("Buyer added successfully", "खरीदार सफलतापूर्वक जोड़ा गया"), variant: "success" });
     },
     onError: () => {
@@ -100,7 +100,7 @@ export default function BuyersTab() {
         address: data.address,
         mandiCode: data.mandiCode || null,
         contact: data.contact || null,
-        negativeFlag: data.negativeFlag,
+        redFlag: data.redFlag,
       });
       return response.json();
     },
@@ -157,7 +157,7 @@ export default function BuyersTab() {
       address: buyer.address,
       mandiCode: buyer.mandiCode || "",
       contact: buyer.contact || "",
-      negativeFlag: buyer.negativeFlag ?? false,
+      redFlag: buyer.redFlag ?? false,
     });
     setShowHistory(false);
     setEditDialogOpen(true);
@@ -194,7 +194,7 @@ export default function BuyersTab() {
       address: t("Address", "पता"),
       mandiCode: t("Mandi Code", "मंडी कोड"),
       contact: t("Contact", "संपर्क"),
-      negativeFlag: t("Negative Flag", "नकारात्मक फ्लैग"),
+      redFlag: t("Red Flag", "रेड फ्लैग"),
     };
     return fieldMap[field] || field;
   };
@@ -344,7 +344,7 @@ export default function BuyersTab() {
                   <div>{t("Address", "पता")}</div>
                   <div>{t("Mandi Code", "मंडी कोड")}</div>
                   <div>{t("Contact", "संपर्क")}</div>
-                  <div>{t("Negative", "नकारात्मक")}</div>
+                  <div>{t("Red Flag", "रेड फ्लैग")}</div>
                   <div>{t("Active", "सक्रिय")}</div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -394,7 +394,7 @@ export default function BuyersTab() {
                       {buyer.contact || '-'}
                     </div>
                     <div className="flex items-center">
-                      {buyer.negativeFlag ? (
+                      {buyer.redFlag ? (
                         <Badge variant="destructive" className="text-xs">{t("Yes", "हाँ")}</Badge>
                       ) : (
                         <Badge variant="secondary" className="text-xs">{t("No", "नहीं")}</Badge>
@@ -442,8 +442,8 @@ export default function BuyersTab() {
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div className="flex items-center gap-2">
-                      {buyer.negativeFlag ? (
-                        <Badge variant="destructive">{t("Negative", "नकारात्मक")}</Badge>
+                      {buyer.redFlag ? (
+                        <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
                       ) : null}
                       <Switch
                         checked={buyer.isActive ?? true}
@@ -516,10 +516,10 @@ export default function BuyersTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t("Negative Flag", "नकारात्मक फ्लैग")}</Label>
+              <Label>{t("Red Flag", "रेड फ्लैग")}</Label>
               <Select
-                value={editForm.negativeFlag ? "yes" : "no"}
-                onValueChange={(v) => setEditForm({ ...editForm, negativeFlag: v === "yes" })}
+                value={editForm.redFlag ? "yes" : "no"}
+                onValueChange={(v) => setEditForm({ ...editForm, redFlag: v === "yes" })}
               >
                 <SelectTrigger data-testid="select-edit-negative">
                   <SelectValue />
@@ -645,10 +645,10 @@ export default function BuyersTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t("Negative Flag", "नकारात्मक फ्लैग")}</Label>
+              <Label>{t("Red Flag", "रेड फ्लैग")}</Label>
               <Select
-                value={addForm.negativeFlag ? "yes" : "no"}
-                onValueChange={(v) => setAddForm({ ...addForm, negativeFlag: v === "yes" })}
+                value={addForm.redFlag ? "yes" : "no"}
+                onValueChange={(v) => setAddForm({ ...addForm, redFlag: v === "yes" })}
               >
                 <SelectTrigger data-testid="select-add-negative">
                   <SelectValue />

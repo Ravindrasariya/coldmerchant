@@ -244,6 +244,7 @@ export interface IStorage {
     tehsil: string | null;
     district: string;
     state: string;
+    redFlag: boolean | null;
     source: 'stock_entry' | 'seed_transaction';
   }[]>;
   
@@ -1864,7 +1865,7 @@ export class DatabaseStorage implements IStorage {
           contact: buyerData.contact || null,
           address: buyerData.address || "",
           mandiCode: buyerData.mandiCode || null,
-          negativeFlag: false,
+          redFlag: false,
           isActive: true,
         });
         return { buyerId: newBuyer.id, isNew: true };
@@ -2048,7 +2049,7 @@ export class DatabaseStorage implements IStorage {
           state: farmerData.state || null,
           pyPayable: "0",
           pyReceivable: "0",
-          negativeFlag: false,
+          redFlag: false,
           isArchived: false,
         });
         return { farmerId: newFarmer.id, isNew: true };
@@ -3461,6 +3462,7 @@ export class DatabaseStorage implements IStorage {
     tehsil: string | null;
     district: string;
     state: string;
+    redFlag: boolean | null;
     source: 'stock_entry' | 'seed_transaction';
   }[]> {
     const normalizedQuery = query.trim().toLowerCase();
@@ -3474,6 +3476,7 @@ export class DatabaseStorage implements IStorage {
       tehsil: farmers.tehsil,
       district: farmers.district,
       state: farmers.state,
+      redFlag: farmers.redFlag,
     })
     .from(farmers)
     .where(eq(farmers.merchantId, merchantId));
@@ -3495,6 +3498,7 @@ export class DatabaseStorage implements IStorage {
         tehsil: farmer.tehsil,
         district: farmer.district || "",
         state: farmer.state || "",
+        redFlag: farmer.redFlag,
         source: 'stock_entry' as const,
       }))
       .sort((a, b) => a.farmerName.localeCompare(b.farmerName));

@@ -814,6 +814,7 @@ interface FarmerSuggestion {
   tehsil: string;
   district: string;
   state: string;
+  redFlag: boolean;
 }
 
 function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
@@ -1023,7 +1024,14 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         }}
                         data-testid={`suggestion-farmer-name-${index}`}
                       >
-                        <div className="font-medium text-sm">{farmer.name}</div>
+                        <div className="font-medium text-sm flex items-center">
+                          {farmer.name}
+                          {farmer.redFlag && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                              Red Flag
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {farmer.contact && <span>{farmer.contact}</span>}
                           {farmer.contact && farmer.village && <span> | </span>}

@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, UserPlus, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -535,13 +535,26 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                   .filter((b) => b.isActive)
                                   .map((buyer) => (
                                     <SelectItem key={buyer.id} value={buyer.id.toString()}>
-                                      {buyer.name} {buyer.address && `(${buyer.address})`}
+                                      <span className="flex items-center gap-2">
+                                        {buyer.name} {buyer.address && `(${buyer.address})`}
+                                        {buyer.redFlag && (
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                            Red Flag
+                                          </span>
+                                        )}
+                                      </span>
                                     </SelectItem>
                                   ))}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
+                        {selectedBuyer?.redFlag && (
+                          <div className="flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm text-orange-700 dark:text-orange-400">
+                            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                            <span>{selectedBuyer.name} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
+                          </div>
+                        )}
 
                         {/* Lot Selection */}
                         <div className="space-y-3">

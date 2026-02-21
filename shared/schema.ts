@@ -305,7 +305,7 @@ export const buyers = pgTable("buyers", {
   mandiCode: text("mandi_code"),
   contact: text("contact"),
   receivableBalance: decimal("receivable_balance", { precision: 12, scale: 2 }).default("0"),
-  negativeFlag: boolean("negative_flag").default(false),
+  redFlag: boolean("red_flag").default(false),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -321,7 +321,7 @@ export const buyerEditHistory = pgTable("buyer_edit_history", {
   buyerId: integer("buyer_id").notNull().references(() => buyers.id),
   changedAt: timestamp("changed_at").defaultNow(),
   changedBy: integer("changed_by").references(() => users.id), // userId who made the change
-  fieldName: text("field_name").notNull(), // name, address, mandiCode, contact, negativeFlag
+  fieldName: text("field_name").notNull(), // name, address, mandiCode, contact, redFlag
   oldValue: text("old_value"),
   newValue: text("new_value"),
 });
@@ -344,7 +344,7 @@ export const farmers = pgTable("farmers", {
   remainingReceivable: decimal("remaining_receivable", { precision: 12, scale: 2 }).default("0"), // pyReceivableFinalAmount - total payments made (what's actually still owed)
   receivableInterestRate: decimal("receivable_interest_rate", { precision: 5, scale: 2 }).default("0"),
   receivableEffectiveDate: date("receivable_effective_date"),
-  negativeFlag: boolean("negative_flag").default(false),
+  redFlag: boolean("red_flag").default(false),
   isArchived: boolean("is_archived").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
