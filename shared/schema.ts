@@ -960,30 +960,42 @@ export type ChargeEntry = z.infer<typeof chargeEntrySchema>;
 
 export const lotFormSchema = z.object({
   place: z.enum(["farm_gate", "cold_store", "mandi"]).default("cold_store"),
-  coldStoreName: z.string().optional(), // required only for cold_store place
-  coldStoreLotNumber: z.string().optional(), // lot number at cold store
+  coldStoreName: z.string().optional(),
+  coldStoreLotNumber: z.string().optional(),
   crop: z.enum(["potato", "onion", "garlic"]).default("potato"),
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
-  potatoType: z.string().optional(), // variety - required only for potato crop
-  harvestPotatoType: z.string().optional(), // Wafer, Ration, Seed - for potato crop only
-  bagType: z.string().optional().default(""), // optional with suggestions
+  potatoType: z.string().optional(),
+  harvestPotatoType: z.string().optional(),
+  bagType: z.string().optional().default(""),
   quality: z.string().min(1, "Quality is required"),
-  cutType: z.enum(["gate_cut", "bilty_cut"]), // now called Delivery Type in UI
+  cutType: z.enum(["gate_cut", "bilty_cut"]),
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
-  totalWeight: z.coerce.number().optional(), // Total weight in kg (optional)
-  charges: z.array(chargeEntrySchema).optional(), // Dynamic charges array
-  mandiCommissionPercent: z.coerce.number().optional(), // Mandi commission % on final value
-  aadhatCommissionPercent: z.coerce.number().optional(), // Aadhat commission % on final value
-  hammaliPerBag: z.coerce.number().optional(), // Hammali charges per bag for mandi
-  mandiExtraCharges: z.coerce.number().optional(), // Extra charges total for mandi
-  adjustedAmount: z.coerce.number().optional(), // adjustment amount for farmer due (principal if rate is used)
-  adjustedAmountType: z.enum(["debit", "credit"]).optional(), // debit or credit
-  adjustedAmountRate: z.coerce.number().optional(), // annual rate % for compound interest
-  adjustedAmountEffectiveDate: z.string().optional(), // effective date for interest calculation (YYYY-MM-DD)
-  adjustedAmountRemark: z.string().optional(), // reason for adjustment
+  totalWeight: z.coerce.number().optional(),
+  charges: z.preprocess(
+    (val) => {
+      if (!Array.isArray(val)) return val;
+      return val.filter((c: any) => c && ((c.type && String(c.type).trim() !== "") || (c.amount && Number(c.amount) > 0)));
+    },
+    z.array(chargeEntrySchema).optional()
+  ),
+  mandiCommissionPercent: z.coerce.number().optional(),
+  aadhatCommissionPercent: z.coerce.number().optional(),
+  hammaliPerBag: z.coerce.number().optional(),
+  mandiExtraCharges: z.coerce.number().optional(),
+  adjustedAmount: z.coerce.number().optional(),
+  adjustedAmountType: z.enum(["debit", "credit"]).optional(),
+  adjustedAmountRate: z.coerce.number().optional(),
+  adjustedAmountEffectiveDate: z.string().optional(),
+  adjustedAmountRemark: z.string().optional(),
   remarks: z.string().optional(),
   bagBreakdowns: z.array(bagBreakdownFormSchema).optional(),
+}).superRefine((data, ctx) => {
+  if (data.place === "cold_store") {
+    if (!data.coldStoreName || data.coldStoreName.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cold store name is required", path: ["coldStoreName"] });
+    }
+  }
 });
 
 export const stockEntryFormSchema = z.object({

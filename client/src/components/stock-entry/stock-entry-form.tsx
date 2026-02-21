@@ -127,6 +127,21 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       form.setValue(`lots.${index}.place`, selectedPlace);
       if (selectedPlace === "mandi") {
         form.setValue(`lots.${index}.cutType`, "gate_cut");
+        form.setValue(`lots.${index}.coldStoreName`, "");
+        form.setValue(`lots.${index}.coldStoreLotNumber`, "");
+        form.setValue(`lots.${index}.charges`, []);
+      } else if (selectedPlace === "farm_gate") {
+        form.setValue(`lots.${index}.coldStoreName`, "");
+        form.setValue(`lots.${index}.coldStoreLotNumber`, "");
+        form.setValue(`lots.${index}.mandiCommissionPercent`, undefined);
+        form.setValue(`lots.${index}.aadhatCommissionPercent`, undefined);
+        form.setValue(`lots.${index}.hammaliPerBag`, undefined);
+        form.setValue(`lots.${index}.mandiExtraCharges`, undefined);
+      } else {
+        form.setValue(`lots.${index}.mandiCommissionPercent`, undefined);
+        form.setValue(`lots.${index}.aadhatCommissionPercent`, undefined);
+        form.setValue(`lots.${index}.hammaliPerBag`, undefined);
+        form.setValue(`lots.${index}.mandiExtraCharges`, undefined);
       }
     });
   }, [selectedPlace, form]);
