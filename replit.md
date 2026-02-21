@@ -106,7 +106,7 @@ When paying a supplier:
 - **Reversals**: Restore transaction allocations first, then add back to remainingReceivable only
 
 ### Buyer Management System
-- **Buyers Table**: Stores buyer information per merchant with fields: name, address, mandiCode, contact, negativeFlag, isActive, receivableBalance
+- **Buyers Table**: Stores buyer information per merchant with fields: name, address, mandiCode, contact, redFlag, isActive, receivableBalance
 - **API Routes**: Full CRUD operations at /api/buyers with Zod validation using insertBuyerSchema
 - **UI Pattern**: Editable table rows with localRows state management:
   - `localRows = null`: Displaying server data (no edits)
@@ -137,7 +137,8 @@ When paying a supplier:
   - Net Due = Harvest Due - PY Receivable - Seed Due
 - **Receivables Integration**: Managed farmers from Cash Settings with pendingDueToBePaid are combined into PY Receivable column and appear in Seed farmer dropdown
 - **PY Balances**: Previous year payable/receivable are editable inline with blur-based commits
-- **Negative Flag & Archive**: Toggle controls per farmer; archived farmers shown at bottom with toggle to show/hide
+- **Red Flag & Archive**: Toggle controls per farmer; archived farmers shown at bottom with toggle to show/hide
+- **Red Flag in Auto-fill**: Red-flagged farmers/buyers appear in suggestion dropdowns with orange warning badges instead of being hidden
 - **Farmer IDs Never Reassigned**: Unique farmer codes (FMYYYYMMDD#) are permanent and never recycled
 - **Accessible via**: User dropdown menu > "Farmer Ledger" link
 
