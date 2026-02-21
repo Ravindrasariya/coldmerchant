@@ -1137,6 +1137,13 @@ export function CashManagementTab() {
                       <p className="font-medium">{viewDetailsEntry.supplierName}</p>
                     </div>
                   )}
+                  
+                  {viewDetailsEntry.aadhatName && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">{t("Aadhtiya Name", "आढ़तिया का नाम")}</Label>
+                      <p className="font-medium">{viewDetailsEntry.aadhatName}</p>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -2334,6 +2341,8 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
@@ -2361,6 +2370,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
 
   const getExpenseTypeLabel = (type: string | null) => {
     switch (type) {
+      case "aadhtiya": return t("Aadhtiya", "आढ़तिया");
       case "cold_store_charge": return t("Cold Store", "शीत भंडार");
       case "farmer": return t("Farmer - Harvest", "किसान - फसल");
       case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");

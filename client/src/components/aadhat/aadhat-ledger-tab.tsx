@@ -80,6 +80,7 @@ export default function AadhatLedgerTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       setAddDialogOpen(false);
       setAddForm({ name: "", address: "", contact: "", pyPayable: "", redFlag: false });
       toast({ title: t("Aadhat added successfully", "आढ़त सफलतापूर्वक जोड़ा गया"), variant: "success" });
@@ -102,6 +103,7 @@ export default function AadhatLedgerTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       setEditDialogOpen(false);
       setEditingAadhat(null);
       setShowHistory(false);
@@ -119,6 +121,7 @@ export default function AadhatLedgerTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
     },
   });
 
