@@ -13,7 +13,7 @@ export function CropToggle({ value, onChange }: CropToggleProps) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as CropType)}>
       <SelectTrigger 
-        className="bg-green-600 text-white border-green-600 focus:ring-green-500 font-bold [&>svg]:text-white"
+        className="w-fit shrink-0 bg-green-600 text-white border-green-600 focus:ring-green-500 font-bold [&>svg]:text-white [&>span]:!line-clamp-none"
         data-testid="toggle-crop"
       >
         <SelectValue placeholder={t("Potato", "आलू")} />

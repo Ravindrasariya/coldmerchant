@@ -405,7 +405,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <Select value={selectedPlace} onValueChange={(v) => setSelectedPlace(v as "farm_gate" | "cold_store")}>
                     <SelectTrigger
-                      className="w-auto bg-orange-500 text-white border-orange-500 focus:ring-orange-400 font-bold [&>svg]:text-white"
+                      className="w-fit shrink-0 bg-orange-500 text-white border-orange-500 focus:ring-orange-400 font-bold [&>svg]:text-white [&>span]:!line-clamp-none"
                       data-testid="select-place-header"
                     >
                       <SelectValue />
