@@ -44,7 +44,7 @@ export const stockEntries = pgTable("stock_entries", {
   uniqueId: text("unique_id"), // HSE + YYYYMMDD + sequence (e.g., HSE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   serialNumber: integer("serial_number").notNull(),
-  crop: text("crop").default("potato"), // potato or onion - for separate serial number sequences
+  crop: text("crop").default("potato"), // potato, onion, or garlic - for separate serial number sequences
   purchaseDate: date("purchase_date").notNull(),
   farmerId: integer("farmer_id").references(() => farmers.id), // links to farmer ledger for matching
   farmerName: text("farmer_name").notNull(),
@@ -137,7 +137,7 @@ export const transactions = pgTable("transactions", {
   uniqueId: text("unique_id"), // HTE + YYYYMMDD + sequence (e.g., HTE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
-  crop: text("crop").default("potato"), // potato or onion - for separate transaction number sequences
+  crop: text("crop").default("potato"), // potato, onion, or garlic - for separate transaction number sequences
   transporterName: text("transporter_name"), // transporter/driver name for autocomplete history
   dateOfLoading: text("date_of_loading"), // date when truck was loaded (YYYY-MM-DD format)
   partyName: text("party_name"),
