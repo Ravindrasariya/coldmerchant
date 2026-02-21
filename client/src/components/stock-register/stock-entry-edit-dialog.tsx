@@ -40,12 +40,15 @@ interface StockEntryWithLots {
   id: number;
   serialNumber: number;
   purchaseDate: string;
+  place: string | null;
   farmerName: string;
   farmerContact: string | null;
   village: string | null;
   tehsil: string | null;
   district: string;
   state: string;
+  aadhatDbId: number | null;
+  aadhatName: string | null;
   paymentStatus: string;
   remarks: string | null;
   lots: Array<{
@@ -65,6 +68,10 @@ interface StockEntryWithLots {
     pricePerKg: string | null;
     totalWeight: string | null;
     charges: Array<{ type: string; amount: number | string }> | null;
+    mandiCommissionPercent: string | null;
+    aadhatCommissionPercent: string | null;
+    hammaliPerBag: string | null;
+    mandiExtraCharges: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
     adjustedAmount: string | null;
@@ -107,6 +114,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : null,
     totalWeight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : null,
     charges: lot.charges || [],
+    mandiCommissionPercent: lot.mandiCommissionPercent !== null ? parseFloat(lot.mandiCommissionPercent) : null,
+    aadhatCommissionPercent: lot.aadhatCommissionPercent !== null ? parseFloat(lot.aadhatCommissionPercent) : null,
+    hammaliPerBag: lot.hammaliPerBag !== null ? parseFloat(lot.hammaliPerBag) : null,
+    mandiExtraCharges: lot.mandiExtraCharges !== null ? parseFloat(lot.mandiExtraCharges) : null,
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
     adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
@@ -433,58 +444,98 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          <Card className="border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t("Farmer Details", "किसान विवरण")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground text-xs">{t("Name", "नाम")}</p>
-                  <p className="font-medium">{entry.farmerName}</p>
+          {entry.place === "mandi" ? (
+            <Card className="border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("Aadhtiya Details", "आढ़तिया विवरण")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Aadhtiya Name", "आढ़तिया नाम")}</p>
+                    <p className="font-medium">{entry.aadhatName || entry.farmerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Date", "तिथि")}</p>
+                    <p className="font-medium">
+                      {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Place", "स्थान")}</p>
+                    <p className="font-medium">{t("Mandi", "मंडी")}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("District", "जिला")}</p>
+                    <p className="font-medium">{entry.district}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("State", "राज्य")}</p>
+                    <p className="font-medium">{entry.state}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t("Contact", "संपर्क")}</p>
-                  <p className="font-medium">{entry.farmerContact || "—"}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("Farmer Details", "किसान विवरण")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Name", "नाम")}</p>
+                    <p className="font-medium">{entry.farmerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Contact", "संपर्क")}</p>
+                    <p className="font-medium">{entry.farmerContact || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Date", "तिथि")}</p>
+                    <p className="font-medium">
+                      {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("Village", "गाँव")}</p>
+                    <p className="font-medium">{entry.village || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("District", "जिला")}</p>
+                    <p className="font-medium">{entry.district}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">{t("State", "राज्य")}</p>
+                    <p className="font-medium">{entry.state}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t("Date", "तिथि")}</p>
-                  <p className="font-medium">
-                    {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t("Village", "गाँव")}</p>
-                  <p className="font-medium">{entry.village || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t("District", "जिला")}</p>
-                  <p className="font-medium">{entry.district}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t("State", "राज्य")}</p>
-                  <p className="font-medium">{entry.state}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="space-y-4">
             <h4 className="font-medium">{t("Lots", "लॉट")}</h4>
             {lots.map((lot, lotIndex) => (
               <Card key={lot.id || lotIndex} className="border-border">
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 shrink-0">
                         <Package className="h-3 w-3 text-primary" />
                       </div>
                       {lot.place === "farm_gate" ? (
                         <CardTitle className="text-base font-medium">{t("Farm Gate", "फार्म गेट")}</CardTitle>
+                      ) : lot.place === "mandi" ? (
+                        <CardTitle className="text-base font-medium">{t("Mandi", "मंडी")}</CardTitle>
                       ) : (
                         <div className="relative flex-1 max-w-[220px]">
                           <Input
@@ -532,13 +583,15 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           )}
                         </div>
                       )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-xs shrink-0">
                         {lot.potatoType} • {lot.quality}
                       </Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-mono font-medium">{lot.remainingBags}</span>
-                      <span>/{lot.originalBags} {t("bags", "बोरी")}</span>
+                      <div className="text-sm text-muted-foreground shrink-0">
+                        <span className="font-mono font-medium">{lot.remainingBags}</span>
+                        <span>/{lot.originalBags} {t("bags", "बोरी")}</span>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -683,7 +736,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                   </div>
                 </CardContent>
                 
-                {/* Adjusted Amount Section - applies to all cut types */}
+                {/* Adjusted Amount Section - NOT shown for mandi */}
+                {lot.place !== "mandi" && (
                 <CardContent className="pt-0 border-t">
                   <div className="p-3 bg-purple-50/50 dark:bg-purple-900/10 rounded-md">
                     <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
@@ -758,7 +812,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         />
                       </div>
                     </div>
-                    {/* Show calculated final amount when rate and effective date are provided */}
                     {lot.adjustedAmount && lot.adjustedAmount > 0 && lot.adjustedAmountRate && lot.adjustedAmountRate > 0 && lot.adjustedAmountEffectiveDate && (
                       (() => {
                         const principal = lot.adjustedAmount;
@@ -790,8 +843,109 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     )}
                   </div>
                 </CardContent>
+                )}
                 
-                {/* Dynamic Charges Section */}
+                {/* Mandi Charges Section - only for mandi lots */}
+                {lot.place === "mandi" && (
+                <CardContent className="pt-0 border-t">
+                  <div className="space-y-3">
+                    <Label className="text-xs font-medium">{t("Mandi Charges", "मंडी शुल्क")}</Label>
+                    {(() => {
+                      const costOfGoods = lot.bagBreakdowns
+                        .filter(bd => bd.size && bd.size !== "Wastage")
+                        .reduce((sum, bd) => {
+                          const weight = bd.weight || 0;
+                          const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
+                          return sum + (netWeight * (bd.pricePerKg || 0));
+                        }, 0);
+                      const totalBags = lot.bagBreakdowns
+                        .filter(bd => bd.size && bd.size !== "Wastage")
+                        .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
+                      const mandiPct = lot.mandiCommissionPercent || 0;
+                      const aadhatPct = lot.aadhatCommissionPercent || 0;
+                      const hammaliRate = lot.hammaliPerBag || 0;
+                      const mandiTotal = costOfGoods * mandiPct / 100;
+                      const aadhatTotal = costOfGoods * aadhatPct / 100;
+                      const hammaliTotal = totalBags * hammaliRate;
+                      return (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("Mandi %", "मंडी %")}</Label>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="0"
+                                value={lot.mandiCommissionPercent ?? ""}
+                                onChange={(e) => handleLotFieldChange(lotIndex, "mandiCommissionPercent", e.target.value === "" ? null : parseFloat(e.target.value))}
+                                data-testid={`edit-mandi-commission-${lotIndex}`}
+                              />
+                            </div>
+                            <div className="col-span-2 text-sm font-mono text-right">
+                              {t("Mandi Commission", "मंडी कमीशन")}: ₹{mandiTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("Aadhat %", "आढ़त %")}</Label>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="0"
+                                value={lot.aadhatCommissionPercent ?? ""}
+                                onChange={(e) => handleLotFieldChange(lotIndex, "aadhatCommissionPercent", e.target.value === "" ? null : parseFloat(e.target.value))}
+                                data-testid={`edit-aadhat-commission-${lotIndex}`}
+                              />
+                            </div>
+                            <div className="col-span-2 text-sm font-mono text-right">
+                              {t("Aadhat Commission", "आढ़त कमीशन")}: ₹{aadhatTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("Hammali/Bag", "हम्माली/बोरी")}</Label>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="₹0"
+                                value={lot.hammaliPerBag ?? ""}
+                                onChange={(e) => handleLotFieldChange(lotIndex, "hammaliPerBag", e.target.value === "" ? null : parseFloat(e.target.value))}
+                                data-testid={`edit-hammali-per-bag-${lotIndex}`}
+                              />
+                            </div>
+                            <div className="col-span-2 text-sm font-mono text-right">
+                              {t("Hammali", "हम्माली")} ({totalBags} × ₹{hammaliRate}): ₹{hammaliTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("Extra Charges", "अन्य शुल्क")}</Label>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="₹0"
+                                value={lot.mandiExtraCharges ?? ""}
+                                onChange={(e) => handleLotFieldChange(lotIndex, "mandiExtraCharges", e.target.value === "" ? null : parseFloat(e.target.value))}
+                                data-testid={`edit-mandi-extra-charges-${lotIndex}`}
+                              />
+                            </div>
+                            <div className="col-span-2 text-sm font-mono text-right">
+                              {t("Extra Charges", "अन्य शुल्क")}: ₹{(lot.mandiExtraCharges || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+                )}
+
+                {/* Dynamic Charges Section - NOT shown for mandi */}
+                {lot.place !== "mandi" && (
                 <CardContent className="pt-0 border-t">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -856,17 +1010,16 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     )}
                   </div>
                 </CardContent>
+                )}
                 
                 {/* Summary Row */}
                 <CardContent className="pt-0 border-t">
                   {(() => {
-                    // Calculate summary values
                     const actualBags = lot.bagBreakdowns
                       .filter(bd => bd.size && bd.size !== "Wastage")
                       .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
                     
-                    // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
-                    const totalPayable = lot.bagBreakdowns
+                    const costOfGoods = lot.bagBreakdowns
                       .filter(bd => bd.size && bd.size !== "Wastage")
                       .reduce((sum, bd) => {
                         const weight = bd.weight || 0;
@@ -875,6 +1028,60 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         return sum + (netWeight * price);
                       }, 0);
                     
+                    const isMandi = lot.place === "mandi";
+                    
+                    if (isMandi) {
+                      const mandiPct = lot.mandiCommissionPercent || 0;
+                      const aadhatPct = lot.aadhatCommissionPercent || 0;
+                      const hammaliRate = lot.hammaliPerBag || 0;
+                      const extraCharges = lot.mandiExtraCharges || 0;
+                      const mandiTotal = costOfGoods * mandiPct / 100;
+                      const aadhatTotal = costOfGoods * aadhatPct / 100;
+                      const hammaliTotal = actualBags * hammaliRate;
+                      const totalMandiCharges = mandiTotal + aadhatTotal + hammaliTotal + extraCharges;
+                      const netPayable = costOfGoods + totalMandiCharges;
+                      const isPaid = entry.paymentStatus === "paid";
+                      
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-md">
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">{t("Actual Bags", "वास्तविक बोरी")}</p>
+                            <p className="font-mono font-semibold text-sm">{actualBags}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">{t("Cost of Goods", "माल की लागत")}</p>
+                            <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">
+                              ₹{costOfGoods.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">{t("Mandi Charges", "मंडी शुल्क")}</p>
+                            <p className="font-mono font-semibold text-sm text-orange-600 dark:text-orange-400">
+                              ₹{totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground">{t("Net Payable", "शुद्ध देय")}</p>
+                            <p className="font-mono font-bold text-sm text-primary">
+                              ₹{netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
+                          </div>
+                          <div className="text-center flex items-center justify-center">
+                            {isPaid ? (
+                              <Badge className="bg-green-500 text-white">
+                                {t("Paid", "भुगतान")}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                {t("Dues", "बकाया")}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    const totalPayable = costOfGoods;
                     const hammali = lot.hammaliGradingCharges || 0;
                     const isFarmGate = lot.place === "farm_gate";
                     const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
