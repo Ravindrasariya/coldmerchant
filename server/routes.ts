@@ -205,10 +205,14 @@ export async function registerRoutes(
       }
 
       const lotsMap = new Map<number, any[]>();
+      const mandiEntryIds = new Set<number>();
       for (const lot of allLots) {
         const arr = lotsMap.get(lot.stockEntryId) || [];
         arr.push(lot);
         lotsMap.set(lot.stockEntryId, arr);
+        if (lot.place === "Mandi") {
+          mandiEntryIds.add(lot.stockEntryId);
+        }
       }
 
       const breakdownsMap = new Map<number, any[]>();
@@ -232,6 +236,7 @@ export async function registerRoutes(
       let summaryColdStoreDue = 0;
 
       for (const entry of filteredEntries) {
+        if (mandiEntryIds.has(entry.id)) continue;
         const dateKey = entry.purchaseDate;
         const entryLots = lotsMap.get(entry.id) || [];
 
@@ -239,7 +244,6 @@ export async function registerRoutes(
         let entryVolume = 0;
 
         for (const lot of entryLots) {
-          if (lot.place === "Mandi") continue;
           entryNetPayable += parseFloat(lot.netPayable || "0");
 
           const lotBreakdowns = breakdownsMap.get(lot.id) || [];
@@ -2853,12 +2857,16 @@ export async function registerRoutes(
       const allBreakdowns = await storage.getAllBagBreakdownsByMerchant(merchantId);
       
       
-      // Build a map of stockEntryId -> lots for cold charges calculation
+      // Build a map of stockEntryId -> lots and identify Mandi entries
       const lotsByEntryId = new Map<number, typeof allLots>();
+      const mandiEntryIds = new Set<number>();
       for (const lot of allLots) {
         const existing = lotsByEntryId.get(lot.stockEntryId) || [];
         existing.push(lot);
         lotsByEntryId.set(lot.stockEntryId, existing);
+        if (lot.place === "Mandi") {
+          mandiEntryIds.add(lot.stockEntryId);
+        }
       }
       
       // Build a map of lotId -> bag breakdowns for harvest due calculation
@@ -2881,6 +2889,7 @@ export async function registerRoutes(
         let coldDue = 0;
         
         for (const entry of stockEntryList) {
+          if (mandiEntryIds.has(entry.id)) continue;
           // Match by farmerId first (primary), then fall back to composite key (for legacy data)
           const matchesByFarmerId = entry.farmerId === farmer.id;
           const entryName = entry.farmerName?.trim().toLowerCase() || "";
@@ -2895,7 +2904,6 @@ export async function registerRoutes(
               let entryNetPayable = 0;
               
               for (const lot of entryLots) {
-                if (lot.place === "Mandi") continue;
                 entryNetPayable += parseFloat(lot.netPayable || "0");
                 
                 // Extract cold charges for cold due calculation
@@ -2924,7 +2932,6 @@ export async function registerRoutes(
               const entryLots = lotsByEntryId.get(entry.id) || [];
               const coldStoreTypesElse = ["Cold Charges", "Ware House Charges"];
               for (const lot of entryLots) {
-                if (lot.place === "Mandi") continue;
                 if (lot.charges) {
                   try {
                     const chargesArray = typeof lot.charges === 'string' ? JSON.parse(lot.charges) : lot.charges;
@@ -3019,6 +3026,15 @@ export async function registerRoutes(
       // Get all seed transactions  
       const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
       
+      // Get all lots to identify Mandi entries (aadhatiyas - not farmers)
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      const mandiEntryIds = new Set<number>();
+      for (const lot of allLots) {
+        if (lot.place === "Mandi") {
+          mandiEntryIds.add(lot.stockEntryId);
+        }
+      }
+      
       // Collect unique farmers from stock entries
       // Use full composite key: name + contact + village (case-insensitive, trimmed)
       const farmerMap = new Map<string, { name: string; contact: string | null; village: string | null; tehsil: string | null; district: string | null; state: string | null }>();
@@ -3033,7 +3049,9 @@ export async function registerRoutes(
       };
       
       // Process stock entries first (has mandatory farmer fields)
+      // Skip Mandi entries - those are aadhatiyas, not farmers
       for (const entry of stockEntryList) {
+        if (mandiEntryIds.has(entry.id)) continue;
         if (entry.farmerName) {
           const key = makeKey(entry.farmerName, entry.farmerContact || null, entry.village || null);
           const existing = farmerMap.get(key);
@@ -3140,8 +3158,9 @@ export async function registerRoutes(
         farmerIdMap.set(key, existing!.id);
       }
       
-      // Link farmerId to stock entries that don't have one
+      // Link farmerId to stock entries that don't have one (skip Mandi entries)
       for (const entry of stockEntryList) {
+        if (mandiEntryIds.has(entry.id)) continue;
         if (!entry.farmerId && entry.farmerName) {
           const key = makeKey(entry.farmerName, entry.farmerContact || null, entry.village || null);
           const farmerId = farmerIdMap.get(key);
