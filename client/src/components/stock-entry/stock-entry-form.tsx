@@ -224,9 +224,37 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     createMutation.mutate(data);
   };
 
+  const onInvalid = (errors: any) => {
+    const flatErrors: string[] = [];
+    const collectErrors = (obj: any, prefix = "") => {
+      for (const key in obj) {
+        const val = obj[key];
+        if (val?.message) {
+          flatErrors.push(val.message);
+        } else if (Array.isArray(val)) {
+          val.forEach((item: any, i: number) => {
+            if (item) collectErrors(item, `${prefix}Lot ${i + 1} > `);
+          });
+        } else if (typeof val === "object" && val !== null) {
+          collectErrors(val, `${prefix}${key} > `);
+        }
+      }
+    };
+    collectErrors(errors);
+    toast({
+      title: t("Please fix the following errors", "कृपया निम्नलिखित त्रुटियाँ ठीक करें"),
+      description: flatErrors.slice(0, 5).join("\n") + (flatErrors.length > 5 ? `\n...and ${flatErrors.length - 5} more` : ""),
+      variant: "destructive",
+    });
+    const firstError = formContainerRef.current?.querySelector("[aria-invalid='true'], .text-destructive");
+    if (firstError) {
+      firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
   return (
     <Form {...form}>
-      <form ref={formContainerRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form ref={formContainerRef} onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {selectedPlace === "mandi" ? (
           <AadhtiyaInfoSection form={form} />
         ) : (
