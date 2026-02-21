@@ -41,7 +41,7 @@ The system isolates data by merchant:
 - **Stock Entries**: Per-merchant with auto-incrementing serial numbers and globally unique IDs (HSE+YYYYMMDD+sequence)
 - **Lots**: Child of stock entries, tracks inventory with flexible field structure:
   - **Place**: Farm Gate or Cold Store (determines conditional field display)
-  - **Crop**: Potato or Onion (determines variety/type field visibility)
+  - **Crop**: Potato, Onion, or Garlic (determines variety/type field visibility; Garlic uses same fields as Onion)
   - **Cold Store Fields**: Name, Lot Number (only visible when Place=Cold Store)
   - **Potato Fields**: Variety (potatoType), Harvest Potato Type (only visible when Crop=Potato)
   - **Delivery Type**: Gate Cut or Full Truck
@@ -58,7 +58,7 @@ All four record types have globally unique IDs for backend matching purposes (no
 - Date is derived from purchaseDate for stock entries, createdAt for transactions
 - Unique constraint enforced at database level for data integrity
 - **User-facing IDs**: Serial numbers (Sr No:) and Transaction numbers (Tr No:) are displayed to users
-- **Separate counters**: Potato, Onion, and Seed each have their own serial/transaction number sequences
+- **Separate counters**: Potato, Onion, Garlic, and Seed each have their own serial/transaction number sequences
 - Serial numbers reset yearly while uniqueIds remain globally unique
 
 ### Cold Store Dues Calculation
