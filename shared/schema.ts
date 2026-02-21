@@ -210,6 +210,8 @@ export const cashEntries = pgTable("cash_entries", {
   farmerId: integer("farmer_id").references(() => farmers.id), // resolved farmer ledger ID for reliable matching
   coldStoreName: text("cold_store_name"), // For cold store charge payment outflow
   supplierName: text("supplier_name"), // For supplier outflow (seed stock suppliers)
+  aadhatName: text("aadhat_name"), // For aadhtiya outflow
+  aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // resolved aadhat ledger ID
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
@@ -1024,7 +1026,7 @@ export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
 export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
-export const EXPENSE_TYPES = ["cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "salary", "supplier"] as const;
+export const EXPENSE_TYPES = ["aadhtiya", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "salary", "supplier"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 

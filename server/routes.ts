@@ -1843,12 +1843,36 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/aadhats-with-dues - Get aadhats with outstanding dues (totalDue > 0)
+  app.get("/api/cash/aadhats-with-dues", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const allAadhats = await storage.getAadhatsByMerchant(merchantId);
+      const aadhatsWithDues = allAadhats
+        .filter(a => a.isActive)
+        .map(a => ({
+          id: a.id,
+          aadhatId: a.aadhatId,
+          name: a.name,
+          address: a.address,
+          contact: a.contact,
+          pyPayable: a.pyPayable,
+          totalDue: parseFloat(a.pyPayable || "0"),
+        }))
+        .filter(a => a.totalDue > 0);
+      res.json(aadhatsWithDues);
+    } catch (error) {
+      console.error("Error fetching aadhats with dues:", error);
+      res.status(500).json({ message: "Failed to fetch aadhats with dues" });
+    }
+  });
+
   // POST /api/cash/entries - Create a cash entry (inward, outflow, or transfer)
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, amount, entryDate, remarks } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -1883,7 +1907,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
         }
         if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
@@ -1898,6 +1922,9 @@ export async function registerRoutes(
         }
         if (expenseType === "supplier" && !supplierName) {
           return res.status(400).json({ message: "Supplier name is required when expense type is supplier" });
+        }
+        if (expenseType === "aadhtiya" && !aadhatName) {
+          return res.status(400).json({ message: "Aadhtiya name is required when expense type is aadhtiya" });
         }
       } else if (direction === "transfer") {
         if (!fromAccountType || !["cash_in_hand", "bank_account"].includes(fromAccountType)) {
@@ -1953,11 +1980,15 @@ export async function registerRoutes(
         }
       }
 
+      // Resolve aadhatDbId
+      let resolvedAadhatDbId: number | null = requestAadhatDbId ? parseInt(requestAadhatDbId) : null;
+
       // Determine if FIFO should be applied
       const applyFIFO = (direction === "inward" && !!partyName) || 
                         (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
-                        (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName);
+                        (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName) ||
+                        (direction === "outflow" && expenseType === "aadhtiya" && !!aadhatName);
 
       // Generate cash flow code: CFYYYYMMDD{seq} - unique per merchant (MAX-based with retry)
       const txDateStr = parseDateToCodeFormat(entryDate);
@@ -1991,6 +2022,8 @@ export async function registerRoutes(
             farmerId: resolvedFarmerId,
             coldStoreName: titleCase(coldStoreName) || null,
             supplierName: titleCase(supplierName) || null,
+            aadhatName: expenseType === "aadhtiya" ? (aadhatName || null) : null,
+            aadhatDbId: expenseType === "aadhtiya" ? resolvedAadhatDbId : null,
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,

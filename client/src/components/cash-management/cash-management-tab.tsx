@@ -55,6 +55,8 @@ interface CashEntry {
   farmerVillage: string | null;
   coldStoreName: string | null;
   supplierName: string | null;
+  aadhatName: string | null;
+  aadhatDbId: number | null;
   amount: string;
   entryDate: string;
   remarks: string | null;
@@ -107,6 +109,16 @@ interface SeedSupplierWithDue {
   district: string | null;
   totalDue: number;
   entryCount: number;
+}
+
+interface AadhatWithDue {
+  id: number;
+  aadhatId: string;
+  name: string;
+  address: string;
+  contact: string | null;
+  pyPayable: string;
+  totalDue: number;
 }
 
 // Farmer Ledger data with comprehensive dues
@@ -217,6 +229,8 @@ const outflowFormSchema = z.object({
   farmerName: z.string().optional(),
   coldStoreName: z.string().optional(),
   supplierName: z.string().optional(),
+  aadhatName: z.string().optional(),
+  aadhatDbId: z.coerce.number().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -241,6 +255,13 @@ const outflowFormSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Supplier name is required",
       path: ["supplierName"],
+    });
+  }
+  if (data.expenseType === "aadhtiya" && (!data.aadhatName || data.aadhatName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Aadhtiya name is required",
+      path: ["aadhatName"],
     });
   }
   if (data.paymentMode === "account_transfer" && !data.bankAccountId) {
@@ -321,6 +342,11 @@ export function CashManagementTab() {
   // Fetch seed suppliers with dues from seed stock entries
   const { data: seedSuppliers = [] } = useQuery<SeedSupplierWithDue[]>({
     queryKey: ["/api/cash/seed-suppliers"],
+  });
+
+  // Fetch aadhats with outstanding dues
+  const { data: aadhatsWithDues = [] } = useQuery<AadhatWithDue[]>({
+    queryKey: ["/api/cash/aadhats-with-dues"],
   });
 
   // Fetch Farmer Ledger data (comprehensive dues from all sources)
@@ -429,6 +455,8 @@ export function CashManagementTab() {
       farmerName: "",
       coldStoreName: "",
       supplierName: "",
+      aadhatName: "",
+      aadhatDbId: undefined,
       amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -479,6 +507,8 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
@@ -508,6 +538,8 @@ export function CashManagementTab() {
           farmerName: "",
           coldStoreName: "",
           supplierName: "",
+          aadhatName: "",
+          aadhatDbId: undefined,
           amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -532,6 +564,11 @@ export function CashManagementTab() {
   });
 
   const expenseType = outflowForm.watch("expenseType");
+
+  // State for searchable expense type popover
+  const [expenseTypePopoverOpen, setExpenseTypePopoverOpen] = useState(false);
+  // State for searchable aadhtiya name popover
+  const [aadhatPopoverOpen, setAadhatPopoverOpen] = useState(false);
 
   // Merge managed parties with transaction-derived parties (de-duplicate by name)
   const mergedParties = (() => {
@@ -655,6 +692,10 @@ export function CashManagementTab() {
       return;
     }
     
+    const selectedAadhat = values.expenseType === "aadhtiya"
+      ? aadhatsWithDues.find(a => a.name === values.aadhatName)
+      : null;
+
     const outflowData: any = {
       direction: "outflow",
       expenseType: values.expenseType,
@@ -666,6 +707,8 @@ export function CashManagementTab() {
       farmerId: selectedLedgerFarmerOut?.id || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
       supplierName: values.expenseType === "supplier" ? values.supplierName : null,
+      aadhatName: values.expenseType === "aadhtiya" ? values.aadhatName : null,
+      aadhatDbId: selectedAadhat?.id || values.aadhatDbId || null,
       amount: values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
@@ -830,6 +873,7 @@ export function CashManagementTab() {
 
   const getExpenseTypeLabel = (type: string) => {
     switch (type) {
+      case "aadhtiya": return t("Aadhtiya", "आढ़तिया");
       case "cold_store_charge": return t("Cold Store Charge", "शीत भंडार शुल्क");
       case "farmer": return t("Farmer - Harvest", "किसान - फसल");
       case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");
@@ -907,6 +951,7 @@ export function CashManagementTab() {
       t("Farmer Village", "किसान का गाँव"),
       t("Cold Store", "शीत भंडार"),
       t("Supplier Name", "आपूर्तिकर्ता का नाम"),
+      t("Aadhtiya Name", "आढ़तिया का नाम"),
       t("From Account", "स्रोत खाता"),
       t("To Account", "गंतव्य खाता"),
       t("Amount", "राशि"),
@@ -929,6 +974,7 @@ export function CashManagementTab() {
       entry.farmerVillage || "",
       entry.coldStoreName || "",
       entry.supplierName || "",
+      entry.aadhatName || "",
       getFromAccountLabel(entry),
       getToAccountLabel(entry),
       entry.amount,
@@ -1701,24 +1747,113 @@ export function CashManagementTab() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t("Expense Type", "खर्च प्रकार")} *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-expense-type">
-                              <SelectValue placeholder={t("Select expense type", "खर्च प्रकार चुनें")} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {EXPENSE_TYPES.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {getExpenseTypeLabel(type)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover open={expenseTypePopoverOpen} onOpenChange={setExpenseTypePopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                data-testid="select-expense-type"
+                              >
+                                {field.value ? getExpenseTypeLabel(field.value) : t("Select expense type", "खर्च प्रकार चुनें")}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t("Search expense type...", "खर्च प्रकार खोजें...")} />
+                              <CommandList>
+                                <CommandEmpty>{t("No type found", "कोई प्रकार नहीं मिला")}</CommandEmpty>
+                                <CommandGroup>
+                                  {EXPENSE_TYPES.map((type) => (
+                                    <CommandItem
+                                      key={type}
+                                      value={getExpenseTypeLabel(type)}
+                                      onSelect={() => {
+                                        field.onChange(type);
+                                        setExpenseTypePopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", field.value === type ? "opacity-100" : "opacity-0")} />
+                                      {getExpenseTypeLabel(type)}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  {expenseType === "aadhtiya" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="aadhatName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Aadhtiya Name", "आढ़तिया का नाम")} *</FormLabel>
+                          <Popover open={aadhatPopoverOpen} onOpenChange={setAadhatPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                  data-testid="select-aadhat-name"
+                                >
+                                  {field.value || t("Select Aadhtiya", "आढ़तिया चुनें")}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder={t("Search aadhtiya...", "आढ़तिया खोजें...")} />
+                                <CommandList>
+                                  <CommandEmpty>{t("No aadhtiya found with dues", "कोई बकाया आढ़तिया नहीं मिला")}</CommandEmpty>
+                                  <CommandGroup>
+                                    {aadhatsWithDues.map((aadhat) => {
+                                      const shortAddr = aadhat.address.length > 25
+                                        ? aadhat.address.substring(0, 25) + "..."
+                                        : aadhat.address;
+                                      return (
+                                        <CommandItem
+                                          key={aadhat.id}
+                                          value={`${aadhat.name} ${aadhat.address}`}
+                                          onSelect={() => {
+                                            field.onChange(aadhat.name);
+                                            outflowForm.setValue("aadhatDbId", aadhat.id);
+                                            setAadhatPopoverOpen(false);
+                                          }}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4", field.value === aadhat.name ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex items-center justify-between gap-2 w-full">
+                                            <span>{aadhat.name}</span>
+                                            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                              {shortAddr}
+                                            </span>
+                                            <Badge variant="secondary" className="shrink-0">
+                                              {t("Due", "बकाया")}: ₹{aadhat.totalDue.toLocaleString('en-IN')}
+                                            </Badge>
+                                          </div>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   {expenseType === "farmer" && (
                     <>
@@ -2278,7 +2413,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
                 ? getTransferLabel()
                 : isInward 
                   ? (entry.partyName || entry.farmerName || t("Unknown", "अज्ञात"))
-                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || getExpenseTypeLabel(entry.expenseType))}
+                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || entry.aadhatName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 

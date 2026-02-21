@@ -1679,6 +1679,27 @@ export class DatabaseStorage implements IStorage {
           remainingAmount -= toApply;
         }
       }
+
+      // If this is an aadhtiya payment, reduce pyPayable on the matched aadhat record (FIFO: pyPayable first)
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId) {
+        let remainingAmount = parseFloat(entry.amount);
+        
+        const [aadhat] = await tx.select().from(aadhats)
+          .where(and(eq(aadhats.id, entry.aadhatDbId), eq(aadhats.merchantId, entry.merchantId)));
+        
+        if (aadhat) {
+          const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+          const toDeduct = Math.min(remainingAmount, currentPyPayable);
+          
+          if (toDeduct > 0) {
+            const newPyPayable = Math.max(0, currentPyPayable - toDeduct);
+            await tx.update(aadhats)
+              .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
+              .where(eq(aadhats.id, aadhat.id));
+            remainingAmount -= toDeduct;
+          }
+        }
+      }
       
       return { ...createdEntry, allocations, coldStoreAllocations };
     });
@@ -3194,6 +3215,26 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      // If this is an aadhtiya payment, reduce pyPayable on the matched aadhat record (FIFO: pyPayable first)
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId) {
+        let remainingAmount = parseFloat(entry.amount);
+        
+        const [aadhat] = await tx.select().from(aadhats)
+          .where(and(eq(aadhats.id, entry.aadhatDbId), eq(aadhats.merchantId, entry.merchantId)));
+        
+        if (aadhat) {
+          const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+          const toDeduct = Math.min(remainingAmount, currentPyPayable);
+          
+          if (toDeduct > 0) {
+            const newPyPayable = Math.max(0, currentPyPayable - toDeduct);
+            await tx.update(aadhats)
+              .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
+              .where(eq(aadhats.id, aadhat.id));
+          }
+        }
+      }
+
       return { ...createdEntry, allocations, coldStoreAllocations };
     });
   }
@@ -3439,7 +3480,23 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // 4e. Reverse cold store charge allocations (only for cold_store_charge outflows)
+      // 4e. Reverse aadhtiya payment (restore pyPayable on aadhat record)
+      if (entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId) {
+        const [aadhat] = await tx.select().from(aadhats)
+          .where(and(eq(aadhats.id, entry.aadhatDbId), eq(aadhats.merchantId, merchantId)));
+        
+        if (aadhat) {
+          const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+          const amountToRestore = parseFloat(entry.amount);
+          const newPyPayable = currentPyPayable + amountToRestore;
+          
+          await tx.update(aadhats)
+            .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
+            .where(eq(aadhats.id, aadhat.id));
+        }
+      }
+
+      // 4f. Reverse cold store charge allocations (only for cold_store_charge outflows)
       if (entry.direction === "outflow" && entry.expenseType === "cold_store_charge") {
         for (const alloc of coldStoreAllocs) {
           const [lot] = await tx.select().from(lots)
