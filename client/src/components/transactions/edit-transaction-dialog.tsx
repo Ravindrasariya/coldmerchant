@@ -27,6 +27,7 @@ interface TransactionItem {
   lotId: number;
   breakdownId: number | null;
   serialNumber: number;
+  place?: string;
   coldStoreName: string;
   potatoType: string | null;
   size: string | null;
@@ -41,6 +42,7 @@ interface UnsoldInventoryItem {
   breakdownId: number | null;
   lotId: number;
   serialNumber: number;
+  place?: string;
   coldStoreName: string;
   potatoType: string;
   size: string | null;
@@ -53,6 +55,7 @@ interface EditableItem {
   lotId: number;
   breakdownId: number | null;
   serialNumber: number;
+  place?: string;
   coldStoreName: string;
   potatoType: string | null;
   size: string | null;
@@ -66,6 +69,12 @@ interface EditableItem {
   originalRevenue: number;
   inventoryKey?: string;
   action: 'keep' | 'update' | 'add' | 'remove';
+}
+
+function lotPlaceLabel(place?: string, coldStoreName?: string): string {
+  if (place === "farm_gate") return "Farm Gate";
+  if (place === "mandi") return "Mandi";
+  return coldStoreName || "-";
 }
 
 interface EditHistoryChange {
@@ -212,6 +221,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         lotId: item.lotId,
         breakdownId: item.breakdownId,
         serialNumber: item.serialNumber,
+        place: item.place,
         coldStoreName: item.coldStoreName,
         potatoType: item.potatoType,
         size: item.size,
@@ -396,6 +406,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       lotId: inv.lotId,
       breakdownId: inv.breakdownId,
       serialNumber: inv.serialNumber,
+      place: inv.place,
       coldStoreName: inv.coldStoreName,
       potatoType: inv.potatoType,
       size: inv.size,
@@ -510,7 +521,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           key={`${inv.lotId}-${inv.breakdownId || 'lot'}`} 
                           value={`${inv.lotId}-${inv.breakdownId || 'lot'}`}
                         >
-                          S#{inv.serialNumber} - {inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"} ({inv.remainingBags} {t("available", "उपलब्ध")})
+                          S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)} - {inv.potatoType} - {inv.size || "Mixed"} ({inv.remainingBags} {t("available", "उपलब्ध")})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -562,7 +573,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     {/* Desktop row */}
                     <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
                       <span className="truncate text-xs">
-                        S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
+                        S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)} - {item.potatoType} - {item.size || "Mixed"}
                       </span>
                       <Input
                         type="number"
@@ -616,7 +627,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <div className="md:hidden border rounded-md p-3 space-y-2 mb-2">
                       <div className="flex justify-between items-start gap-2">
                         <span className="text-xs font-medium flex-1">
-                          S#{item.serialNumber} - {item.coldStoreName} - {item.potatoType} - {item.size || "Mixed"}
+                          S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)} - {item.potatoType} - {item.size || "Mixed"}
                         </span>
                         <Button 
                           type="button" 
@@ -1003,7 +1014,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               {deleteConfirmIndex !== null && editableItems[deleteConfirmIndex] && (
                 <>
                   {t("Are you sure you want to remove", "क्या आप इसे हटाना चाहते हैं")}{" "}
-                  <strong>S#{editableItems[deleteConfirmIndex].serialNumber} - {editableItems[deleteConfirmIndex].coldStoreName} - {editableItems[deleteConfirmIndex].size || "Mixed"}</strong>
+                  <strong>S#{editableItems[deleteConfirmIndex].serialNumber} - {lotPlaceLabel(editableItems[deleteConfirmIndex].place, editableItems[deleteConfirmIndex].coldStoreName)} - {editableItems[deleteConfirmIndex].size || "Mixed"}</strong>
                   {" "}({editableItems[deleteConfirmIndex].bagsMoved} {t("bags", "बोरी")})?
                 </>
               )}

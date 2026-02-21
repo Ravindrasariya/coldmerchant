@@ -635,10 +635,11 @@ export class DatabaseStorage implements IStorage {
         if (lot.length > 0) {
           const entry = await db.select().from(stockEntries).where(and(eq(stockEntries.id, lot[0].stockEntryId), eq(stockEntries.merchantId, merchantId))).limit(1);
           if (entry.length > 0) {
-            return { ...item, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
+            return { ...item, place: lot[0].place, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
           }
+          return { ...item, place: lot[0].place, farmerName: undefined, farmerVillage: undefined };
         }
-        return { ...item, farmerName: undefined, farmerVillage: undefined };
+        return { ...item, place: undefined, farmerName: undefined, farmerVillage: undefined };
       }));
       
       return { ...txn, items: enrichedItems };
@@ -819,7 +820,12 @@ export class DatabaseStorage implements IStorage {
     const items = await db.select().from(transactionItems)
       .where(eq(transactionItems.transactionId, txn.id));
     
-    return { ...txn, items };
+    const enrichedItems = await Promise.all(items.map(async (item) => {
+      const lot = await db.select().from(lots).where(and(eq(lots.id, item.lotId), eq(lots.merchantId, merchantId))).limit(1);
+      return { ...item, place: lot.length > 0 ? lot[0].place : undefined };
+    }));
+    
+    return { ...txn, items: enrichedItems };
   }
 
   // Update transaction
