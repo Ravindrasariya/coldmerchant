@@ -79,6 +79,8 @@ interface StockEntryWithLots {
     adjustedAmountRate: string | null;
     adjustedAmountEffectiveDate: string | null;
     adjustedAmountRemark: string | null;
+    totalCharges: string | null;
+    netPayable: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
@@ -360,63 +362,50 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     let mandiDue = 0;
 
     filteredEntries.forEach(entry => {
+      let entryNetPayable = 0;
       let entryTotalAmount = 0;
-      let entryAdjustment = 0;
-      let entryDeductions = 0;
       let entryColdStoreTotalCharges = 0;
       let entryColdStorePaid = 0;
-
       let entryFarmGateColdCharges = 0;
+      let entryTotalDeductions = 0;
       const isMandi = (entry.place || entry.lots[0]?.place) === "mandi";
-      let entryMandiCharges = 0;
+      let entryMandiNetPayable = 0;
 
       entry.lots.forEach(lot => {
         const metrics = computeLotMetrics(lot);
         bagsTotal += metrics.actualSellableBags;
         bagsRemaining += metrics.remainingToSell;
+
+        const storedNetPayable = lot.netPayable ? parseFloat(lot.netPayable) : 0;
+        const storedTotalCharges = lot.totalCharges ? parseFloat(lot.totalCharges) : 0;
+        entryNetPayable += storedNetPayable;
+        entryTotalDeductions += storedTotalCharges;
+
         if (metrics.totalAmount !== null) {
           entryTotalAmount += metrics.totalAmount;
         }
-        if (metrics.adjustedAmount > 0 && metrics.adjustedAmountType) {
-          if (metrics.adjustedAmountType === "debit") {
-            entryAdjustment -= metrics.adjustedAmount;
-          } else if (metrics.adjustedAmountType === "credit") {
-            entryAdjustment += metrics.adjustedAmount;
-          }
-        }
-        entryDeductions += metrics.totalDeductions;
         entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
         entryColdStorePaid += metrics.coldStorePaid;
         if (lot.place === "farm_gate") {
           entryFarmGateColdCharges += metrics.coldStoreTotalCharges;
         }
-        if (lot.place === "mandi" && metrics.totalAmount !== null) {
-          const costOfGoods = metrics.totalAmount;
-          const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
-          const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
-          const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
-          const extraCharges = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
-          const mandiCommission = costOfGoods * mandiPct / 100;
-          const aadhatCommission = costOfGoods * aadhatPct / 100;
-          const hammaliCharges = metrics.actualSellableBags * hammaliRate;
-          entryMandiCharges += mandiCommission + aadhatCommission + hammaliCharges + extraCharges;
+        if (lot.place === "mandi") {
+          entryMandiNetPayable += storedNetPayable;
         }
       });
 
-      const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
-      farmerTotal += netPayable;
+      farmerTotal += entryNetPayable;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      farmerDue += Math.max(netPayable - amountPaid, 0);
-      
+      farmerDue += Math.max(entryNetPayable - amountPaid, 0);
+
       totalPayable += entryTotalAmount + entryFarmGateColdCharges;
-      totalDeductions += entryDeductions;
+      totalDeductions += entryTotalDeductions;
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
 
       if (isMandi) {
-        const mandiNetPayable = entryTotalAmount + entryMandiCharges;
-        mandiTotal += mandiNetPayable;
-        mandiDue += Math.max(mandiNetPayable - amountPaid, 0);
+        mandiTotal += entryMandiNetPayable;
+        mandiDue += Math.max(entryMandiNetPayable - amountPaid, 0);
       }
     });
 
@@ -536,9 +525,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const adjustmentType = lot.adjustedAmountType;
         const signedInterest = adjustmentType === "credit" ? lotInterest : -lotInterest;
         
-        // Farmer total and net payable (matching edit dialog: Total - Deductions + Adjustment)
+        // Farmer total and net payable - use stored netPayable from database
         const lotFarmerTotal = metrics.totalAmount ?? 0;
-        const lotNetPayable = lotFarmerTotal - totalDeductions + signedInterest;
+        const lotNetPayable = lot.netPayable ? parseFloat(lot.netPayable) : (lotFarmerTotal - totalDeductions + signedInterest);
         
         // Farmer due per lot (prorated payment, based on net payable)
         const lotPaidRatio = entryFarmerTotal > 0 ? lotFarmerTotal / entryFarmerTotal : 0;
@@ -935,20 +924,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               entryDeductions += metrics.totalDeductions;
               entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
               entryColdStorePaid += metrics.coldStorePaid;
-              if (lot.place === "mandi" && metrics.totalAmount !== null) {
-                const costOfGoods = metrics.totalAmount;
-                const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
-                const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
-                const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
-                const extraCharges = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
-                entryMandiChargesTotal += costOfGoods * mandiPct / 100 + costOfGoods * aadhatPct / 100 + metrics.actualSellableBags * hammaliRate + extraCharges;
-              }
             });
             
             const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-            const adjustedEntryTotal = entryIsMandi
-              ? entryTotalAmount + entryMandiChargesTotal
-              : entryTotalAmount - entryDeductions + entryAdjustment;
+            const adjustedEntryTotal = entry.lots.reduce((sum, lot) => sum + (lot.netPayable ? parseFloat(lot.netPayable) : 0), 0);
             const farmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
             const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
             

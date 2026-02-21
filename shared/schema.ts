@@ -109,6 +109,8 @@ export const lots = pgTable("lots", {
   adjustedAmountRate: decimal("adjusted_amount_rate", { precision: 6, scale: 2 }), // annual rate % for simple interest
   adjustedAmountEffectiveDate: date("adjusted_amount_effective_date"), // effective date for interest calculation
   adjustedAmountRemark: text("adjusted_amount_remark"), // reason for adjustment
+  totalCharges: decimal("total_charges", { precision: 12, scale: 2 }),
+  netPayable: decimal("net_payable", { precision: 12, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -415,6 +417,9 @@ export const seedLots = pgTable("seed_lots", {
   hammaliCharges: decimal("hammali_charges", { precision: 12, scale: 2 }),
   gradingCharges: decimal("grading_charges", { precision: 12, scale: 2 }),
   transportCharges: decimal("transport_charges", { precision: 12, scale: 2 }),
+  totalCharges: decimal("total_charges", { precision: 12, scale: 2 }),
+  netPayable: decimal("net_payable", { precision: 12, scale: 2 }),
+  avgCostPerBag: decimal("avg_cost_per_bag", { precision: 10, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),

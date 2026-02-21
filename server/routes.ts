@@ -16,6 +16,123 @@ function titleCaseKeep(str: string): string {
   return str.trim().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Compute totalCharges and netPayable for a harvest lot based on its breakdowns and charge data
+function computeHarvestLotCharges(lot: any) {
+  const place = lot.place || "cold_store";
+  const breakdowns = lot.bagBreakdowns || [];
+  
+  // Calculate cost of goods from bag breakdowns
+  let costOfGoods = 0;
+  const sellable = breakdowns.filter((bd: any) => bd.size !== "Wastage");
+  const hasBdData = sellable.some((bd: any) => {
+    const w = bd.weight ? parseFloat(bd.weight) : 0;
+    const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+    return w > 0 && p > 0;
+  });
+  
+  if (hasBdData) {
+    for (const bd of sellable) {
+      const weight = bd.weight ? parseFloat(bd.weight) : 0;
+      const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+      const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+      if (netWeight > 0 && price > 0) {
+        costOfGoods += netWeight * price;
+      }
+    }
+  } else {
+    const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+    const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+    const netWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
+    if (netWeight > 0 && lotPrice > 0) {
+      costOfGoods = netWeight * lotPrice;
+    }
+  }
+
+  const wastageBags = breakdowns
+    .filter((bd: any) => bd.size === "Wastage")
+    .reduce((sum: number, bd: any) => sum + bd.numberOfBags, 0);
+  const actualBags = lot.originalBags - wastageBags;
+
+  if (place === "mandi") {
+    const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
+    const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
+    const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
+    const extraCharges = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
+    const mandiCommission = costOfGoods * mandiPct / 100;
+    const aadhatCommission = costOfGoods * aadhatPct / 100;
+    const hammaliTotal = actualBags * hammaliRate;
+    const totalCharges = mandiCommission + aadhatCommission + hammaliTotal + extraCharges;
+    const netPayable = costOfGoods + totalCharges;
+    return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2) };
+  }
+  
+  // Farm Gate and Cold Store
+  const isFarmGate = place === "farm_gate";
+  const charges: Array<{type: string; amount: number | string}> = lot.charges || [];
+  const hammaliGrading = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
+  const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+  const dynamicCharges = charges
+    .filter((c: any) => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+    .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+  const totalDeductions = hammaliGrading + dynamicCharges;
+  
+  // Adjustment: use adjustedAmountFinal (includes accrued interest from scheduler) if available
+  const adjType = lot.adjustedAmountType;
+  const adjFinal = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : (lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0);
+  const signedAdj = adjType === "credit" ? adjFinal : adjType === "debit" ? -adjFinal : 0;
+  
+  const totalCharges = totalDeductions;
+  const netPayable = costOfGoods - totalDeductions + signedAdj;
+  return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2) };
+}
+
+// After creating/updating lots and breakdowns, recompute and store totalCharges and netPayable
+async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
+  const entry = await storage.getStockEntryById(entryId, merchantId);
+  if (!entry) return;
+  for (const lot of entry.lots) {
+    const { totalCharges, netPayable } = computeHarvestLotCharges(lot);
+    await storage.updateLot(lot.id, merchantId, {
+      totalCharges,
+      netPayable,
+    });
+  }
+}
+
+// Compute totalCharges, netPayable, avgCostPerBag for a seed lot
+function computeSeedLotCharges(lot: any) {
+  const bags = lot.originalBags || 0;
+  const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
+  const costOfGoods = bags * pricePerBag;
+  
+  const hammali = lot.hammaliCharges ? parseFloat(lot.hammaliCharges) : 0;
+  const grading = lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0;
+  const transport = lot.transportCharges ? parseFloat(lot.transportCharges) : 0;
+  const totalCharges = hammali + grading + transport;
+  const netPayable = costOfGoods + totalCharges;
+  const avgCostPerBag = bags > 0 ? netPayable / bags : 0;
+  
+  return {
+    totalCharges: totalCharges.toFixed(2),
+    netPayable: netPayable.toFixed(2),
+    avgCostPerBag: avgCostPerBag.toFixed(2),
+  };
+}
+
+// After creating/updating seed lots, recompute and store totalCharges, netPayable, avgCostPerBag
+async function recomputeSeedLotCharges(entryId: number, merchantId: number) {
+  const entry = await storage.getSeedEntryById(entryId, merchantId);
+  if (!entry) return;
+  for (const lot of entry.seedLots) {
+    const { totalCharges, netPayable, avgCostPerBag } = computeSeedLotCharges(lot);
+    await storage.updateSeedLot(lot.id, merchantId, {
+      totalCharges,
+      netPayable,
+      avgCostPerBag,
+    });
+  }
+}
+
 // Middleware to ensure user is authenticated
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated() || !req.user) {
@@ -510,6 +627,9 @@ export async function registerRoutes(
         }
       }
 
+      // Compute and store totalCharges and netPayable for all lots
+      await recomputeHarvestLotCharges(stockEntry.id, merchantId);
+
       // Fetch the complete entry with lots and breakdowns
       const completeEntry = await storage.getStockEntryById(stockEntry.id, merchantId);
       res.status(201).json(completeEntry);
@@ -817,6 +937,9 @@ export async function registerRoutes(
       if (changes.length > 0) {
         await storage.createEditHistory(id, merchantId, userId, changes);
       }
+
+      // Recompute and store totalCharges and netPayable for all lots
+      await recomputeHarvestLotCharges(id, merchantId);
 
       // Fetch updated entry
       const updatedEntry = await storage.getStockEntryById(id, merchantId);
@@ -3451,6 +3574,9 @@ export async function registerRoutes(
         });
       }
 
+      // Compute and store totalCharges, netPayable, avgCostPerBag for all seed lots
+      await recomputeSeedLotCharges(seedEntry.id, merchantId);
+
       // Fetch the complete entry with lots
       const completeEntry = await storage.getSeedEntryById(seedEntry.id, merchantId);
       res.status(201).json(completeEntry);
@@ -3627,6 +3753,9 @@ export async function registerRoutes(
       if (changeSet.length > 0) {
         await storage.createSeedEditHistory(id, merchantId, userId, changeSet);
       }
+
+      // Recompute and store totalCharges, netPayable, avgCostPerBag for all seed lots
+      await recomputeSeedLotCharges(id, merchantId);
 
       // Fetch and return the updated entry
       const updatedEntry = await storage.getSeedEntryById(id, merchantId);
