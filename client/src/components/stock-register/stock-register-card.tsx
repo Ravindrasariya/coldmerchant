@@ -210,6 +210,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const currentYear = new Date().getFullYear();
   const [filterYear, setFilterYear] = useState<string>(currentYear.toString());
   const [filterSerial, setFilterSerial] = useState<string>("");
+  const [serialPopoverOpen, setSerialPopoverOpen] = useState(false);
   const [filterFarmer, setFilterFarmer] = useState<string>("");
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
@@ -394,9 +395,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         }
       });
 
-      farmerTotal += entryNetPayable;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      farmerDue += Math.max(entryNetPayable - amountPaid, 0);
+      if (!isMandi) {
+        farmerTotal += entryNetPayable;
+        farmerDue += Math.max(entryNetPayable - amountPaid, 0);
+      }
 
       totalPayable += entryTotalAmount + entryFarmGateColdCharges;
       totalDeductions += entryTotalDeductions;
@@ -668,16 +671,50 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               </SelectContent>
             </Select>
 
-            <Select value={filterSerial} onValueChange={setFilterSerial}>
-              <SelectTrigger className="text-sm sm:w-[100px]" data-testid="filter-serial">
-                <SelectValue placeholder={t("Serial #", "क्रमांक")} />
-              </SelectTrigger>
-              <SelectContent>
-                {serialNumbers.map((num) => (
-                  <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={serialPopoverOpen} onOpenChange={setSerialPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={serialPopoverOpen}
+                  className={cn(
+                    "justify-between font-normal text-sm sm:w-[100px]",
+                    !filterSerial && "text-muted-foreground"
+                  )}
+                  data-testid="filter-serial"
+                >
+                  <span className="truncate">
+                    {filterSerial || t("Serial #", "क्रमांक")}
+                  </span>
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[120px] p-0">
+                <Command>
+                  <CommandInput placeholder={t("Search...", "खोजें...")} />
+                  <CommandList>
+                    <CommandEmpty>{t("No match.", "कोई मिलान नहीं।")}</CommandEmpty>
+                    <CommandGroup>
+                      {serialNumbers.map((num) => (
+                        <CommandItem
+                          key={num}
+                          value={num.toString()}
+                          onSelect={(currentValue) => {
+                            setFilterSerial(currentValue === filterSerial ? "" : currentValue);
+                            setSerialPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${filterSerial === num.toString() ? "opacity-100" : "opacity-0"}`}
+                          />
+                          {num}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <Popover open={farmerPopoverOpen} onOpenChange={setFarmerPopoverOpen}>
               <PopoverTrigger asChild>
