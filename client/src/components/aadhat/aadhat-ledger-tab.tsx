@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { type Aadhat, type AadhatEditHistory } from "@shared/schema";
 
 interface AadhatWithDues extends Aadhat {
+  stockDue: number;
   totalDue: number;
 }
 
@@ -270,7 +271,7 @@ export default function AadhatLedgerTab() {
           ) : (
             <div className="space-y-4">
               <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
-                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[700px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}>
+                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[800px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}>
                   <div></div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -290,6 +291,7 @@ export default function AadhatLedgerTab() {
                   <div>{t("Red Flag", "रेड फ्लैग")}</div>
                   <div>{t("Active", "सक्रिय")}</div>
                   <div>{t("PY Payable", "पीवाय देय")}</div>
+                  <div>{t("Stock Due", "स्टॉक बकाया")}</div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
                     onClick={() => handleSort('totalDue')}
@@ -307,8 +309,8 @@ export default function AadhatLedgerTab() {
                 {filteredAadhats.map((aadhat, index) => (
                   <div 
                     key={aadhat.id} 
-                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[700px]"
-                    style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}
+                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[800px]"
+                    style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}
                     data-testid={`aadhat-row-${index}`}
                   >
                     <div className="flex items-center justify-center">
@@ -349,6 +351,9 @@ export default function AadhatLedgerTab() {
                     </div>
                     <div className="text-xs font-mono">
                       ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                    </div>
+                    <div className="text-xs font-mono" data-testid={`text-aadhat-stock-due-${index}`}>
+                      ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
                     <div className="text-xs font-mono">
                       ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
@@ -391,6 +396,7 @@ export default function AadhatLedgerTab() {
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-muted-foreground">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="text-xs text-muted-foreground">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                       <div className="text-sm font-mono">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                     </div>
                   </div>

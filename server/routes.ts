@@ -2006,6 +2006,29 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const allAadhats = await storage.getAadhatsByMerchant(merchantId);
+      const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      
+      const lotsByEntryId = new Map<number, typeof allLots>();
+      for (const lot of allLots) {
+        const arr = lotsByEntryId.get(lot.stockEntryId) || [];
+        arr.push(lot);
+        lotsByEntryId.set(lot.stockEntryId, arr);
+      }
+      
+      const aadhatDuesMap = new Map<number, number>();
+      for (const entry of stockEntryList) {
+        if (!entry.aadhatDbId) continue;
+        const entryLots = lotsByEntryId.get(entry.id) || [];
+        let entryNetPayable = 0;
+        for (const lot of entryLots) {
+          entryNetPayable += parseFloat(lot.netPayable || "0");
+        }
+        const amountPaid = parseFloat(entry.amountPaid || "0");
+        const entryDue = Math.max(0, entryNetPayable - amountPaid);
+        aadhatDuesMap.set(entry.aadhatDbId, (aadhatDuesMap.get(entry.aadhatDbId) || 0) + entryDue);
+      }
+      
       const aadhatsWithDues = allAadhats
         .filter(a => a.isActive)
         .map(a => ({
@@ -2015,7 +2038,8 @@ export async function registerRoutes(
           address: a.address,
           contact: a.contact,
           pyPayable: a.pyPayable,
-          totalDue: parseFloat(a.pyPayable || "0"),
+          stockDue: aadhatDuesMap.get(a.id) || 0,
+          totalDue: parseFloat(a.pyPayable || "0") + (aadhatDuesMap.get(a.id) || 0),
         }))
         .filter(a => a.totalDue > 0);
       res.json(aadhatsWithDues);
@@ -4157,12 +4181,36 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const aadhatList = await storage.getAadhatsByMerchant(merchantId);
+      const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      
+      const lotsByEntryId = new Map<number, typeof allLots>();
+      for (const lot of allLots) {
+        const arr = lotsByEntryId.get(lot.stockEntryId) || [];
+        arr.push(lot);
+        lotsByEntryId.set(lot.stockEntryId, arr);
+      }
+      
+      const aadhatDuesMap = new Map<number, number>();
+      for (const entry of stockEntryList) {
+        if (!entry.aadhatDbId) continue;
+        const entryLots = lotsByEntryId.get(entry.id) || [];
+        let entryNetPayable = 0;
+        for (const lot of entryLots) {
+          entryNetPayable += parseFloat(lot.netPayable || "0");
+        }
+        const amountPaid = parseFloat(entry.amountPaid || "0");
+        const entryDue = Math.max(0, entryNetPayable - amountPaid);
+        aadhatDuesMap.set(entry.aadhatDbId, (aadhatDuesMap.get(entry.aadhatDbId) || 0) + entryDue);
+      }
       
       const aadhatsWithDues = aadhatList.map(aadhat => {
         const pyPayable = parseFloat(aadhat.pyPayable || "0");
+        const stockDue = aadhatDuesMap.get(aadhat.id) || 0;
         return {
           ...aadhat,
-          totalDue: pyPayable,
+          stockDue,
+          totalDue: pyPayable + stockDue,
         };
       });
       
