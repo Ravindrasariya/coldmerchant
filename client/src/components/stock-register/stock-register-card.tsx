@@ -249,6 +249,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       entry.lots.forEach(lot => {
         if (lot.place === "farm_gate") {
           stores.add("Farm Gate");
+        } else if (lot.place === "mandi") {
+          stores.add("Mandi");
         } else if (lot.coldStoreName) {
           stores.add(lot.coldStoreName);
         }
@@ -321,6 +323,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       if (filterColdStore) {
         const hasColdStore = entry.lots.some(lot => {
           if (filterColdStore === "Farm Gate") return lot.place === "farm_gate";
+          if (filterColdStore === "Mandi") return lot.place === "mandi";
           return lot.coldStoreName === filterColdStore;
         });
         if (!hasColdStore) return false;
@@ -353,6 +356,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     let coldStoreDue = 0;
     let totalPayable = 0;
     let totalDeductions = 0;
+    let mandiTotal = 0;
+    let mandiDue = 0;
 
     filteredEntries.forEach(entry => {
       let entryTotalAmount = 0;
@@ -362,6 +367,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       let entryColdStorePaid = 0;
 
       let entryFarmGateColdCharges = 0;
+      const isMandi = (entry.place || entry.lots[0]?.place) === "mandi";
+      let entryMandiCharges = 0;
 
       entry.lots.forEach(lot => {
         const metrics = computeLotMetrics(lot);
@@ -383,23 +390,37 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         if (lot.place === "farm_gate") {
           entryFarmGateColdCharges += metrics.coldStoreTotalCharges;
         }
+        if (lot.place === "mandi" && metrics.totalAmount !== null) {
+          const costOfGoods = metrics.totalAmount;
+          const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
+          const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
+          const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
+          const extraCharges = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
+          const mandiCommission = costOfGoods * mandiPct / 100;
+          const aadhatCommission = costOfGoods * aadhatPct / 100;
+          const hammaliCharges = metrics.actualSellableBags * hammaliRate;
+          entryMandiCharges += mandiCommission + aadhatCommission + hammaliCharges + extraCharges;
+        }
       });
 
-      // Net Payable = Total Payable - Deductions + Adjustment (matches edit dialog formula)
       const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
       farmerTotal += netPayable;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       farmerDue += Math.max(netPayable - amountPaid, 0);
       
-      // Total Cost: base payable + cold/warehouse charges for Farm Gate lots
-      // (Farm Gate cold charges aren't deducted from farmer but are still merchant's cost)
       totalPayable += entryTotalAmount + entryFarmGateColdCharges;
       totalDeductions += entryDeductions;
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
+
+      if (isMandi) {
+        const mandiNetPayable = entryTotalAmount + entryMandiCharges;
+        mandiTotal += mandiNetPayable;
+        mandiDue += Math.max(mandiNetPayable - amountPaid, 0);
+      }
     });
 
-    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions };
+    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions, mandiTotal, mandiDue };
   }, [filteredEntries]);
 
   const handleDownloadCSV = () => {
@@ -785,7 +806,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
         <Card className="border-blue-300 dark:border-blue-700" data-testid="card-bags-summary">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
@@ -837,6 +858,20 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
               <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi-summary">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-mandi-total">₹{summaryTotals.mandiTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
+              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-mandi-due">₹{summaryTotals.mandiDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
           </CardContent>
         </Card>
@@ -975,7 +1010,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-2">
                         {(entryTotalAmount > 0 || entryAdjustment !== 0) && (
                           <span className="inline-flex items-center gap-1">
-                            <span className="text-muted-foreground whitespace-nowrap">{t("Farmer Total", "किसान कुल")}</span>
+                            <span className="text-muted-foreground whitespace-nowrap">{(entry.place || entry.lots[0]?.place) === "mandi" ? t("Aadhat Total", "आढ़त कुल") : t("Farmer Total", "किसान कुल")}</span>
                             <span className="font-medium whitespace-nowrap">₹ {adjustedEntryTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                             <span className="text-muted-foreground">|</span>
                             <span className="text-muted-foreground whitespace-nowrap">{t("Due", "बाकी")}</span>
