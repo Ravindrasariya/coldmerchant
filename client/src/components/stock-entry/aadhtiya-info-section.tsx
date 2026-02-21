@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,16 +9,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Store, AlertTriangle } from "lucide-react";
+import { Store, AlertTriangle, ChevronDown, X } from "lucide-react";
 import { StockEntryForm } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 interface AadhtiyaInfoSectionProps {
   form: UseFormReturn<StockEntryForm>;
 }
 
-interface AadhatSuggestion {
+interface AadhatOption {
   id: number;
   name: string;
   address: string;
@@ -28,91 +29,45 @@ interface AadhatSuggestion {
 
 export function AadhtiyaInfoSection({ form }: AadhtiyaInfoSectionProps) {
   const { t } = useLanguage();
-  const [suggestions, setSuggestions] = useState<AadhatSuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
-  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const searchAadhats = useCallback(async (query: string) => {
-    if (query.length < 1) {
-      setSuggestions([]);
-      return;
-    }
-    try {
-      const response = await fetch(`/api/aadhats`);
-      if (response.ok) {
-        const data: AadhatSuggestion[] = await response.json();
-        const filtered = data.filter(a =>
-          a.name.toLowerCase().includes(query.toLowerCase()) ||
-          (a.address && a.address.toLowerCase().includes(query.toLowerCase()))
-        );
-        setSuggestions(filtered);
-      }
-    } catch (error) {
-      console.error("Error searching aadhats:", error);
-    }
-  }, []);
+  const { data: aadhats = [] } = useQuery<AadhatOption[]>({
+    queryKey: ["/api/aadhats"],
+  });
 
-  useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-    debounceRef.current = setTimeout(() => {
-      searchAadhats(searchQuery);
-    }, 300);
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, [searchQuery, searchAadhats]);
+  const selectedId = form.watch("aadhatDbId");
+  const selectedAadhat = aadhats.find(a => a.id === selectedId);
+
+  const filtered = aadhats.filter(a =>
+    a.name.toLowerCase().includes(searchText.toLowerCase()) ||
+    (a.address && a.address.toLowerCase().includes(searchText.toLowerCase()))
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const suggestionElements = document.querySelectorAll('[data-aadhat-suggestion-dropdown]');
-      let isInsideSuggestion = false;
-      suggestionElements.forEach(el => {
-        if (el.contains(target)) {
-          isInsideSuggestion = true;
-        }
-      });
-      if (!isInsideSuggestion) {
-        setShowSuggestions(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearchText("");
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectAadhat = (aadhat: AadhatSuggestion) => {
-    const fieldsToHighlight = new Set<string>();
-
+  const handleSelect = (aadhat: AadhatOption) => {
     form.setValue("aadhatDbId", aadhat.id);
     form.setValue("aadhatName", aadhat.name);
-    fieldsToHighlight.add("aadhatName");
-
-    setHighlightedFields(fieldsToHighlight);
-    if (aadhat.redFlag) {
-      setRedFlagWarning(aadhat.name);
-    } else {
-      setRedFlagWarning(null);
-    }
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setSearchQuery("");
-
-    setTimeout(() => {
-      setHighlightedFields(new Set());
-    }, 2000);
+    setIsOpen(false);
+    setSearchText("");
   };
 
-  const getHighlightClass = (fieldName: string) => {
-    return highlightedFields.has(fieldName)
-      ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950/30 transition-all duration-300"
-      : "";
+  const handleClear = () => {
+    form.setValue("aadhatDbId", undefined as any);
+    form.setValue("aadhatName", "");
+    setSearchText("");
   };
 
   return (
@@ -148,70 +103,118 @@ export function AadhtiyaInfoSection({ form }: AadhtiyaInfoSectionProps) {
           <FormField
             control={form.control}
             name="aadhatName"
-            render={({ field }) => (
-              <FormItem className="relative">
+            render={() => (
+              <FormItem>
                 <FormLabel>{t("Aadhtiya Name", "आढ़तिया का नाम")} *</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder={t("Search aadhtiya name", "आढ़तिया का नाम खोजें")}
-                    {...field}
-                    value={field.value || ""}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      setSearchQuery(e.target.value);
-                      setShowSuggestions(true);
-                    }}
-                    onFocus={() => {
-                      if (field.value && field.value.length >= 1) {
-                        setSearchQuery(field.value);
-                        setShowSuggestions(true);
-                      }
-                    }}
-                    className={cn(getHighlightClass("aadhatName"))}
-                    autoComplete="off"
-                    data-testid="input-aadhtiya-name"
-                  />
-                </FormControl>
-                {showSuggestions && suggestions.length > 0 && (
-                  <div
-                    data-aadhat-suggestion-dropdown
-                    className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
-                  >
-                    {suggestions.map((aadhat, index) => (
-                      <div
-                        key={`${aadhat.id}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectAadhat(aadhat);
-                        }}
-                        data-testid={`suggestion-aadhat-${index}`}
-                      >
-                        <div className="text-sm font-medium flex items-center">
-                          {aadhat.name}
-                          {aadhat.redFlag && (
-                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                              Red Flag
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {aadhat.address}
-                          {aadhat.contact && <span> • {aadhat.contact}</span>}
-                        </div>
+                <div ref={dropdownRef} className="relative">
+                  {selectedAadhat && !isOpen ? (
+                    <div
+                      className={cn(
+                        "flex items-center justify-between h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm cursor-pointer",
+                        selectedAadhat.redFlag && "border-orange-400"
+                      )}
+                      onClick={() => {
+                        setIsOpen(true);
+                        setTimeout(() => inputRef.current?.focus(), 0);
+                      }}
+                      data-testid="select-aadhtiya-trigger"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        {selectedAadhat.name}
+                        {selectedAadhat.redFlag && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                            Red Flag
+                          </span>
+                        )}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <X
+                          className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClear();
+                          }}
+                          data-testid="button-clear-aadhtiya"
+                        />
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <div
+                      className="relative"
+                      onClick={() => {
+                        setIsOpen(true);
+                        setTimeout(() => inputRef.current?.focus(), 0);
+                      }}
+                    >
+                      <Input
+                        ref={inputRef}
+                        placeholder={t("Search aadhtiya...", "आढ़तिया खोजें...")}
+                        value={searchText}
+                        onChange={(e) => {
+                          setSearchText(e.target.value);
+                          setIsOpen(true);
+                        }}
+                        onFocus={() => setIsOpen(true)}
+                        autoComplete="off"
+                        data-testid="input-search-aadhtiya"
+                      />
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    </div>
+                  )}
+
+                  {isOpen && (
+                    <div
+                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
+                      data-testid="dropdown-aadhtiya-list"
+                    >
+                      {filtered.length === 0 ? (
+                        <div className="px-3 py-3 text-sm text-muted-foreground text-center">
+                          {aadhats.length === 0
+                            ? t("No aadhtiyas found. Add them in Aadhat Ledger first.", "कोई आढ़तिया नहीं मिला। पहले आढ़त खाता में जोड़ें।")
+                            : t("No matching aadhtiya", "कोई मिलता आढ़तिया नहीं")}
+                        </div>
+                      ) : (
+                        filtered.map((aadhat) => (
+                          <div
+                            key={aadhat.id}
+                            className={cn(
+                              "px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0",
+                              selectedId === aadhat.id && "bg-muted"
+                            )}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelect(aadhat);
+                            }}
+                            data-testid={`option-aadhat-${aadhat.id}`}
+                          >
+                            <div className="text-sm font-medium flex items-center">
+                              {aadhat.name}
+                              {aadhat.redFlag && (
+                                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                  Red Flag
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {aadhat.address}
+                              {aadhat.contact && <span> • {aadhat.contact}</span>}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        {redFlagWarning && (
+        {selectedAadhat?.redFlag && (
           <div className="mt-3 flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm text-orange-700 dark:text-orange-400">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span>{redFlagWarning} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
+            <span>{selectedAadhat.name} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
           </div>
         )}
       </CardContent>
