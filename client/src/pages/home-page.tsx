@@ -17,6 +17,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { CropToggle } from "@/components/crop-toggle";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StockEntryForm } from "@/components/stock-entry/stock-entry-form";
 import { StockRegisterCard } from "@/components/stock-register/stock-register-card";
 import { SeedSection } from "@/components/seed/seed-section";
@@ -67,6 +68,7 @@ export default function HomePage() {
     setSelectedCropState(crop);
     localStorage.setItem("vyapar_selected_crop", crop);
   };
+  const [selectedPlace, setSelectedPlace] = useState<"farm_gate" | "cold_store">("cold_store");
   const [passwordForm, setPasswordForm] = useState({
     mobileNumber: "",
     currentPassword: "",
@@ -392,9 +394,26 @@ export default function HomePage() {
                     {t("Record new purchases from farmers", "किसानों से नई खरीद दर्ज करें")}
                   </p>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedPlace} onValueChange={(v) => setSelectedPlace(v as "farm_gate" | "cold_store")}>
+                    <SelectTrigger
+                      className="bg-orange-500 text-white border-orange-500 focus:ring-orange-400 font-bold [&>svg]:text-white"
+                      data-testid="select-place-header"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="farm_gate">{t("Farm Gate", "खेत गेट")}</SelectItem>
+                      <SelectItem value="cold_store">{t("Cold Store", "कोल्ड स्टोर")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} />
+                </div>
               </div>
               <StockEntryForm 
-                onSuccess={() => setActiveTab("stock-register")} 
+                onSuccess={() => setActiveTab("stock-register")}
+                selectedCrop={selectedCrop}
+                selectedPlace={selectedPlace}
               />
             </div>
           </div>

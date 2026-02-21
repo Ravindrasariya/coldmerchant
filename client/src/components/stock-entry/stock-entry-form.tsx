@@ -85,9 +85,10 @@ interface StockEntryFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   selectedCrop?: "potato" | "onion" | "garlic";
+  selectedPlace?: "farm_gate" | "cold_store";
 }
 
-export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }: StockEntryFormProps) {
+export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", selectedPlace = "cold_store" }: StockEntryFormProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
   const formContainerRef = useRef<HTMLFormElement>(null);
@@ -109,6 +110,20 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }:
 
   useEffect(() => {
     form.reset(loadSavedFormData(selectedCrop));
+  }, [selectedCrop, form]);
+
+  useEffect(() => {
+    const lots = form.getValues("lots");
+    lots.forEach((_, index) => {
+      form.setValue(`lots.${index}.place`, selectedPlace);
+    });
+  }, [selectedPlace, form]);
+
+  useEffect(() => {
+    const lots = form.getValues("lots");
+    lots.forEach((_, index) => {
+      form.setValue(`lots.${index}.crop`, selectedCrop);
+    });
   }, [selectedCrop, form]);
 
   const scrollToTop = () => {
@@ -160,7 +175,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato" }:
 
   const handleAddLot = () => {
     appendLot({
-      place: "cold_store",
+      place: selectedPlace,
       coldStoreName: "",
       coldStoreLotNumber: "",
       crop: selectedCrop,

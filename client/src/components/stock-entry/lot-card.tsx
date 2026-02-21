@@ -152,28 +152,6 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name={`lots.${lotIndex}.place`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("Place", "स्थान")} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || "cold_store"}>
-                  <FormControl>
-                    <SelectTrigger data-testid={`select-place-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select place", "स्थान चुनें")} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="farm_gate">{t("Farm Gate", "खेत गेट")}</SelectItem>
-                    <SelectItem value="cold_store">{t("Cold Store", "कोल्ड स्टोर")}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           {place === "cold_store" && (
             <>
               <FormField
@@ -247,29 +225,6 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
               />
             </>
           )}
-
-          <FormField
-            control={form.control}
-            name={`lots.${lotIndex}.crop`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("Crop", "फसल")} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || "potato"}>
-                  <FormControl>
-                    <SelectTrigger data-testid={`select-crop-${lotIndex}`}>
-                      <SelectValue placeholder={t("Select crop", "फसल चुनें")} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="potato">{t("Potato", "आलू")}</SelectItem>
-                    <SelectItem value="onion">{t("Onion", "प्याज")}</SelectItem>
-                    <SelectItem value="garlic">{t("Garlic", "लहसुन")}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
           <FormField
             control={form.control}
