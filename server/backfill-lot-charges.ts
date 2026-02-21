@@ -66,8 +66,10 @@ async function backfillHarvestLots() {
           totalCharges = hammaliGrading + dynamicCharges;
           
           const adjType = lot.adjustedAmountType;
-          const adjFinal = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : (lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0);
-          const signedAdj = adjType === "credit" ? adjFinal : adjType === "debit" ? -adjFinal : 0;
+          const adjPrincipal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
+          const adjFinal = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : adjPrincipal;
+          const interestOnly = adjFinal - adjPrincipal;
+          const signedAdj = adjType === "credit" ? interestOnly : adjType === "debit" ? -interestOnly : 0;
           netPayable = costOfGoods - totalCharges + signedAdj;
         }
 

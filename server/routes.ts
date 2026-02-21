@@ -76,10 +76,13 @@ function computeHarvestLotCharges(lot: any) {
     .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
   const totalDeductions = hammaliGrading + dynamicCharges;
   
-  // Adjustment: use adjustedAmountFinal (includes accrued interest from scheduler) if available
+  // Adjustment: use only the interest portion (adjustedAmountFinal - adjustedAmount)
+  // Principal is already part of charges/deductions, so only interest affects net payable
   const adjType = lot.adjustedAmountType;
-  const adjFinal = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : (lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0);
-  const signedAdj = adjType === "credit" ? adjFinal : adjType === "debit" ? -adjFinal : 0;
+  const adjPrincipal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
+  const adjFinal = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : adjPrincipal;
+  const interestOnly = adjFinal - adjPrincipal;
+  const signedAdj = adjType === "credit" ? interestOnly : adjType === "debit" ? -interestOnly : 0;
   
   const totalCharges = totalDeductions;
   const netPayable = costOfGoods - totalDeductions + signedAdj;
