@@ -184,24 +184,27 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   const hammali = form.watch(`lots.${lotIndex}.hammaliPerBag`);
 
   useEffect(() => {
-    if (place === "mandi" && lotIndex === 0) {
+    if (place === "mandi") {
       const savedMandi = localStorage.getItem("vyapar_mandi_commission");
       const savedAadhat = localStorage.getItem("vyapar_aadhat_commission");
       const savedHammali = localStorage.getItem("vyapar_hammali_per_bag");
-      const currentMandi = form.getValues(`lots.${lotIndex}.mandiCommissionPercent`);
-      const currentAadhat = form.getValues(`lots.${lotIndex}.aadhatCommissionPercent`);
-      const currentHammali = form.getValues(`lots.${lotIndex}.hammaliPerBag`);
-      if (savedMandi && !currentMandi) form.setValue(`lots.${lotIndex}.mandiCommissionPercent`, parseFloat(savedMandi) as any);
-      if (savedAadhat && !currentAadhat) form.setValue(`lots.${lotIndex}.aadhatCommissionPercent`, parseFloat(savedAadhat) as any);
-      if (savedHammali && !currentHammali) form.setValue(`lots.${lotIndex}.hammaliPerBag`, parseFloat(savedHammali) as any);
+      const currentMandi = parseFloat(String(form.getValues(`lots.${lotIndex}.mandiCommissionPercent`) ?? "0"));
+      const currentAadhat = parseFloat(String(form.getValues(`lots.${lotIndex}.aadhatCommissionPercent`) ?? "0"));
+      const currentHammali = parseFloat(String(form.getValues(`lots.${lotIndex}.hammaliPerBag`) ?? "0"));
+      if (savedMandi && currentMandi === 0) form.setValue(`lots.${lotIndex}.mandiCommissionPercent`, parseFloat(savedMandi) as any);
+      if (savedAadhat && currentAadhat === 0) form.setValue(`lots.${lotIndex}.aadhatCommissionPercent`, parseFloat(savedAadhat) as any);
+      if (savedHammali && currentHammali === 0) form.setValue(`lots.${lotIndex}.hammaliPerBag`, parseFloat(savedHammali) as any);
     }
   }, [place, lotIndex, form]);
 
   useEffect(() => {
     if (place === "mandi") {
-      if (mandiCommission != null) localStorage.setItem("vyapar_mandi_commission", String(mandiCommission));
-      if (aadhatCommission != null) localStorage.setItem("vyapar_aadhat_commission", String(aadhatCommission));
-      if (hammali != null) localStorage.setItem("vyapar_hammali_per_bag", String(hammali));
+      const mc = parseFloat(String(mandiCommission || "0"));
+      const ac = parseFloat(String(aadhatCommission || "0"));
+      const hm = parseFloat(String(hammali || "0"));
+      if (mc > 0) localStorage.setItem("vyapar_mandi_commission", String(mc));
+      if (ac > 0) localStorage.setItem("vyapar_aadhat_commission", String(ac));
+      if (hm > 0) localStorage.setItem("vyapar_hammali_per_bag", String(hm));
     }
   }, [place, mandiCommission, aadhatCommission, hammali]);
 
