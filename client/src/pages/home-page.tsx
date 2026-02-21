@@ -68,7 +68,15 @@ export default function HomePage() {
     setSelectedCropState(crop);
     localStorage.setItem("vyapar_selected_crop", crop);
   };
-  const [selectedPlace, setSelectedPlace] = useState<"farm_gate" | "cold_store">("cold_store");
+  const [selectedPlace, setSelectedPlaceState] = useState<"farm_gate" | "cold_store">(() => {
+    const saved = localStorage.getItem("vyapar_selected_place");
+    if (saved === "farm_gate" || saved === "cold_store") return saved;
+    return "cold_store";
+  });
+  const setSelectedPlace = (place: "farm_gate" | "cold_store") => {
+    setSelectedPlaceState(place);
+    localStorage.setItem("vyapar_selected_place", place);
+  };
   const [passwordForm, setPasswordForm] = useState({
     mobileNumber: "",
     currentPassword: "",
@@ -397,7 +405,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <Select value={selectedPlace} onValueChange={(v) => setSelectedPlace(v as "farm_gate" | "cold_store")}>
                     <SelectTrigger
-                      className="bg-orange-500 text-white border-orange-500 focus:ring-orange-400 font-bold [&>svg]:text-white"
+                      className="w-[140px] bg-orange-500 text-white border-orange-500 focus:ring-orange-400 font-bold [&>svg]:text-white"
                       data-testid="select-place-header"
                     >
                       <SelectValue />
