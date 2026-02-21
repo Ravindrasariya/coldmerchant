@@ -1527,11 +1527,6 @@ export function CashManagementTab() {
                                       )}
                                       <Badge variant="secondary">
                                         {t("Due", "बकाया")}: ₹{parseFloat(party.overallDue.toFixed(1)).toLocaleString('en-IN')}
-                                        {party.receivables > 0 && (
-                                          <span className="ml-1 text-xs opacity-75">
-                                            ({t("incl.", "शामिल")} ₹{parseFloat(party.receivables.toFixed(1)).toLocaleString('en-IN')} {t("receivable", "प्राप्य")})
-                                          </span>
-                                        )}
                                       </Badge>
                                     </div>
                                   </SelectItem>
