@@ -850,7 +850,7 @@ export function CashManagementTab() {
 
   const getRevenueTypeLabel = (type: string) => {
     switch (type) {
-      case "raw_potato": return t("Raw Potato", "कच्चा आलू");
+      case "raw_potato": return t("Harvest", "हार्वेस्ट");
       case "seed_sale": return t("Seed Sale", "बीज बिक्री");
       default: return type;
     }
@@ -1487,7 +1487,7 @@ export function CashManagementTab() {
                             <SelectItem value="raw_potato">
                               <div className="flex items-center gap-2">
                                 <Package className="h-4 w-4" />
-                                {t("Raw Potato", "कच्चा आलू")}
+                                {t("Harvest", "हार्वेस्ट")}
                               </div>
                             </SelectItem>
                             <SelectItem value="seed_sale">

@@ -1873,7 +1873,7 @@ export async function registerRoutes(
         }
         // For raw_potato, partyName is required; for seed_sale, farmerName is required
         if (revenueType === "raw_potato" && !partyName) {
-          return res.status(400).json({ message: "Party name is required for raw potato entries" });
+          return res.status(400).json({ message: "Party name is required for harvest entries" });
         }
         if (revenueType === "seed_sale" && !farmerName) {
           return res.status(400).json({ message: "Farmer name is required for seed sale entries" });
@@ -3949,7 +3949,7 @@ export async function registerRoutes(
         const issues: string[] = [];
         
         if (rawPotatoRemaining.hasRemaining) {
-          issues.push(`Raw Potato: ${rawPotatoRemaining.count} lots with ${rawPotatoRemaining.totalBags} remaining bags`);
+          issues.push(`Harvest: ${rawPotatoRemaining.count} lots with ${rawPotatoRemaining.totalBags} remaining bags`);
         }
         
         if (seedRemaining.hasRemaining) {
