@@ -471,7 +471,7 @@ export async function registerRoutes(
           originalBags: lotData.originalBags,
           potatoType: lotData.crop === "potato" ? (lotData.potatoType || null) : null,
           harvestPotatoType: lotData.crop === "potato" ? (lotData.harvestPotatoType || null) : null,
-          bagType: lotData.bagType,
+          bagType: lotData.bagType || "",
           quality: lotData.quality,
           cutType: lotData.cutType,
           size: lotData.cutType === "gate_cut" ? (lotData.size || null) : null,

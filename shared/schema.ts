@@ -966,7 +966,7 @@ export const lotFormSchema = z.object({
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
   potatoType: z.string().optional(), // variety - required only for potato crop
   harvestPotatoType: z.string().optional(), // Wafer, Ration, Seed - for potato crop only
-  bagType: z.string().min(1, "Bag type is required"), // editable text field
+  bagType: z.string().optional().default(""), // optional with suggestions
   quality: z.string().min(1, "Quality is required"),
   cutType: z.enum(["gate_cut", "bilty_cut"]), // now called Delivery Type in UI
   size: z.string().optional(),
@@ -1061,6 +1061,8 @@ export const HARVEST_POTATO_TYPES = ["Wafer", "Ration", "Seed"] as const; // Pot
 export const SEED_POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "CS1", "CS3", "Torus", "LR"] as const;
 export const BAG_TYPES = ["Wafer", "Ration", "Seed"] as const;
 export const SEED_BAG_TYPES = ["Wafer", "Ration"] as const;
+export const BAG_TYPE_SUGGESTIONS = ["Jute", "Shakti", "PP", "HDPE", "Net"] as const;
+
 export const QUALITY_OPTIONS = ["Poor", "Medium", "Good"] as const;
 export const CUT_TYPES = ["gate_cut", "bilty_cut"] as const; // Delivery Types
 export const SIZE_OPTIONS = ["Large", "Medium", "Small", "Wastage"] as const;
@@ -1078,7 +1080,7 @@ export const seedLotFormSchema = z.object({
   coldStoreName: z.string().min(1, "Cold store name is required"),
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
   potatoType: z.string().min(1, "Potato type is required"),
-  bagType: z.string().min(1, "Bag type is required"),
+  bagType: z.string().optional().default(""),
   brandName: z.string().optional(),
   size: z.string().min(1, "Size is required"),
   pricePerBag: z.coerce.number().min(0, "Price per bag must be positive"),
@@ -1107,7 +1109,7 @@ export const seedLotUpdateSchema = z.object({
   originalBags: z.coerce.number().min(1).optional(),
   remainingBags: z.coerce.number().min(0).optional(),
   potatoType: z.string().min(1).optional(),
-  bagType: z.string().min(1).optional(),
+  bagType: z.string().optional(),
   brandName: z.string().optional(),
   size: z.string().min(1).optional(),
   pricePerBag: z.coerce.number().min(0).optional(),

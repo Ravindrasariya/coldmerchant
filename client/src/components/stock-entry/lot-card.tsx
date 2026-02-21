@@ -19,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Plus, Trash2, Package } from "lucide-react";
-import { StockEntryForm, POTATO_TYPES, HARVEST_POTATO_TYPES, QUALITY_OPTIONS, SIZE_OPTIONS, CHARGE_TYPES } from "@shared/schema";
+import { StockEntryForm, POTATO_TYPES, HARVEST_POTATO_TYPES, QUALITY_OPTIONS, SIZE_OPTIONS, CHARGE_TYPES, BAG_TYPE_SUGGESTIONS } from "@shared/schema";
 import { BagBreakdownRow } from "./bag-breakdown-row";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -28,6 +28,74 @@ interface LotCardProps {
   lotIndex: number;
   onRemove: () => void;
   canRemove: boolean;
+}
+
+function BagTypeField({ form, lotIndex }: { form: UseFormReturn<StockEntryForm>; lotIndex: number }) {
+  const { t } = useLanguage();
+  const [bagTypeOpen, setBagTypeOpen] = useState(false);
+  const bagTypeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (bagTypeRef.current && !bagTypeRef.current.contains(e.target as Node)) {
+        setBagTypeOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <FormField
+      control={form.control}
+      name={`lots.${lotIndex}.bagType`}
+      render={({ field }) => {
+        const filteredSuggestions = BAG_TYPE_SUGGESTIONS.filter(s =>
+          !field.value || s.toLowerCase().includes((field.value || "").toLowerCase())
+        );
+        return (
+          <FormItem>
+            <FormLabel>{t("Bag Type", "बोरी का प्रकार")}</FormLabel>
+            <div ref={bagTypeRef} className="relative">
+              <FormControl>
+                <Input
+                  placeholder={t("e.g. Jute, Shakti", "जैसे जूट, शक्ति")}
+                  {...field}
+                  value={field.value || ""}
+                  onChange={(e) => {
+                    field.onChange(e);
+                    setBagTypeOpen(true);
+                  }}
+                  onFocus={() => setBagTypeOpen(true)}
+                  autoComplete="off"
+                  data-testid={`input-bag-type-${lotIndex}`}
+                />
+              </FormControl>
+              {bagTypeOpen && filteredSuggestions.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-36 overflow-y-auto">
+                  {filteredSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion}
+                      className="px-3 py-1.5 hover:bg-muted cursor-pointer text-sm border-b last:border-b-0"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        field.onChange(suggestion);
+                        setBagTypeOpen(false);
+                      }}
+                      data-testid={`suggestion-bag-type-${lotIndex}-${suggestion}`}
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
+    />
+  );
 }
 
 export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
@@ -331,24 +399,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             </>
           )}
 
-          <FormField
-            control={form.control}
-            name={`lots.${lotIndex}.bagType`}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("Bag Type", "बोरी का प्रकार")} *</FormLabel>
-                <FormControl>
-                  <Input 
-                    placeholder={t("Enter bag type", "बोरी का प्रकार दर्ज करें")} 
-                    {...field}
-                    value={field.value || ""}
-                    data-testid={`input-bag-type-${lotIndex}`}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <BagTypeField form={form} lotIndex={lotIndex} />
 
           <FormField
             control={form.control}

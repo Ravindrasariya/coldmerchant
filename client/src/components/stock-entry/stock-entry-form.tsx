@@ -186,6 +186,19 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   });
 
   const handleAddLot = () => {
+    const currentLots = form.getValues("lots");
+    const lastLot = currentLots.length > 0 ? currentLots[currentLots.length - 1] : null;
+
+    const mandiChargesFromPrev = selectedPlace === "mandi" && lastLot ? {
+      mandiCommissionPercent: lastLot.mandiCommissionPercent,
+      aadhatCommissionPercent: lastLot.aadhatCommissionPercent,
+      hammaliPerBag: lastLot.hammaliPerBag,
+    } : {
+      mandiCommissionPercent: undefined,
+      aadhatCommissionPercent: undefined,
+      hammaliPerBag: undefined,
+    };
+
     appendLot({
       place: selectedPlace,
       coldStoreName: "",
@@ -196,13 +209,11 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       harvestPotatoType: "",
       bagType: "",
       quality: "",
-      cutType: "gate_cut",
+      cutType: selectedPlace === "mandi" ? "gate_cut" : "gate_cut",
       size: "",
       pricePerKg: undefined,
       charges: [],
-      mandiCommissionPercent: undefined,
-      aadhatCommissionPercent: undefined,
-      hammaliPerBag: undefined,
+      ...mandiChargesFromPrev,
       mandiExtraCharges: undefined,
       remarks: "",
       bagBreakdowns: [],
