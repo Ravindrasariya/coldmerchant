@@ -914,7 +914,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             let entryColdStoreTotalCharges = 0;
             let entryColdStorePaid = 0;
             
-            lotsWithMetrics.forEach(({ metrics }) => {
+            const entryIsMandi = (entry.place || entry.lots[0]?.place) === "mandi";
+            let entryMandiChargesTotal = 0;
+
+            lotsWithMetrics.forEach(({ lot, metrics }) => {
               totalOriginal += metrics.originalBags;
               totalWastage += metrics.wastageBags;
               totalActual += metrics.actualSellableBags;
@@ -932,11 +935,20 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               entryDeductions += metrics.totalDeductions;
               entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
               entryColdStorePaid += metrics.coldStorePaid;
+              if (lot.place === "mandi" && metrics.totalAmount !== null) {
+                const costOfGoods = metrics.totalAmount;
+                const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
+                const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
+                const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
+                const extraCharges = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
+                entryMandiChargesTotal += costOfGoods * mandiPct / 100 + costOfGoods * aadhatPct / 100 + metrics.actualSellableBags * hammaliRate + extraCharges;
+              }
             });
             
             const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-            // Net Payable = Total Cost - Deductions + Adjustment (matches edit dialog formula)
-            const adjustedEntryTotal = entryTotalAmount - entryDeductions + entryAdjustment;
+            const adjustedEntryTotal = entryIsMandi
+              ? entryTotalAmount + entryMandiChargesTotal
+              : entryTotalAmount - entryDeductions + entryAdjustment;
             const farmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
             const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
             
