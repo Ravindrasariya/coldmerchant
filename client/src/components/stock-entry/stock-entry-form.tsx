@@ -243,6 +243,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   };
 
   const onInvalid = (errors: any) => {
+    console.log("Form validation errors:", JSON.stringify(errors, null, 2));
     const flatErrors: string[] = [];
     const getLabel = (key: string) => fieldLabels[key] || key;
 
