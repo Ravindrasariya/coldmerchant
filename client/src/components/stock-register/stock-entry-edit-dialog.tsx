@@ -101,6 +101,11 @@ interface StockEntryEditDialogProps {
 export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEditDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { data: aadhats } = useQuery<Array<{ id: number; name: string; address: string; contact: string | null }>>({
+    queryKey: ["/api/aadhats"],
+    enabled: entry.place === "mandi" && !!entry.aadhatDbId,
+  });
+  const aadhatRecord = aadhats?.find(a => a.id === entry.aadhatDbId);
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [lots, setLots] = useState(entry.lots.map(lot => ({
     ...lot,
@@ -465,17 +470,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       })}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">{t("Place", "स्थान")}</p>
-                    <p className="font-medium">{t("Mandi", "मंडी")}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">{t("District", "जिला")}</p>
-                    <p className="font-medium">{entry.district}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">{t("State", "राज्य")}</p>
-                    <p className="font-medium">{entry.state}</p>
+                  <div className="md:col-span-1">
+                    <p className="text-muted-foreground text-xs">{t("Address", "पता")}</p>
+                    <p className="font-medium">{aadhatRecord?.address || "—"}</p>
                   </div>
                 </div>
               </CardContent>
