@@ -235,44 +235,28 @@ export async function registerRoutes(
         const dateKey = entry.purchaseDate;
         const entryLots = lotsMap.get(entry.id) || [];
 
-        let entryTotalAmount = 0;
-        let entryDeductions = 0;
-        let entryAdjustment = 0;
+        let entryNetPayable = 0;
         let entryVolume = 0;
 
         for (const lot of entryLots) {
+          entryNetPayable += parseFloat(lot.netPayable || "0");
+
           const lotBreakdowns = breakdownsMap.get(lot.id) || [];
           const sellable = lotBreakdowns.filter((bd: any) => bd.size !== "Wastage");
-
           const hasBreakdownData = sellable.some((bd: any) => {
             const w = bd.weight ? parseFloat(bd.weight) : 0;
             const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
             return w > 0 && p > 0;
           });
-
           if (hasBreakdownData) {
             for (const bd of sellable) {
               const weight = bd.weight ? parseFloat(bd.weight) : 0;
               entryVolume += weight;
-              const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-              const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-              if (netWeight > 0 && price > 0) {
-                entryTotalAmount += netWeight * price;
-              }
             }
           } else {
             const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
-            const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-            const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
             entryVolume += lotTotalWeight;
-            if (netWeight > 0 && price > 0) {
-              entryTotalAmount += netWeight * price;
-            }
           }
-
-          const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
-          const dynamicCharges = (lot.charges || []).reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-          entryDeductions += hammaliGradingCharges + dynamicCharges;
 
           const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
           const lotColdCharges = (lot.charges || [])
@@ -281,23 +265,10 @@ export async function registerRoutes(
           const lotColdPaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
           summaryColdStoreTotalCharges += lotColdCharges;
           summaryColdStoreDue += Math.max(lotColdCharges - lotColdPaid, 0);
-
-          const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
-          const finalAdjAmount = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : rawAdjustedAmount;
-          let finalAdj = Math.max(0, finalAdjAmount - rawAdjustedAmount);
-
-          if (finalAdj > 0 && lot.adjustedAmountType) {
-            if (lot.adjustedAmountType === "credit") {
-              entryAdjustment += finalAdj;
-            } else if (lot.adjustedAmountType === "debit") {
-              entryAdjustment -= finalAdj;
-            }
-          }
         }
 
-        const netPayable = entryTotalAmount - entryDeductions + entryAdjustment;
         const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-        const farmerDue = Math.max(netPayable - amountPaid, 0);
+        const farmerDue = Math.max(entryNetPayable - amountPaid, 0);
 
         farmerDueMap.set(dateKey, (farmerDueMap.get(dateKey) || 0) + farmerDue);
         volumeMap.set(dateKey, (volumeMap.get(dateKey) || 0) + entryVolume);
@@ -2919,55 +2890,19 @@ export async function registerRoutes(
           if (matchesByFarmerId || matchesByCompositeKey) {
             // Only calculate harvest due for entries with "due" or "partial" payment status
             if (entry.paymentStatus === "due" || entry.paymentStatus === "partial") {
-              // Get lots for this entry
               const entryLots = lotsByEntryId.get(entry.id) || [];
-              let entryTotalCost = 0;
-              let entryDeductions = 0;
-              let entryAdjustment = 0;
+              let entryNetPayable = 0;
               
               for (const lot of entryLots) {
-                // Get breakdowns and calculate total cost using netWeight * pricePerKg (matches edit dialog formula)
-                const lotBreakdowns = breakdownsByLotId.get(lot.id) || [];
-                for (const bd of lotBreakdowns) {
-                  if (bd.size !== "Wastage") {
-                    const weight = parseFloat(bd.weight || "0");
-                    const pricePerKg = parseFloat(bd.pricePerKg || "0");
-                    // Net Weight = Total Weight - Number of Bags (matches edit dialog)
-                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-                    if (netWeight > 0 && pricePerKg > 0) {
-                      entryTotalCost += netWeight * pricePerKg;
-                    }
-                  }
-                }
+                entryNetPayable += parseFloat(lot.netPayable || "0");
                 
-                // Fallback to lot-level data when no breakdown weight/price data exists
-                const hasBreakdownData = lotBreakdowns.some(bd => {
-                  if (bd.size === "Wastage") return false;
-                  const w = parseFloat(bd.weight || "0");
-                  const p = parseFloat(bd.pricePerKg || "0");
-                  return w > 0 && p > 0;
-                });
-                if (!hasBreakdownData && lot.pricePerKg) {
-                  const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
-                  const price = parseFloat(lot.pricePerKg);
-                  const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
-                  if (netWeight > 0 && price > 0) {
-                    entryTotalCost += netWeight * price;
-                  }
-                }
-                
-                // Calculate deductions (matches edit dialog formula): hammali/grading + all dynamic charges
-                const hammaliGradingCharges = parseFloat(lot.hammaliGradingCharges || "0");
-                // Parse lot.charges JSON array to get dynamic charges
-                let dynamicCharges = 0;
+                // Extract cold charges for cold due calculation
                 let lotColdCharges = 0;
                 const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
                 if (lot.charges) {
                   try {
                     const chargesArray = typeof lot.charges === 'string' ? JSON.parse(lot.charges) : lot.charges;
                     if (Array.isArray(chargesArray)) {
-                      dynamicCharges = chargesArray.reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
-                      // Sum only Cold Charges and Ware House Charges for cold due
                       lotColdCharges = chargesArray
                         .filter((c: any) => c && coldStoreTypes.includes(c.type))
                         .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
@@ -2976,32 +2911,11 @@ export async function registerRoutes(
                     // ignore parse errors
                   }
                 }
-                entryDeductions += hammaliGradingCharges + dynamicCharges;
-                
-                // Apply interest-only adjustment (principal is already included in total amount)
-                if (lot.adjustedAmount && lot.adjustedAmountType) {
-                  const principal = parseFloat(lot.adjustedAmount);
-                  const finalAdjAmount = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : principal;
-                  const interestAmount = Math.max(0, finalAdjAmount - principal);
-                  
-                  if (interestAmount > 0) {
-                    if (lot.adjustedAmountType === "debit") {
-                      entryAdjustment -= interestAmount;
-                    } else if (lot.adjustedAmountType === "credit") {
-                      entryAdjustment += interestAmount;
-                    }
-                  }
-                }
-                
-                // Sum cold charges for cold due calculation (from Cold Charges/Ware House Charges in charges array)
                 coldDue += lotColdCharges;
               }
               
-              // Net Payable = Total Cost - Deductions + Adjustment (matches edit dialog formula)
-              const netPayable = entryTotalCost - entryDeductions + entryAdjustment;
-              // Harvest Due = Net Payable - Amount Paid
               const amountPaid = parseFloat(entry.amountPaid || "0");
-              const entryDue = Math.max(0, netPayable - amountPaid);
+              const entryDue = Math.max(0, entryNetPayable - amountPaid);
               harvestDue += entryDue;
             } else {
               // For fully paid entries, still count cold charges from charges array
