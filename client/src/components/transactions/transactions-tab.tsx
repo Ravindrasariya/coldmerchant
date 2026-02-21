@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, Share2 } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download } from "lucide-react";
 import { CropToggle } from "@/components/crop-toggle";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -68,7 +68,6 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
-  const [shareTransactionId, setShareTransactionId] = useState<number | null>(null);
   
   // Download dialog state (uses filtered transactions directly)
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -521,7 +520,6 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               transaction={txn} 
               onEdit={() => setEditTransactionId(txn.id)}
               onPrint={() => setPrintTransactionId(txn.id)}
-              onShare={() => setShareTransactionId(txn.id)}
             />
           ))}
         </div>
@@ -545,13 +543,6 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         onOpenChange={(open) => !open && setPrintTransactionId(null)}
       />
 
-      <SalesReceiptDialog
-        transactionId={shareTransactionId}
-        merchantId={user?.merchantId || 0}
-        open={shareTransactionId !== null}
-        onOpenChange={(open) => !open && setShareTransactionId(null)}
-        autoAction="share"
-      />
     </div>
   );
 }
@@ -560,10 +551,9 @@ interface TransactionCardProps {
   transaction: Transaction;
   onEdit: () => void;
   onPrint: () => void;
-  onShare: () => void;
 }
 
-function TransactionCard({ transaction, onEdit, onPrint, onShare }: TransactionCardProps) {
+function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps) {
   const { t } = useLanguage();
 
   const totalCost = parseFloat(transaction.totalCostOfGoods || "0");
@@ -696,16 +686,6 @@ function TransactionCard({ transaction, onEdit, onPrint, onShare }: TransactionC
             >
               <Printer className="h-3.5 w-3.5 mr-1.5" />
               {t("Receipt", "रसीद")}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={onShare}
-              className="flex-1 sm:flex-none h-8 sm:h-9"
-              data-testid={`button-share-transaction-${transaction.id}`}
-            >
-              <Share2 className="h-3.5 w-3.5 mr-1.5" />
-              {t("Share", "शेयर")}
             </Button>
           </div>
         </div>

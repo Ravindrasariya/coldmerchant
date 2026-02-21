@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Printer, Share2, Download } from "lucide-react";
+import { Printer, Share2 } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
@@ -278,12 +278,10 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
                 <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-seed-receipt">
                   {sharing ? (
                     <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : isMobile ? (
-                    <Share2 className="h-4 w-4 mr-2" />
                   ) : (
-                    <Download className="h-4 w-4 mr-2" />
+                    <Share2 className="h-4 w-4 mr-2" />
                   )}
-                  {sharing ? "..." : isMobile ? "Share" : "PDF"}
+                  {sharing ? "..." : "Share"}
                 </Button>
                 <Button onClick={handlePrint} size="sm" data-testid="button-print-seed-receipt">
                   <Printer className="h-4 w-4 mr-2" />
