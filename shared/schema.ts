@@ -46,6 +46,7 @@ export const stockEntries = pgTable("stock_entries", {
   serialNumber: integer("serial_number").notNull(),
   crop: text("crop").default("potato"), // potato, onion, or garlic - for separate serial number sequences
   purchaseDate: date("purchase_date").notNull(),
+  place: text("place").default("cold_store"), // farm_gate, cold_store, mandi
   farmerId: integer("farmer_id").references(() => farmers.id), // links to farmer ledger for matching
   farmerName: text("farmer_name").notNull(),
   farmerContact: text("farmer_contact"),
@@ -53,6 +54,8 @@ export const stockEntries = pgTable("stock_entries", {
   tehsil: text("tehsil"),
   district: text("district").notNull(),
   state: text("state").notNull(),
+  aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // links to aadhat ledger for mandi entries
+  aadhatName: text("aadhat_name"), // cached aadhtiya name for mandi entries
   paymentStatus: text("payment_status").default("due"), // due, partial, paid
   amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).default("0"), // amount paid to farmer
   remarks: text("remarks"),
@@ -79,10 +82,10 @@ export const lots = pgTable("lots", {
   id: serial("id").primaryKey(),
   stockEntryId: integer("stock_entry_id").notNull().references(() => stockEntries.id, { onDelete: "cascade" }),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  place: text("place").default("cold_store"), // farm_gate, cold_store
+  place: text("place").default("cold_store"), // farm_gate, cold_store, mandi
   coldStoreName: text("cold_store_name"), // required only for cold_store place (made nullable)
   coldStoreLotNumber: text("cold_store_lot_number"), // lot number at cold store
-  crop: text("crop").default("potato"), // potato, onion
+  crop: text("crop").default("potato"), // potato, onion, garlic
   originalBags: integer("original_bags").notNull(),
   potatoType: text("potato_type"), // Jyoti, Pukhraj, Lakar, LR, Torus, CS1, CS3, Others - variety (potato only, made nullable)
   harvestPotatoType: text("harvest_potato_type"), // Wafer, Ration, Seed - for potato crop only
@@ -93,6 +96,10 @@ export const lots = pgTable("lots", {
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalWeight: decimal("total_weight", { precision: 12, scale: 2 }), // Total weight in kg (optional)
   charges: jsonb("charges"), // Dynamic charges array: [{ type: string, amount: number }]
+  mandiCommissionPercent: decimal("mandi_commission_percent", { precision: 6, scale: 2 }), // Mandi commission % on final value
+  aadhatCommissionPercent: decimal("aadhat_commission_percent", { precision: 6, scale: 2 }), // Aadhat commission % on final value
+  hammaliPerBag: decimal("hammali_per_bag", { precision: 10, scale: 2 }), // Hammali charges per bag for mandi
+  mandiExtraCharges: decimal("mandi_extra_charges", { precision: 12, scale: 2 }), // Extra charges total for mandi
   coldStoreChargesPerBag: decimal("cold_store_charges_per_bag", { precision: 10, scale: 2 }), // legacy: charges per bag from cold store
   hammaliGradingCharges: decimal("hammali_grading_charges", { precision: 12, scale: 2 }), // legacy: hammali and grading charges
   coldStorageChargesPaid: decimal("cold_storage_charges_paid", { precision: 12, scale: 2 }).default("0"), // total amount paid towards cold store charges
@@ -952,7 +959,7 @@ export const chargeEntrySchema = z.object({
 export type ChargeEntry = z.infer<typeof chargeEntrySchema>;
 
 export const lotFormSchema = z.object({
-  place: z.enum(["farm_gate", "cold_store"]).default("cold_store"),
+  place: z.enum(["farm_gate", "cold_store", "mandi"]).default("cold_store"),
   coldStoreName: z.string().optional(), // required only for cold_store place
   coldStoreLotNumber: z.string().optional(), // lot number at cold store
   crop: z.enum(["potato", "onion", "garlic"]).default("potato"),
@@ -966,6 +973,10 @@ export const lotFormSchema = z.object({
   pricePerKg: z.coerce.number().optional(),
   totalWeight: z.coerce.number().optional(), // Total weight in kg (optional)
   charges: z.array(chargeEntrySchema).optional(), // Dynamic charges array
+  mandiCommissionPercent: z.coerce.number().optional(), // Mandi commission % on final value
+  aadhatCommissionPercent: z.coerce.number().optional(), // Aadhat commission % on final value
+  hammaliPerBag: z.coerce.number().optional(), // Hammali charges per bag for mandi
+  mandiExtraCharges: z.coerce.number().optional(), // Extra charges total for mandi
   adjustedAmount: z.coerce.number().optional(), // adjustment amount for farmer due (principal if rate is used)
   adjustedAmountType: z.enum(["debit", "credit"]).optional(), // debit or credit
   adjustedAmountRate: z.coerce.number().optional(), // annual rate % for compound interest
@@ -977,14 +988,42 @@ export const lotFormSchema = z.object({
 
 export const stockEntryFormSchema = z.object({
   purchaseDate: z.string().min(1, "Purchase date is required"),
-  farmerName: z.string().min(1, "Farmer name is required"),
-  farmerContact: z.string().regex(/^\d{10}$/, "Enter valid 10-digit number"),
-  village: z.string().min(1, "Village name is required"),
-  tehsil: z.string().min(1, "Tehsil is required"),
-  district: z.string().min(1, "District is required"),
-  state: z.string().min(1, "State is required"),
+  place: z.enum(["farm_gate", "cold_store", "mandi"]).default("cold_store"),
+  farmerName: z.string().optional().default(""),
+  farmerContact: z.string().optional().default(""),
+  village: z.string().optional().default(""),
+  tehsil: z.string().optional().default(""),
+  district: z.string().optional().default(""),
+  state: z.string().optional().default(""),
+  aadhatDbId: z.coerce.number().optional(),
+  aadhatName: z.string().optional(),
   remarks: z.string().optional(),
   lots: z.array(lotFormSchema).min(1, "At least one lot is required"),
+}).superRefine((data, ctx) => {
+  if (data.place === "mandi") {
+    if (!data.aadhatName || data.aadhatName.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aadhtiya name is required", path: ["aadhatName"] });
+    }
+  } else {
+    if (!data.farmerName || data.farmerName.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Farmer name is required", path: ["farmerName"] });
+    }
+    if (!data.farmerContact || !/^\d{10}$/.test(data.farmerContact)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Enter valid 10-digit number", path: ["farmerContact"] });
+    }
+    if (!data.village || data.village.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Village name is required", path: ["village"] });
+    }
+    if (!data.tehsil || data.tehsil.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tehsil is required", path: ["tehsil"] });
+    }
+    if (!data.district || data.district.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "District is required", path: ["district"] });
+    }
+    if (!data.state || data.state.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "State is required", path: ["state"] });
+    }
+  }
 });
 
 export type BagBreakdownForm = z.infer<typeof bagBreakdownFormSchema>;
@@ -1014,7 +1053,7 @@ export type TransactionForm = z.infer<typeof transactionFormSchema>;
 export const DISTRICTS = ["Ujjain", "Shajapur", "Indore", "Dewas", "Agar Malwa"] as const;
 export const SEED_DISTRICTS = ["Ujjain", "Agar Malwa", "Shajapur", "Dewas", "Indore", "Ratlam", "Rajgarh", "Other"] as const;
 export const STATES = ["Madhya Pradesh", "Gujarat"] as const;
-export const PLACE_OPTIONS = ["farm_gate", "cold_store"] as const;
+export const PLACE_OPTIONS = ["farm_gate", "cold_store", "mandi"] as const;
 export const CROP_OPTIONS = ["potato", "onion", "garlic"] as const;
 export type CropType = typeof CROP_OPTIONS[number];
 export const POTATO_TYPES = ["Jyoti", "Pukhraj", "Lakar", "LR", "Torus", "CS1", "CS3", "Others"] as const;

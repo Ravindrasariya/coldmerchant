@@ -68,12 +68,12 @@ export default function HomePage() {
     setSelectedCropState(crop);
     localStorage.setItem("vyapar_selected_crop", crop);
   };
-  const [selectedPlace, setSelectedPlaceState] = useState<"farm_gate" | "cold_store">(() => {
+  const [selectedPlace, setSelectedPlaceState] = useState<"farm_gate" | "cold_store" | "mandi">(() => {
     const saved = localStorage.getItem("vyapar_selected_place");
-    if (saved === "farm_gate" || saved === "cold_store") return saved;
+    if (saved === "farm_gate" || saved === "cold_store" || saved === "mandi") return saved;
     return "cold_store";
   });
-  const setSelectedPlace = (place: "farm_gate" | "cold_store") => {
+  const setSelectedPlace = (place: "farm_gate" | "cold_store" | "mandi") => {
     setSelectedPlaceState(place);
     localStorage.setItem("vyapar_selected_place", place);
   };
@@ -403,7 +403,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Select value={selectedPlace} onValueChange={(v) => setSelectedPlace(v as "farm_gate" | "cold_store")}>
+                  <Select value={selectedPlace} onValueChange={(v) => setSelectedPlace(v as "farm_gate" | "cold_store" | "mandi")}>
                     <SelectTrigger
                       className="w-fit shrink-0 bg-orange-500 text-white border-orange-500 focus:ring-orange-400 font-bold [&>svg]:text-white [&>span]:!line-clamp-none"
                       data-testid="select-place-header"
@@ -413,6 +413,7 @@ export default function HomePage() {
                     <SelectContent>
                       <SelectItem value="farm_gate">{t("Farm Gate", "खेत गेट")}</SelectItem>
                       <SelectItem value="cold_store">{t("Cold Store", "कोल्ड स्टोर")}</SelectItem>
+                      <SelectItem value="mandi">{t("Mandi", "मंडी")}</SelectItem>
                     </SelectContent>
                   </Select>
                   <CropToggle value={selectedCrop} onChange={setSelectedCrop} />

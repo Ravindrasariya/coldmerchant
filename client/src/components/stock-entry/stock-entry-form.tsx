@@ -9,6 +9,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { StockEntryForm as StockEntryFormType, stockEntryFormSchema } from "@shared/schema";
 import { FarmerInfoSection } from "./farmer-info-section";
+import { AadhtiyaInfoSection } from "./aadhtiya-info-section";
 import { LotCard } from "./lot-card";
 import { useLanguage } from "@/hooks/use-language";
 
@@ -18,19 +19,22 @@ function getStorageKey(crop: "potato" | "onion" | "garlic") {
   return `${STORAGE_KEY_PREFIX}${crop}`;
 }
 
-function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic"): StockEntryFormType {
+function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic", selectedPlace: "farm_gate" | "cold_store" | "mandi" = "cold_store"): StockEntryFormType {
   return {
     purchaseDate: new Date().toISOString().split("T")[0],
+    place: selectedPlace,
     farmerName: "",
     farmerContact: "",
     village: "",
     tehsil: "",
     district: "",
     state: "",
+    aadhatDbId: undefined,
+    aadhatName: "",
     remarks: "",
     lots: [
       {
-        place: "cold_store",
+        place: selectedPlace,
         coldStoreName: "",
         coldStoreLotNumber: "",
         crop: selectedCrop,
@@ -39,10 +43,14 @@ function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic"): Stoc
         harvestPotatoType: "",
         bagType: "",
         quality: "",
-        cutType: "gate_cut",
+        cutType: selectedPlace === "mandi" ? "gate_cut" : "gate_cut",
         size: "",
         pricePerKg: undefined,
         charges: [],
+        mandiCommissionPercent: undefined,
+        aadhatCommissionPercent: undefined,
+        hammaliPerBag: undefined,
+        mandiExtraCharges: undefined,
         remarks: "",
         bagBreakdowns: [],
       },
@@ -85,7 +93,7 @@ interface StockEntryFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
   selectedCrop?: "potato" | "onion" | "garlic";
-  selectedPlace?: "farm_gate" | "cold_store";
+  selectedPlace?: "farm_gate" | "cold_store" | "mandi";
 }
 
 export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", selectedPlace = "cold_store" }: StockEntryFormProps) {
@@ -113,9 +121,13 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   }, [selectedCrop, form]);
 
   useEffect(() => {
+    form.setValue("place", selectedPlace);
     const lots = form.getValues("lots");
     lots.forEach((_, index) => {
       form.setValue(`lots.${index}.place`, selectedPlace);
+      if (selectedPlace === "mandi") {
+        form.setValue(`lots.${index}.cutType`, "gate_cut");
+      }
     });
   }, [selectedPlace, form]);
 
@@ -134,7 +146,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   const resetFormAndClearStorage = () => {
     isPausingAutoSaveRef.current = true;
     clearSavedFormData(selectedCrop);
-    form.reset(getDefaultFormValues(selectedCrop));
+    form.reset(getDefaultFormValues(selectedCrop, selectedPlace));
     scrollToTop();
     setTimeout(() => {
       isPausingAutoSaveRef.current = false;
@@ -188,6 +200,10 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       size: "",
       pricePerKg: undefined,
       charges: [],
+      mandiCommissionPercent: undefined,
+      aadhatCommissionPercent: undefined,
+      hammaliPerBag: undefined,
+      mandiExtraCharges: undefined,
       remarks: "",
       bagBreakdowns: [],
     });
@@ -200,7 +216,11 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   return (
     <Form {...form}>
       <form ref={formContainerRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FarmerInfoSection form={form} />
+        {selectedPlace === "mandi" ? (
+          <AadhtiyaInfoSection form={form} />
+        ) : (
+          <FarmerInfoSection form={form} />
+        )}
 
         <div className="space-y-4">
           <h3 className="text-lg font-medium">{t("Lots", "लॉट")}</h3>

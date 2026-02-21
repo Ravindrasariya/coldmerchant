@@ -404,29 +404,57 @@ export async function registerRoutes(
       
       // Determine crop from first lot (all lots in an entry should have the same crop)
       const entryCrop = data.lots?.[0]?.crop || "potato";
+      const entryPlace = data.place || data.lots?.[0]?.place || "cold_store";
 
-      // Lookup or create farmer in farmer ledger
-      const { farmerId } = await storage.lookupOrCreateFarmer(merchantId, {
-        name: titleCaseKeep(data.farmerName),
-        contact: data.farmerContact || null,
-        village: titleCase(data.village) || null,
-        tehsil: titleCase(data.tehsil) || null,
-        district: titleCase(data.district) || null,
-        state: titleCase(data.state) || null,
-      });
+      let farmerId: number | null = null;
+      let farmerName = "";
+      let farmerContact: string | null = null;
+      let village: string | null = null;
+      let tehsil: string | null = null;
+      let district: string = "";
+      let state: string = "";
+      let aadhatDbId: number | null = null;
+      let aadhatName: string | null = null;
+
+      if (entryPlace === "mandi") {
+        aadhatDbId = data.aadhatDbId || null;
+        aadhatName = data.aadhatName || null;
+        farmerName = data.aadhatName || "Mandi Entry";
+        district = "Mandi";
+        state = "Madhya Pradesh";
+      } else {
+        const farmerResult = await storage.lookupOrCreateFarmer(merchantId, {
+          name: titleCaseKeep(data.farmerName!),
+          contact: data.farmerContact || null,
+          village: titleCase(data.village) || null,
+          tehsil: titleCase(data.tehsil) || null,
+          district: titleCase(data.district) || null,
+          state: titleCase(data.state) || null,
+        });
+        farmerId = farmerResult.farmerId;
+        farmerName = titleCaseKeep(data.farmerName!);
+        farmerContact = data.farmerContact || null;
+        village = titleCase(data.village) || null;
+        tehsil = titleCase(data.tehsil) || null;
+        district = titleCase(data.district) || data.district || "";
+        state = titleCase(data.state) || data.state || "";
+      }
 
       // Create stock entry
       const stockEntry = await storage.createStockEntry({
         merchantId,
         crop: entryCrop,
         purchaseDate: data.purchaseDate,
+        place: entryPlace,
         farmerId,
-        farmerName: titleCaseKeep(data.farmerName),
-        farmerContact: data.farmerContact || null,
-        village: titleCase(data.village) || null,
-        tehsil: titleCase(data.tehsil) || null,
-        district: titleCase(data.district) || data.district,
-        state: titleCase(data.state) || data.state,
+        farmerName,
+        farmerContact,
+        village,
+        tehsil,
+        district,
+        state,
+        aadhatDbId,
+        aadhatName,
         remarks: data.remarks || null,
         paymentStatus: "due",
       });
@@ -454,6 +482,10 @@ export async function registerRoutes(
             ? lotData.totalWeight.toString() 
             : null,
           charges: lotData.charges && lotData.charges.length > 0 ? lotData.charges : null,
+          mandiCommissionPercent: lotData.mandiCommissionPercent ? lotData.mandiCommissionPercent.toString() : null,
+          aadhatCommissionPercent: lotData.aadhatCommissionPercent ? lotData.aadhatCommissionPercent.toString() : null,
+          hammaliPerBag: lotData.hammaliPerBag ? lotData.hammaliPerBag.toString() : null,
+          mandiExtraCharges: lotData.mandiExtraCharges ? lotData.mandiExtraCharges.toString() : null,
           remainingBags: lotData.originalBags,
         });
 
@@ -611,6 +643,18 @@ export async function registerRoutes(
             if (existingLot && lotData.coldStoreLotNumber !== undefined) {
               compareField('coldStoreLotNumber', existingLot.coldStoreLotNumber, lotData.coldStoreLotNumber, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.mandiCommissionPercent !== undefined) {
+              compareField('mandiCommissionPercent', existingLot.mandiCommissionPercent, lotData.mandiCommissionPercent, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.aadhatCommissionPercent !== undefined) {
+              compareField('aadhatCommissionPercent', existingLot.aadhatCommissionPercent, lotData.aadhatCommissionPercent, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.hammaliPerBag !== undefined) {
+              compareField('hammaliPerBag', existingLot.hammaliPerBag, lotData.hammaliPerBag, lotLabel, 'lot', lotData.id);
+            }
+            if (existingLot && lotData.mandiExtraCharges !== undefined) {
+              compareField('mandiExtraCharges', existingLot.mandiExtraCharges, lotData.mandiExtraCharges, lotLabel, 'lot', lotData.id);
+            }
 
             // Track charges array changes
             if (existingLot && lotData.charges !== undefined) {
@@ -680,6 +724,18 @@ export async function registerRoutes(
                 : undefined,
               charges: lotData.charges !== undefined
                 ? (lotData.charges && lotData.charges.length > 0 ? lotData.charges : null)
+                : undefined,
+              mandiCommissionPercent: lotData.mandiCommissionPercent !== undefined
+                ? (lotData.mandiCommissionPercent ? lotData.mandiCommissionPercent.toString() : null)
+                : undefined,
+              aadhatCommissionPercent: lotData.aadhatCommissionPercent !== undefined
+                ? (lotData.aadhatCommissionPercent ? lotData.aadhatCommissionPercent.toString() : null)
+                : undefined,
+              hammaliPerBag: lotData.hammaliPerBag !== undefined
+                ? (lotData.hammaliPerBag ? lotData.hammaliPerBag.toString() : null)
+                : undefined,
+              mandiExtraCharges: lotData.mandiExtraCharges !== undefined
+                ? (lotData.mandiExtraCharges ? lotData.mandiExtraCharges.toString() : null)
                 : undefined,
             });
 

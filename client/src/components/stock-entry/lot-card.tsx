@@ -111,6 +111,32 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   const cutType = form.watch(`lots.${lotIndex}.cutType`);
   const originalBags = form.watch(`lots.${lotIndex}.originalBags`) || 0;
 
+  const mandiCommission = form.watch(`lots.${lotIndex}.mandiCommissionPercent`);
+  const aadhatCommission = form.watch(`lots.${lotIndex}.aadhatCommissionPercent`);
+  const hammali = form.watch(`lots.${lotIndex}.hammaliPerBag`);
+
+  useEffect(() => {
+    if (place === "mandi" && lotIndex === 0) {
+      const savedMandi = localStorage.getItem("vyapar_mandi_commission");
+      const savedAadhat = localStorage.getItem("vyapar_aadhat_commission");
+      const savedHammali = localStorage.getItem("vyapar_hammali_per_bag");
+      const currentMandi = form.getValues(`lots.${lotIndex}.mandiCommissionPercent`);
+      const currentAadhat = form.getValues(`lots.${lotIndex}.aadhatCommissionPercent`);
+      const currentHammali = form.getValues(`lots.${lotIndex}.hammaliPerBag`);
+      if (savedMandi && !currentMandi) form.setValue(`lots.${lotIndex}.mandiCommissionPercent`, parseFloat(savedMandi) as any);
+      if (savedAadhat && !currentAadhat) form.setValue(`lots.${lotIndex}.aadhatCommissionPercent`, parseFloat(savedAadhat) as any);
+      if (savedHammali && !currentHammali) form.setValue(`lots.${lotIndex}.hammaliPerBag`, parseFloat(savedHammali) as any);
+    }
+  }, [place, lotIndex, form]);
+
+  useEffect(() => {
+    if (place === "mandi") {
+      if (mandiCommission != null) localStorage.setItem("vyapar_mandi_commission", String(mandiCommission));
+      if (aadhatCommission != null) localStorage.setItem("vyapar_aadhat_commission", String(aadhatCommission));
+      if (hammali != null) localStorage.setItem("vyapar_hammali_per_bag", String(hammali));
+    }
+  }, [place, mandiCommission, aadhatCommission, hammali]);
+
   const handleAddBreakdown = () => {
     appendBreakdown({
       size: "",
@@ -355,7 +381,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>{t("Delivery Type", "डिलीवरी प्रकार")} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={place === "mandi"}>
                   <FormControl>
                     <SelectTrigger data-testid={`select-delivery-type-${lotIndex}`}>
                       <SelectValue placeholder={t("Select delivery type", "डिलीवरी प्रकार चुनें")} />
@@ -452,96 +478,203 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
 
         </div>
 
-        {/* Dynamic Charges Section */}
-        <div className="space-y-4 pt-4 border-t">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">{t("Charges", "शुल्क")}</h4>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAddCharge}
-              data-testid={`button-add-charge-${lotIndex}`}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              {t("Add Charges", "शुल्क जोड़ें")}
-            </Button>
-          </div>
-
-          {chargeFields.length > 0 && (
-            <div className="space-y-3">
-              {chargeFields.map((chargeField, chargeIndex) => (
-                <div key={chargeField.id} className="flex items-end gap-3">
-                  <FormField
-                    control={form.control}
-                    name={`lots.${lotIndex}.charges.${chargeIndex}.type`}
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        {chargeIndex === 0 && (
-                          <FormLabel>{t("Charge Type", "शुल्क प्रकार")} *</FormLabel>
-                        )}
-                        <Select 
-                          onValueChange={field.onChange} 
-                          value={field.value || ""}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
-                              <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {CHARGE_TYPES.map((type) => (
-                              <SelectItem key={type} value={type}>
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`lots.${lotIndex}.charges.${chargeIndex}.amount`}
-                    render={({ field }) => (
-                      <FormItem className="w-32">
-                        {chargeIndex === 0 && (
-                          <FormLabel>{t("Amount", "राशि")} *</FormLabel>
-                        )}
-                        <FormControl>
-                          <Input 
-                            type="number"
-                            step="any"
-                            placeholder="0" 
-                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            {...field}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
-                            }}
-                            data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeCharge(chargeIndex)}
-                    className="text-destructive h-9 w-9"
-                    data-testid={`button-remove-charge-${lotIndex}-${chargeIndex}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+        {place === "mandi" ? (
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="text-sm font-medium">{t("Mandi Charges", "मंडी शुल्क")}</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.mandiCommissionPercent`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Mandi Commission %", "मंडी कमीशन %")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                          field.onChange(val);
+                        }}
+                        data-testid={`input-mandi-commission-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.aadhatCommissionPercent`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Aadhat Commission %", "आढ़त कमीशन %")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                          field.onChange(val);
+                        }}
+                        data-testid={`input-aadhat-commission-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.hammaliPerBag`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Hammali / Bag", "हम्माली / बोरी")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                          field.onChange(val);
+                        }}
+                        data-testid={`input-hammali-per-bag-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.mandiExtraCharges`}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("Extra Charges", "अतिरिक्त शुल्क")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? null : parseFloat(e.target.value);
+                          field.onChange(val);
+                        }}
+                        data-testid={`input-mandi-extra-charges-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">{t("Charges", "शुल्क")}</h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddCharge}
+                data-testid={`button-add-charge-${lotIndex}`}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {t("Add Charges", "शुल्क जोड़ें")}
+              </Button>
+            </div>
+
+            {chargeFields.length > 0 && (
+              <div className="space-y-3">
+                {chargeFields.map((chargeField, chargeIndex) => (
+                  <div key={chargeField.id} className="flex items-end gap-3">
+                    <FormField
+                      control={form.control}
+                      name={`lots.${lotIndex}.charges.${chargeIndex}.type`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          {chargeIndex === 0 && (
+                            <FormLabel>{t("Charge Type", "शुल्क प्रकार")} *</FormLabel>
+                          )}
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
+                                <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {CHARGE_TYPES.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`lots.${lotIndex}.charges.${chargeIndex}.amount`}
+                      render={({ field }) => (
+                        <FormItem className="w-32">
+                          {chargeIndex === 0 && (
+                            <FormLabel>{t("Amount", "राशि")} *</FormLabel>
+                          )}
+                          <FormControl>
+                            <Input 
+                              type="number"
+                              step="any"
+                              placeholder="0" 
+                              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              {...field}
+                              value={field.value || ""}
+                              onChange={(e) => {
+                                field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
+                              }}
+                              data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeCharge(chargeIndex)}
+                      className="text-destructive h-9 w-9"
+                      data-testid={`button-remove-charge-${lotIndex}-${chargeIndex}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {cutType === "bilty_cut" && (
           <div className="space-y-4 pt-4 border-t">
