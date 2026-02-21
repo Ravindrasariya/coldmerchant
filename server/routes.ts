@@ -239,6 +239,7 @@ export async function registerRoutes(
         let entryVolume = 0;
 
         for (const lot of entryLots) {
+          if (lot.place === "Mandi") continue;
           entryNetPayable += parseFloat(lot.netPayable || "0");
 
           const lotBreakdowns = breakdownsMap.get(lot.id) || [];
@@ -2894,6 +2895,7 @@ export async function registerRoutes(
               let entryNetPayable = 0;
               
               for (const lot of entryLots) {
+                if (lot.place === "Mandi") continue;
                 entryNetPayable += parseFloat(lot.netPayable || "0");
                 
                 // Extract cold charges for cold due calculation
@@ -2922,6 +2924,7 @@ export async function registerRoutes(
               const entryLots = lotsByEntryId.get(entry.id) || [];
               const coldStoreTypesElse = ["Cold Charges", "Ware House Charges"];
               for (const lot of entryLots) {
+                if (lot.place === "Mandi") continue;
                 if (lot.charges) {
                   try {
                     const chargesArray = typeof lot.charges === 'string' ? JSON.parse(lot.charges) : lot.charges;
