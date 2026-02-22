@@ -224,7 +224,7 @@ export default function AadhatLedgerTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader className="flex flex-col gap-4">
-          <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
               {t("Aadhat Ledger", "आढ़त खाता")}
