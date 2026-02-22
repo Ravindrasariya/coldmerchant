@@ -1,72 +1,170 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+const HTML2CANVAS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+const JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
 
-const PDF_CAPTURE_WIDTH = 800;
+const RECEIPT_BASE_STYLES = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    background: #ffffff;
+    color: #000000;
+  }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+  .header h1 { margin: 0; font-size: 24px; }
+  .header p { margin: 5px 0; color: #555; }
+  .receipt-title { text-align: center; font-size: 18px; font-weight: 600; margin: 10px 0; }
+  .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+  .receipt-info p { margin: 2px 0; }
+  .receipt-info .right, .receipt-info div:last-child { text-align: right; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  th, td { border: 1px solid #999; padding: 6px 8px; text-align: left; font-size: 13px; }
+  th { background-color: #f0f0f0; font-weight: 600; }
+  tfoot td { background-color: #f9f9f9; font-weight: 600; }
+  .text-right, td.text-right, th.text-right { text-align: right; }
+  .text-center, td.text-center, th.text-center { text-align: center; }
+  .text-left { text-align: left; }
+  .font-bold, .font-semibold { font-weight: 600; }
+  .font-medium { font-weight: 500; }
+  .totals-section { border: 1px solid #000; padding: 10px 12px; margin-top: 15px; }
+  .totals-section h3 { font-size: 14px; margin: 0 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #ccc; text-align: center; }
+  .totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+  .totals-row.highlight { background-color: #f5f5f5; font-weight: bold; padding: 5px 8px; margin: 4px -12px; }
+  .totals-row.final { background-color: #e8f5e9; font-weight: bold; font-size: 14px; padding: 6px 8px; margin: 6px -12px -10px -12px; border-top: 1px solid #000; }
+  .profit { color: #2e7d32; }
+  .loss { color: #c62828; }
+  .disclaimer { margin-top: 20px; padding: 8px; border: 1px dashed #999; text-align: center; font-size: 11px; color: #666; }
+  .disclaimer p { margin: 2px 0; }
+  .thank-you { text-align: center; font-size: 12px; color: #666; margin: 10px 0; }
+  .hindi { font-size: 0.9em; color: #666; }
+  .bilingual { display: block; }
+  .space-y-6 > * + * { margin-top: 24px; }
+  .space-y-2 > * + * { margin-top: 8px; }
+  .space-y-1 > * + * { margin-top: 4px; }
+  .space-y-0\\.5 > * + * { margin-top: 2px; }
+  .border-t { border-top: 1px solid #ddd; padding-top: 10px; }
+  .border-b { border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+  .pt-1 { padding-top: 4px; }
+  .pt-4 { padding-top: 16px; }
+  .pb-2 { padding-bottom: 8px; }
+  .pb-4 { padding-bottom: 16px; }
+  .mt-1 { margin-top: 4px; }
+  .mt-6 { margin-top: 24px; }
+  .mb-1 { margin-bottom: 4px; }
+  .p-2 { padding: 8px; }
+  .p-3 { padding: 12px; }
+  .px-1 { padding-left: 4px; padding-right: 4px; }
+  .px-2 { padding-left: 8px; padding-right: 8px; }
+  .py-0\\.5 { padding-top: 2px; padding-bottom: 2px; }
+  .py-1\\.5 { padding-top: 6px; padding-bottom: 6px; }
+  .bg-gray-100 { background-color: #f3f4f6; }
+  .bg-gray-50 { background-color: #f9fafb; }
+  .bg-green-100 { background-color: #dcfce7; }
+  .text-gray-600, .text-gray-500 { color: #666; }
+  .text-base { font-size: 16px; }
+  .text-sm { font-size: 14px; }
+  .text-xs { font-size: 12px; }
+  .text-\\[10px\\] { font-size: 10px; }
+  .text-\\[9px\\] { font-size: 9px; }
+  .text-\\[8px\\] { font-size: 8px; }
+  .text-2xl { font-size: 24px; }
+  .text-xl { font-size: 20px; }
+  .border { border: 1px solid #ddd; }
+  .border-black { border-color: #000; }
+  .border-gray-400 { border-color: #9ca3af; }
+  .border-gray-300 { border-color: #d1d5db; }
+  .border-dashed { border-style: dashed; }
+  .flex { display: flex; }
+  .justify-between { justify-content: space-between; }
+  .items-center { align-items: center; }
+  .gap-2 { gap: 8px; }
+`;
+
+function loadScript(doc: Document, src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const script = doc.createElement("script");
+    script.src = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    doc.head.appendChild(script);
+  });
+}
 
 export async function shareReceiptAsPdf(
   contentElement: HTMLElement,
   filename: string
 ): Promise<void> {
-  const scrollContainer = contentElement.closest("[class*='overflow']") as HTMLElement | null;
-  const dialog = contentElement.closest("[role='dialog']") as HTMLElement | null;
+  const receiptHTML = contentElement.innerHTML;
 
-  const origStyles = {
-    elWidth: contentElement.style.width,
-    elMinWidth: contentElement.style.minWidth,
-    elMaxWidth: contentElement.style.maxWidth,
-    scrollOverflow: scrollContainer?.style.overflow || "",
-    scrollMaxHeight: scrollContainer?.style.maxHeight || "",
-    dialogWidth: dialog?.style.width || "",
-    dialogMinWidth: dialog?.style.minWidth || "",
-    dialogMaxWidth: dialog?.style.maxWidth || "",
-    dialogOverflow: dialog?.style.overflow || "",
-    dialogPosition: dialog?.style.position || "",
-    dialogLeft: dialog?.style.left || "",
-  };
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-9999px";
+  iframe.style.top = "0";
+  iframe.style.width = "820px";
+  iframe.style.height = "1200px";
+  iframe.style.border = "none";
+  iframe.style.opacity = "0";
+  document.body.appendChild(iframe);
 
-  contentElement.style.width = `${PDF_CAPTURE_WIDTH}px`;
-  contentElement.style.minWidth = `${PDF_CAPTURE_WIDTH}px`;
-  contentElement.style.maxWidth = `${PDF_CAPTURE_WIDTH}px`;
-
-  if (scrollContainer) {
-    scrollContainer.style.overflow = "visible";
-    scrollContainer.style.maxHeight = "none";
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error("Could not access iframe document");
   }
 
-  if (dialog) {
-    dialog.style.width = `${PDF_CAPTURE_WIDTH + 64}px`;
-    dialog.style.minWidth = `${PDF_CAPTURE_WIDTH + 64}px`;
-    dialog.style.maxWidth = `${PDF_CAPTURE_WIDTH + 64}px`;
-    dialog.style.overflow = "visible";
-    dialog.style.position = "fixed";
-    dialog.style.left = "-9999px";
-  }
+  iframeDoc.open();
+  iframeDoc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>${RECEIPT_BASE_STYLES}</style>
+      </head>
+      <body>
+        <div id="receipt-root">${receiptHTML}</div>
+      </body>
+    </html>
+  `);
+  iframeDoc.close();
 
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise((r) => setTimeout(r, 300));
 
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   try {
-    const contentRect = contentElement.getBoundingClientRect();
-    console.log("PDF capture: element rect", { w: contentRect.width, h: contentRect.height, top: contentRect.top, left: contentRect.left });
+    await loadScript(iframeDoc, HTML2CANVAS_CDN);
+    await loadScript(iframeDoc, JSPDF_CDN);
 
-    const canvas = await html2canvas(contentElement, {
+    await new Promise((r) => setTimeout(r, 200));
+
+    const iframeWindow = iframe.contentWindow as any;
+    const html2canvasFn = iframeWindow.html2canvas;
+    const jsPDFClass = iframeWindow.jspdf?.jsPDF;
+
+    if (!html2canvasFn || !jsPDFClass) {
+      throw new Error("Libraries not available");
+    }
+
+    const receiptRoot = iframeDoc.getElementById("receipt-root");
+    if (!receiptRoot) {
+      throw new Error("Receipt root not found");
+    }
+
+    const canvas = await html2canvasFn(receiptRoot, {
       scale: isMobileDevice ? 1.5 : 2,
       useCORS: true,
       backgroundColor: "#ffffff",
       logging: false,
-      width: PDF_CAPTURE_WIDTH,
-      height: contentRect.height > 0 ? Math.ceil(contentRect.height) : undefined,
-      windowWidth: PDF_CAPTURE_WIDTH + 64,
+      width: 800,
+      windowWidth: 820,
       scrollX: 0,
       scrollY: 0,
     });
 
-    console.log("PDF capture: canvas size", { w: canvas.width, h: canvas.height });
-
     const imgWidth = 210;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const pdf = new jsPDF("p", "mm", "a4");
+    const pdf = new jsPDFClass("p", "mm", "a4");
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     if (imgHeight <= pageHeight) {
@@ -105,36 +203,35 @@ export async function shareReceiptAsPdf(
       } catch (shareErr: any) {
         if (shareErr?.name !== "AbortError") {
           downloadPdf();
-          setTimeout(() => {
-            window.open("https://wa.me/", "_blank");
-          }, 500);
         }
       }
-    } else if (isMobileDevice) {
-      downloadPdf();
-      setTimeout(() => {
-        window.open("https://wa.me/", "_blank");
-      }, 500);
     } else {
       downloadPdf();
     }
-  } finally {
-    contentElement.style.width = origStyles.elWidth;
-    contentElement.style.minWidth = origStyles.elMinWidth;
-    contentElement.style.maxWidth = origStyles.elMaxWidth;
-
-    if (scrollContainer) {
-      scrollContainer.style.overflow = origStyles.scrollOverflow;
-      scrollContainer.style.maxHeight = origStyles.scrollMaxHeight;
+  } catch (cdnError) {
+    console.warn("PDF generation failed, falling back to print:", cdnError);
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>${filename}</title>
+            <style>
+              ${RECEIPT_BASE_STYLES}
+              @media print { body { padding: 10px; } }
+            </style>
+          </head>
+          <body>${receiptHTML}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
     }
-
-    if (dialog) {
-      dialog.style.width = origStyles.dialogWidth;
-      dialog.style.minWidth = origStyles.dialogMinWidth;
-      dialog.style.maxWidth = origStyles.dialogMaxWidth;
-      dialog.style.overflow = origStyles.dialogOverflow;
-      dialog.style.position = origStyles.dialogPosition;
-      dialog.style.left = origStyles.dialogLeft;
+  } finally {
+    if (iframe.parentNode) {
+      document.body.removeChild(iframe);
     }
   }
 }
