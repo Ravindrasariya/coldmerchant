@@ -1354,6 +1354,43 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/recalculate-lot-payables", requireSystemAdmin, async (req, res) => {
+    try {
+      const allMerchants = await storage.getAllMerchants();
+      let harvestUpdated = 0;
+      let seedUpdated = 0;
+
+      for (const merchant of allMerchants) {
+        const entries = await storage.getStockEntriesByMerchant(merchant.id);
+        for (const entry of entries) {
+          for (const lot of entry.lots) {
+            const { totalCharges, netPayable } = computeHarvestLotCharges(lot);
+            await storage.updateLot(lot.id, merchant.id, { totalCharges, netPayable });
+            harvestUpdated++;
+          }
+        }
+
+        const seedEntries = await storage.getSeedEntriesByMerchant(merchant.id);
+        for (const seedEntry of seedEntries) {
+          for (const lot of seedEntry.seedLots) {
+            const { totalCharges, netPayable, avgCostPerBag } = computeSeedLotCharges(lot);
+            await storage.updateSeedLot(lot.id, merchant.id, { totalCharges, netPayable, avgCostPerBag });
+            seedUpdated++;
+          }
+        }
+      }
+
+      res.json({
+        message: "Recalculation complete",
+        harvestLotsUpdated: harvestUpdated,
+        seedLotsUpdated: seedUpdated,
+      });
+    } catch (error) {
+      console.error("Error recalculating lot payables:", error);
+      res.status(500).json({ message: "Failed to recalculate lot payables" });
+    }
+  });
+
   // Transaction Routes
   // GET /api/transactions - Get all transactions for the merchant
   app.get("/api/transactions", requireMerchant, async (req, res) => {
