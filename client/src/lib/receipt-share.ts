@@ -79,6 +79,53 @@ const RECEIPT_BASE_STYLES = `
   .justify-between { justify-content: space-between; }
   .items-center { align-items: center; }
   .gap-2 { gap: 8px; }
+  .gap-1 { gap: 4px; }
+  .w-full { width: 100%; }
+  .min-w-\\[600px\\] { min-width: 600px; }
+  .min-w-\\[650px\\] { min-width: 650px; }
+  .min-w-\\[700px\\] { min-width: 700px; }
+  .rounded-lg { border-radius: 8px; }
+  .rounded { border-radius: 4px; }
+  .bg-white { background-color: #ffffff; }
+  .text-black { color: #000000; }
+  .p-4 { padding: 16px; }
+  .p-1 { padding: 4px; }
+  .px-4 { padding-left: 16px; padding-right: 16px; }
+  .py-2 { padding-top: 8px; padding-bottom: 8px; }
+  .space-y-3 > * + * { margin-top: 12px; }
+  .space-y-4 > * + * { margin-top: 16px; }
+  .grid { display: grid; }
+  .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .col-span-2 { grid-column: span 2; }
+  .inline { display: inline; }
+  .block { display: block; }
+  .inline-block { display: inline-block; }
+  .overflow-hidden { overflow: hidden; }
+  .-mx-2 { margin-left: -8px; margin-right: -8px; }
+  .-mx-4 { margin-left: -16px; margin-right: -16px; }
+  .-mb-2 { margin-bottom: -8px; }
+  .mt-2 { margin-top: 8px; }
+  .mt-3 { margin-top: 12px; }
+  .mt-4 { margin-top: 16px; }
+  .mb-2 { margin-bottom: 8px; }
+  .mb-4 { margin-bottom: 16px; }
+  .mr-1 { margin-right: 4px; }
+  .mr-2 { margin-right: 8px; }
+  .ml-1 { margin-left: 4px; }
+  .leading-tight { line-height: 1.25; }
+  .leading-snug { line-height: 1.375; }
+  .whitespace-nowrap { white-space: nowrap; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .underline { text-decoration: underline; }
+  .italic { font-style: italic; }
+  .text-red-600 { color: #dc2626; }
+  .text-green-600 { color: #16a34a; }
+  .text-blue-600 { color: #2563eb; }
+  .bg-yellow-50 { background-color: #fefce8; }
+  .bg-blue-50 { background-color: #eff6ff; }
+  .border-b-2 { border-bottom-width: 2px; border-bottom-style: solid; }
+  .border-t-2 { border-top-width: 2px; border-top-style: solid; }
 `;
 
 function loadScript(doc: Document, src: string): Promise<void> {
@@ -95,7 +142,7 @@ export async function shareReceiptAsPdf(
   contentElement: HTMLElement,
   filename: string
 ): Promise<void> {
-  const receiptHTML = contentElement.innerHTML;
+  const receiptHTML = contentElement.outerHTML;
 
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
@@ -122,7 +169,7 @@ export async function shareReceiptAsPdf(
         <style>${RECEIPT_BASE_STYLES}</style>
       </head>
       <body>
-        <div id="receipt-root">${receiptHTML}</div>
+        <div id="receipt-root" style="width:800px;">${receiptHTML}</div>
       </body>
     </html>
   `);
