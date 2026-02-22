@@ -16,7 +16,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
-  LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle, Search 
+  LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle, Search,
+  Wrench, Play, CheckCircle2, XCircle
 } from "lucide-react";
 import type { Merchant, User } from "@shared/schema";
 
@@ -49,6 +50,8 @@ export default function AdminPage() {
   
   const [merchantFilter, setMerchantFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
+
+  const [utilityResults, setUtilityResults] = useState<Record<string, { status: "idle" | "running" | "success" | "error"; message?: string }>>({});
 
   useEffect(() => {
     if (!user?.isSystemAdmin) {
@@ -340,6 +343,10 @@ export default function AdminPage() {
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="utilities" data-testid="tab-utilities">
+            <Wrench className="h-4 w-4 mr-2" />
+            Utilities
           </TabsTrigger>
         </TabsList>
 
@@ -682,6 +689,93 @@ export default function AdminPage() {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="utilities">
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Utilities</CardTitle>
+              <CardDescription>One-time fix scripts and maintenance tools. These are safe to run multiple times.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                {[
+                  {
+                    id: "recalculate-lot-payables",
+                    name: "Recalculate Lot Payables",
+                    description: "Recalculates totalCharges, netPayable, and avgCostPerBag for all harvest and seed lots across all merchants. Use this after migrations or if farmer dues show as 0.",
+                    endpoint: "/api/admin/recalculate-lot-payables",
+                  },
+                ].map((utility) => {
+                  const result = utilityResults[utility.id] || { status: "idle" };
+                  return (
+                    <div
+                      key={utility.id}
+                      className="flex items-start justify-between gap-4 p-4 border rounded-lg"
+                      data-testid={`utility-card-${utility.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm">{utility.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">{utility.description}</p>
+                        {result.status === "success" && (
+                          <div className="flex items-center gap-1.5 mt-2 text-xs text-green-600">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {result.message}
+                          </div>
+                        )}
+                        {result.status === "error" && (
+                          <div className="flex items-center gap-1.5 mt-2 text-xs text-destructive">
+                            <XCircle className="h-3.5 w-3.5" />
+                            {result.message || "Failed to run"}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={result.status === "running"}
+                        data-testid={`button-run-${utility.id}`}
+                        onClick={async () => {
+                          setUtilityResults((prev) => ({
+                            ...prev,
+                            [utility.id]: { status: "running" },
+                          }));
+                          try {
+                            const res = await apiRequest("POST", utility.endpoint);
+                            const data = await res.json();
+                            setUtilityResults((prev) => ({
+                              ...prev,
+                              [utility.id]: {
+                                status: "success",
+                                message: data.message
+                                  ? `${data.message}${data.harvestLotsUpdated != null ? ` (Harvest: ${data.harvestLotsUpdated}, Seed: ${data.seedLotsUpdated})` : ""}`
+                                  : "Completed successfully",
+                              },
+                            }));
+                          } catch (err: any) {
+                            setUtilityResults((prev) => ({
+                              ...prev,
+                              [utility.id]: {
+                                status: "error",
+                                message: err?.message || "An error occurred",
+                              },
+                            }));
+                          }
+                        }}
+                      >
+                        {result.status === "running" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4 mr-1" />
+                        )}
+                        {result.status === "running" ? "Running..." : "Run"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
