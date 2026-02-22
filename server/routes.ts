@@ -241,15 +241,31 @@ export async function registerRoutes(
 
       for (const entry of filteredEntries) {
         if (mandiEntryIds.has(entry.id)) {
+          const dateKey = entry.purchaseDate;
           const entryLots = lotsMap.get(entry.id) || [];
           let entryNetPayable = 0;
           let entryBags = 0;
+          let entryVolume = 0;
           for (const lot of entryLots) {
             entryNetPayable += parseFloat(lot.netPayable || "0");
             const lotBreakdowns = breakdownsMap.get(lot.id) || [];
             entryBags += lotBreakdowns.reduce((s: number, bd: any) => s + (bd.numberOfBags || 0), 0);
             if (entryBags === 0) entryBags += lot.originalBags;
+            const sellable = lotBreakdowns.filter((bd: any) => bd.size !== "Wastage");
+            const hasBreakdownData = sellable.some((bd: any) => {
+              const w = bd.weight ? parseFloat(bd.weight) : 0;
+              const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+              return w > 0 && p > 0;
+            });
+            if (hasBreakdownData) {
+              for (const bd of sellable) {
+                entryVolume += bd.weight ? parseFloat(bd.weight) : 0;
+              }
+            } else {
+              entryVolume += lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+            }
           }
+          volumeMap.set(dateKey, (volumeMap.get(dateKey) || 0) + entryVolume);
           const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
           const entryDue = Math.max(entryNetPayable - amountPaid, 0);
           summaryMandiTotal += entryNetPayable;
