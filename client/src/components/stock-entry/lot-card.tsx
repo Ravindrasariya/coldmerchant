@@ -671,7 +671,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                             value={field.value || ""}
                           >
                             <FormControl>
-                              <SelectTrigger data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
+                              <SelectTrigger className="text-left" data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
                                 <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
                               </SelectTrigger>
                             </FormControl>
