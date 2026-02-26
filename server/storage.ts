@@ -172,6 +172,9 @@ export interface IStorage {
   lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }>;
   syncPartiesWithBuyers(merchantId: number): Promise<{ partiesLinked: number; buyersCreated: number }>;
   
+  getBuyerByCompositeKey(merchantId: number, name: string, contact: string | null): Promise<Buyer | undefined>;
+  mergeBuyers(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingBuyer: Buyer; mergedCount: number }>;
+  
   // Buyer Edit History operations
   getBuyerEditHistory(buyerId: number, merchantId: number): Promise<BuyerEditHistory[]>;
   getNextBuyerEditHistorySerialNumber(merchantId: number): Promise<number>;
@@ -200,6 +203,9 @@ export interface IStorage {
   getMaxAadhatCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createAadhat(aadhat: InsertAadhat): Promise<Aadhat>;
   updateAadhat(id: number, merchantId: number, data: Partial<Aadhat>): Promise<Aadhat | undefined>;
+  getAadhatByCompositeKey(merchantId: number, name: string, contact: string | null): Promise<Aadhat | undefined>;
+  mergeAadhats(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingAadhat: Aadhat; mergedCount: number }>;
+  updateAadhatWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; contact: string | null }): Promise<{ aadhat: Aadhat | undefined; stockEntriesUpdated: number; cashEntriesUpdated: number }>;
 
   // Aadhat Edit History operations
   getAadhatEditHistory(aadhatId: number, merchantId: number): Promise<AadhatEditHistory[]>;
@@ -1887,6 +1893,137 @@ export class DatabaseStorage implements IStorage {
   async deleteBuyer(id: number, merchantId: number): Promise<void> {
     await db.delete(buyers)
       .where(and(eq(buyers.id, id), eq(buyers.merchantId, merchantId)));
+  }
+
+  async getBuyerByCompositeKey(merchantId: number, name: string, contact: string | null): Promise<Buyer | undefined> {
+    const normalizedName = normalizeName(name);
+    const normalizedContact = contact ? normalizeName(contact) : null;
+    
+    const allBuyers = await db.select().from(buyers)
+      .where(eq(buyers.merchantId, merchantId));
+    
+    return allBuyers.find(b => {
+      const bName = normalizeName(b.name);
+      const bContact = b.contact ? normalizeName(b.contact) : null;
+      if (bName !== normalizedName) return false;
+      if (normalizedContact && bContact) return bContact === normalizedContact;
+      return true;
+    });
+  }
+
+  async mergeBuyers(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingBuyer: Buyer; mergedCount: number }> {
+    const [lowerId, higherId] = sourceId < targetId ? [sourceId, targetId] : [targetId, sourceId];
+    
+    const [survivingBuyer] = await db.select().from(buyers)
+      .where(and(eq(buyers.id, lowerId), eq(buyers.merchantId, merchantId)));
+    const [mergingBuyer] = await db.select().from(buyers)
+      .where(and(eq(buyers.id, higherId), eq(buyers.merchantId, merchantId)));
+    
+    if (!survivingBuyer || !mergingBuyer) {
+      throw new Error("One or both buyers not found");
+    }
+    
+    let mergedCount = 0;
+    const normalizeForMatch = (val: string | null | undefined) => (val || "").trim().toLowerCase();
+    
+    const txResult = await db.update(transactions)
+      .set({
+        buyerId: lowerId,
+        partyName: survivingBuyer.name,
+        partyAddress: survivingBuyer.address,
+      })
+      .where(and(eq(transactions.buyerId, higherId), eq(transactions.merchantId, merchantId)))
+      .returning();
+    mergedCount += txResult.length;
+    
+    const orphanTxns = await db.select().from(transactions)
+      .where(and(
+        eq(transactions.merchantId, merchantId),
+        isNull(transactions.buyerId)
+      ));
+    
+    for (const txn of orphanTxns) {
+      const txnName = normalizeForMatch(txn.partyName);
+      const mergingName = normalizeForMatch(mergingBuyer.name);
+      if (txnName === mergingName) {
+        await db.update(transactions)
+          .set({
+            buyerId: lowerId,
+            partyName: survivingBuyer.name,
+            partyAddress: survivingBuyer.address,
+          })
+          .where(eq(transactions.id, txn.id));
+        mergedCount++;
+      }
+    }
+    
+    const partyResult = await db.update(parties)
+      .set({
+        buyerId: lowerId,
+        name: survivingBuyer.name,
+        address: survivingBuyer.address,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(parties.buyerId, higherId), eq(parties.merchantId, merchantId)))
+      .returning();
+    mergedCount += partyResult.length;
+    
+    const orphanParties = await db.select().from(parties)
+      .where(and(
+        eq(parties.merchantId, merchantId),
+        isNull(parties.buyerId)
+      ));
+    
+    for (const p of orphanParties) {
+      const pName = normalizeForMatch(p.name);
+      const mergingName = normalizeForMatch(mergingBuyer.name);
+      if (pName === mergingName) {
+        await db.update(parties)
+          .set({
+            buyerId: lowerId,
+            name: survivingBuyer.name,
+            address: survivingBuyer.address,
+            updatedAt: new Date(),
+          })
+          .where(eq(parties.id, p.id));
+        mergedCount++;
+      }
+    }
+    
+    const cashResult = await db.update(cashEntries)
+      .set({ buyerId: lowerId })
+      .where(and(eq(cashEntries.buyerId, higherId), eq(cashEntries.merchantId, merchantId)))
+      .returning();
+    mergedCount += cashResult.length;
+    
+    const newReceivable = (parseFloat(survivingBuyer.receivableBalance || "0") + parseFloat(mergingBuyer.receivableBalance || "0")).toString();
+    
+    const [updatedSurvivor] = await db.update(buyers)
+      .set({
+        receivableBalance: newReceivable,
+        address: survivingBuyer.address || mergingBuyer.address,
+        mandiCode: survivingBuyer.mandiCode || mergingBuyer.mandiCode,
+        contact: survivingBuyer.contact || mergingBuyer.contact,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(buyers.id, lowerId), eq(buyers.merchantId, merchantId)))
+      .returning();
+    
+    const nextSerial = await this.getNextBuyerEditHistorySerialNumber(merchantId);
+    await this.createBuyerEditHistory({
+      serialNumber: nextSerial,
+      merchantId,
+      buyerId: lowerId,
+      changedBy: userId,
+      fieldName: 'merge',
+      oldValue: `${mergingBuyer.buyerCode} (${mergingBuyer.name})`,
+      newValue: `${mergedCount} linked records transferred`,
+    });
+    
+    await db.delete(buyers)
+      .where(and(eq(buyers.id, higherId), eq(buyers.merchantId, merchantId)));
+    
+    return { survivingBuyer: updatedSurvivor, mergedCount };
   }
 
   async lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }> {
@@ -3829,6 +3966,171 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(aadhats.id, id), eq(aadhats.merchantId, merchantId)))
       .returning();
     return updated;
+  }
+
+  async getAadhatByCompositeKey(merchantId: number, name: string, contact: string | null): Promise<Aadhat | undefined> {
+    const normalizedName = normalizeName(name);
+    const normalizedContact = contact ? normalizeName(contact) : null;
+    
+    const allAadhats = await db.select().from(aadhats)
+      .where(eq(aadhats.merchantId, merchantId));
+    
+    return allAadhats.find(a => {
+      const aName = normalizeName(a.name);
+      const aContact = a.contact ? normalizeName(a.contact) : null;
+      if (aName !== normalizedName) return false;
+      if (normalizedContact && aContact) return aContact === normalizedContact;
+      return true;
+    });
+  }
+
+  async updateAadhatWithPropagation(
+    id: number,
+    merchantId: number,
+    data: { name: string; address: string | null; contact: string | null }
+  ): Promise<{ aadhat: Aadhat | undefined; stockEntriesUpdated: number; cashEntriesUpdated: number }> {
+    const [updatedAadhat] = await db.update(aadhats)
+      .set({
+        name: data.name,
+        address: data.address ?? undefined,
+        contact: data.contact ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(aadhats.id, id), eq(aadhats.merchantId, merchantId)))
+      .returning();
+
+    if (!updatedAadhat) {
+      return { aadhat: undefined, stockEntriesUpdated: 0, cashEntriesUpdated: 0 };
+    }
+
+    const stockResult = await db.update(stockEntries)
+      .set({ aadhatName: data.name, updatedAt: new Date() })
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        eq(stockEntries.aadhatDbId, id)
+      ))
+      .returning({ id: stockEntries.id });
+
+    const cashResult = await db.update(cashEntries)
+      .set({ aadhatName: data.name })
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        eq(cashEntries.aadhatDbId, id)
+      ))
+      .returning({ id: cashEntries.id });
+
+    return {
+      aadhat: updatedAadhat,
+      stockEntriesUpdated: stockResult.length,
+      cashEntriesUpdated: cashResult.length,
+    };
+  }
+
+  async mergeAadhats(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingAadhat: Aadhat; mergedCount: number }> {
+    const [lowerId, higherId] = sourceId < targetId ? [sourceId, targetId] : [targetId, sourceId];
+    
+    const [survivingAadhat] = await db.select().from(aadhats)
+      .where(and(eq(aadhats.id, lowerId), eq(aadhats.merchantId, merchantId)));
+    const [mergingAadhat] = await db.select().from(aadhats)
+      .where(and(eq(aadhats.id, higherId), eq(aadhats.merchantId, merchantId)));
+    
+    if (!survivingAadhat || !mergingAadhat) {
+      throw new Error("One or both aadhats not found");
+    }
+    
+    let mergedCount = 0;
+    const normalizeForMatch = (val: string | null | undefined) => (val || "").trim().toLowerCase();
+    
+    const stockByIdResult = await db.update(stockEntries)
+      .set({
+        aadhatDbId: lowerId,
+        aadhatName: survivingAadhat.name,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(stockEntries.aadhatDbId, higherId), eq(stockEntries.merchantId, merchantId)))
+      .returning();
+    mergedCount += stockByIdResult.length;
+    
+    const orphanStockEntries = await db.select().from(stockEntries)
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        isNull(stockEntries.aadhatDbId)
+      ));
+    
+    for (const entry of orphanStockEntries) {
+      const entryName = normalizeForMatch(entry.aadhatName);
+      const mergingName = normalizeForMatch(mergingAadhat.name);
+      if (entryName === mergingName) {
+        await db.update(stockEntries)
+          .set({
+            aadhatDbId: lowerId,
+            aadhatName: survivingAadhat.name,
+            updatedAt: new Date(),
+          })
+          .where(eq(stockEntries.id, entry.id));
+        mergedCount++;
+      }
+    }
+    
+    const cashByIdResult = await db.update(cashEntries)
+      .set({
+        aadhatDbId: lowerId,
+        aadhatName: survivingAadhat.name,
+      })
+      .where(and(eq(cashEntries.aadhatDbId, higherId), eq(cashEntries.merchantId, merchantId)))
+      .returning();
+    mergedCount += cashByIdResult.length;
+    
+    const orphanCash = await db.select().from(cashEntries)
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        isNull(cashEntries.aadhatDbId)
+      ));
+    
+    for (const ce of orphanCash) {
+      const ceName = normalizeForMatch(ce.aadhatName);
+      const mergingName = normalizeForMatch(mergingAadhat.name);
+      if (ceName === mergingName) {
+        await db.update(cashEntries)
+          .set({
+            aadhatDbId: lowerId,
+            aadhatName: survivingAadhat.name,
+          })
+          .where(eq(cashEntries.id, ce.id));
+        mergedCount++;
+      }
+    }
+    
+    const newPyPayable = (parseFloat(survivingAadhat.pyPayable || "0") + parseFloat(mergingAadhat.pyPayable || "0")).toString();
+    
+    const [updatedSurvivor] = await db.update(aadhats)
+      .set({
+        pyPayable: newPyPayable,
+        address: survivingAadhat.address || mergingAadhat.address,
+        contact: survivingAadhat.contact || mergingAadhat.contact,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(aadhats.id, lowerId), eq(aadhats.merchantId, merchantId)))
+      .returning();
+    
+    const nextSerial = await this.getNextAadhatEditHistorySerialNumber(merchantId);
+    const mergingPyPayable = parseFloat(mergingAadhat.pyPayable || "0");
+    const pyInfo = mergingPyPayable > 0 ? ` | PY: ₹${mergingPyPayable.toFixed(0)} payable` : '';
+    
+    await this.createAadhatEditHistory({
+      serialNumber: nextSerial,
+      merchantId,
+      aadhatId: lowerId,
+      changedBy: userId,
+      fieldName: 'merge',
+      oldValue: `${mergingAadhat.aadhatId} (${mergingAadhat.name})${pyInfo}`,
+      newValue: `${mergedCount} linked records transferred`,
+    });
+    
+    await db.delete(aadhats)
+      .where(and(eq(aadhats.id, higherId), eq(aadhats.merchantId, merchantId)));
+    
+    return { survivingAadhat: updatedSurvivor, mergedCount };
   }
 
   // Aadhat Edit History operations

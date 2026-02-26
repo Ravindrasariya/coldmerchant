@@ -2883,19 +2883,29 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Buyer name is required" });
       }
 
-      // Get existing buyer for comparison
       const existingBuyer = await storage.getBuyerById(id, merchantId);
       if (!existingBuyer) {
         return res.status(404).json({ message: "Buyer not found" });
       }
 
+      const newName = name.trim();
+      const newContact = contact?.trim() || null;
+      if (existingBuyer.name !== newName || existingBuyer.contact !== newContact) {
+        const matchingBuyer = await storage.getBuyerByCompositeKey(merchantId, newName, newContact);
+        if (matchingBuyer && matchingBuyer.id !== id) {
+          return res.status(409).json({
+            message: "A buyer with this name and contact already exists",
+            requiresMerge: true,
+            existingBuyer: matchingBuyer,
+          });
+        }
+      }
+
       // Track changes for edit history
       const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
       
-      const newName = name.trim();
       const newAddress = address?.trim() || null;
       const newMandiCode = mandiCode?.trim() || null;
-      const newContact = contact?.trim() || null;
       const newRedFlag = redFlag ?? existingBuyer.redFlag;
 
       if (existingBuyer.name !== newName) {
@@ -2955,6 +2965,29 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating buyer with propagation:", error);
       res.status(500).json({ message: "Failed to update buyer" });
+    }
+  });
+
+  // POST /api/buyers/merge - Merge two buyers
+  app.post("/api/buyers/merge", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const { sourceId, targetId } = req.body;
+
+      if (!sourceId || !targetId) {
+        return res.status(400).json({ message: "sourceId and targetId are required" });
+      }
+
+      const result = await storage.mergeBuyers(merchantId, userId, sourceId, targetId);
+      res.json({
+        buyer: result.survivingBuyer,
+        mergedCount: result.mergedCount,
+        message: `Buyers merged successfully. ${result.mergedCount} linked records transferred.`
+      });
+    } catch (error) {
+      console.error("Error merging buyers:", error);
+      res.status(500).json({ message: "Failed to merge buyers" });
     }
   });
 
@@ -4423,11 +4456,22 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Aadhat not found" });
       }
 
-      const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
-      
       const newName = name.trim();
       const newAddress = address?.trim() || null;
       const newContact = contact?.trim() || null;
+
+      if (existingAadhat.name !== newName || existingAadhat.contact !== newContact) {
+        const matchingAadhat = await storage.getAadhatByCompositeKey(merchantId, newName, newContact);
+        if (matchingAadhat && matchingAadhat.id !== id) {
+          return res.status(409).json({
+            message: "An aadhat with this name and contact already exists",
+            requiresMerge: true,
+            existingAadhat: matchingAadhat,
+          });
+        }
+      }
+
+      const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
       const newPyPayable = pyPayable ?? "0";
       const newRedFlag = redFlag ?? existingAadhat.redFlag;
 
