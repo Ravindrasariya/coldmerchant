@@ -2954,11 +2954,14 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Buyer not found" });
       }
 
+      const totalUpdated = result.transactionsUpdated + result.partiesUpdated + result.cashEntriesUpdated;
       res.json({
         buyer: result.buyer,
         transactionsUpdated: result.transactionsUpdated,
+        partiesUpdated: result.partiesUpdated,
+        cashEntriesUpdated: result.cashEntriesUpdated,
         changesRecorded: changes.length,
-        message: `Buyer updated. ${result.transactionsUpdated} transaction(s) updated.`
+        message: `Buyer updated. ${totalUpdated} linked record(s) updated.`
       });
     } catch (error) {
       console.error("Error updating buyer with propagation:", error);
@@ -4502,22 +4505,30 @@ export async function registerRoutes(
         }
       }
 
-      const updated = await storage.updateAadhat(id, merchantId, {
+      const result = await storage.updateAadhatWithPropagation(id, merchantId, {
         name: newName,
         address: newAddress,
         contact: newContact,
-        pyPayable: newPyPayable,
-        redFlag: newRedFlag,
       });
 
-      if (!updated) {
+      if (existingAadhat.pyPayable !== newPyPayable || existingAadhat.redFlag !== newRedFlag) {
+        await storage.updateAadhat(id, merchantId, {
+          pyPayable: newPyPayable,
+          redFlag: newRedFlag,
+        });
+      }
+
+      if (!result.aadhat) {
         return res.status(404).json({ message: "Aadhat not found" });
       }
 
+      const totalUpdated = result.stockEntriesUpdated + result.cashEntriesUpdated;
       res.json({
-        aadhat: updated,
+        aadhat: result.aadhat,
+        stockEntriesUpdated: result.stockEntriesUpdated,
+        cashEntriesUpdated: result.cashEntriesUpdated,
         changesRecorded: changes.length,
-        message: `Aadhat updated successfully.`
+        message: `Aadhat updated. ${totalUpdated} linked record(s) updated.`
       });
     } catch (error) {
       console.error("Error updating aadhat details:", error);

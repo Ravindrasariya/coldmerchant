@@ -167,7 +167,7 @@ export interface IStorage {
   getMaxBuyerCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, merchantId: number, data: Partial<Buyer>): Promise<Buyer | undefined>;
-  updateBuyerWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }>;
+  updateBuyerWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number; partiesUpdated: number; cashEntriesUpdated: number }>;
   deleteBuyer(id: number, merchantId: number): Promise<void>;
   lookupOrCreateBuyer(merchantId: number, buyerData: { name: string; contact?: string | null; address?: string | null; mandiCode?: string | null }): Promise<{ buyerId: number; isNew: boolean }>;
   syncPartiesWithBuyers(merchantId: number): Promise<{ partiesLinked: number; buyersCreated: number }>;
@@ -1857,7 +1857,7 @@ export class DatabaseStorage implements IStorage {
     id: number,
     merchantId: number,
     data: { name: string; address: string | null; mandiCode: string | null; contact: string | null }
-  ): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number }> {
+  ): Promise<{ buyer: Buyer | undefined; transactionsUpdated: number; partiesUpdated: number; cashEntriesUpdated: number }> {
     const [updatedBuyer] = await db.update(buyers)
       .set({ 
         name: data.name,
@@ -1870,10 +1870,10 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     if (!updatedBuyer) {
-      return { buyer: undefined, transactionsUpdated: 0 };
+      return { buyer: undefined, transactionsUpdated: 0, partiesUpdated: 0, cashEntriesUpdated: 0 };
     }
 
-    const result = await db.update(transactions)
+    const txResult = await db.update(transactions)
       .set({
         partyName: data.name,
         partyAddress: data.address ?? undefined,
@@ -1884,9 +1884,33 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning({ id: transactions.id });
 
+    const partyResult = await db.update(parties)
+      .set({
+        name: data.name,
+        address: data.address ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(parties.merchantId, merchantId),
+        eq(parties.buyerId, id)
+      ))
+      .returning({ id: parties.id });
+
+    const cashResult = await db.update(cashEntries)
+      .set({
+        partyName: data.name,
+      })
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        eq(cashEntries.buyerId, id)
+      ))
+      .returning({ id: cashEntries.id });
+
     return { 
       buyer: updatedBuyer, 
-      transactionsUpdated: result.length 
+      transactionsUpdated: txResult.length,
+      partiesUpdated: partyResult.length,
+      cashEntriesUpdated: cashResult.length,
     };
   }
 
