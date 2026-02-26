@@ -1,0 +1,23 @@
+root@srv1277141:/var/www/vyapar-vriddhi# pm2 logs vyapar-vriddhi
+[TAILING] Tailing last 15 lines for [vyapar-vriddhi] process (change the value with --lines option)
+/root/.pm2/logs/vyapar-vriddhi-error-2.log last 15 lines:
+2|vyapar-v |     at Ka.dispatch (/var/www/vyapar-vriddhi/dist/index.cjs:38:5049)
+2|vyapar-v |     at Wa.handle_request (/var/www/vyapar-vriddhi/dist/index.cjs:38:3170)
+2|vyapar-v |     at /var/www/vyapar-vriddhi/dist/index.cjs:38:7922
+2|vyapar-v |     at Hn.process_params (/var/www/vyapar-vriddhi/dist/index.cjs:38:8466)
+2|vyapar-v | Error creating buyer: TypeError: C.countBuyersByCodePrefix is not a function
+2|vyapar-v |     at /var/www/vyapar-vriddhi/dist/index.cjs:76:118993
+2|vyapar-v |     at Wa.handle_request (/var/www/vyapar-vriddhi/dist/index.cjs:38:3170)
+2|vyapar-v |     at u (/var/www/vyapar-vriddhi/dist/index.cjs:38:5250)
+2|vyapar-v |     at te (/var/www/vyapar-vriddhi/dist/index.cjs:76:79835)
+2|vyapar-v |     at Wa.handle_request (/var/www/vyapar-vriddhi/dist/index.cjs:38:3170)
+2|vyapar-v |     at u (/var/www/vyapar-vriddhi/dist/index.cjs:38:5250)
+2|vyapar-v |     at Ka.dispatch (/var/www/vyapar-vriddhi/dist/index.cjs:38:5049)
+2|vyapar-v |     at Wa.handle_request (/var/www/vyapar-vriddhi/dist/index.cjs:38:3170)
+2|vyapar-v |     at /var/www/vyapar-vriddhi/dist/index.cjs:38:7922
+2|vyapar-v |     at Hn.process_params (/var/www/vyapar-vriddhi/dist/index.cjs:38:8466)
+
+/root/.pm2/logs/vyapar-vriddhi-out-2.log last 15 lines:
+2|vyapar-v | "Testing Merchant","contactNumber":"8882589392","address":"Divya Vihar, Indore","status":"active","createdAt":"2026-02-04T15:32:39.402Z"},{"id":2,"merchantCode":"MR202602042","name":"Roop Laxmi Traders","contactNumber":"9179764030","address":"Kachnariya, Teh - Tarana, Dist-Ujjain, (M.P.) 456668","status":"active","createdAt":"2026-02-04T15:51:42.527Z"},{"id":3,"merchantCode":"MR202602171","name":"RGP Dattotar","contactNumber":"9630609672","address":"Dattotar, Teh- Dewas, Dist- Dewas,  Madhya Pradesh, India, 455001","status":"active","createdAt":"2026-02-16T18:48:28.805Z"},{"id":4,"merchantCode":"MR202602201","name":"Jay shree mahakal Traders","contactNumber":"9179126405","address":"Ujjain, Madhya Pradesh, 456001","status":"active","createdAt":"2026-02-20T14:09:51.422Z"}]
+2|vyapar-v | 6:40:46 PM [express] GET /api/admin/users 200 in 38ms :: [{"id":1,"username":"admin","name":"System Administrator","mobileNumber":null,"merchantId":null,"isSystemAdmin":true,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T14:53:26.227Z"},{"id":6,"username":"rajsariya","name":"Rajesh Sariya","mobileNumber":"9179764030","merchantId":2,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":true,"createdAt":"2026-02-04T16:00:52.339Z","merchantName":"Roop Laxmi Traders"},{"id":3,"username":"sprajapati","name":"Satish Prajapati","mobileNumber":"9981787208","merchantId":2,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T15:57:36.614Z","merchantName":"Roop Laxmi Traders"},{"id":4,"username":"mpatidar","name":"Manoj Patidar","mobileNumber":"9098631186","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T15:58:23.833Z","merchantName":"Testing Merchant"},{"id":7,"username":"rsariya","name":"Ravindra Sariya","mobileNumber":"8882589392","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T16:01:10.990Z","merchantName":"Testing Merchant"},{"id":9,"username":"rampatidar","name":"Rambabu Patidar","mobileNumber":"9630609672","merchantId":3,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-16T18:55:13.189Z","merchantName":"RGP Dattotar"},{"id":8,"username":"rajpatidar","name":"Rajendra Patidar","mobileNumber":"9685327296","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-05T13:36:18.967Z","merchantName":"Testing Merchant"},{"id":5,"username":"dranasara","name":"Deepak Ranasara","mobileNumber":"6268432011","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T15:59:11.286Z","merchantName":"Testing Merchant"},{"id":10,"username":"vjsingh","name":"Vijayendra singh","mobileNumber":"9179126405","merchantId":4,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-20T14:11:07.138Z","merchantName":"Jay shree mahakal Traders"}]
+2|vyapar-v | 6:40:47 PM [express] GET /api/demo-videos 304 in 7ms :: []
