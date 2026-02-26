@@ -2044,6 +2044,10 @@ export class DatabaseStorage implements IStorage {
       newValue: `${mergedCount} linked records transferred`,
     });
     
+    await db.update(buyerEditHistory)
+      .set({ buyerId: lowerId })
+      .where(and(eq(buyerEditHistory.buyerId, higherId), eq(buyerEditHistory.merchantId, merchantId)));
+
     await db.delete(buyers)
       .where(and(eq(buyers.id, higherId), eq(buyers.merchantId, merchantId)));
     
@@ -2662,7 +2666,10 @@ export class DatabaseStorage implements IStorage {
       newValue: `${mergedCount} linked records transferred`,
     });
     
-    // Delete the merged farmer
+    await db.update(farmerEditHistory)
+      .set({ farmerId: lowerId })
+      .where(and(eq(farmerEditHistory.farmerId, higherId), eq(farmerEditHistory.merchantId, merchantId)));
+
     await db.delete(farmers)
       .where(and(eq(farmers.id, higherId), eq(farmers.merchantId, merchantId)));
     
@@ -4151,6 +4158,10 @@ export class DatabaseStorage implements IStorage {
       newValue: `${mergedCount} linked records transferred`,
     });
     
+    await db.update(aadhatEditHistory)
+      .set({ aadhatId: lowerId })
+      .where(and(eq(aadhatEditHistory.aadhatId, higherId), eq(aadhatEditHistory.merchantId, merchantId)));
+
     await db.delete(aadhats)
       .where(and(eq(aadhats.id, higherId), eq(aadhats.merchantId, merchantId)));
     
