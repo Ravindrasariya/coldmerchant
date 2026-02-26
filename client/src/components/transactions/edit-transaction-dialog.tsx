@@ -876,6 +876,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     )}
                   />
 
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
                     <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
@@ -883,9 +886,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <span className="text-xs text-muted-foreground ml-2">({t("sum of lot revenues", "लॉट राजस्व का योग")})</span>
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="transportationCharges"
