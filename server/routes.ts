@@ -2890,15 +2890,13 @@ export async function registerRoutes(
 
       const newName = name.trim();
       const newContact = contact?.trim() || null;
-      if (existingBuyer.name !== newName || existingBuyer.contact !== newContact) {
-        const matchingBuyer = await storage.getBuyerByCompositeKey(merchantId, newName, newContact);
-        if (matchingBuyer && matchingBuyer.id !== id) {
-          return res.status(409).json({
-            message: "A buyer with this name and contact already exists",
-            requiresMerge: true,
-            existingBuyer: matchingBuyer,
-          });
-        }
+      const matchingBuyer = await storage.getBuyerByCompositeKey(merchantId, newName, newContact);
+      if (matchingBuyer && matchingBuyer.id !== id) {
+        return res.status(409).json({
+          message: "A buyer with this name and contact already exists",
+          requiresMerge: true,
+          existingBuyer: matchingBuyer,
+        });
       }
 
       // Track changes for edit history
@@ -4460,15 +4458,13 @@ export async function registerRoutes(
       const newAddress = address?.trim() || null;
       const newContact = contact?.trim() || null;
 
-      if (existingAadhat.name !== newName || existingAadhat.contact !== newContact) {
-        const matchingAadhat = await storage.getAadhatByCompositeKey(merchantId, newName, newContact);
-        if (matchingAadhat && matchingAadhat.id !== id) {
-          return res.status(409).json({
-            message: "An aadhat with this name and contact already exists",
-            requiresMerge: true,
-            existingAadhat: matchingAadhat,
-          });
-        }
+      const matchingAadhat = await storage.getAadhatByCompositeKey(merchantId, newName, newContact);
+      if (matchingAadhat && matchingAadhat.id !== id) {
+        return res.status(409).json({
+          message: "An aadhat with this name and contact already exists",
+          requiresMerge: true,
+          existingAadhat: matchingAadhat,
+        });
       }
 
       const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
