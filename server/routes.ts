@@ -6,6 +6,34 @@ import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStoc
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const videoStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+
+const videoUpload = multer({
+  storage: videoStorage,
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("video/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only video files are allowed"));
+    }
+  },
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
 
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
@@ -4468,6 +4496,120 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching aadhat edit history:", error);
       res.status(500).json({ message: "Failed to fetch edit history" });
+    }
+  });
+
+  // ==================== Demo Videos ====================
+
+  app.post("/api/admin/demo-videos", requireSystemAdmin, (req, res) => {
+    videoUpload.single("video")(req, res, async (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+          return res.status(413).json({ message: "File too large. Maximum size is 200MB." });
+        }
+        return res.status(400).json({ message: err.message || "Upload failed" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No video file provided" });
+      }
+      try {
+        const caption = (req.body.caption as string) || req.file.originalname;
+        const video = await storage.createDemoVideo({
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          caption,
+          mimeType: req.file.mimetype,
+          fileSize: req.file.size,
+        });
+        res.status(201).json(video);
+      } catch (error) {
+        console.error("Error creating demo video:", error);
+        res.status(500).json({ message: "Failed to save video" });
+      }
+    });
+  });
+
+  app.get("/api/demo-videos", requireAuth, async (_req, res) => {
+    try {
+      const videos = await storage.getDemoVideos();
+      res.json(videos);
+    } catch (error) {
+      console.error("Error fetching demo videos:", error);
+      res.status(500).json({ message: "Failed to fetch videos" });
+    }
+  });
+
+  app.get("/api/demo-videos/:id/stream", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const video = await storage.getDemoVideoById(id);
+      if (!video) return res.status(404).json({ message: "Video not found" });
+
+      const filePath = path.join(uploadsDir, video.filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Video file not found" });
+
+      const stat = fs.statSync(filePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+        const stream = fs.createReadStream(filePath, { start, end });
+        res.writeHead(206, {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunkSize,
+          "Content-Type": video.mimeType,
+        });
+        stream.pipe(res);
+      } else {
+        res.writeHead(200, {
+          "Content-Length": fileSize,
+          "Content-Type": video.mimeType,
+          "Accept-Ranges": "bytes",
+        });
+        fs.createReadStream(filePath).pipe(res);
+      }
+    } catch (error) {
+      console.error("Error streaming demo video:", error);
+      res.status(500).json({ message: "Failed to stream video" });
+    }
+  });
+
+  app.patch("/api/admin/demo-videos/:id", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { caption } = req.body;
+      if (!caption || typeof caption !== "string") {
+        return res.status(400).json({ message: "Caption is required" });
+      }
+      const updated = await storage.updateDemoVideoCaption(id, caption);
+      if (!updated) return res.status(404).json({ message: "Video not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating demo video:", error);
+      res.status(500).json({ message: "Failed to update video" });
+    }
+  });
+
+  app.delete("/api/admin/demo-videos/:id", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const video = await storage.getDemoVideoById(id);
+      if (!video) return res.status(404).json({ message: "Video not found" });
+
+      const filePath = path.join(uploadsDir, video.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      await storage.deleteDemoVideo(id);
+      res.json({ message: "Video deleted" });
+    } catch (error) {
+      console.error("Error deleting demo video:", error);
+      res.status(500).json({ message: "Failed to delete video" });
     }
   });
 

@@ -39,7 +39,8 @@ import {
   Users,
   Wheat,
   Phone,
-  LayoutDashboard
+  LayoutDashboard,
+  PlayCircle
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -48,6 +49,7 @@ import { FarmerLedgerTab } from "@/components/farmer-ledger/farmer-ledger-tab";
 import BuyersTab from "@/components/buyers/buyers-tab";
 import AadhatLedgerTab from "@/components/aadhat/aadhat-ledger-tab";
 import { DashboardTab } from "@/components/dashboard/dashboard-tab";
+import { DemoVideosTab } from "@/components/demo-videos/demo-videos-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -225,6 +227,14 @@ export default function HomePage() {
                   <Users className="h-4 w-4" />
                   {t("Aadhat", "आढ़त")}
                 </TabsTrigger>
+                <TabsTrigger 
+                  value="demo-videos" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-demo-videos"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  {t("Demo Videos", "डेमो वीडियो")}
+                </TabsTrigger>
               </TabsList>
             </nav>
 
@@ -377,6 +387,15 @@ export default function HomePage() {
                           <Users className="h-4 w-4" />
                           {t("Aadhat", "आढ़त")}
                         </TabsTrigger>
+                        <TabsTrigger 
+                          value="demo-videos" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-demo-videos-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <PlayCircle className="h-4 w-4" />
+                          {t("Demo Videos", "डेमो वीडियो")}
+                        </TabsTrigger>
                       </TabsList>
                     </nav>
                   </div>
@@ -489,6 +508,10 @@ export default function HomePage() {
 
           <div className={activeTab === "aadhat" ? "block" : "hidden"}>
             <AadhatLedgerTab />
+          </div>
+
+          <div className={activeTab === "demo-videos" ? "block" : "hidden"}>
+            <DemoVideosTab />
           </div>
 
           <footer className="mt-8 pt-4 border-t text-sm text-muted-foreground">

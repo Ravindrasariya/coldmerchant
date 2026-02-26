@@ -32,7 +32,8 @@ import {
   type SeedTransaction, type InsertSeedTransaction,
   type SeedTransactionItem, type InsertSeedTransactionItem,
   type SeedTransactionWithItems,
-  type SeedTransactionEditHistory
+  type SeedTransactionEditHistory,
+  demoVideos, type DemoVideo, type InsertDemoVideo
 } from "@shared/schema";
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
@@ -276,6 +277,13 @@ export interface IStorage {
   
   // Brand name lookup operations (for autocomplete in seed lot forms)
   searchSeedBrands(merchantId: number, query: string): Promise<string[]>;
+
+  // Demo Videos operations
+  getDemoVideos(): Promise<DemoVideo[]>;
+  getDemoVideoById(id: number): Promise<DemoVideo | undefined>;
+  createDemoVideo(data: InsertDemoVideo): Promise<DemoVideo>;
+  updateDemoVideoCaption(id: number, caption: string): Promise<DemoVideo | undefined>;
+  deleteDemoVideo(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3844,6 +3852,29 @@ export class DatabaseStorage implements IStorage {
   async createAadhatEditHistory(data: InsertAadhatEditHistory): Promise<AadhatEditHistory> {
     const [created] = await db.insert(aadhatEditHistory).values(data).returning();
     return created;
+  }
+
+  async getDemoVideos(): Promise<DemoVideo[]> {
+    return db.select().from(demoVideos).orderBy(desc(demoVideos.uploadedAt));
+  }
+
+  async getDemoVideoById(id: number): Promise<DemoVideo | undefined> {
+    const [video] = await db.select().from(demoVideos).where(eq(demoVideos.id, id));
+    return video;
+  }
+
+  async createDemoVideo(data: InsertDemoVideo): Promise<DemoVideo> {
+    const [created] = await db.insert(demoVideos).values(data).returning();
+    return created;
+  }
+
+  async updateDemoVideoCaption(id: number, caption: string): Promise<DemoVideo | undefined> {
+    const [updated] = await db.update(demoVideos).set({ caption }).where(eq(demoVideos.id, id)).returning();
+    return updated;
+  }
+
+  async deleteDemoVideo(id: number): Promise<void> {
+    await db.delete(demoVideos).where(eq(demoVideos.id, id));
   }
 }
 

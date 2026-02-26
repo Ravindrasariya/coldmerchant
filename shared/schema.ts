@@ -1182,3 +1182,22 @@ export type SeedTransactionItemEnriched = SeedTransactionItem & { supplierName: 
 export type SeedTransactionWithItems = SeedTransaction & {
   items: SeedTransactionItemEnriched[];
 };
+
+// ==================== Demo Videos ====================
+export const demoVideos = pgTable("demo_videos", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  caption: text("caption").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertDemoVideoSchema = createInsertSchema(demoVideos).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertDemoVideo = z.infer<typeof insertDemoVideoSchema>;
+export type DemoVideo = typeof demoVideos.$inferSelect;

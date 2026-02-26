@@ -17,9 +17,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
   LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle, Search,
-  Wrench, Play, CheckCircle2, XCircle
+  Wrench, Play, CheckCircle2, XCircle, PlayCircle, Upload
 } from "lucide-react";
-import type { Merchant, User } from "@shared/schema";
+import type { Merchant, User, DemoVideo } from "@shared/schema";
 
 type MerchantWithUsers = Merchant;
 type UserWithMerchant = Omit<User, 'password'> & { merchantName?: string };
@@ -53,6 +53,12 @@ export default function AdminPage() {
 
   const [utilityResults, setUtilityResults] = useState<Record<string, { status: "idle" | "running" | "success" | "error"; message?: string }>>({});
 
+  const [videoCaption, setVideoCaption] = useState("");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [editingVideoId, setEditingVideoId] = useState<number | null>(null);
+  const [editingVideoCaption, setEditingVideoCaption] = useState("");
+
   useEffect(() => {
     if (!user?.isSystemAdmin) {
       setLocation("/");
@@ -70,6 +76,61 @@ export default function AdminPage() {
   const { data: users = [], isLoading: usersLoading } = useQuery<UserWithMerchant[]>({
     queryKey: ["/api/admin/users"],
   });
+
+  const { data: demoVideos = [], isLoading: videosLoading } = useQuery<DemoVideo[]>({
+    queryKey: ["/api/demo-videos"],
+  });
+
+  const handleVideoUpload = async () => {
+    if (!videoFile) return;
+    setVideoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("video", videoFile);
+      formData.append("caption", videoCaption || videoFile.name);
+      const res = await fetch("/api/admin/demo-videos", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
+      setVideoFile(null);
+      setVideoCaption("");
+      const fileInput = document.getElementById("video-file-input") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      toast({ title: "Video uploaded successfully", variant: "success" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const handleVideoDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this video?")) return;
+    try {
+      await apiRequest("DELETE", `/api/admin/demo-videos/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
+      toast({ title: "Video deleted", variant: "success" });
+    } catch (error: any) {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleVideoCaptionUpdate = async (id: number) => {
+    try {
+      await apiRequest("PATCH", `/api/admin/demo-videos/${id}`, { caption: editingVideoCaption });
+      queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
+      setEditingVideoId(null);
+      toast({ title: "Caption updated", variant: "success" });
+    } catch (error: any) {
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    }
+  };
 
   const createMerchantMutation = useMutation({
     mutationFn: async (data: typeof merchantForm) => {
@@ -347,6 +408,10 @@ export default function AdminPage() {
           <TabsTrigger value="utilities" data-testid="tab-utilities">
             <Wrench className="h-4 w-4 mr-2" />
             Utilities
+          </TabsTrigger>
+          <TabsTrigger value="demo-videos" data-testid="tab-demo-videos">
+            <PlayCircle className="h-4 w-4 mr-2" />
+            Demo Videos
           </TabsTrigger>
         </TabsList>
 
@@ -776,6 +841,129 @@ export default function AdminPage() {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="demo-videos">
+          <Card>
+            <CardHeader>
+              <CardTitle>Demo Videos</CardTitle>
+              <CardDescription>Upload and manage demo/tutorial videos visible to all users</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex flex-col sm:flex-row gap-3 items-end p-4 border rounded-lg bg-muted/30">
+                <div className="flex-1 w-full">
+                  <Label htmlFor="video-file-input" className="text-xs">Video File</Label>
+                  <Input
+                    id="video-file-input"
+                    type="file"
+                    accept="video/*"
+                    onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+                    data-testid="input-video-file"
+                  />
+                </div>
+                <div className="flex-1 w-full">
+                  <Label className="text-xs">Caption</Label>
+                  <Input
+                    placeholder="Enter video caption..."
+                    value={videoCaption}
+                    onChange={(e) => setVideoCaption(e.target.value)}
+                    data-testid="input-video-caption"
+                  />
+                </div>
+                <Button
+                  onClick={handleVideoUpload}
+                  disabled={!videoFile || videoUploading}
+                  data-testid="button-upload-video"
+                >
+                  {videoUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {videoUploading ? "Uploading..." : "Upload"}
+                </Button>
+              </div>
+
+              {videosLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : demoVideos.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No demo videos uploaded yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {demoVideos.map((video) => (
+                    <div
+                      key={video.id}
+                      className="flex items-center justify-between gap-4 p-3 border rounded-lg"
+                      data-testid={`admin-video-row-${video.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        {editingVideoId === video.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingVideoCaption}
+                              onChange={(e) => setEditingVideoCaption(e.target.value)}
+                              className="h-8 text-sm"
+                              data-testid={`input-edit-caption-${video.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleVideoCaptionUpdate(video.id)}
+                              data-testid={`button-save-caption-${video.id}`}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingVideoId(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <h4 className="font-medium text-sm truncate">{video.caption}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              {video.originalName} · {(video.fileSize / (1024 * 1024)).toFixed(1)} MB · {video.uploadedAt ? new Date(video.uploadedAt).toLocaleDateString() : ""}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      {editingVideoId !== video.id && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingVideoId(video.id);
+                              setEditingVideoCaption(video.caption);
+                            }}
+                            data-testid={`button-edit-video-${video.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleVideoDelete(video.id)}
+                            data-testid={`button-delete-video-${video.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -164,6 +164,13 @@ When paying a supplier:
 - date-fns for date manipulation
 - Lucide React for icons
 
+### Demo Videos
+- multer for video file uploads (disk storage in uploads/ directory)
+- Admin uploads/manages videos via /api/admin/demo-videos endpoints
+- All authenticated users can view videos via "Demo Videos" tab
+- Video streaming with HTTP Range request support for seeking
+- 200MB file size limit per video
+
 ### Build & Development
 - Vite for frontend bundling with HMR
 - esbuild for server bundling in production
