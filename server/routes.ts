@@ -4626,26 +4626,46 @@ export async function registerRoutes(
       const fileSize = stat.size;
       const range = req.headers.range;
 
+      const CHUNK_SIZE = 1024 * 1024;
+
       if (range) {
         const parts = range.replace(/bytes=/, "").split("-");
         const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE, fileSize - 1);
         const chunkSize = end - start + 1;
         const stream = fs.createReadStream(filePath, { start, end });
+        stream.on("error", (err) => {
+          console.error("Stream read error:", err);
+          if (!res.headersSent) res.status(500).end();
+        });
         res.writeHead(206, {
           "Content-Range": `bytes ${start}-${end}/${fileSize}`,
           "Accept-Ranges": "bytes",
           "Content-Length": chunkSize,
           "Content-Type": video.mimeType,
+          "Cache-Control": "no-cache, no-store",
+          "X-Accel-Buffering": "no",
+          "Connection": "keep-alive",
         });
         stream.pipe(res);
       } else {
-        res.writeHead(200, {
-          "Content-Length": fileSize,
-          "Content-Type": video.mimeType,
-          "Accept-Ranges": "bytes",
+        const end = Math.min(CHUNK_SIZE, fileSize - 1);
+        const chunkSize = end + 1;
+        const stream = fs.createReadStream(filePath, { start: 0, end });
+        stream.on("error", (err) => {
+          console.error("Stream read error:", err);
+          if (!res.headersSent) res.status(500).end();
         });
-        fs.createReadStream(filePath).pipe(res);
+        res.writeHead(206, {
+          "Content-Range": `bytes 0-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunkSize,
+          "Content-Type": video.mimeType,
+          "Cache-Control": "no-cache, no-store",
+          "X-Accel-Buffering": "no",
+          "Connection": "keep-alive",
+        });
+        stream.pipe(res);
       }
     } catch (error) {
       console.error("Error streaming demo video:", error);
