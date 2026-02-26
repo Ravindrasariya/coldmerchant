@@ -5,7 +5,7 @@ import { createServer } from "http";
 import { seedAdminUser } from "./seed-admin";
 import { startInterestScheduler } from "./interest-scheduler";
 
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason) => {
   console.error("[crash-guard] Unhandled promise rejection:", reason);
 });
 
@@ -13,14 +13,9 @@ process.on("uncaughtException", (err) => {
   console.error("[crash-guard] Uncaught exception:", err);
 });
 
-const originalExit = process.exit;
-process.exit = function (code?: number) {
-  if (code === 1) {
-    console.error(`[crash-guard] process.exit(1) intercepted`);
-    return undefined as never;
-  }
-  return originalExit.call(process, code);
-} as typeof process.exit;
+process.on("SIGHUP", () => {
+  console.error("[crash-guard] SIGHUP received, ignoring");
+});
 
 const app = express();
 const httpServer = createServer(app);
