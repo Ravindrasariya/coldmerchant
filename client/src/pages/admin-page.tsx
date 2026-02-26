@@ -94,8 +94,15 @@ export default function AdminPage() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Upload failed");
+        if (res.status === 413) {
+          throw new Error("File too large. Maximum size is 200MB. If using a reverse proxy (Nginx), ensure client_max_body_size is set to at least 200M.");
+        }
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const err = await res.json();
+          throw new Error(err.message || "Upload failed");
+        }
+        throw new Error(`Upload failed (${res.status}). Server may have a file size limit configured.`);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
       setVideoFile(null);
