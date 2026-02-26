@@ -1,0 +1,98 @@
+Demo Videos Feature — Full Implementation Guide
+1. Database Table
+
+Create a demo_videos table with these columns:
+
+    id — serial primary key
+    filename — text, the unique filename stored on disk
+    original_name — text, the original uploaded filename
+    caption — text, a user-provided label for the video
+    mime_type — text (e.g., video/mp4)
+    file_size — integer, size in bytes
+    uploaded_at — timestamp, defaults to current time
+
+2. Backend — Dependencies
+
+    multer — Node.js middleware for handling multipart/form-data file uploads
+    @types/multer — TypeScript types (if using TypeScript)
+
+3. Backend — File Upload Setup (multer config)
+
+    Create an uploads/ directory in your project root (auto-create if missing using fs.mkdirSync)
+    Configure multer with:
+        Disk storage: saves files to uploads/ with unique filenames (Date.now()-random.ext)
+        File filter: only accept files where mimetype starts with video/
+        Size limit: 200MB (200 * 1024 * 1024 bytes)
+
+4. Backend — API Endpoints
+
+a) Upload video (Admin only)
+
+    POST /api/admin/demo-videos
+    Uses multer's callback pattern inside the route handler for proper error catching:
+
+    videoUpload.single("video")(req, res, (err) => { ... })
+
+    Saves file metadata (filename, original name, caption, mime type, file size) to the database
+    Returns the created video record as JSON
+
+b) List all videos (Authenticated users)
+
+    GET /api/demo-videos
+    Returns all rows from demo_videos table ordered by uploaded_at descending
+
+c) Stream a video (Authenticated users)
+
+    GET /api/demo-videos/:id/stream
+    Looks up the video record by ID, resolves the file path in uploads/
+    Supports HTTP Range requests for seeking/timeline:
+        If request has a Range header: respond with status 206 (Partial Content) and the requested byte range
+        Otherwise: respond with status 200 and the full file
+    Sets proper headers: Content-Type, Content-Length, Content-Range, Accept-Ranges: bytes
+
+d) Update caption (Admin only)
+
+    PATCH /api/admin/demo-videos/:id
+    Updates the caption field in the database
+
+e) Delete video (Admin only)
+
+    DELETE /api/admin/demo-videos/:id
+    Deletes the file from disk (fs.unlinkSync)
+    Deletes the record from the database
+
+5. Frontend — User-Facing "Demo Videos" Page
+
+    Lists all videos as compact cards, each with:
+        Caption label at the top (in a bordered header)
+        HTML5 <video> element with controls and preload="metadata"
+        Video source points to the streaming endpoint: /api/demo-videos/{id}/stream
+    Cards are constrained to max-w-lg (~512px) so they don't take the full page width
+    Video height capped at max-h-[50vh]
+    Users can fullscreen using the browser's built-in video controls
+    Empty state shows a message when no videos exist
+
+6. Frontend — Admin Video Management (in Admin Panel)
+
+    A "Demo Videos" tab in the admin panel
+    Upload form: file input (accept video/*) + caption text field + upload button
+    Uploads via FormData with fetch (not JSON) — important for file uploads
+    Shows list of uploaded videos with caption, filename, size, date
+    Each video has: edit caption button, delete button
+    Shows upload progress/loading state
+
+7. Navigation
+
+    Added "Demo Videos" as a nav item with a PlayCircle icon (from lucide-react)
+    Route: /demo-videos
+    Visible to all authenticated users (both admin and regular users)
+
+8. Nginx Configuration (Production)
+
+    Add client_max_body_size 250M; in the Nginx server block to allow large video uploads (default is 1MB)
+
+9. Translations (if bilingual)
+
+    Added translation keys for: title, subtitle, no videos message, upload labels, delete confirmation, etc.
+
+This covers every piece — database, backend APIs, file storage, streaming with seek support, frontend pages, admin management, navigation, and production server c
