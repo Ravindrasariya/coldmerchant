@@ -420,7 +420,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
           {/* Header Section - Transport Details */}
           <Card className="bg-muted/30">
             <CardContent className="pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="relative">
                   <Label className="text-xs">{t("Transporter Name", "ट्रांसपोर्टर का नाम")}</Label>
                   <Input
@@ -520,7 +520,7 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                     <CollapsibleContent>
                       <CardContent className="pt-0 space-y-4">
                         {/* Buyer Selection */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label className="text-xs">{t("Select Buyer", "खरीदार चुनें")}</Label>
                             <Select
