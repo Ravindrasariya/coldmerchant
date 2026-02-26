@@ -5,6 +5,15 @@ import { createServer } from "http";
 import { seedAdminUser } from "./seed-admin";
 import { startInterestScheduler } from "./interest-scheduler";
 
+const originalExit = process.exit;
+process.exit = function (code?: number) {
+  if (code === 1) {
+    console.error(`[safety] process.exit(1) intercepted — keeping server alive`);
+    return undefined as never;
+  }
+  return originalExit.call(process, code);
+} as typeof process.exit;
+
 const app = express();
 const httpServer = createServer(app);
 
