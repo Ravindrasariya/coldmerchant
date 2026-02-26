@@ -42,6 +42,8 @@ export default function BuyersTab() {
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
   const [editForm, setEditForm] = useState({ name: "", address: "", mandiCode: "", contact: "", redFlag: false });
   const [showHistory, setShowHistory] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [mergingBuyer, setMergingBuyer] = useState<{ id: number; buyerCode: string; name: string } | null>(null);
   
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", address: "", mandiCode: "", contact: "", redFlag: false });
@@ -95,25 +97,79 @@ export default function BuyersTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: { id: number } & typeof editForm) => {
-      const response = await apiRequest("PATCH", `/api/buyers/${id}/details`, {
-        name: data.name,
-        address: data.address,
-        mandiCode: data.mandiCode || null,
-        contact: data.contact || null,
-        redFlag: data.redFlag,
+      const response = await fetch(`/api/buyers/${id}/details`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          address: data.address,
+          mandiCode: data.mandiCode || null,
+          contact: data.contact || null,
+          redFlag: data.redFlag,
+        }),
+        credentials: "include",
       });
-      return response.json();
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw { status: response.status, data: responseData };
+      }
+      return responseData;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setEditDialogOpen(false);
       setEditingBuyer(null);
       setShowHistory(false);
-      toast({ title: t("Buyer updated successfully", "खरीदार सफलतापूर्वक अपडेट किया गया"), variant: "success" });
+      toast({ title: t("Buyer updated successfully", "खरीदार सफलतापूर्वक अपडेट किया गया"), description: data.message, variant: "success" });
     },
-    onError: () => {
-      toast({ title: t("Failed to update buyer", "खरीदार अपडेट करने में विफल"), variant: "destructive" });
+    onError: (error: any) => {
+      const errorData = error.data || error;
+      if (error.status === 409 && errorData.requiresMerge && errorData.existingBuyer) {
+        setEditDialogOpen(false);
+        setMergingBuyer({
+          id: errorData.existingBuyer.id,
+          buyerCode: errorData.existingBuyer.buyerCode,
+          name: errorData.existingBuyer.name,
+        });
+        setMergeDialogOpen(true);
+      } else {
+        toast({ title: t("Failed to update buyer", "खरीदार अपडेट करने में विफल"), description: errorData.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: async ({ sourceId, targetId }: { sourceId: number; targetId: number }) => {
+      const response = await apiRequest("POST", "/api/buyers/merge", { sourceId, targetId });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      setMergeDialogOpen(false);
+      setMergingBuyer(null);
+      setEditingBuyer(null);
+      toast({
+        title: t("Buyers Merged", "खरीदार मर्ज किए गए"),
+        description: data.message,
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message || t("Failed to merge buyers", "खरीदारों को मर्ज करने में विफल"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -174,6 +230,14 @@ export default function BuyersTab() {
       return;
     }
     updateMutation.mutate({ id: editingBuyer.id, ...editForm });
+  };
+
+  const handleConfirmMerge = () => {
+    if (!editingBuyer || !mergingBuyer) return;
+    mergeMutation.mutate({
+      sourceId: editingBuyer.id,
+      targetId: mergingBuyer.id,
+    });
   };
 
   const handleAddBuyer = () => {
@@ -559,17 +623,27 @@ export default function BuyersTab() {
                   ) : (
                     <div className="space-y-2">
                       {editHistory.map((entry) => (
-                        <div key={entry.id} className="p-2 bg-muted/50 rounded text-xs">
+                        <div key={entry.id} className={`p-2 rounded text-xs ${entry.fieldName === 'merge' ? 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800' : 'bg-muted/50'}`}>
                           <div className="flex justify-between text-muted-foreground">
-                            <span>#{entry.serialNumber}</span>
+                            <span className="flex items-center gap-1">
+                              #{entry.serialNumber}
+                              {entry.fieldName === 'merge' && <Badge variant="outline" className="text-blue-600 border-blue-300 text-[10px] px-1 py-0">{t("Merge", "मर्ज")}</Badge>}
+                            </span>
                             <span>{new Date(entry.changedAt!).toLocaleString()}</span>
                           </div>
-                          <div className="mt-1">
-                            <span className="font-medium">{formatFieldName(entry.fieldName)}</span>: 
-                            <span className="line-through text-muted-foreground ml-1">{entry.oldValue || '-'}</span>
-                            <span className="ml-1">→</span>
-                            <span className="ml-1 text-primary">{entry.newValue || '-'}</span>
-                          </div>
+                          {entry.fieldName === 'merge' ? (
+                            <div className="mt-1">
+                              <span className="text-blue-700 dark:text-blue-400">{entry.oldValue}</span>
+                              <div className="text-muted-foreground mt-0.5">{entry.newValue}</div>
+                            </div>
+                          ) : (
+                            <div className="mt-1">
+                              <span className="font-medium">{formatFieldName(entry.fieldName)}</span>: 
+                              <span className="line-through text-muted-foreground ml-1">{entry.oldValue || '-'}</span>
+                              <span className="ml-1">→</span>
+                              <span className="ml-1 text-primary">{entry.newValue || '-'}</span>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -668,6 +742,45 @@ export default function BuyersTab() {
             <Button onClick={handleAddBuyer} disabled={createMutation.isPending}>
               {createMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {t("Add", "जोड़ें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>{t("Merge Buyers", "खरीदार मर्ज करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm mb-4">
+              {t("A buyer with these details already exists:", "इन विवरणों के साथ एक खरीदार पहले से मौजूद है:")}
+            </p>
+            <div className="bg-muted/50 p-3 rounded mb-4">
+              <div className="text-sm font-medium" data-testid="text-merge-buyer-name">{mergingBuyer?.name}</div>
+              <div className="text-xs text-muted-foreground font-mono" data-testid="text-merge-buyer-code">{mergingBuyer?.buyerCode}</div>
+            </div>
+            <p className="text-sm mb-2">
+              {t("If you merge:", "यदि आप मर्ज करते हैं:")}
+            </p>
+            <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+              <li>{t("The buyer with the lower ID will be kept", "कम आईडी वाला खरीदार रखा जाएगा")}</li>
+              <li>{t("All linked transactions and cash entries will be transferred", "सभी संबंधित लेनदेन और नकद प्रविष्टियाँ स्थानांतरित की जाएंगी")}</li>
+              <li>{t("Receivable balances will be combined", "प्राप्य शेष राशि संयोजित की जाएगी")}</li>
+              <li>{t("The other buyer record will be deleted", "दूसरा खरीदार रिकॉर्ड हटा दिया जाएगा")}</li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setMergeDialogOpen(false); setMergingBuyer(null); }}>
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button 
+              onClick={handleConfirmMerge} 
+              disabled={mergeMutation.isPending}
+              data-testid="button-confirm-buyer-merge"
+            >
+              {mergeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("Confirm Merge", "मर्ज की पुष्टि करें")}
             </Button>
           </DialogFooter>
         </DialogContent>

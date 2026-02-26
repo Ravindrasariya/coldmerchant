@@ -41,6 +41,8 @@ export default function AadhatLedgerTab() {
   const [editingAadhat, setEditingAadhat] = useState<AadhatWithDues | null>(null);
   const [editForm, setEditForm] = useState({ name: "", address: "", contact: "", pyPayable: "", redFlag: false });
   const [showHistory, setShowHistory] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [mergingAadhat, setMergingAadhat] = useState<{ id: number; aadhatId: string; name: string } | null>(null);
   
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", address: "", contact: "", pyPayable: "", redFlag: false });
@@ -93,25 +95,78 @@ export default function AadhatLedgerTab() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: { id: number } & typeof editForm) => {
-      const response = await apiRequest("PATCH", `/api/aadhats/${id}/details`, {
-        name: data.name,
-        address: data.address,
-        contact: data.contact || null,
-        pyPayable: data.pyPayable || "0",
-        redFlag: data.redFlag,
+      const response = await fetch(`/api/aadhats/${id}/details`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          address: data.address,
+          contact: data.contact || null,
+          pyPayable: data.pyPayable || "0",
+          redFlag: data.redFlag,
+        }),
+        credentials: "include",
       });
-      return response.json();
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw { status: response.status, data: responseData };
+      }
+      return responseData;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       setEditDialogOpen(false);
       setEditingAadhat(null);
       setShowHistory(false);
-      toast({ title: t("Aadhat updated successfully", "आढ़त सफलतापूर्वक अपडेट किया गया"), variant: "success" });
+      toast({ title: t("Aadhat updated successfully", "आढ़त सफलतापूर्वक अपडेट किया गया"), description: data.message, variant: "success" });
     },
-    onError: () => {
-      toast({ title: t("Failed to update aadhat", "आढ़त अपडेट करने में विफल"), variant: "destructive" });
+    onError: (error: any) => {
+      const errorData = error.data || error;
+      if (error.status === 409 && errorData.requiresMerge && errorData.existingAadhat) {
+        setEditDialogOpen(false);
+        setMergingAadhat({
+          id: errorData.existingAadhat.id,
+          aadhatId: errorData.existingAadhat.aadhatId,
+          name: errorData.existingAadhat.name,
+        });
+        setMergeDialogOpen(true);
+      } else {
+        toast({ title: t("Failed to update aadhat", "आढ़त अपडेट करने में विफल"), description: errorData.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: async ({ sourceId, targetId }: { sourceId: number; targetId: number }) => {
+      const response = await apiRequest("POST", "/api/aadhats/merge", { sourceId, targetId });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw errorData;
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      setMergeDialogOpen(false);
+      setMergingAadhat(null);
+      setEditingAadhat(null);
+      toast({
+        title: t("Aadhats Merged", "आढ़त मर्ज किए गए"),
+        description: data.message,
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message || t("Failed to merge aadhats", "आढ़तों को मर्ज करने में विफल"),
+        variant: "destructive",
+      });
     },
   });
 
@@ -146,6 +201,14 @@ export default function AadhatLedgerTab() {
       return;
     }
     updateMutation.mutate({ id: editingAadhat.id, ...editForm });
+  };
+
+  const handleConfirmMerge = () => {
+    if (!editingAadhat || !mergingAadhat) return;
+    mergeMutation.mutate({
+      sourceId: editingAadhat.id,
+      targetId: mergingAadhat.id,
+    });
   };
 
   const handleAddAadhat = () => {
@@ -506,17 +569,27 @@ export default function AadhatLedgerTab() {
                   ) : (
                     <div className="space-y-2">
                       {editHistory.map((entry) => (
-                        <div key={entry.id} className="p-2 bg-muted/50 rounded text-xs">
+                        <div key={entry.id} className={`p-2 rounded text-xs ${entry.fieldName === 'merge' ? 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800' : 'bg-muted/50'}`}>
                           <div className="flex justify-between text-muted-foreground">
-                            <span>#{entry.serialNumber}</span>
+                            <span className="flex items-center gap-1">
+                              #{entry.serialNumber}
+                              {entry.fieldName === 'merge' && <Badge variant="outline" className="text-blue-600 border-blue-300 text-[10px] px-1 py-0">{t("Merge", "मर्ज")}</Badge>}
+                            </span>
                             <span>{new Date(entry.changedAt!).toLocaleString()}</span>
                           </div>
-                          <div className="mt-1">
-                            <span className="font-medium">{formatFieldName(entry.fieldName)}</span>: 
-                            <span className="line-through text-muted-foreground ml-1">{entry.oldValue || '-'}</span>
-                            <span className="ml-1">→</span>
-                            <span className="ml-1 text-primary">{entry.newValue || '-'}</span>
-                          </div>
+                          {entry.fieldName === 'merge' ? (
+                            <div className="mt-1">
+                              <span className="text-blue-700 dark:text-blue-400">{entry.oldValue}</span>
+                              <div className="text-muted-foreground mt-0.5">{entry.newValue}</div>
+                            </div>
+                          ) : (
+                            <div className="mt-1">
+                              <span className="font-medium">{formatFieldName(entry.fieldName)}</span>: 
+                              <span className="line-through text-muted-foreground ml-1">{entry.oldValue || '-'}</span>
+                              <span className="ml-1">→</span>
+                              <span className="ml-1 text-primary">{entry.newValue || '-'}</span>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -617,6 +690,45 @@ export default function AadhatLedgerTab() {
             <Button onClick={handleAddAadhat} disabled={createMutation.isPending}>
               {createMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
               {t("Add", "जोड़ें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>{t("Merge Aadhats", "आढ़त मर्ज करें")}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm mb-4">
+              {t("An aadhat with these details already exists:", "इन विवरणों के साथ एक आढ़त पहले से मौजूद है:")}
+            </p>
+            <div className="bg-muted/50 p-3 rounded mb-4">
+              <div className="text-sm font-medium" data-testid="text-merge-aadhat-name">{mergingAadhat?.name}</div>
+              <div className="text-xs text-muted-foreground font-mono" data-testid="text-merge-aadhat-code">{mergingAadhat?.aadhatId}</div>
+            </div>
+            <p className="text-sm mb-2">
+              {t("If you merge:", "यदि आप मर्ज करते हैं:")}
+            </p>
+            <ul className="text-xs text-muted-foreground list-disc pl-5 space-y-1">
+              <li>{t("The aadhat with the lower ID will be kept", "कम आईडी वाला आढ़त रखा जाएगा")}</li>
+              <li>{t("All linked stock entries and cash entries will be transferred", "सभी संबंधित स्टॉक एंट्री और नकद प्रविष्टियाँ स्थानांतरित की जाएंगी")}</li>
+              <li>{t("PY payable balances will be combined", "पिछले वर्ष की देय शेष राशि संयोजित की जाएगी")}</li>
+              <li>{t("The other aadhat record will be deleted", "दूसरा आढ़त रिकॉर्ड हटा दिया जाएगा")}</li>
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setMergeDialogOpen(false); setMergingAadhat(null); }}>
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button 
+              onClick={handleConfirmMerge} 
+              disabled={mergeMutation.isPending}
+              data-testid="button-confirm-aadhat-merge"
+            >
+              {mergeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("Confirm Merge", "मर्ज की पुष्टि करें")}
             </Button>
           </DialogFooter>
         </DialogContent>

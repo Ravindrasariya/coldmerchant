@@ -4529,6 +4529,29 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/aadhats/merge - Merge two aadhats
+  app.post("/api/aadhats/merge", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const { sourceId, targetId } = req.body;
+
+      if (!sourceId || !targetId) {
+        return res.status(400).json({ message: "sourceId and targetId are required" });
+      }
+
+      const result = await storage.mergeAadhats(merchantId, userId, sourceId, targetId);
+      res.json({
+        aadhat: result.survivingAadhat,
+        mergedCount: result.mergedCount,
+        message: `Aadhats merged successfully. ${result.mergedCount} linked records transferred.`
+      });
+    } catch (error) {
+      console.error("Error merging aadhats:", error);
+      res.status(500).json({ message: "Failed to merge aadhats" });
+    }
+  });
+
   // GET /api/aadhats/:id/history - Get edit history for an aadhat
   app.get("/api/aadhats/:id/history", requireMerchant, async (req, res) => {
     try {
