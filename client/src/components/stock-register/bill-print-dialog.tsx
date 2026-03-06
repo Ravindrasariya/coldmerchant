@@ -287,7 +287,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; page-break-inside: avoid;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
             <div>
-              <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0;">${lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.coldStoreName}</p>
+              <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0;">${lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.place === "mandi" ? "Mandi / मंडी" : lot.coldStoreName}</p>
               <p style="font-size: 11px; color: #666; margin: 0;">
                 ${lot.potatoType} • ${lot.bagType} • ${lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
               </p>
@@ -443,7 +443,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
             <div className="flex justify-between items-start mb-1">
               <div>
-                <p className="font-semibold">{lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.coldStoreName}</p>
+                <p className="font-semibold">{lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.place === "mandi" ? "Mandi / मंडी" : lot.coldStoreName}</p>
                 <p className="text-xs text-gray-600">
                   {lot.potatoType} • {lot.bagType} • {lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
                 </p>
