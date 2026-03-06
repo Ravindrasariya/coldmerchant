@@ -23,6 +23,9 @@ interface StockEntryWithLots {
   tehsil: string | null;
   district: string;
   state: string;
+  place?: string | null;
+  aadhatDbId?: number | null;
+  aadhatName?: string | null;
   paymentStatus: string;
   remarks: string | null;
   lots: Array<{
@@ -167,6 +170,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     };
   }, { totalPayable: 0, totalDeductions: 0, adjustedValue: 0, netPayable: 0 });
 
+  const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
+
   const getSizeBilingual = (size: string) => {
     const sizeMap: Record<string, string> = {
       "Large": "Large / बड़ा",
@@ -300,6 +305,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     }).join("");
 
     const address = [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ");
+    const detailsLabel = isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण";
+    const detailsName = isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName;
+    const detailsContact = isMandi ? null : entry.farmerContact;
+    const summaryLabel = isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश";
+    const netDueLabel = isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय";
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -337,9 +347,9 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                 <p style="margin: 0;"><span style="color: #666;">Status / स्थिति:</span> <span style="font-weight: 500; color: ${entry.paymentStatus === "paid" ? "#15803d" : "#c2410c"};">${entry.paymentStatus === "paid" ? "Paid / भुगतान हुआ" : "Due / बाकी"}</span></p>
               </div>
               <div style="flex: 1; text-align: right;">
-                <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">Farmer Details / किसान विवरण</h3>
-                <p style="font-weight: 600; margin: 0 0 4px 0;">${entry.farmerName}</p>
-                ${entry.farmerContact ? `<p style="color: #666; margin: 0 0 4px 0;">${entry.farmerContact}</p>` : ""}
+                <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">${detailsLabel}</h3>
+                <p style="font-weight: 600; margin: 0 0 4px 0;">${detailsName}</p>
+                ${detailsContact ? `<p style="color: #666; margin: 0 0 4px 0;">${detailsContact}</p>` : ""}
                 <p style="color: #666; margin: 0;">${address}</p>
               </div>
             </div>
@@ -355,7 +365,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
             <!-- Totals Summary -->
             <div style="margin-top: 12px; padding: 10px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border: 1px solid #0ea5e9;">
-              <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 8px 0; font-weight: 700; letter-spacing: 0.05em;">Farmer Payment Summary / किसान भुगतान सारांश</h3>
+              <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 8px 0; font-weight: 700; letter-spacing: 0.05em;">${summaryLabel}</h3>
               <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
@@ -370,7 +380,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                   <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 <div style="background: #0d9488; padding: 8px; border-radius: 6px; margin: -8px;">
-                  <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">Net Due to Farmer / किसान को देय</p>
+                  <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">${netDueLabel}</p>
                   <p style="font-family: monospace; font-weight: 700; font-size: 20px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
               </div>
@@ -414,10 +424,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           </div>
         </div>
         <div>
-          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Farmer Details / किसान विवरण</h3>
+          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">{isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण"}</h3>
           <div className="space-y-1 text-sm">
-            <p className="font-semibold">{entry.farmerName}</p>
-            {entry.farmerContact && <p className="text-gray-600">{entry.farmerContact}</p>}
+            <p className="font-semibold">{isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName}</p>
+            {!isMandi && entry.farmerContact && <p className="text-gray-600">{entry.farmerContact}</p>}
             <p className="text-gray-600">
               {[entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ")}
             </p>
@@ -552,7 +562,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       </div>
 
       <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
-        <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">Farmer Payment Summary / किसान भुगतान सारांश</h3>
+        <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">{isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश"}</h3>
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
             <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
@@ -567,7 +577,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </div>
           <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
-            <p className="text-xs opacity-90 mb-1">Net Due to Farmer / किसान को देय</p>
+            <p className="text-xs opacity-90 mb-1">{isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय"}</p>
             <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </div>
         </div>
