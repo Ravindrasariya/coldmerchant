@@ -33,7 +33,8 @@ import {
   type SeedTransactionItem, type InsertSeedTransactionItem,
   type SeedTransactionWithItems,
   type SeedTransactionEditHistory,
-  demoVideos, type DemoVideo, type InsertDemoVideo
+  demoVideos, type DemoVideo, type InsertDemoVideo,
+  aadhatPaymentAllocations, type AadhatPaymentAllocation
 } from "@shared/schema";
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
@@ -247,7 +248,7 @@ export interface IStorage {
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
   
-  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
+  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number, aadhatAllocations?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
   // Season Reset operations
   checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
@@ -395,6 +396,7 @@ export class DatabaseStorage implements IStorage {
     // First delete allocations and settlements
     await db.delete(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, id));
     await db.delete(cashEntryAllocations).where(eq(cashEntryAllocations.merchantId, id));
+    await db.delete(aadhatPaymentAllocations).where(eq(aadhatPaymentAllocations.merchantId, id));
     
     // Delete edit histories
     await db.delete(stockEntryEditHistory).where(eq(stockEntryEditHistory.merchantId, id));
@@ -3098,7 +3100,8 @@ export class DatabaseStorage implements IStorage {
   async createCashEntry(
     entry: InsertCashEntry, 
     applyFIFO: boolean, 
-    userId?: number
+    userId?: number,
+    aadhatAllocationsInput?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>
   ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     
     return await db.transaction(async (tx) => {
@@ -3397,11 +3400,90 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // If this is an aadhtiya payment, reduce pyPayable first then apply remainder to oldest Mandi stock entries (FIFO)
-      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId) {
+      // If this is an aadhtiya payment with manual allocations, apply them precisely
+      if (entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId && aadhatAllocationsInput && aadhatAllocationsInput.length > 0) {
+        for (const alloc of aadhatAllocationsInput) {
+          const totalSettled = (alloc.amount || 0) + (alloc.discountAmount || 0) + (alloc.pettyAdjustment || 0);
+          
+          if (alloc.isPyPayable) {
+            const [aadhat] = await tx.select().from(aadhats)
+              .where(and(eq(aadhats.id, entry.aadhatDbId!), eq(aadhats.merchantId, entry.merchantId)));
+            
+            if (aadhat) {
+              const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+              if (totalSettled > currentPyPayable + 0.01) {
+                throw new Error(`PY Payable allocation ₹${totalSettled.toFixed(2)} exceeds current PY payable ₹${currentPyPayable.toFixed(2)}`);
+              }
+              const newPyPayable = Math.max(0, currentPyPayable - totalSettled);
+              await tx.update(aadhats)
+                .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
+                .where(eq(aadhats.id, aadhat.id));
+            }
+            
+            await tx.insert(aadhatPaymentAllocations).values({
+              cashEntryId: createdEntry.id,
+              stockEntryId: null,
+              merchantId: entry.merchantId,
+              appliedAmount: (alloc.amount || 0).toFixed(2),
+              discountPercent: (alloc.discountPercent || 0).toFixed(2),
+              discountAmount: (alloc.discountAmount || 0).toFixed(2),
+              pettyAdjustment: (alloc.pettyAdjustment || 0).toFixed(2),
+              isPyPayable: true,
+            });
+          } else if (alloc.stockEntryId) {
+            const [se] = await tx.select().from(stockEntries)
+              .where(and(
+                eq(stockEntries.id, alloc.stockEntryId),
+                eq(stockEntries.merchantId, entry.merchantId),
+                eq(stockEntries.aadhatDbId, entry.aadhatDbId!)
+              ));
+            
+            if (!se) {
+              throw new Error(`Stock entry ${alloc.stockEntryId} does not belong to aadhat ${entry.aadhatDbId} or does not exist`);
+            }
+
+            const entryLots = await tx.select().from(lots)
+              .where(eq(lots.stockEntryId, se.id));
+            
+            let entryNetPayable = 0;
+            for (const lot of entryLots) {
+              entryNetPayable += parseFloat(lot.netPayable || "0");
+            }
+            
+            const currentPaid = parseFloat(se.amountPaid || "0");
+            const due = entryNetPayable - currentPaid;
+            if (totalSettled > due + 0.01) {
+              throw new Error(`Allocation total ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for stock entry ${alloc.stockEntryId}`);
+            }
+            
+            const newPaid = currentPaid + totalSettled;
+            const newDue = entryNetPayable - newPaid;
+            const newStatus = newDue <= 0.01 ? "paid" : "partial";
+            
+            await tx.update(stockEntries)
+              .set({ 
+                amountPaid: newPaid.toFixed(2),
+                paymentStatus: newStatus
+              })
+              .where(eq(stockEntries.id, se.id));
+            
+            await tx.insert(aadhatPaymentAllocations).values({
+              cashEntryId: createdEntry.id,
+              stockEntryId: alloc.stockEntryId,
+              merchantId: entry.merchantId,
+              appliedAmount: (alloc.amount || 0).toFixed(2),
+              discountPercent: (alloc.discountPercent || 0).toFixed(2),
+              discountAmount: (alloc.discountAmount || 0).toFixed(2),
+              pettyAdjustment: (alloc.pettyAdjustment || 0).toFixed(2),
+              isPyPayable: false,
+            });
+          }
+        }
+      }
+      // Fallback: legacy FIFO for aadhtiya without manual allocations
+      else if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId) {
         let remainingAmount = parseFloat(entry.amount);
         
-        // STEP 1: First reduce pyPayable on the aadhat record
         const [aadhat] = await tx.select().from(aadhats)
           .where(and(eq(aadhats.id, entry.aadhatDbId), eq(aadhats.merchantId, entry.merchantId)));
         
@@ -3418,7 +3500,6 @@ export class DatabaseStorage implements IStorage {
           }
         }
         
-        // STEP 2: Apply remainder to oldest Mandi stock entries linked to this aadhat (FIFO by createdAt)
         if (remainingAmount > 0) {
           const aadhatStockEntries = await tx.select().from(stockEntries)
             .where(and(
@@ -3706,51 +3787,89 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // 4e. Reverse aadhtiya payment (reverse stock entries first, then restore pyPayable)
+      // 4e. Reverse aadhtiya payment using allocation records if available, else legacy reversal
       if (entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId) {
-        let amountToReverse = parseFloat(entry.amount);
-        
-        // STEP 1: Reverse stock entry payments first (most recent entries first)
-        const aadhatStockEntries = await tx.select().from(stockEntries)
+        const aadhatAllocs = await tx.select().from(aadhatPaymentAllocations)
           .where(and(
-            eq(stockEntries.merchantId, merchantId),
-            eq(stockEntries.aadhatDbId, entry.aadhatDbId)
-          ))
-          .orderBy(asc(stockEntries.createdAt));
+            eq(aadhatPaymentAllocations.cashEntryId, cashEntryId),
+            eq(aadhatPaymentAllocations.merchantId, merchantId)
+          ));
         
-        // Reverse from most recent first (reverse FIFO)
-        for (const se of aadhatStockEntries.reverse()) {
-          if (amountToReverse <= 0) break;
-          
-          const currentPaid = parseFloat(se.amountPaid || "0");
-          if (currentPaid <= 0) continue;
-          
-          const toReverse = Math.min(amountToReverse, currentPaid);
-          const newPaid = currentPaid - toReverse;
-          const newStatus = newPaid <= 0 ? "due" : "partial";
-          
-          await tx.update(stockEntries)
-            .set({ 
-              amountPaid: newPaid.toString(),
-              paymentStatus: newStatus
-            })
-            .where(eq(stockEntries.id, se.id));
-          
-          amountToReverse -= toReverse;
-        }
-        
-        // STEP 2: Restore remaining to pyPayable
-        if (amountToReverse > 0) {
-          const [aadhat] = await tx.select().from(aadhats)
-            .where(and(eq(aadhats.id, entry.aadhatDbId), eq(aadhats.merchantId, merchantId)));
-          
-          if (aadhat) {
-            const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
-            const newPyPayable = currentPyPayable + amountToReverse;
+        if (aadhatAllocs.length > 0) {
+          for (const alloc of aadhatAllocs) {
+            const totalSettled = parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.discountAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
             
-            await tx.update(aadhats)
-              .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
-              .where(eq(aadhats.id, aadhat.id));
+            if (alloc.isPyPayable) {
+              const [aadhat] = await tx.select().from(aadhats)
+                .where(and(eq(aadhats.id, entry.aadhatDbId!), eq(aadhats.merchantId, merchantId)));
+              
+              if (aadhat) {
+                const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+                const newPyPayable = currentPyPayable + totalSettled;
+                await tx.update(aadhats)
+                  .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
+                  .where(eq(aadhats.id, aadhat.id));
+              }
+            } else if (alloc.stockEntryId) {
+              const [se] = await tx.select().from(stockEntries)
+                .where(eq(stockEntries.id, alloc.stockEntryId));
+              
+              if (se) {
+                const currentPaid = parseFloat(se.amountPaid || "0");
+                const newPaid = Math.max(0, currentPaid - totalSettled);
+                const newStatus = newPaid <= 0 ? "due" : "partial";
+                
+                await tx.update(stockEntries)
+                  .set({ 
+                    amountPaid: newPaid.toFixed(2),
+                    paymentStatus: newStatus
+                  })
+                  .where(eq(stockEntries.id, alloc.stockEntryId));
+              }
+            }
+          }
+        } else {
+          let amountToReverse = parseFloat(entry.amount);
+          
+          const aadhatStockEntries = await tx.select().from(stockEntries)
+            .where(and(
+              eq(stockEntries.merchantId, merchantId),
+              eq(stockEntries.aadhatDbId, entry.aadhatDbId)
+            ))
+            .orderBy(asc(stockEntries.createdAt));
+          
+          for (const se of aadhatStockEntries.reverse()) {
+            if (amountToReverse <= 0) break;
+            
+            const currentPaid = parseFloat(se.amountPaid || "0");
+            if (currentPaid <= 0) continue;
+            
+            const toReverse = Math.min(amountToReverse, currentPaid);
+            const newPaid = currentPaid - toReverse;
+            const newStatus = newPaid <= 0 ? "due" : "partial";
+            
+            await tx.update(stockEntries)
+              .set({ 
+                amountPaid: newPaid.toString(),
+                paymentStatus: newStatus
+              })
+              .where(eq(stockEntries.id, se.id));
+            
+            amountToReverse -= toReverse;
+          }
+          
+          if (amountToReverse > 0) {
+            const [aadhat] = await tx.select().from(aadhats)
+              .where(and(eq(aadhats.id, entry.aadhatDbId), eq(aadhats.merchantId, merchantId)));
+            
+            if (aadhat) {
+              const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+              const newPyPayable = currentPyPayable + amountToReverse;
+              
+              await tx.update(aadhats)
+                .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
+                .where(eq(aadhats.id, aadhat.id));
+            }
           }
         }
       }

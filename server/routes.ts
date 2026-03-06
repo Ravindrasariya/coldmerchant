@@ -2118,6 +2118,74 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/aadhat-pending-entries/:aadhatDbId - Get pending stock entries for an aadhat (for manual allocation)
+  app.get("/api/cash/aadhat-pending-entries/:aadhatDbId", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const aadhatDbId = parseInt(req.params.aadhatDbId);
+      if (isNaN(aadhatDbId)) {
+        return res.status(400).json({ message: "Invalid aadhat ID" });
+      }
+
+      const aadhat = await storage.getAadhatById(aadhatDbId, merchantId);
+      if (!aadhat) {
+        return res.status(404).json({ message: "Aadhat not found" });
+      }
+
+      const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+
+      const lotsByEntryId = new Map<number, typeof allLots>();
+      for (const lot of allLots) {
+        const arr = lotsByEntryId.get(lot.stockEntryId) || [];
+        arr.push(lot);
+        lotsByEntryId.set(lot.stockEntryId, arr);
+      }
+
+      const pendingEntries = stockEntryList
+        .filter(se => se.aadhatDbId === aadhatDbId && (se.paymentStatus === "due" || se.paymentStatus === "partial"))
+        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .map((se: any) => {
+          const entryLots = lotsByEntryId.get(se.id) || [];
+          let netPayable = 0;
+          let totalBags = 0;
+          for (const lot of entryLots) {
+            netPayable += parseFloat(lot.netPayable || "0");
+            totalBags += lot.originalBags;
+          }
+          const amountPaid = parseFloat(se.amountPaid || "0");
+          const dueAmount = Math.max(0, netPayable - amountPaid);
+          if (dueAmount <= 0) return null;
+
+          const purchaseDate = se.purchaseDate;
+          const daysSince = Math.floor((Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
+
+          return {
+            stockEntryId: se.id,
+            serialNumber: se.serialNumber,
+            crop: se.crop || "potato",
+            purchaseDate,
+            totalBags,
+            netPayable: parseFloat(netPayable.toFixed(2)),
+            amountPaid: parseFloat(amountPaid.toFixed(2)),
+            dueAmount: parseFloat(dueAmount.toFixed(2)),
+            daysSince,
+          };
+        })
+        .filter(Boolean);
+
+      const pyPayable = parseFloat(aadhat.pyPayable || "0");
+
+      res.json({
+        pendingEntries,
+        pyPayable: parseFloat(pyPayable.toFixed(2)),
+      });
+    } catch (error) {
+      console.error("Error fetching aadhat pending entries:", error);
+      res.status(500).json({ message: "Failed to fetch aadhat pending entries" });
+    }
+  });
+
   // GET /api/cash/aadhats-with-dues - Get aadhats with outstanding dues (totalDue > 0)
   app.get("/api/cash/aadhats-with-dues", requireMerchant, async (req, res) => {
     try {
@@ -2171,7 +2239,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2224,6 +2292,30 @@ export async function registerRoutes(
         }
         if (expenseType === "aadhtiya" && !aadhatName) {
           return res.status(400).json({ message: "Aadhtiya name is required when expense type is aadhtiya" });
+        }
+        if (expenseType === "aadhtiya" && Array.isArray(aadhatAllocations)) {
+          if (aadhatAllocations.length === 0) {
+            return res.status(400).json({ message: "At least one allocation is required for aadhtiya payments" });
+          }
+          for (const alloc of aadhatAllocations) {
+            const allocAmount = parseFloat(alloc.amount) || 0;
+            const allocDiscount = parseFloat(alloc.discountAmount) || 0;
+            const allocPetty = parseFloat(alloc.pettyAdjustment) || 0;
+            if (allocAmount < 0 || allocDiscount < 0 || allocPetty < 0) {
+              return res.status(400).json({ message: "Allocation amounts must be non-negative" });
+            }
+            const totalSettled = allocAmount + allocDiscount + allocPetty;
+            if (totalSettled <= 0) {
+              return res.status(400).json({ message: "Each allocation must have a positive total settled amount" });
+            }
+            if (!alloc.isPyPayable && !alloc.stockEntryId) {
+              return res.status(400).json({ message: "Each allocation must reference either a stock entry or PY payable" });
+            }
+          }
+          const totalCash = aadhatAllocations.reduce((sum: number, a: any) => sum + (parseFloat(a.amount) || 0), 0);
+          if (totalCash <= 0) {
+            return res.status(400).json({ message: "Total cash amount must be greater than 0" });
+          }
         }
       } else if (direction === "transfer") {
         if (!fromAccountType || !["cash_in_hand", "bank_account"].includes(fromAccountType)) {
@@ -2347,7 +2439,7 @@ export async function registerRoutes(
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,
-          }, applyFIFO, userId);
+          }, applyFIFO, userId, expenseType === "aadhtiya" && Array.isArray(aadhatAllocations) ? aadhatAllocations : undefined);
           break;
         } catch (error: any) {
           if (error?.code === '23505' && error?.constraint?.includes('transaction_code') && attempt < maxRetries - 1) {

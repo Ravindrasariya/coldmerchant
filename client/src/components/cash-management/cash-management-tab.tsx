@@ -124,6 +124,33 @@ interface AadhatWithDue {
   totalDue: number;
 }
 
+interface AadhatPendingEntry {
+  stockEntryId: number;
+  serialNumber: number;
+  crop: string;
+  purchaseDate: string;
+  totalBags: number;
+  netPayable: number;
+  amountPaid: number;
+  dueAmount: number;
+}
+
+interface AadhatPendingResponse {
+  pendingEntries: AadhatPendingEntry[];
+  pyPayable: number;
+}
+
+interface AadhatAllocationRow {
+  stockEntryId?: number;
+  isPyPayable?: boolean;
+  label: string;
+  dueAmount: number;
+  amount: number;
+  discountPercent: number;
+  discountAmount: number;
+  pettyAdjustment: number;
+}
+
 // Farmer Ledger data with comprehensive dues
 interface LedgerFarmer {
   id: number;
@@ -234,7 +261,7 @@ const outflowFormSchema = z.object({
   supplierName: z.string().optional(),
   aadhatName: z.string().optional(),
   aadhatDbId: z.coerce.number().optional(),
-  amount: z.coerce.number().min(0, "Amount cannot be negative"),
+  amount: z.coerce.number().min(0, "Amount cannot be negative").optional().default(0),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -511,6 +538,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -547,6 +575,7 @@ export function CashManagementTab() {
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
         });
+        setAadhatAllocations([]);
       } else if (activeTab === "transfer") {
         transferForm.reset({
           fromAccountType: "cash_in_hand",
@@ -572,6 +601,81 @@ export function CashManagementTab() {
   const [expenseTypePopoverOpen, setExpenseTypePopoverOpen] = useState(false);
   // State for searchable aadhtiya name popover
   const [aadhatPopoverOpen, setAadhatPopoverOpen] = useState(false);
+
+  // Aadhat allocation state
+  const [aadhatAllocations, setAadhatAllocations] = useState<AadhatAllocationRow[]>([]);
+  const [aadhatEntryPickerOpen, setAadhatEntryPickerOpen] = useState(false);
+
+  const selectedAadhatDbId = outflowForm.watch("aadhatDbId");
+
+  const { data: aadhatPendingData } = useQuery<AadhatPendingResponse>({
+    queryKey: ["/api/cash/aadhat-pending-entries", selectedAadhatDbId],
+    queryFn: async () => {
+      if (!selectedAadhatDbId) return { pendingEntries: [], pyPayable: 0 };
+      const res = await fetch(`/api/cash/aadhat-pending-entries/${selectedAadhatDbId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending entries");
+      return res.json();
+    },
+    enabled: !!selectedAadhatDbId && expenseType === "aadhtiya",
+  });
+
+  useEffect(() => {
+    setAadhatAllocations([]);
+  }, [selectedAadhatDbId]);
+
+  const aadhatGrandTotalCash = aadhatAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const toggleAadhatEntry = (entry: AadhatPendingEntry | { isPyPayable: true; dueAmount: number }) => {
+    if ('isPyPayable' in entry && entry.isPyPayable) {
+      const exists = aadhatAllocations.find(a => a.isPyPayable);
+      if (exists) {
+        setAadhatAllocations(prev => prev.filter(a => !a.isPyPayable));
+      } else {
+        setAadhatAllocations(prev => [...prev, {
+          isPyPayable: true,
+          label: t("PY Payable (Previous Year)", "पीवाई देय (पिछला वर्ष)"),
+          dueAmount: entry.dueAmount,
+          amount: 0,
+          discountPercent: 0,
+          discountAmount: 0,
+          pettyAdjustment: 0,
+        }]);
+      }
+    } else if ('stockEntryId' in entry) {
+      const exists = aadhatAllocations.find(a => a.stockEntryId === entry.stockEntryId);
+      if (exists) {
+        setAadhatAllocations(prev => prev.filter(a => a.stockEntryId !== entry.stockEntryId));
+      } else {
+        const daysSince = Math.floor((Date.now() - new Date(entry.purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
+        setAadhatAllocations(prev => [...prev, {
+          stockEntryId: entry.stockEntryId,
+          label: `SR #${entry.serialNumber} | ${entry.crop} | ${format(new Date(entry.purchaseDate), "dd/MM/yy")} | ${entry.totalBags} bags | ${daysSince}d`,
+          dueAmount: entry.dueAmount,
+          amount: 0,
+          discountPercent: 0,
+          discountAmount: 0,
+          pettyAdjustment: 0,
+        }]);
+      }
+    }
+  };
+
+  const updateAadhatAllocation = (index: number, field: 'amount' | 'discountPercent' | 'pettyAdjustment', value: number) => {
+    setAadhatAllocations(prev => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      if (field === 'amount') {
+        row.amount = value;
+      } else if (field === 'discountPercent') {
+        row.discountPercent = value;
+        row.discountAmount = Math.round((value / 100) * row.dueAmount * 100) / 100;
+      } else if (field === 'pettyAdjustment') {
+        row.pettyAdjustment = value;
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
 
   // Merge managed parties with transaction-derived parties (de-duplicate by name)
   const mergedParties = (() => {
@@ -687,15 +791,55 @@ export function CashManagementTab() {
       ? ledgerFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
-    if (!values.amount || values.amount <= 0) {
-      outflowForm.setError("amount", { 
-        type: "manual", 
-        message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
-      });
-      return;
+    const isAadhtiya = values.expenseType === "aadhtiya";
+
+    if (isAadhtiya) {
+      if (aadhatAllocations.length === 0) {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: t("Please select at least one entry to allocate payment", "कृपया भुगतान आवंटित करने के लिए कम से कम एक प्रविष्टि चुनें"),
+          variant: "destructive",
+        });
+        return;
+      }
+      for (const alloc of aadhatAllocations) {
+        const totalSettled = (alloc.amount || 0) + (alloc.discountAmount || 0) + (alloc.pettyAdjustment || 0);
+        if (totalSettled <= 0) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Each selected entry must have some amount allocated", "प्रत्येक चयनित प्रविष्टि में कुछ राशि आवंटित होनी चाहिए"),
+            variant: "destructive",
+          });
+          return;
+        }
+        if (totalSettled > alloc.dueAmount + 0.01) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Total settled cannot exceed due amount for an entry", "कुल निपटान एक प्रविष्टि की बकाया राशि से अधिक नहीं हो सकता"),
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      if (aadhatGrandTotalCash <= 0) {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: t("Total cash amount must be greater than 0", "कुल नकद राशि 0 से अधिक होनी चाहिए"),
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      if (!values.amount || values.amount <= 0) {
+        outflowForm.setError("amount", { 
+          type: "manual", 
+          message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
+        });
+        return;
+      }
     }
     
-    const selectedAadhat = values.expenseType === "aadhtiya"
+    const selectedAadhat = isAadhtiya
       ? aadhatsWithDues.find(a => a.name === values.aadhatName)
       : null;
 
@@ -710,12 +854,23 @@ export function CashManagementTab() {
       farmerId: selectedLedgerFarmerOut?.id || null,
       coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
       supplierName: values.expenseType === "supplier" ? values.supplierName : null,
-      aadhatName: values.expenseType === "aadhtiya" ? values.aadhatName : null,
+      aadhatName: isAadhtiya ? values.aadhatName : null,
       aadhatDbId: selectedAadhat?.id || values.aadhatDbId || null,
-      amount: values.amount,
+      amount: isAadhtiya ? aadhatGrandTotalCash : values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
     };
+
+    if (isAadhtiya) {
+      outflowData.aadhatAllocations = aadhatAllocations.map(a => ({
+        stockEntryId: a.stockEntryId || null,
+        isPyPayable: a.isPyPayable || false,
+        amount: a.amount || 0,
+        discountPercent: a.discountPercent || 0,
+        discountAmount: a.discountAmount || 0,
+        pettyAdjustment: a.pettyAdjustment || 0,
+      }));
+    }
 
     createEntryMutation.mutate(outflowData);
   };
@@ -1901,6 +2056,159 @@ export function CashManagementTab() {
                     />
                   )}
 
+                  {expenseType === "aadhtiya" && selectedAadhatDbId && aadhatPendingData && (
+                    <div className="space-y-3" data-testid="aadhat-allocation-section">
+                      <div>
+                        <Label className="text-sm font-medium">{t("Select Entries to Allocate", "आवंटित करने के लिए प्रविष्टियाँ चुनें")}</Label>
+                        <Popover open={aadhatEntryPickerOpen} onOpenChange={setAadhatEntryPickerOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn("w-full justify-between mt-1", aadhatAllocations.length === 0 && "text-muted-foreground")}
+                              data-testid="button-pick-aadhat-entries"
+                            >
+                              {aadhatAllocations.length > 0
+                                ? `${aadhatAllocations.length} ${t("entries selected", "प्रविष्टियाँ चयनित")}`
+                                : t("Select pending entries...", "बकाया प्रविष्टियाँ चुनें...")}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t("Search entries...", "प्रविष्टियाँ खोजें...")} />
+                              <CommandList>
+                                <CommandEmpty>{t("No pending entries found", "कोई बकाया प्रविष्टि नहीं मिली")}</CommandEmpty>
+                                <CommandGroup>
+                                  {aadhatPendingData.pyPayable > 0 && (
+                                    <CommandItem
+                                      value="py-payable"
+                                      onSelect={() => toggleAadhatEntry({ isPyPayable: true, dueAmount: aadhatPendingData.pyPayable })}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", aadhatAllocations.some(a => a.isPyPayable) ? "opacity-100" : "opacity-0")} />
+                                      <div className="flex items-center justify-between gap-2 w-full">
+                                        <span className="font-medium">{t("PY Payable", "पीवाई देय")}</span>
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
+                                          ₹{aadhatPendingData.pyPayable.toLocaleString('en-IN')}
+                                        </Badge>
+                                      </div>
+                                    </CommandItem>
+                                  )}
+                                  {aadhatPendingData.pendingEntries.map((entry) => {
+                                    const daysSince = Math.floor((Date.now() - new Date(entry.purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
+                                    const isSelected = aadhatAllocations.some(a => a.stockEntryId === entry.stockEntryId);
+                                    return (
+                                      <CommandItem
+                                        key={entry.stockEntryId}
+                                        value={`SR ${entry.serialNumber} ${entry.crop} ${entry.purchaseDate}`}
+                                        onSelect={() => toggleAadhatEntry(entry)}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex items-center justify-between gap-2 w-full text-xs">
+                                          <span className="font-medium">SR #{entry.serialNumber}</span>
+                                          <span className="text-muted-foreground">{entry.crop}</span>
+                                          <span className="text-muted-foreground">{format(new Date(entry.purchaseDate), "dd/MM/yy")}</span>
+                                          <span className="text-muted-foreground">{entry.totalBags}B</span>
+                                          <span className="text-muted-foreground">{daysSince}d</span>
+                                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
+                                            ₹{entry.dueAmount.toLocaleString('en-IN')}
+                                          </Badge>
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {aadhatAllocations.length > 0 && (
+                        <div className="space-y-3">
+                          {aadhatAllocations.map((alloc, idx) => {
+                            const totalSettled = (alloc.amount || 0) + (alloc.discountAmount || 0) + (alloc.pettyAdjustment || 0);
+                            const overLimit = totalSettled > alloc.dueAmount + 0.01;
+                            return (
+                              <Card key={alloc.stockEntryId || 'py'} className={cn(overLimit && "border-red-400")} data-testid={`card-aadhat-alloc-${idx}`}>
+                                <CardContent className="p-3 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-medium truncate">{alloc.label}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400">
+                                        {t("Due", "बकाया")}: ₹{alloc.dueAmount.toLocaleString('en-IN')}
+                                      </Badge>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setAadhatAllocations(prev => prev.filter((_, i) => i !== idx))}
+                                        data-testid={`button-remove-alloc-${idx}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")} (₹)</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        value={alloc.amount || ""}
+                                        onChange={(e) => updateAadhatAllocation(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                        data-testid={`input-alloc-amount-${idx}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground">{t("Discount", "छूट")} %</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        max="100"
+                                        value={alloc.discountPercent || ""}
+                                        onChange={(e) => updateAadhatAllocation(idx, 'discountPercent', parseFloat(e.target.value) || 0)}
+                                        data-testid={`input-alloc-discount-${idx}`}
+                                      />
+                                      {alloc.discountAmount > 0 && (
+                                        <span className="text-xs text-muted-foreground">= ₹{alloc.discountAmount.toLocaleString('en-IN')}</span>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground">{t("Petty Adj", "पेटी")} (₹)</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        value={alloc.pettyAdjustment || ""}
+                                        onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                        data-testid={`input-alloc-petty-${idx}`}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">{t("Total Settled", "कुल निपटान")}</span>
+                                    <span className={cn("font-semibold", overLimit ? "text-red-600" : "text-foreground")}>
+                                      ₹{totalSettled.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      {overLimit && ` (${t("exceeds due", "बकाया से अधिक")})`}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+
+                          <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="aadhat-grand-total">
+                            <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                            <span className="font-bold text-lg">₹{aadhatGrandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {expenseType === "farmer" && (
                     <>
                       <FormField
@@ -2124,21 +2432,23 @@ export function CashManagementTab() {
                     </div>
                   )}
 
-                  <FormField
-                    control={outflowForm.control}
-                    name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t("Amount", "राशि")} (₹) *
-                        </FormLabel>
-                        <FormControl>
-                          <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-outflow-amount" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {expenseType !== "aadhtiya" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t("Amount", "राशि")} (₹) *
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-outflow-amount" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={outflowForm.control}
@@ -2381,6 +2691,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });

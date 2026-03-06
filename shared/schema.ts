@@ -244,6 +244,20 @@ export const cashEntryAllocations = pgTable("cash_entry_allocations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Aadhat Payment Allocations - tracks manual allocation of payments to aadhat stock entries
+export const aadhatPaymentAllocations = pgTable("aadhat_payment_allocations", {
+  id: serial("id").primaryKey(),
+  cashEntryId: integer("cash_entry_id").notNull().references(() => cashEntries.id, { onDelete: "cascade" }),
+  stockEntryId: integer("stock_entry_id").references(() => stockEntries.id),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
+  discountPercent: decimal("discount_percent", { precision: 6, scale: 2 }).default("0"),
+  discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).default("0"),
+  pettyAdjustment: decimal("petty_adjustment", { precision: 12, scale: 2 }).default("0"),
+  isPyPayable: boolean("is_py_payable").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Cold Store Charge Allocations - tracks which lots a cold store payment was applied to (FIFO)
 export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations", {
   id: serial("id").primaryKey(),
@@ -1201,3 +1215,11 @@ export const insertDemoVideoSchema = createInsertSchema(demoVideos).omit({
 
 export type InsertDemoVideo = z.infer<typeof insertDemoVideoSchema>;
 export type DemoVideo = typeof demoVideos.$inferSelect;
+
+export const insertAadhatPaymentAllocationSchema = createInsertSchema(aadhatPaymentAllocations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAadhatPaymentAllocation = z.infer<typeof insertAadhatPaymentAllocationSchema>;
+export type AadhatPaymentAllocation = typeof aadhatPaymentAllocations.$inferSelect;

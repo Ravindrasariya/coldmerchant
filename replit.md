@@ -67,6 +67,17 @@ Cold store dues are calculated from the `charges` array on each lot:
 - FIFO allocation applies payments to oldest outstanding lots first
 - Dues are grouped by normalized cold store name (case-insensitive)
 
+### Aadhat Payment (Manual Allocation)
+Aadhat (aadhtiya) payments use manual transaction-level allocation instead of FIFO:
+- User selects specific pending stock entries and/or PY Payable to allocate payment to
+- Each allocation has three fields: Amount (cash), Discount % (auto-calculates rupee value from due), Petty Adjustment (manual rupee amount)
+- Total settled per entry = Amount + Discount + Petty (validated to not exceed due)
+- Only "Amount" counts as real cash outflow; discount and petty reduce due but aren't cash
+- Allocations stored in `aadhat_payment_allocations` table for precise reversal
+- Reversals use allocation records to precisely undo each allocation
+- Legacy FIFO fallback preserved for backward compatibility with old entries
+- API: `GET /api/cash/aadhat-pending-entries/:aadhatDbId` returns pending stock entries with due amounts
+
 ### Supplier Payment FIFO
 When paying a supplier:
 - Payments are allocated to oldest seed stock entries first (by createdAt)
