@@ -1197,6 +1197,92 @@ export type SeedTransactionWithItems = SeedTransaction & {
   items: SeedTransactionItemEnriched[];
 };
 
+// ==================== Books: Assets ====================
+export const ASSET_CATEGORIES = ["vehicle", "building", "equipment", "furniture", "computer", "other"] as const;
+export const ASSET_DEPRECIATION_RATES: Record<string, number> = {
+  vehicle: 15,
+  building: 10,
+  equipment: 15,
+  furniture: 10,
+  computer: 40,
+  other: 10,
+};
+
+export const assets = pgTable("assets", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  purchaseDate: date("purchase_date").notNull(),
+  purchaseCost: decimal("purchase_cost", { precision: 14, scale: 2 }).notNull(),
+  salvageValue: decimal("salvage_value", { precision: 14, scale: 2 }).default("0"),
+  usefulLifeYears: integer("useful_life_years"),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const assetDepreciationLog = pgTable("asset_depreciation_log", {
+  id: serial("id").primaryKey(),
+  assetId: integer("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  financialYear: text("financial_year").notNull(),
+  openingValue: decimal("opening_value", { precision: 14, scale: 2 }).notNull(),
+  depreciationAmount: decimal("depreciation_amount", { precision: 14, scale: 2 }).notNull(),
+  closingValue: decimal("closing_value", { precision: 14, scale: 2 }).notNull(),
+  depreciationRate: decimal("depreciation_rate", { precision: 6, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+export type Asset = typeof assets.$inferSelect;
+
+export const insertAssetDepreciationLogSchema = createInsertSchema(assetDepreciationLog).omit({ id: true, createdAt: true });
+export type InsertAssetDepreciationLog = z.infer<typeof insertAssetDepreciationLogSchema>;
+export type AssetDepreciationLog = typeof assetDepreciationLog.$inferSelect;
+
+// ==================== Books: Liabilities ====================
+export const LIABILITY_CATEGORIES = ["bank_loan", "personal_loan", "vehicle_loan", "other"] as const;
+export const LIABILITY_TYPES = ["long_term", "short_term"] as const;
+
+export const liabilities = pgTable("liabilities", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  lenderName: text("lender_name"),
+  principalAmount: decimal("principal_amount", { precision: 14, scale: 2 }).notNull(),
+  interestRate: decimal("interest_rate", { precision: 6, scale: 2 }).default("0"),
+  startDate: date("start_date").notNull(),
+  tenureMonths: integer("tenure_months"),
+  type: text("type").notNull().default("short_term"),
+  remarks: text("remarks"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const liabilityPayments = pgTable("liability_payments", {
+  id: serial("id").primaryKey(),
+  liabilityId: integer("liability_id").notNull().references(() => liabilities.id, { onDelete: "cascade" }),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  paymentDate: date("payment_date").notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  principalPortion: decimal("principal_portion", { precision: 14, scale: 2 }).default("0"),
+  interestPortion: decimal("interest_portion", { precision: 14, scale: 2 }).default("0"),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLiabilitySchema = createInsertSchema(liabilities).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLiability = z.infer<typeof insertLiabilitySchema>;
+export type Liability = typeof liabilities.$inferSelect;
+
+export const insertLiabilityPaymentSchema = createInsertSchema(liabilityPayments).omit({ id: true, createdAt: true });
+export type InsertLiabilityPayment = z.infer<typeof insertLiabilityPaymentSchema>;
+export type LiabilityPayment = typeof liabilityPayments.$inferSelect;
+
 // ==================== Demo Videos ====================
 export const demoVideos = pgTable("demo_videos", {
   id: serial("id").primaryKey(),

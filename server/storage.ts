@@ -34,7 +34,11 @@ import {
   type SeedTransactionWithItems,
   type SeedTransactionEditHistory,
   demoVideos, type DemoVideo, type InsertDemoVideo,
-  aadhatPaymentAllocations, type AadhatPaymentAllocation
+  aadhatPaymentAllocations, type AadhatPaymentAllocation,
+  assets, type Asset, type InsertAsset,
+  assetDepreciationLog, type AssetDepreciationLog, type InsertAssetDepreciationLog,
+  liabilities, type Liability, type InsertLiability,
+  liabilityPayments, type LiabilityPayment, type InsertLiabilityPayment
 } from "@shared/schema";
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
@@ -291,6 +295,25 @@ export interface IStorage {
   createDemoVideo(data: InsertDemoVideo): Promise<DemoVideo>;
   updateDemoVideoCaption(id: number, caption: string): Promise<DemoVideo | undefined>;
   deleteDemoVideo(id: number): Promise<void>;
+
+  // Books: Asset operations
+  getAssets(merchantId: number): Promise<Asset[]>;
+  getAssetById(id: number, merchantId: number): Promise<Asset | undefined>;
+  createAsset(data: InsertAsset): Promise<Asset>;
+  updateAsset(id: number, merchantId: number, data: Partial<Asset>): Promise<Asset | undefined>;
+  deleteAsset(id: number, merchantId: number): Promise<void>;
+  getDepreciationLogs(merchantId: number, assetId?: number, financialYear?: string): Promise<AssetDepreciationLog[]>;
+  createDepreciationLog(data: InsertAssetDepreciationLog): Promise<AssetDepreciationLog>;
+
+  // Books: Liability operations
+  getLiabilities(merchantId: number): Promise<Liability[]>;
+  getLiabilityById(id: number, merchantId: number): Promise<Liability | undefined>;
+  createLiability(data: InsertLiability): Promise<Liability>;
+  updateLiability(id: number, merchantId: number, data: Partial<Liability>): Promise<Liability | undefined>;
+  deleteLiability(id: number, merchantId: number): Promise<void>;
+  getLiabilityPayments(liabilityId: number, merchantId: number): Promise<LiabilityPayment[]>;
+  createLiabilityPayment(data: InsertLiabilityPayment): Promise<LiabilityPayment>;
+  deleteLiabilityPayment(id: number, merchantId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4331,6 +4354,77 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDemoVideo(id: number): Promise<void> {
     await db.delete(demoVideos).where(eq(demoVideos.id, id));
+  }
+
+  async getAssets(merchantId: number): Promise<Asset[]> {
+    return db.select().from(assets).where(eq(assets.merchantId, merchantId)).orderBy(desc(assets.createdAt));
+  }
+
+  async getAssetById(id: number, merchantId: number): Promise<Asset | undefined> {
+    const [asset] = await db.select().from(assets).where(and(eq(assets.id, id), eq(assets.merchantId, merchantId)));
+    return asset;
+  }
+
+  async createAsset(data: InsertAsset): Promise<Asset> {
+    const [created] = await db.insert(assets).values(data).returning();
+    return created;
+  }
+
+  async updateAsset(id: number, merchantId: number, data: Partial<Asset>): Promise<Asset | undefined> {
+    const [updated] = await db.update(assets).set({ ...data, updatedAt: new Date() }).where(and(eq(assets.id, id), eq(assets.merchantId, merchantId))).returning();
+    return updated;
+  }
+
+  async deleteAsset(id: number, merchantId: number): Promise<void> {
+    await db.delete(assets).where(and(eq(assets.id, id), eq(assets.merchantId, merchantId)));
+  }
+
+  async getDepreciationLogs(merchantId: number, assetId?: number, financialYear?: string): Promise<AssetDepreciationLog[]> {
+    const conditions = [eq(assetDepreciationLog.merchantId, merchantId)];
+    if (assetId) conditions.push(eq(assetDepreciationLog.assetId, assetId));
+    if (financialYear) conditions.push(eq(assetDepreciationLog.financialYear, financialYear));
+    return db.select().from(assetDepreciationLog).where(and(...conditions)).orderBy(desc(assetDepreciationLog.financialYear));
+  }
+
+  async createDepreciationLog(data: InsertAssetDepreciationLog): Promise<AssetDepreciationLog> {
+    const [created] = await db.insert(assetDepreciationLog).values(data).returning();
+    return created;
+  }
+
+  async getLiabilities(merchantId: number): Promise<Liability[]> {
+    return db.select().from(liabilities).where(eq(liabilities.merchantId, merchantId)).orderBy(desc(liabilities.createdAt));
+  }
+
+  async getLiabilityById(id: number, merchantId: number): Promise<Liability | undefined> {
+    const [liability] = await db.select().from(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.merchantId, merchantId)));
+    return liability;
+  }
+
+  async createLiability(data: InsertLiability): Promise<Liability> {
+    const [created] = await db.insert(liabilities).values(data).returning();
+    return created;
+  }
+
+  async updateLiability(id: number, merchantId: number, data: Partial<Liability>): Promise<Liability | undefined> {
+    const [updated] = await db.update(liabilities).set({ ...data, updatedAt: new Date() }).where(and(eq(liabilities.id, id), eq(liabilities.merchantId, merchantId))).returning();
+    return updated;
+  }
+
+  async deleteLiability(id: number, merchantId: number): Promise<void> {
+    await db.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.merchantId, merchantId)));
+  }
+
+  async getLiabilityPayments(liabilityId: number, merchantId: number): Promise<LiabilityPayment[]> {
+    return db.select().from(liabilityPayments).where(and(eq(liabilityPayments.liabilityId, liabilityId), eq(liabilityPayments.merchantId, merchantId))).orderBy(desc(liabilityPayments.paymentDate));
+  }
+
+  async createLiabilityPayment(data: InsertLiabilityPayment): Promise<LiabilityPayment> {
+    const [created] = await db.insert(liabilityPayments).values(data).returning();
+    return created;
+  }
+
+  async deleteLiabilityPayment(id: number, merchantId: number): Promise<void> {
+    await db.delete(liabilityPayments).where(and(eq(liabilityPayments.id, id), eq(liabilityPayments.merchantId, merchantId)));
   }
 }
 

@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
@@ -4796,6 +4796,396 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting demo video:", error);
       res.status(500).json({ message: "Failed to delete video" });
+    }
+  });
+
+  // ==================== Books: Asset Routes ====================
+  app.get("/api/assets", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const assetsList = await storage.getAssets(merchantId);
+      const depLogs = await storage.getDepreciationLogs(merchantId);
+      const enriched = assetsList.map(a => {
+        const logs = depLogs.filter(d => d.assetId === a.id);
+        const totalDepreciation = logs.reduce((sum, d) => sum + parseFloat(d.depreciationAmount), 0);
+        const currentBookValue = parseFloat(a.purchaseCost) - totalDepreciation;
+        return { ...a, depreciationLogs: logs, totalDepreciation, currentBookValue };
+      });
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching assets:", error);
+      res.status(500).json({ message: "Failed to fetch assets" });
+    }
+  });
+
+  app.post("/api/assets", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const data = insertAssetSchema.parse({ ...req.body, merchantId });
+      const asset = await storage.createAsset(data);
+      res.json(asset);
+    } catch (error) {
+      console.error("Error creating asset:", error);
+      res.status(500).json({ message: "Failed to create asset" });
+    }
+  });
+
+  app.patch("/api/assets/:id", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateAsset(id, merchantId, req.body);
+      if (!updated) return res.status(404).json({ message: "Asset not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating asset:", error);
+      res.status(500).json({ message: "Failed to update asset" });
+    }
+  });
+
+  app.delete("/api/assets/:id", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const id = parseInt(req.params.id);
+      await storage.deleteAsset(id, merchantId);
+      res.json({ message: "Asset deleted" });
+    } catch (error) {
+      console.error("Error deleting asset:", error);
+      res.status(500).json({ message: "Failed to delete asset" });
+    }
+  });
+
+  app.get("/api/assets/:id/depreciation", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const assetId = parseInt(req.params.id);
+      const logs = await storage.getDepreciationLogs(merchantId, assetId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching depreciation logs:", error);
+      res.status(500).json({ message: "Failed to fetch depreciation logs" });
+    }
+  });
+
+  app.post("/api/assets/:id/depreciate", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const assetId = parseInt(req.params.id);
+      const { financialYear } = req.body;
+      if (!financialYear) return res.status(400).json({ message: "Financial year is required" });
+
+      const asset = await storage.getAssetById(assetId, merchantId);
+      if (!asset) return res.status(404).json({ message: "Asset not found" });
+
+      const existingLogs = await storage.getDepreciationLogs(merchantId, assetId, financialYear);
+      if (existingLogs.length > 0) return res.status(400).json({ message: "Depreciation already calculated for this FY" });
+
+      const allLogs = await storage.getDepreciationLogs(merchantId, assetId);
+      const totalPriorDep = allLogs.reduce((sum, d) => sum + parseFloat(d.depreciationAmount), 0);
+      const openingValue = parseFloat(asset.purchaseCost) - totalPriorDep;
+      const salvage = parseFloat(asset.salvageValue || "0");
+
+      if (openingValue <= salvage) {
+        return res.status(400).json({ message: "Asset fully depreciated" });
+      }
+
+      const rate = ASSET_DEPRECIATION_RATES[asset.category] || 10;
+      let depAmount = (openingValue * rate) / 100;
+      if (openingValue - depAmount < salvage) {
+        depAmount = openingValue - salvage;
+      }
+      const closingValue = openingValue - depAmount;
+
+      const log = await storage.createDepreciationLog({
+        assetId,
+        merchantId,
+        financialYear,
+        openingValue: openingValue.toFixed(2),
+        depreciationAmount: depAmount.toFixed(2),
+        closingValue: closingValue.toFixed(2),
+        depreciationRate: rate.toFixed(2),
+      });
+      res.json(log);
+    } catch (error) {
+      console.error("Error calculating depreciation:", error);
+      res.status(500).json({ message: "Failed to calculate depreciation" });
+    }
+  });
+
+  // ==================== Books: Liability Routes ====================
+  app.get("/api/liabilities", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const liabilitiesList = await storage.getLiabilities(merchantId);
+      const enriched = await Promise.all(liabilitiesList.map(async (l) => {
+        const payments = await storage.getLiabilityPayments(l.id, merchantId);
+        const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        const totalPrincipalPaid = payments.reduce((sum, p) => sum + parseFloat(p.principalPortion || "0"), 0);
+        const remainingBalance = parseFloat(l.principalAmount) - totalPrincipalPaid;
+        return { ...l, payments, totalPaid, totalPrincipalPaid, remainingBalance };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching liabilities:", error);
+      res.status(500).json({ message: "Failed to fetch liabilities" });
+    }
+  });
+
+  app.post("/api/liabilities", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const data = insertLiabilitySchema.parse({ ...req.body, merchantId });
+      const liability = await storage.createLiability(data);
+      res.json(liability);
+    } catch (error) {
+      console.error("Error creating liability:", error);
+      res.status(500).json({ message: "Failed to create liability" });
+    }
+  });
+
+  app.patch("/api/liabilities/:id", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateLiability(id, merchantId, req.body);
+      if (!updated) return res.status(404).json({ message: "Liability not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating liability:", error);
+      res.status(500).json({ message: "Failed to update liability" });
+    }
+  });
+
+  app.delete("/api/liabilities/:id", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const id = parseInt(req.params.id);
+      await storage.deleteLiability(id, merchantId);
+      res.json({ message: "Liability deleted" });
+    } catch (error) {
+      console.error("Error deleting liability:", error);
+      res.status(500).json({ message: "Failed to delete liability" });
+    }
+  });
+
+  app.get("/api/liabilities/:id/payments", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const liabilityId = parseInt(req.params.id);
+      const payments = await storage.getLiabilityPayments(liabilityId, merchantId);
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching liability payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  app.post("/api/liabilities/:id/payments", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const liabilityId = parseInt(req.params.id);
+      const data = insertLiabilityPaymentSchema.parse({ ...req.body, liabilityId, merchantId });
+      const payment = await storage.createLiabilityPayment(data);
+      res.json(payment);
+    } catch (error) {
+      console.error("Error creating liability payment:", error);
+      res.status(500).json({ message: "Failed to create payment" });
+    }
+  });
+
+  app.delete("/api/liabilities/payments/:id", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const id = parseInt(req.params.id);
+      await storage.deleteLiabilityPayment(id, merchantId);
+      res.json({ message: "Payment deleted" });
+    } catch (error) {
+      console.error("Error deleting liability payment:", error);
+      res.status(500).json({ message: "Failed to delete payment" });
+    }
+  });
+
+  // ==================== Books: Balance Sheet ====================
+  app.get("/api/books/balance-sheet", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const fy = req.query.fy as string;
+      if (!fy) return res.status(400).json({ message: "Financial year (fy) is required" });
+
+      const [fyStartYear] = fy.split("-").map(Number);
+      const fyStartDate = `${fyStartYear}-04-01`;
+      const fyEndDate = `${fyStartYear + 1}-03-31`;
+
+      const assetsList = await storage.getAssets(merchantId);
+      const allDepLogs = await storage.getDepreciationLogs(merchantId);
+
+      let fixedAssetsGross = 0;
+      let accumulatedDepreciation = 0;
+      const fixedAssetDetails: any[] = [];
+      for (const a of assetsList) {
+        const cost = parseFloat(a.purchaseCost);
+        const logsUpToFY = allDepLogs.filter(d => d.assetId === a.id && d.financialYear <= fy);
+        const totalDep = logsUpToFY.reduce((sum, d) => sum + parseFloat(d.depreciationAmount), 0);
+        fixedAssetsGross += cost;
+        accumulatedDepreciation += totalDep;
+        fixedAssetDetails.push({ name: a.name, category: a.category, cost, depreciation: totalDep, bookValue: cost - totalDep });
+      }
+
+      const cashSettingsData = await storage.getCashSettings(merchantId, fy);
+      const openingCash = parseFloat(cashSettingsData?.openingCashInHand || "0");
+      const openingAccount = parseFloat(cashSettingsData?.openingCashInAccount || "0");
+
+      const cashEntries = await storage.getCashEntriesByMerchant(merchantId);
+      const fyEntries = cashEntries.filter(e => {
+        const d = e.entryDate;
+        return d >= fyStartDate && d <= fyEndDate && !e.isReversed;
+      });
+
+      let cashInHand = openingCash;
+      let bankBalance = openingAccount;
+      for (const e of fyEntries) {
+        const amt = parseFloat(e.amount);
+        if (e.direction === "inward") {
+          if (e.receiptType === "cash_received") cashInHand += amt;
+          else if (e.receiptType === "account_received") bankBalance += amt;
+        } else if (e.direction === "outflow") {
+          if (e.paymentMode === "cash") cashInHand -= amt;
+          else if (e.paymentMode === "account_transfer") bankBalance -= amt;
+        } else if (e.direction === "transfer") {
+          if (e.fromAccountType === "cash_in_hand") cashInHand -= amt;
+          if (e.toAccountType === "cash_in_hand") cashInHand += amt;
+        }
+      }
+
+      const bankAccounts = await storage.getBankAccountsByMerchant(merchantId);
+      const bankAccountBalances: any[] = [];
+      let totalBankBalance = 0;
+      if (bankAccounts.length > 0) {
+        for (const acct of bankAccounts) {
+          let bal = parseFloat(acct.openingBalance || "0");
+          for (const e of fyEntries) {
+            const amt = parseFloat(e.amount);
+            if (e.direction === "inward" && e.receiptType === "account_received" && e.bankAccountId === acct.id) bal += amt;
+            if (e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === acct.id) bal -= amt;
+            if (e.direction === "transfer" && e.toBankAccountId === acct.id) bal += amt;
+            if (e.direction === "transfer" && e.fromBankAccountId === acct.id) bal -= amt;
+          }
+          bankAccountBalances.push({ name: acct.name, balance: bal });
+          totalBankBalance += bal;
+        }
+      } else {
+        totalBankBalance = bankBalance;
+      }
+
+      const buyers = await storage.getBuyersByMerchant(merchantId);
+      const buyerReceivables = buyers.reduce((sum, b) => sum + parseFloat(b.receivableBalance || "0"), 0);
+
+      const farmers = await storage.getFarmersByMerchant(merchantId);
+      const farmerReceivables = farmers.reduce((sum, f) => sum + parseFloat(f.remainingReceivable || "0"), 0);
+      const farmerPayables = farmers.reduce((sum, f) => sum + parseFloat(f.pyPayable || "0"), 0);
+
+      const liabilitiesList = await storage.getLiabilities(merchantId);
+      let longTermLiabilities = 0;
+      let shortTermLiabilities = 0;
+      const liabilityDetails: any[] = [];
+      for (const l of liabilitiesList) {
+        if (!l.isActive) continue;
+        const payments = await storage.getLiabilityPayments(l.id, merchantId);
+        const principalPaid = payments.reduce((sum, p) => sum + parseFloat(p.principalPortion || "0"), 0);
+        const remaining = parseFloat(l.principalAmount) - principalPaid;
+        if (remaining <= 0) continue;
+        if (l.type === "long_term") longTermLiabilities += remaining;
+        else shortTermLiabilities += remaining;
+        liabilityDetails.push({ name: l.name, type: l.type, remaining });
+      }
+
+      const fixedAssetsNet = fixedAssetsGross - accumulatedDepreciation;
+      const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables;
+      const totalAssets = fixedAssetsNet + currentAssets;
+      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables;
+      const ownersEquity = totalAssets - totalLiabilities;
+
+      res.json({
+        financialYear: fy,
+        assets: {
+          fixedAssets: { gross: fixedAssetsGross, depreciation: accumulatedDepreciation, net: fixedAssetsNet, details: fixedAssetDetails },
+          currentAssets: { cashInHand, bankBalances: bankAccounts.length > 0 ? bankAccountBalances : [{ name: "Bank Account", balance: bankBalance }], totalBankBalance, buyerReceivables, farmerReceivables, total: currentAssets },
+          totalAssets,
+        },
+        liabilities: {
+          longTerm: { total: longTermLiabilities, details: liabilityDetails.filter(l => l.type === "long_term") },
+          shortTerm: { total: shortTermLiabilities, details: liabilityDetails.filter(l => l.type === "short_term") },
+          currentLiabilities: { farmerPayables },
+          totalLiabilities,
+        },
+        ownersEquity,
+        balanceCheck: Math.abs(totalAssets - (totalLiabilities + ownersEquity)) < 0.01,
+      });
+    } catch (error) {
+      console.error("Error generating balance sheet:", error);
+      res.status(500).json({ message: "Failed to generate balance sheet" });
+    }
+  });
+
+  // ==================== Books: Profit & Loss ====================
+  app.get("/api/books/profit-loss", requireAuth, async (req, res) => {
+    try {
+      const merchantId = (req.user as any).merchantId;
+      const fy = req.query.fy as string;
+      if (!fy) return res.status(400).json({ message: "Financial year (fy) is required" });
+
+      const [fyStartYear] = fy.split("-").map(Number);
+      const fyStartDate = `${fyStartYear}-04-01`;
+      const fyEndDate = `${fyStartYear + 1}-03-31`;
+
+      const cashEntries = await storage.getCashEntriesByMerchant(merchantId);
+      const fyEntries = cashEntries.filter(e => {
+        const d = e.entryDate;
+        return d >= fyStartDate && d <= fyEndDate && !e.isReversed;
+      });
+
+      const revenueByType: Record<string, number> = {};
+      const expenseByType: Record<string, number> = {};
+
+      for (const e of fyEntries) {
+        const amt = parseFloat(e.amount);
+        if (e.direction === "inward" && e.revenueType) {
+          revenueByType[e.revenueType] = (revenueByType[e.revenueType] || 0) + amt;
+        } else if (e.direction === "outflow" && e.expenseType) {
+          expenseByType[e.expenseType] = (expenseByType[e.expenseType] || 0) + amt;
+        }
+      }
+
+      const depLogs = await storage.getDepreciationLogs(merchantId, undefined, fy);
+      const totalDepreciation = depLogs.reduce((sum, d) => sum + parseFloat(d.depreciationAmount), 0);
+      if (totalDepreciation > 0) {
+        expenseByType["depreciation"] = totalDepreciation;
+      }
+
+      const liabilitiesList = await storage.getLiabilities(merchantId);
+      let liabilityInterest = 0;
+      for (const l of liabilitiesList) {
+        const payments = await storage.getLiabilityPayments(l.id, merchantId);
+        const fyPayments = payments.filter(p => p.paymentDate >= fyStartDate && p.paymentDate <= fyEndDate);
+        liabilityInterest += fyPayments.reduce((sum, p) => sum + parseFloat(p.interestPortion || "0"), 0);
+      }
+      if (liabilityInterest > 0) {
+        expenseByType["interest_on_loans"] = liabilityInterest;
+      }
+
+      const totalRevenue = Object.values(revenueByType).reduce((a, b) => a + b, 0);
+      const totalExpenses = Object.values(expenseByType).reduce((a, b) => a + b, 0);
+      const netProfitLoss = totalRevenue - totalExpenses;
+
+      res.json({
+        financialYear: fy,
+        revenue: { byType: revenueByType, total: totalRevenue },
+        expenses: { byType: expenseByType, total: totalExpenses },
+        netProfitLoss,
+      });
+    } catch (error) {
+      console.error("Error generating P&L:", error);
+      res.status(500).json({ message: "Failed to generate P&L" });
     }
   });
 
