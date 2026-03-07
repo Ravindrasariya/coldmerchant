@@ -175,6 +175,16 @@ When paying a supplier:
 - date-fns for date manipulation
 - Lucide React for icons
 
+### Books (Financial Statements)
+The Books feature provides simplified accounting views:
+- **Asset Register**: CRUD for fixed assets (vehicles, buildings, equipment, furniture, computers, other) with per-FY depreciation calculation using standard Indian rates (WDV method). Depreciation logs stored in `asset_depreciation_log` table.
+- **Liability Register**: CRUD for loans/debts with payment tracking. Each liability has category, lender, principal, interest rate, type (long/short term). Payments recorded with principal/interest split.
+- **Balance Sheet**: Auto-generated for selected FY. Assets = Fixed (after depreciation) + Current (cash, bank, buyer receivables, farmer receivables). Liabilities = Long-term + Short-term + Farmer payables. Owner's Equity = Assets - Liabilities.
+- **Profit & Loss**: Auto-generated for selected FY. Revenue from cash inward entries by revenueType. Expenses from cash outflow entries by expenseType + depreciation + loan interest. Shows net profit/loss.
+- All financial reports are derived (computed on the fly), never stored.
+- FY selector allows viewing any year (Indian FY: April–March).
+- Tables: `assets`, `asset_depreciation_log`, `liabilities`, `liability_payments`
+
 ### Demo Videos
 - multer for video file uploads (disk storage in uploads/ directory)
 - Admin uploads/manages videos via /api/admin/demo-videos endpoints

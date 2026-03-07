@@ -40,7 +40,8 @@ import {
   Wheat,
   Phone,
   LayoutDashboard,
-  PlayCircle
+  PlayCircle,
+  BookOpen
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -50,6 +51,7 @@ import BuyersTab from "@/components/buyers/buyers-tab";
 import AadhatLedgerTab from "@/components/aadhat/aadhat-ledger-tab";
 import { DashboardTab } from "@/components/dashboard/dashboard-tab";
 import { DemoVideosTab } from "@/components/demo-videos/demo-videos-tab";
+import { BooksTab } from "@/components/books/books-tab";
 
 export default function HomePage() {
   const [, setLocation] = useLocation();
@@ -232,6 +234,14 @@ export default function HomePage() {
                   {t("Aadhat", "आढ़त")}
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="books" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-books"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  {t("Books", "बुक्स")}
+                </TabsTrigger>
+                <TabsTrigger 
                   value="demo-videos" 
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-demo-videos"
@@ -392,6 +402,15 @@ export default function HomePage() {
                           {t("Aadhat", "आढ़त")}
                         </TabsTrigger>
                         <TabsTrigger 
+                          value="books" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-books-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <BookOpen className="h-4 w-4" />
+                          {t("Books", "बुक्स")}
+                        </TabsTrigger>
+                        <TabsTrigger 
                           value="demo-videos" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-demo-videos-mobile"
@@ -512,6 +531,10 @@ export default function HomePage() {
 
           <div className={activeTab === "aadhat" ? "block" : "hidden"}>
             <AadhatLedgerTab />
+          </div>
+
+          <div className={activeTab === "books" ? "block" : "hidden"}>
+            <BooksTab />
           </div>
 
           <div className={activeTab === "demo-videos" ? "block" : "hidden"}>
