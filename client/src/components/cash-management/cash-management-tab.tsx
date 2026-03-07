@@ -1032,6 +1032,7 @@ export function CashManagementTab() {
   const getExpenseTypeLabel = (type: string) => {
     switch (type) {
       case "aadhtiya": return t("Aadhtiya", "आढ़तिया");
+      case "bag_charges": return t("Bag Charges", "बोरी शुल्क");
       case "cold_store_charge": return t("Cold Store Charge", "शीत भंडार शुल्क");
       case "farmer": return t("Farmer - Harvest", "किसान - फसल");
       case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");
@@ -1040,8 +1041,11 @@ export function CashManagementTab() {
       case "general_expense": return t("General Expense", "सामान्य खर्च");
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
+      case "kata_charges": return t("Kata Charges", "काटा शुल्क");
+      case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
+      case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
       default: return type;
     }
   };
@@ -2721,6 +2725,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
   const getExpenseTypeLabel = (type: string | null) => {
     switch (type) {
       case "aadhtiya": return t("Aadhtiya", "आढ़तिया");
+      case "bag_charges": return t("Bag Charges", "बोरी शुल्क");
       case "cold_store_charge": return t("Cold Store", "शीत भंडार");
       case "farmer": return t("Farmer - Harvest", "किसान - फसल");
       case "farmer_advance": return t("Farmer Advance", "किसान अग्रिम");
@@ -2729,8 +2734,11 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       case "general_expense": return t("General", "सामान्य");
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
+      case "kata_charges": return t("Kata Charges", "काटा शुल्क");
+      case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
+      case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
       default: return type || "";
     }
   };
