@@ -33,11 +33,11 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
       seedLots: [
         {
           coldStoreName: "",
-          originalBags: 0,
+          originalBags: "" as any,
           potatoType: "",
           bagType: "",
           size: "",
-          pricePerBag: 0,
+          pricePerBag: "" as any,
           coldStoreChargesPerBag: undefined,
           remarks: "",
         },
@@ -78,11 +78,11 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
   const handleAddLot = () => {
     appendLot({
       coldStoreName: "",
-      originalBags: 0,
+      originalBags: "" as any,
       potatoType: "",
       bagType: "",
       size: "",
-      pricePerBag: 0,
+      pricePerBag: "" as any,
       coldStoreChargesPerBag: undefined,
       remarks: "",
     });
