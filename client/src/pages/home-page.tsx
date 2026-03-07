@@ -55,7 +55,11 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
   const { user, logoutMutation, changePasswordMutation } = useAuth();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTabState] = useState(() => localStorage.getItem("vyapar_activeTab") || "dashboard");
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    localStorage.setItem("vyapar_activeTab", tab);
+  };
   const [seedDownloadDialogOpen, setSeedDownloadDialogOpen] = useState(false);
   const [rawDownloadDialogOpen, setRawDownloadDialogOpen] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);

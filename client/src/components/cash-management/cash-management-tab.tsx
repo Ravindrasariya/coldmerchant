@@ -327,7 +327,11 @@ type TransferFormValues = z.infer<typeof transferFormSchema>;
 export function CashManagementTab() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"inward" | "outflow" | "transfer">("inward");
+  const [activeTab, setActiveTabState] = useState<"inward" | "outflow" | "transfer">(() => (localStorage.getItem("vyapar_cashActiveTab") as "inward" | "outflow" | "transfer") || "inward");
+  const setActiveTab = (tab: "inward" | "outflow" | "transfer") => {
+    setActiveTabState(tab);
+    localStorage.setItem("vyapar_cashActiveTab", tab);
+  };
   
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false);

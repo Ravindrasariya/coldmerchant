@@ -14,7 +14,11 @@ interface SeedSectionProps {
 
 export function SeedSection({ seedDownloadDialogOpen, setSeedDownloadDialogOpen }: SeedSectionProps) {
   const { t } = useLanguage();
-  const [activeSeedTab, setActiveSeedTab] = useState("seed-stock-entry");
+  const [activeSeedTab, setActiveSeedTabState] = useState(() => localStorage.getItem("vyapar_activeSeedTab") || "seed-stock-entry");
+  const setActiveSeedTab = (tab: string) => {
+    setActiveSeedTabState(tab);
+    localStorage.setItem("vyapar_activeSeedTab", tab);
+  };
   const [seedTxnDownloadDialogOpen, setSeedTxnDownloadDialogOpen] = useState(false);
 
   return (
