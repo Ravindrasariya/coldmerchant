@@ -33,7 +33,7 @@ import { CashSettingsDialog } from "./cash-settings-dialog";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES } from "@shared/schema";
+import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES, ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
 
 interface CashEntry {
   id: number;
@@ -60,6 +60,10 @@ interface CashEntry {
   supplierName: string | null;
   aadhatName: string | null;
   aadhatDbId: number | null;
+  expenseCategory: string | null;
+  capitalAssetName: string | null;
+  capitalAssetCategory: string | null;
+  capitalAssetId: number | null;
   amount: string;
   entryDate: string;
   remarks: string | null;
@@ -253,7 +257,8 @@ const inwardFormSchema = z.object({
 });
 
 const outflowFormSchema = z.object({
-  expenseType: z.string().min(1, "Expense type is required"),
+  expenseCategory: z.string().default("revenue"),
+  expenseType: z.string().optional().default(""),
   paymentMode: z.string().min(1, "Payment mode is required"),
   bankAccountId: z.coerce.number().optional(),
   farmerName: z.string().optional(),
@@ -261,38 +266,64 @@ const outflowFormSchema = z.object({
   supplierName: z.string().optional(),
   aadhatName: z.string().optional(),
   aadhatDbId: z.coerce.number().optional(),
+  capitalAssetName: z.string().optional(),
+  capitalAssetCategory: z.string().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative").optional().default(0),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
-  const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
-  if (farmerExpenseTypes.includes(data.expenseType) && (!data.farmerName || data.farmerName.length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Farmer name is required",
-      path: ["farmerName"],
-    });
-  }
-  if (data.expenseType === "cold_store_charge" && (!data.coldStoreName || data.coldStoreName.length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Cold store name is required",
-      path: ["coldStoreName"],
-    });
-  }
-  if (data.expenseType === "supplier" && (!data.supplierName || data.supplierName.length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Supplier name is required",
-      path: ["supplierName"],
-    });
-  }
-  if (data.expenseType === "aadhtiya" && (!data.aadhatName || data.aadhatName.length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Aadhtiya name is required",
-      path: ["aadhatName"],
-    });
+  if (data.expenseCategory === "capital") {
+    if (!data.capitalAssetName || data.capitalAssetName.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Asset name is required",
+        path: ["capitalAssetName"],
+      });
+    }
+    if (!data.capitalAssetCategory || data.capitalAssetCategory.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Asset category is required",
+        path: ["capitalAssetCategory"],
+      });
+    }
+  } else {
+    if (!data.expenseType || data.expenseType.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Expense type is required",
+        path: ["expenseType"],
+      });
+    }
+    const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
+    if (data.expenseType && farmerExpenseTypes.includes(data.expenseType) && (!data.farmerName || data.farmerName.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Farmer name is required",
+        path: ["farmerName"],
+      });
+    }
+    if (data.expenseType === "cold_store_charge" && (!data.coldStoreName || data.coldStoreName.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Cold store name is required",
+        path: ["coldStoreName"],
+      });
+    }
+    if (data.expenseType === "supplier" && (!data.supplierName || data.supplierName.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Supplier name is required",
+        path: ["supplierName"],
+      });
+    }
+    if (data.expenseType === "aadhtiya" && (!data.aadhatName || data.aadhatName.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Aadhtiya name is required",
+        path: ["aadhatName"],
+      });
+    }
   }
   if (data.paymentMode === "account_transfer" && !data.bankAccountId) {
     ctx.addIssue({
@@ -483,6 +514,7 @@ export function CashManagementTab() {
   const outflowForm = useForm<OutflowFormValues>({
     resolver: zodResolver(outflowFormSchema),
     defaultValues: {
+      expenseCategory: "revenue",
       expenseType: "",
       paymentMode: "cash",
       bankAccountId: undefined,
@@ -491,6 +523,8 @@ export function CashManagementTab() {
       supplierName: "",
       aadhatName: "",
       aadhatDbId: undefined,
+      capitalAssetName: "",
+      capitalAssetCategory: "",
       amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -568,6 +602,7 @@ export function CashManagementTab() {
         });
       } else if (activeTab === "outflow") {
         outflowForm.reset({
+          expenseCategory: "revenue",
           expenseType: "",
           paymentMode: "cash",
           farmerName: "",
@@ -575,6 +610,8 @@ export function CashManagementTab() {
           supplierName: "",
           aadhatName: "",
           aadhatDbId: undefined,
+          capitalAssetName: "",
+          capitalAssetCategory: "",
           amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -600,6 +637,8 @@ export function CashManagementTab() {
   });
 
   const expenseType = outflowForm.watch("expenseType");
+  const expenseCategory = outflowForm.watch("expenseCategory");
+  const capitalAssetCategory = outflowForm.watch("capitalAssetCategory");
 
   // State for searchable expense type popover
   const [expenseTypePopoverOpen, setExpenseTypePopoverOpen] = useState(false);
@@ -789,13 +828,15 @@ export function CashManagementTab() {
   };
 
   const onOutflowSubmit = (values: OutflowFormValues) => {
+    const isCapital = values.expenseCategory === "capital";
+    const effectiveExpenseType = isCapital ? "capital_expense" : values.expenseType || "";
     const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
-    const isFarmerType = farmerExpenseTypes.includes(values.expenseType);
+    const isFarmerType = !isCapital && farmerExpenseTypes.includes(effectiveExpenseType);
     const selectedLedgerFarmerOut = isFarmerType
       ? ledgerFarmers.find(f => f.name.toLowerCase() === values.farmerName?.toLowerCase())
       : null;
     
-    const isAadhtiya = values.expenseType === "aadhtiya";
+    const isAadhtiya = !isCapital && effectiveExpenseType === "aadhtiya";
 
     if (isAadhtiya) {
       if (aadhatAllocations.length === 0) {
@@ -849,17 +890,20 @@ export function CashManagementTab() {
 
     const outflowData: any = {
       direction: "outflow",
-      expenseType: values.expenseType,
+      expenseType: effectiveExpenseType,
+      expenseCategory: isCapital ? "capital" : "revenue",
       paymentMode: values.paymentMode,
       bankAccountId: values.paymentMode === "account_transfer" ? values.bankAccountId : null,
       farmerName: isFarmerType ? values.farmerName : null,
       farmerVillage: selectedLedgerFarmerOut?.village || null,
       farmerContact: selectedLedgerFarmerOut?.contact || null,
       farmerId: selectedLedgerFarmerOut?.id || null,
-      coldStoreName: values.expenseType === "cold_store_charge" ? values.coldStoreName : null,
-      supplierName: values.expenseType === "supplier" ? values.supplierName : null,
+      coldStoreName: effectiveExpenseType === "cold_store_charge" ? values.coldStoreName : null,
+      supplierName: effectiveExpenseType === "supplier" ? values.supplierName : null,
       aadhatName: isAadhtiya ? values.aadhatName : null,
       aadhatDbId: selectedAadhat?.id || values.aadhatDbId || null,
+      capitalAssetName: isCapital ? values.capitalAssetName : null,
+      capitalAssetCategory: isCapital ? values.capitalAssetCategory : null,
       amount: isAadhtiya ? aadhatGrandTotalCash : values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
@@ -1066,7 +1110,22 @@ export function CashManagementTab() {
       case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
+      case "capital_expense": return t("Capital Expense", "पूंजीगत व्यय");
       default: return type;
+    }
+  };
+
+  const getAssetCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case "building": return t("Building", "भवन");
+      case "plant_machinery": return t("Plant & Machinery", "यंत्र एवं मशीनरी");
+      case "furniture": return t("Furniture & Fixtures", "फर्नीचर एवं जुड़नार");
+      case "vehicle": return t("Vehicles", "वाहन");
+      case "computer": return t("Computers", "कंप्यूटर");
+      case "electrical_fittings": return t("Electrical Fittings", "विद्युत फिटिंग");
+      case "equipment": return t("Equipment", "उपकरण");
+      case "other": return t("Other", "अन्य");
+      default: return cat;
     }
   };
 
@@ -1133,6 +1192,9 @@ export function CashManagementTab() {
       t("Cold Store", "शीत भंडार"),
       t("Supplier Name", "आपूर्तिकर्ता का नाम"),
       t("Aadhtiya Name", "आढ़तिया का नाम"),
+      t("Expense Category", "व्यय श्रेणी"),
+      t("Asset Name", "संपत्ति का नाम"),
+      t("Asset Category", "संपत्ति श्रेणी"),
       t("From Account", "स्रोत खाता"),
       t("To Account", "गंतव्य खाता"),
       t("Amount", "राशि"),
@@ -1157,6 +1219,9 @@ export function CashManagementTab() {
       entry.coldStoreName || "",
       entry.supplierName || "",
       entry.aadhatName || "",
+      entry.expenseCategory === "capital" ? t("Capital", "पूंजीगत") : entry.expenseCategory === "revenue" ? t("Revenue", "राजस्व") : "",
+      entry.capitalAssetName || "",
+      entry.capitalAssetCategory ? getAssetCategoryLabel(entry.capitalAssetCategory) : "",
       getFromAccountLabel(entry),
       getToAccountLabel(entry),
       entry.amount,
@@ -1299,6 +1364,22 @@ export function CashManagementTab() {
                       <div className="mt-2">
                         <Label className="text-xs text-muted-foreground">{t("Bank Account", "बैंक खाता")}</Label>
                         <p className="font-medium">{viewDetailsEntry.bankAccountName}</p>
+                      </div>
+                    )}
+                    {viewDetailsEntry.expenseType === "capital_expense" && (
+                      <div className="mt-2 grid grid-cols-2 gap-4">
+                        {viewDetailsEntry.capitalAssetName && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">{t("Asset Name", "संपत्ति का नाम")}</Label>
+                            <p className="font-medium">{viewDetailsEntry.capitalAssetName}</p>
+                          </div>
+                        )}
+                        {viewDetailsEntry.capitalAssetCategory && (
+                          <div>
+                            <Label className="text-xs text-muted-foreground">{t("Asset Category", "संपत्ति श्रेणी")}</Label>
+                            <p className="font-medium">{getAssetCategoryLabel(viewDetailsEntry.capitalAssetCategory)}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1968,6 +2049,96 @@ export function CashManagementTab() {
                 <form onSubmit={outflowForm.handleSubmit(onOutflowSubmit)} className="space-y-4">
                   <FormField
                     control={outflowForm.control}
+                    name="expenseCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("Expense Category", "व्यय श्रेणी")} *</FormLabel>
+                        <div className="flex gap-2" data-testid="expense-category-toggle">
+                          <Button
+                            type="button"
+                            variant={field.value === "revenue" ? "default" : "outline"}
+                            className="flex-1"
+                            onClick={() => {
+                              field.onChange("revenue");
+                              outflowForm.setValue("capitalAssetName", "");
+                              outflowForm.setValue("capitalAssetCategory", "");
+                            }}
+                            data-testid="btn-revenue-expense"
+                          >
+                            {t("Revenue Expense", "राजस्व व्यय")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "capital" ? "default" : "outline"}
+                            className="flex-1"
+                            onClick={() => {
+                              field.onChange("capital");
+                              outflowForm.setValue("expenseType", "");
+                            }}
+                            data-testid="btn-capital-expense"
+                          >
+                            {t("Capital Expense", "पूंजीगत व्यय")}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {expenseCategory === "capital" && (
+                    <>
+                      <FormField
+                        control={outflowForm.control}
+                        name="capitalAssetName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Asset Name", "संपत्ति का नाम")} *</FormLabel>
+                            <FormControl>
+                              <Input placeholder={t("Enter asset name", "संपत्ति का नाम दर्ज करें")} {...field} data-testid="input-capital-asset-name" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={outflowForm.control}
+                        name="capitalAssetCategory"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Asset Category", "संपत्ति श्रेणी")} *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-capital-asset-category">
+                                  <SelectValue placeholder={t("Select category", "श्रेणी चुनें")} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="building">{t("Building", "भवन")}</SelectItem>
+                                <SelectItem value="plant_machinery">{t("Plant & Machinery", "यंत्र एवं मशीनरी")}</SelectItem>
+                                <SelectItem value="furniture">{t("Furniture & Fixtures", "फर्नीचर एवं जुड़नार")}</SelectItem>
+                                <SelectItem value="vehicle">{t("Vehicles", "वाहन")}</SelectItem>
+                                <SelectItem value="computer">{t("Computers", "कंप्यूटर")}</SelectItem>
+                                <SelectItem value="electrical_fittings">{t("Electrical Fittings", "विद्युत फिटिंग")}</SelectItem>
+                                <SelectItem value="other">{t("Other", "अन्य")}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {capitalAssetCategory && (
+                        <div className="bg-muted/50 rounded-md p-3 text-sm" data-testid="depreciation-rate-display">
+                          <span className="text-muted-foreground">{t("Depreciation Rate", "मूल्यह्रास दर")}: </span>
+                          <span className="font-semibold">{ASSET_DEPRECIATION_RATES[capitalAssetCategory] || 10}%</span>
+                          <span className="text-muted-foreground ml-1">({t("per annum", "प्रति वर्ष")})</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {expenseCategory !== "capital" && (
+                  <FormField
+                    control={outflowForm.control}
                     name="expenseType"
                     render={({ field }) => (
                       <FormItem>
@@ -1992,7 +2163,7 @@ export function CashManagementTab() {
                               <CommandList>
                                 <CommandEmpty>{t("No type found", "कोई प्रकार नहीं मिला")}</CommandEmpty>
                                 <CommandGroup>
-                                  {EXPENSE_TYPES.map((type) => (
+                                  {EXPENSE_TYPES.filter(type => type !== "capital_expense").map((type) => (
                                     <CommandItem
                                       key={type}
                                       value={getExpenseTypeLabel(type)}
@@ -2014,6 +2185,7 @@ export function CashManagementTab() {
                       </FormItem>
                     )}
                   />
+                  )}
 
                   {expenseType === "aadhtiya" && (
                     <FormField

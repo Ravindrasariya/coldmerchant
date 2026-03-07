@@ -224,6 +224,10 @@ export const cashEntries = pgTable("cash_entries", {
   supplierName: text("supplier_name"), // For supplier outflow (seed stock suppliers)
   aadhatName: text("aadhat_name"), // For aadhtiya outflow
   aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // resolved aadhat ledger ID
+  expenseCategory: text("expense_category"), // "revenue" or "capital" for outflow
+  capitalAssetName: text("capital_asset_name"), // Asset name for capital expenses
+  capitalAssetCategory: text("capital_asset_category"), // Asset category for capital expenses
+  capitalAssetId: integer("capital_asset_id"), // Reference to auto-created asset in asset register
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
@@ -1102,7 +1106,7 @@ export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
 export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
-export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "pesticide_charges", "salary", "supplier", "warehouse_charges"] as const;
+export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "capital_expense", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "pesticide_charges", "salary", "supplier", "warehouse_charges"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 
@@ -1198,13 +1202,15 @@ export type SeedTransactionWithItems = SeedTransaction & {
 };
 
 // ==================== Books: Assets ====================
-export const ASSET_CATEGORIES = ["vehicle", "building", "equipment", "furniture", "computer", "other"] as const;
+export const ASSET_CATEGORIES = ["vehicle", "building", "equipment", "furniture", "computer", "plant_machinery", "electrical_fittings", "other"] as const;
 export const ASSET_DEPRECIATION_RATES: Record<string, number> = {
   vehicle: 15,
   building: 10,
   equipment: 15,
   furniture: 10,
   computer: 40,
+  plant_machinery: 15,
+  electrical_fittings: 10,
   other: 10,
 };
 

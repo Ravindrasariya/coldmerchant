@@ -24,6 +24,8 @@ const CATEGORY_LABELS: Record<string, [string, string]> = {
   equipment: ["Equipment", "उपकरण"],
   furniture: ["Furniture", "फर्नीचर"],
   computer: ["Computer", "कंप्यूटर"],
+  plant_machinery: ["Plant & Machinery", "यंत्र एवं मशीनरी"],
+  electrical_fittings: ["Electrical Fittings", "विद्युत फिटिंग"],
   other: ["Other", "अन्य"],
 };
 

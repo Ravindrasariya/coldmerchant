@@ -259,6 +259,7 @@ export interface IStorage {
   checkSeedRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
   resetSeasonStockEntries(merchantId: number): Promise<void>;
   
+  updateCashEntry(id: number, merchantId: number, data: Partial<CashEntry>): Promise<CashEntry | undefined>;
   // Cash Entry Reversal operations
   reverseCashEntry(cashEntryId: number, merchantId: number): Promise<CashEntry>;
   
@@ -3616,6 +3617,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(seedStockEntries.merchantId, merchantId));
   }
 
+  async updateCashEntry(id: number, merchantId: number, data: Partial<CashEntry>): Promise<CashEntry | undefined> {
+    const [updated] = await db.update(cashEntries).set(data).where(and(eq(cashEntries.id, id), eq(cashEntries.merchantId, merchantId))).returning();
+    return updated;
+  }
+
   async reverseCashEntry(cashEntryId: number, merchantId: number): Promise<CashEntry> {
     return await db.transaction(async (tx) => {
       // 1. Fetch the cash entry
@@ -3914,6 +3920,12 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
+      // 4g. Delete linked capital asset and its depreciation logs (for capital expense reversals)
+      if (entry.capitalAssetId) {
+        await tx.delete(assetDepreciationLog).where(eq(assetDepreciationLog.assetId, entry.capitalAssetId));
+        await tx.delete(assets).where(and(eq(assets.id, entry.capitalAssetId), eq(assets.merchantId, merchantId)));
+      }
+
       // 5. Mark the entry as reversed
       const [reversedEntry] = await tx.update(cashEntries)
         .set({ 

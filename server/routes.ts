@@ -2239,7 +2239,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2274,8 +2274,13 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya", "capital_expense"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
+        }
+        if (expenseType === "capital_expense") {
+          if (!capitalAssetName || !capitalAssetCategory) {
+            return res.status(400).json({ message: "Asset name and category are required for capital expenses" });
+          }
         }
         if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
           return res.status(400).json({ message: "Valid payment mode is required for outflow entries" });
@@ -2436,6 +2441,9 @@ export async function registerRoutes(
             supplierName: titleCase(supplierName) || null,
             aadhatName: expenseType === "aadhtiya" ? (aadhatName || null) : null,
             aadhatDbId: expenseType === "aadhtiya" ? resolvedAadhatDbId : null,
+            expenseCategory: expenseCategory || null,
+            capitalAssetName: capitalAssetName || null,
+            capitalAssetCategory: capitalAssetCategory || null,
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,
@@ -2449,6 +2457,25 @@ export async function registerRoutes(
         }
       }
       if (!createdEntry) throw new Error("Failed to generate unique cash code after multiple attempts");
+
+      if ((expenseCategory === "capital" || expenseType === "capital_expense") && capitalAssetName && capitalAssetCategory) {
+        const usefulLifeMap: Record<string, number> = {
+          vehicle: 7, building: 20, equipment: 7, furniture: 10,
+          computer: 3, plant_machinery: 7, electrical_fittings: 10, other: 5,
+        };
+        const asset = await storage.createAsset({
+          merchantId,
+          name: capitalAssetName,
+          category: capitalAssetCategory,
+          purchaseDate: entryDate,
+          purchaseCost: amount.toString(),
+          salvageValue: "0",
+          usefulLifeYears: usefulLifeMap[capitalAssetCategory] || 5,
+          remarks: `Auto-created from capital expense ${createdEntry.transactionCode}`,
+        });
+        await storage.updateCashEntry(createdEntry.id, merchantId, { capitalAssetId: asset.id });
+        createdEntry.capitalAssetId = asset.id;
+      }
       
       res.status(201).json(createdEntry);
     } catch (error) {
