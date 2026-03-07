@@ -5085,7 +5085,19 @@ export async function registerRoutes(
       }
 
       const buyers = await storage.getBuyersByMerchant(merchantId);
-      const buyerReceivables = buyers.reduce((sum, b) => sum + parseFloat(b.receivableBalance || "0"), 0);
+      const transactionList = await storage.getTransactionsByMerchant(merchantId);
+      let buyerReceivables = 0;
+      for (const buyer of buyers) {
+        let totalDue = 0;
+        for (const txn of transactionList) {
+          if (txn.buyerId === buyer.id) {
+            const revenue = parseFloat(txn.revenue || "0");
+            const amountReceived = parseFloat(txn.amountReceived || "0");
+            totalDue += Math.max(0, revenue - amountReceived);
+          }
+        }
+        buyerReceivables += totalDue + parseFloat(buyer.receivableBalance || "0");
+      }
 
       const farmers = await storage.getFarmersByMerchant(merchantId);
       const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
