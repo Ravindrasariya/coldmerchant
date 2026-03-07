@@ -179,7 +179,7 @@ When paying a supplier:
 The Books feature provides simplified accounting views:
 - **Asset Register**: CRUD for fixed assets (vehicles, buildings, equipment, furniture, computers, other) with per-FY depreciation calculation using standard Indian rates (WDV method). Depreciation logs stored in `asset_depreciation_log` table.
 - **Liability Register**: CRUD for loans/debts with payment tracking. Each liability has category, lender, principal, interest rate, type (long/short term). Payments recorded with principal/interest split.
-- **Balance Sheet**: Auto-generated for selected FY. Assets = Fixed (after depreciation) + Current (cash, bank, buyer receivables, farmer receivables). Liabilities = Long-term + Short-term + Farmer payables. Owner's Equity = Assets - Liabilities.
+- **Balance Sheet**: Auto-generated for selected FY. Assets = Fixed (after depreciation) + Current (cash, bank with positive balances only, buyer receivables, farmer receivables from netDue<0). Liabilities = Long-term + Short-term + Farmer payables (netDue>0) + Limit account overdrafts (negative bank balances). Owner's Equity = Assets - Liabilities. Farmer receivables/payables are computed from netDue = harvestDue - pyReceivable - seedDue per farmer.
 - **Profit & Loss**: Auto-generated for selected FY. Revenue from cash inward entries by revenueType. Expenses from cash outflow entries by expenseType + depreciation + loan interest. Shows net profit/loss.
 - All financial reports are derived (computed on the fly), never stored.
 - FY selector allows viewing any year (Indian FY: April–March).

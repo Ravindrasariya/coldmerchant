@@ -162,6 +162,13 @@ export function BalanceSheet({ financialYear }: BalanceSheetProps) {
             <div>
               <p className="text-sm font-semibold mb-1">{t("Current Liabilities", "चालू देयताएं")}</p>
               <LineItem label={t("Payables to Farmers", "किसानों को देय")} value={l.currentLiabilities.farmerPayables} indent />
+              {l.currentLiabilities.limitAccountLiabilities > 0 && (
+                <>
+                  {(l.currentLiabilities.limitAccountDetails || []).map((d: any, i: number) => (
+                    <LineItem key={i} label={`${d.name} (${t("Overdraft", "ओवरड्राफ्ट")})`} value={d.balance} indent />
+                  ))}
+                </>
+              )}
             </div>
 
             <div className="border-t pt-2">

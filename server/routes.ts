@@ -5059,7 +5059,9 @@ export async function registerRoutes(
 
       const bankAccounts = await storage.getBankAccountsByMerchant(merchantId);
       const bankAccountBalances: any[] = [];
+      const limitAccountLiabilityDetails: any[] = [];
       let totalBankBalance = 0;
+      let limitAccountLiabilities = 0;
       if (bankAccounts.length > 0) {
         for (const acct of bankAccounts) {
           let bal = parseFloat(acct.openingBalance || "0");
@@ -5070,8 +5072,13 @@ export async function registerRoutes(
             if (e.direction === "transfer" && e.toBankAccountId === acct.id) bal += amt;
             if (e.direction === "transfer" && e.fromBankAccountId === acct.id) bal -= amt;
           }
-          bankAccountBalances.push({ name: acct.name, balance: bal });
-          totalBankBalance += bal;
+          if (bal < 0) {
+            limitAccountLiabilities += Math.abs(bal);
+            limitAccountLiabilityDetails.push({ name: acct.name, balance: Math.abs(bal) });
+          } else {
+            bankAccountBalances.push({ name: acct.name, balance: bal });
+            totalBankBalance += bal;
+          }
         }
       } else {
         totalBankBalance = bankBalance;
@@ -5081,8 +5088,70 @@ export async function registerRoutes(
       const buyerReceivables = buyers.reduce((sum, b) => sum + parseFloat(b.receivableBalance || "0"), 0);
 
       const farmers = await storage.getFarmersByMerchant(merchantId);
-      const farmerReceivables = farmers.reduce((sum, f) => sum + parseFloat(f.remainingReceivable || "0"), 0);
-      const farmerPayables = farmers.reduce((sum, f) => sum + parseFloat(f.pyPayable || "0"), 0);
+      const stockEntryList = await storage.getStockEntriesByMerchant(merchantId);
+      const seedTransactionList = await storage.getSeedTransactionsByMerchant(merchantId);
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+
+      const lotsByEntryId = new Map<number, typeof allLots>();
+      const mandiEntryIds = new Set<number>();
+      for (const lot of allLots) {
+        const existing = lotsByEntryId.get(lot.stockEntryId) || [];
+        existing.push(lot);
+        lotsByEntryId.set(lot.stockEntryId, existing);
+        if (lot.place === "mandi") {
+          mandiEntryIds.add(lot.stockEntryId);
+        }
+      }
+
+      let farmerReceivables = 0;
+      let farmerPayables = 0;
+      for (const farmer of farmers) {
+        const normalizedName = farmer.name.trim().toLowerCase();
+        const normalizedContact = farmer.contact?.trim().toLowerCase() || null;
+        const normalizedVillage = farmer.village?.trim().toLowerCase() || null;
+
+        let harvestDue = 0;
+        for (const entry of stockEntryList) {
+          if (mandiEntryIds.has(entry.id)) continue;
+          const matchById = entry.farmerId === farmer.id;
+          const eName = entry.farmerName?.trim().toLowerCase() || "";
+          const eContact = entry.farmerContact?.trim().toLowerCase() || null;
+          const eVillage = (entry as any).village?.trim().toLowerCase() || null;
+          const matchByKey = !entry.farmerId && eName === normalizedName && eContact === normalizedContact && eVillage === normalizedVillage;
+          if (matchById || matchByKey) {
+            if (entry.paymentStatus === "due" || entry.paymentStatus === "partial") {
+              const entryLots = lotsByEntryId.get(entry.id) || [];
+              let entryNetPayable = 0;
+              for (const lot of entryLots) {
+                entryNetPayable += parseFloat(lot.netPayable || "0");
+              }
+              const amountPaid = parseFloat(entry.amountPaid || "0");
+              harvestDue += Math.max(0, entryNetPayable - amountPaid);
+            }
+          }
+        }
+
+        let seedDue = 0;
+        for (const txn of seedTransactionList) {
+          const matchById = txn.farmerId === farmer.id;
+          const tName = txn.farmerName?.trim().toLowerCase() || "";
+          const tContact = txn.farmerContact?.trim().toLowerCase() || null;
+          const tVillage = (txn as any).village?.trim().toLowerCase() || null;
+          const matchByKey = !txn.farmerId && tName === normalizedName && tContact === normalizedContact && tVillage === normalizedVillage;
+          if (matchById || matchByKey) {
+            seedDue += parseFloat(txn.totalDueToFarmer || "0");
+          }
+        }
+
+        const pyReceivable = parseFloat(farmer.remainingReceivable || "0");
+        const netDue = harvestDue - pyReceivable - seedDue;
+
+        if (netDue > 0) {
+          farmerPayables += netDue;
+        } else if (netDue < 0) {
+          farmerReceivables += Math.abs(netDue);
+        }
+      }
 
       const liabilitiesList = await storage.getLiabilities(merchantId);
       let longTermLiabilities = 0;
@@ -5102,7 +5171,7 @@ export async function registerRoutes(
       const fixedAssetsNet = fixedAssetsGross - accumulatedDepreciation;
       const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables;
       const totalAssets = fixedAssetsNet + currentAssets;
-      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables;
+      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + limitAccountLiabilities;
       const ownersEquity = totalAssets - totalLiabilities;
 
       res.json({
@@ -5115,7 +5184,7 @@ export async function registerRoutes(
         liabilities: {
           longTerm: { total: longTermLiabilities, details: liabilityDetails.filter(l => l.type === "long_term") },
           shortTerm: { total: shortTermLiabilities, details: liabilityDetails.filter(l => l.type === "short_term") },
-          currentLiabilities: { farmerPayables },
+          currentLiabilities: { farmerPayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
           totalLiabilities,
         },
         ownersEquity,
