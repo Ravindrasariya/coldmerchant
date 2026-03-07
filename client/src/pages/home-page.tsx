@@ -240,6 +240,7 @@ export default function HomePage() {
                 >
                   <BookOpen className="h-4 w-4" />
                   {t("Books", "बुक्स")}
+                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Beta</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="demo-videos" 
@@ -409,6 +410,7 @@ export default function HomePage() {
                         >
                           <BookOpen className="h-4 w-4" />
                           {t("Books", "बुक्स")}
+                          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Beta</span>
                         </TabsTrigger>
                         <TabsTrigger 
                           value="demo-videos" 
