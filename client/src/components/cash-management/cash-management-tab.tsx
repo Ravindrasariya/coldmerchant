@@ -921,7 +921,15 @@ export function CashManagementTab() {
   const openingCashInHand = cashSettings ? parseFloat(cashSettings.openingCashInHand || "0") : 0;
   const legacyOpeningCashInAccount = cashSettings ? parseFloat(cashSettings.openingCashInAccount || "0") : 0;
   
-  const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense;
+  const transfersFromCash = entries
+    .filter(e => e.direction === "transfer" && e.fromAccountType === "cash_in_hand" && !e.isReversed)
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const transfersToCash = entries
+    .filter(e => e.direction === "transfer" && e.toAccountType === "cash_in_hand" && !e.isReversed)
+    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  
+  const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense - transfersFromCash + transfersToCash;
 
   // Calculate account-wise breakdown for entries that have bankAccountId (exclude reversed entries)
   const accountWiseBreakdown = bankAccounts.map(account => {
@@ -933,8 +941,16 @@ export function CashManagementTab() {
       .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === account.id && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
     
+    const transferIn = entries
+      .filter(e => e.direction === "transfer" && e.toBankAccountId === account.id && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    
+    const transferOut = entries
+      .filter(e => e.direction === "transfer" && e.fromBankAccountId === account.id && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    
     const openingBalance = parseFloat(account.openingBalance || "0");
-    const net = openingBalance + inward - outflow;
+    const net = openingBalance + inward - outflow + transferIn - transferOut;
     
     return {
       id: account.id,
