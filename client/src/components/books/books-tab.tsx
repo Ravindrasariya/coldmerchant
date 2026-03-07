@@ -95,6 +95,8 @@ export function BooksTab() {
         for (const b of (ca.bankBalances || [])) rows.push(row(b.name, fmt(b.balance), { indent: true }));
         rows.push(row(t("Receivables from Buyers", "खरीदारों से प्राप्य"), fmt(ca.buyerReceivables), { indent: true }));
         rows.push(row(t("Receivables from Farmers", "किसानों से प्राप्य"), fmt(ca.farmerReceivables), { indent: true }));
+        if ((ca.harvestStockValue || 0) > 0) rows.push(row(t("Inventory - Harvest Stock", "इन्वेंटरी - फसल स्टॉक"), fmt(ca.harvestStockValue), { indent: true }));
+        if ((ca.seedStockValue || 0) > 0) rows.push(row(t("Inventory - Seed Stock", "इन्वेंटरी - बीज स्टॉक"), fmt(ca.seedStockValue), { indent: true }));
         rows.push(row(t("Total Current Assets", "कुल चालू संपत्ति"), fmt(ca.total), { bold: true }));
         rows.push(row(t("TOTAL ASSETS", "कुल संपत्ति"), fmt(a.totalAssets), { bold: true }));
         rows.push(row(t("LIABILITIES & EQUITY", "देयताएं और इक्विटी"), "", { section: true }));

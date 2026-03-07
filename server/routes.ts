@@ -5180,8 +5180,29 @@ export async function registerRoutes(
         liabilityDetails.push({ name: l.name, type: l.type, remaining });
       }
 
+      const unsoldHarvest = await storage.getUnsoldInventory(merchantId);
+      let harvestStockValue = 0;
+      for (const item of unsoldHarvest) {
+        const ppk = parseFloat(item.pricePerKg || "0");
+        const weight = parseFloat(item.breakdownWeight || item.totalWeight || "0");
+        const origBags = item.originalBags || item.lotOriginalBags || 1;
+        if (ppk > 0 && weight > 0 && origBags > 0) {
+          const weightPerBag = weight / origBags;
+          harvestStockValue += item.remainingBags * weightPerBag * ppk;
+        }
+      }
+
+      const unsoldSeed = await storage.getUnsoldSeedInventory(merchantId);
+      let seedStockValue = 0;
+      for (const item of unsoldSeed) {
+        const avg = parseFloat(item.avgCostPerBag || "0");
+        seedStockValue += item.remainingBags * avg;
+      }
+
+      const inventoryValue = harvestStockValue + seedStockValue;
+
       const fixedAssetsNet = fixedAssetsGross - accumulatedDepreciation;
-      const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables;
+      const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables + inventoryValue;
       const totalAssets = fixedAssetsNet + currentAssets;
       const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + limitAccountLiabilities;
       const ownersEquity = totalAssets - totalLiabilities;
@@ -5190,7 +5211,7 @@ export async function registerRoutes(
         financialYear: fy,
         assets: {
           fixedAssets: { gross: fixedAssetsGross, depreciation: accumulatedDepreciation, net: fixedAssetsNet, details: fixedAssetDetails },
-          currentAssets: { cashInHand, bankBalances: bankAccounts.length > 0 ? bankAccountBalances : [{ name: "Bank Account", balance: bankBalance }], totalBankBalance, buyerReceivables, farmerReceivables, total: currentAssets },
+          currentAssets: { cashInHand, bankBalances: bankAccounts.length > 0 ? bankAccountBalances : [{ name: "Bank Account", balance: bankBalance }], totalBankBalance, buyerReceivables, farmerReceivables, harvestStockValue, seedStockValue, total: currentAssets },
           totalAssets,
         },
         liabilities: {

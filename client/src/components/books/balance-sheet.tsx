@@ -118,6 +118,16 @@ export function BalanceSheet({ financialYear }: BalanceSheetProps) {
               ))}
               <LineItem label={t("Receivables from Buyers", "खरीदारों से प्राप्य")} value={a.currentAssets.buyerReceivables} indent />
               <LineItem label={t("Receivables from Farmers", "किसानों से प्राप्य")} value={a.currentAssets.farmerReceivables} indent />
+              {(a.currentAssets.harvestStockValue > 0 || a.currentAssets.seedStockValue > 0) && (
+                <>
+                  {a.currentAssets.harvestStockValue > 0 && (
+                    <LineItem label={t("Inventory - Harvest Stock", "इन्वेंटरी - फसल स्टॉक")} value={a.currentAssets.harvestStockValue} indent />
+                  )}
+                  {a.currentAssets.seedStockValue > 0 && (
+                    <LineItem label={t("Inventory - Seed Stock", "इन्वेंटरी - बीज स्टॉक")} value={a.currentAssets.seedStockValue} indent />
+                  )}
+                </>
+              )}
               <LineItem label={t("Total Current Assets", "कुल चालू संपत्ति")} value={a.currentAssets.total} bold />
             </div>
 
