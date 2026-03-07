@@ -1,0 +1,62 @@
+The Idea
+
+Books is designed to give a small business owner (specifically a mandi merchant) a simplified view of their financial health — without needing an accountant or separate software. It pulls data that already exists in the system (transactions, cash entries, assets, liabilities) and presents it in standard accounting formats.
+What's Inside Books (4 Pages)
+
+1. Asset Register
+
+    Tracks fixed assets like vehicles, buildings, equipment
+    Each asset has a name, category, purchase date, and cost
+    Calculates depreciation automatically by Financial Year (FY) using standard rates
+    Stores depreciation logs so you can see year-by-year value reduction
+
+2. Liability Register
+
+    Tracks loans and debts (bank loans, personal borrowings)
+    Each liability has amount, interest rate, start date
+    Records payments against liabilities over time
+    Categorizes as long-term or short-term
+
+3. Balance Sheet
+
+    Auto-generated summary for a selected FY
+    Assets side: Fixed assets (after depreciation) + Current assets (cash in hand, bank balances, receivables from buyers)
+    Liabilities side: Long-term liabilities + Current liabilities (payables to farmers)
+    Shows Owner's Equity = Assets - Liabilities
+
+4. Profit & Loss
+
+    Auto-generated for a selected FY
+    Income: Aadhat commission, Mandi commission, Hammali earned, Extra charges
+    Expenses: Depreciation, Interest on liabilities, recorded expenses
+    Shows Net Profit/Loss
+
+Tech Architecture
+Layer	How It Works
+Schema	assets, asset_depreciation_log, liabilities, liability_payments tables in shared/schema.ts with Drizzle ORM
+Backend	API routes like /api/assets, /api/books/balance-sheet, /api/books/profit-and-loss in server/routes.ts. Balance sheet and P&L are computed on the fly by aggregating data from transactions, cash entries, assets, and liabilities
+Frontend	Each page is a standalone React page using TanStack Query for data fetching, with FY selector dropdowns. No complex state management needed
+Storage	CRUD operations through the IStorage interface in server/storage.ts. Assets and liabilities have their own create/update/delete methods
+Key Design Decisions
+
+    Balance Sheet and P&L are derived, not stored — They aggregate from existing tables (transactions, cash entries, assets, liabilities) each time you view them. No duplicate data to keep in sync.
+
+    Financial Year based — Everything filters by FY (April to March), which is standard in India.
+
+    Income comes from charge settings — Aadhat, Mandi, Hammali percentages are configured once in business_charge_settings, and the P&L pulls from actual transaction charges.
+
+    Assets depreciate automatically — Depreciation is calculated based on category-specific rates and logged per FY so the value carries forward.
+
+    Current assets/liabilities pull from ledgers — Buyer receivables (what buyers owe you) come from the buyer ledger. Farmer payables (what you owe farmers) come from the farmer ledger. Cash and bank balances come from the cash management system.
+
+To Replicate in Another App
+
+The pattern is straightforward:
+
+    Define your asset/liability tables with categories and amounts
+    Build CRUD APIs for managing them
+    Create computed endpoints for Balance Sheet and P&L that aggregate from your existing transaction/payment tables
+    Use FY filtering on all financial queries
+    Keep the reports read-only and derived — never store the balance sheet itself
+
+The core insight is that if your app already tracks money in and money out (which yours does through cash entries and transactions), you already have 80% of the data needed for Books. Assets and liabilities are the only new data entry required.
