@@ -5306,7 +5306,7 @@ export async function registerRoutes(
         const amt = parseFloat(e.amount);
         if (e.direction === "inward" && e.revenueType) {
           revenueByType[e.revenueType] = (revenueByType[e.revenueType] || 0) + amt;
-        } else if (e.direction === "outflow" && e.expenseType) {
+        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense") {
           expenseByType[e.expenseType] = (expenseByType[e.expenseType] || 0) + amt;
         }
       }
