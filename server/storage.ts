@@ -1018,7 +1018,8 @@ export class DatabaseStorage implements IStorage {
       const breakdown = await this.getBagBreakdownById(breakdownId, merchantId);
       if (breakdown) {
         const currentRemaining = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
-        const newRemaining = Math.max(0, currentRemaining + bagsDelta);
+        const maxBags = breakdown.numberOfBags ?? currentRemaining;
+        const newRemaining = Math.min(maxBags, Math.max(0, currentRemaining + bagsDelta));
         await this.updateBagBreakdown(breakdownId, merchantId, { remainingBags: newRemaining });
       }
       // Recalculate lot total from all breakdowns
@@ -1032,7 +1033,7 @@ export class DatabaseStorage implements IStorage {
       // Gate cut - adjust lot directly
       const lot = await this.getLotById(lotId, merchantId);
       if (lot) {
-        const newRemaining = Math.max(0, lot.remainingBags + bagsDelta);
+        const newRemaining = Math.min(lot.originalBags, Math.max(0, lot.remainingBags + bagsDelta));
         await this.updateLot(lotId, merchantId, { remainingBags: newRemaining });
       }
     }

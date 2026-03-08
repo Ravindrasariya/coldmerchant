@@ -782,18 +782,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </div>
               </div>
 
-              {hasItemChanges && (
-                <Button 
-                  type="button" 
-                  className="w-full" 
-                  onClick={() => updateItemsMutation.mutate()}
-                  disabled={updateItemsMutation.isPending}
-                  data-testid="button-save-items"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateItemsMutation.isPending ? t("Saving Items...", "आइटम सहेज रहा है...") : t("Save Item Changes", "आइटम परिवर्तन सहेजें")}
-                </Button>
-              )}
             </div>
 
             <Form {...form}>
