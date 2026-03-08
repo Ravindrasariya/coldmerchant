@@ -769,6 +769,12 @@ export class DatabaseStorage implements IStorage {
   computeLotCostPerBag(lot: any, breakdowns: any[]): number {
     if (lot.originalBags <= 0) return 0;
 
+    const wastageBags = breakdowns
+      .filter((bd: any) => bd.size === "Wastage")
+      .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
+    const actualSellableBags = lot.originalBags - wastageBags;
+    if (actualSellableBags <= 0) return 0;
+
     let totalPayable = 0;
     const sellableBreakdowns = breakdowns.filter((bd: any) => bd.size !== "Wastage");
     const hasBreakdownData = sellableBreakdowns.some((bd: any) => {
@@ -809,7 +815,7 @@ export class DatabaseStorage implements IStorage {
       lotCost = totalPayable;
     }
 
-    return lotCost / lot.originalBags;
+    return lotCost / actualSellableBags;
   }
 
   async getUnsoldInventory(merchantId: number): Promise<any[]> {
