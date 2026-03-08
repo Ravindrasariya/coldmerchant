@@ -181,6 +181,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       t("Items (S# - Bags - Size)", "आइटम (क्रमांक - बैग - साइज)"),
       t("Total Bags", "कुल बैग"),
       t("Net Weight", "शुद्ध वज़न"),
+      t("Total Cost", "कुल लागत"),
       t("Revenue", "राजस्व"),
       t("Amount Received", "प्राप्त राशि"),
       t("Due Amount", "बकाया राशि"),
@@ -199,6 +200,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})${item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}`
       ).join(", ");
       
+      const totalCost = parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
       return [
         txn.transactionNumber.toString(),
         format(new Date(txn.createdAt), "dd/MM/yyyy"),
@@ -207,6 +209,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         itemsDetail || "-",
         txn.totalBags.toString(),
         txn.totalNetWeight || "-",
+        parseFloat(totalCost.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(revenue.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(amountReceived.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN'),
@@ -435,13 +438,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
             <CardContent className="p-4">
               {(() => {
                 const totalPL = filteredTransactions.reduce((sum, txn) => {
-                  const rev = txn.revenue 
-                    ? parseFloat(txn.revenue) 
-                    : txn.items.reduce((s, item) => s + parseFloat(item.revenue || "0"), 0);
-                  const cost = parseFloat(txn.totalCostOfGoods || "0");
-                  const transport = parseFloat(txn.transportationCharges || "0");
-                  const other = parseFloat(txn.otherCharges || "0");
-                  return sum + (rev - cost - transport - other);
+                  return sum + parseFloat(txn.profitLoss || "0");
                 }, 0);
                 return (
                   <>
