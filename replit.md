@@ -153,6 +153,15 @@ When paying a supplier:
 - **Farmer IDs Never Reassigned**: Unique farmer codes (FMYYYYMMDD#) are permanent and never recycled
 - **Accessible via**: User dropdown menu > "Farmer Ledger" link
 
+### Cash Tab Filters
+- **Filter Order**: Direction → Expense Category → Buyer Name → Expense Type → Farmer Name → Supplier Name → Month → Year → Remarks
+- **Direction Filter**: All / Inward Cash / Expense / Transfer
+- **Expense Category Filter**: All / Revenue Expense / Capital Expense — selecting either restricts to outflow entries only; changing resets Expense Type filter
+- **Expense Type Dropdown**: Options conditioned by Expense Category (capital shows only `capital_expense`, revenue hides `capital_expense`, all shows everything)
+- **Buyer Name**: Renamed from "Party Name" in filter UI, view details dialog, and CSV headers
+- **Supplier Name Filter**: Filters by unique supplier names from entries
+- **All filters use AND conditions; CSV export respects active filters**
+
 ### Key Design Patterns
 - Shared schema in `/shared/schema.ts` used by both client and server
 - Form schemas defined with Zod and validated on both ends

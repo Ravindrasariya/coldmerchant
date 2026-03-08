@@ -373,9 +373,12 @@ export function CashManagementTab() {
   const [viewDetailsEntry, setViewDetailsEntry] = useState<CashEntry | null>(null);
   
   // Filter state
+  const [filterDirection, setFilterDirection] = useState<string>("");
+  const [filterExpenseCategory, setFilterExpenseCategory] = useState<string>("");
   const [filterPartyName, setFilterPartyName] = useState<string>("");
   const [filterExpenseType, setFilterExpenseType] = useState<string>("");
   const [filterFarmerName, setFilterFarmerName] = useState<string>("");
+  const [filterSupplierName, setFilterSupplierName] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
   const [filterRemarks, setFilterRemarks] = useState<string>("");
@@ -1033,9 +1036,20 @@ export function CashManagementTab() {
     const entryMonth = (entryDate.getMonth() + 1).toString();
     const entryYear = entryDate.getFullYear().toString();
 
+    if (filterDirection && filterDirection !== "all") {
+      if (filterDirection === "outflow" && entry.direction !== "outflow") return false;
+      if (filterDirection === "inward" && entry.direction !== "inward") return false;
+      if (filterDirection === "transfer" && entry.direction !== "transfer") return false;
+    }
+    if (filterExpenseCategory && filterExpenseCategory !== "all") {
+      if (entry.direction !== "outflow") return false;
+      if (filterExpenseCategory === "capital" && entry.expenseCategory !== "capital") return false;
+      if (filterExpenseCategory === "revenue" && entry.expenseCategory === "capital") return false;
+    }
     if (filterPartyName && filterPartyName !== "all" && entry.partyName !== filterPartyName) return false;
     if (filterExpenseType && filterExpenseType !== "all" && entry.expenseType !== filterExpenseType) return false;
     if (filterFarmerName && filterFarmerName !== "all" && entry.farmerName !== filterFarmerName) return false;
+    if (filterSupplierName && filterSupplierName !== "all" && entry.supplierName !== filterSupplierName) return false;
     if (filterMonth && filterMonth !== "all" && entryMonth !== filterMonth) return false;
     if (filterYear && filterYear !== "all" && entryYear !== filterYear) return false;
     if (filterRemarks && !(entry.remarks || "").toLowerCase().includes(filterRemarks.toLowerCase())) return false;
@@ -1053,6 +1067,7 @@ export function CashManagementTab() {
 
   // Get unique values for filter dropdowns
   const uniquePartyNames = Array.from(new Set(entries.filter(e => e.partyName).map(e => e.partyName!)));
+  const uniqueSupplierNames = Array.from(new Set(entries.filter(e => e.supplierName).map(e => e.supplierName!)));
   const uniqueFarmerOptions = (() => {
     const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
     entries.filter(e => e.farmerName).forEach(e => {
@@ -1072,17 +1087,23 @@ export function CashManagementTab() {
   const uniqueFarmerNames = uniqueFarmerOptions.map(f => f.name);
   const uniqueYears = Array.from(new Set(entries.map(e => new Date(e.entryDate).getFullYear().toString()))).sort().reverse();
 
-  const hasActiveFilters = (filterPartyName && filterPartyName !== "all") || 
+  const hasActiveFilters = (filterDirection && filterDirection !== "all") ||
+    (filterExpenseCategory && filterExpenseCategory !== "all") ||
+    (filterPartyName && filterPartyName !== "all") || 
     (filterExpenseType && filterExpenseType !== "all") || 
     (filterFarmerName && filterFarmerName !== "all") || 
+    (filterSupplierName && filterSupplierName !== "all") ||
     (filterMonth && filterMonth !== "all") || 
     (filterYear && filterYear !== "all") ||
     !!filterRemarks;
 
   const clearFilters = () => {
+    setFilterDirection("");
+    setFilterExpenseCategory("");
     setFilterPartyName("");
     setFilterExpenseType("");
     setFilterFarmerName("");
+    setFilterSupplierName("");
     setFilterMonth("");
     setFilterYear("");
     setFilterRemarks("");
@@ -1188,8 +1209,8 @@ export function CashManagementTab() {
       t("Expense Type", "खर्च प्रकार"),
       t("Payment Mode", "भुगतान माध्यम"),
       t("Bank Account", "बैंक खाता"),
-      t("Party Name", "पार्टी का नाम"),
-      t("Party Village", "पार्टी का गाँव"),
+      t("Buyer Name", "खरीदार का नाम"),
+      t("Buyer Village", "खरीदार का गाँव"),
       t("Farmer Name", "किसान का नाम"),
       t("Farmer Village", "किसान का गाँव"),
       t("Cold Store", "शीत भंडार"),
@@ -1320,12 +1341,12 @@ export function CashManagementTab() {
                   {viewDetailsEntry.partyName && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-xs text-muted-foreground">{t("Party Name", "पार्टी का नाम")}</Label>
+                        <Label className="text-xs text-muted-foreground">{t("Buyer Name", "खरीदार का नाम")}</Label>
                         <p className="font-medium">{viewDetailsEntry.partyName}</p>
                       </div>
                       {viewDetailsEntry.partyVillage && (
                         <div>
-                          <Label className="text-xs text-muted-foreground">{t("Party Village", "पार्टी का गाँव")}</Label>
+                          <Label className="text-xs text-muted-foreground">{t("Buyer Village", "खरीदार का गाँव")}</Label>
                           <p className="font-medium">{viewDetailsEntry.partyVillage}</p>
                         </div>
                       )}
@@ -1631,13 +1652,36 @@ export function CashManagementTab() {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_auto_1fr] gap-3">
-            <Select value={filterPartyName} onValueChange={setFilterPartyName}>
-              <SelectTrigger data-testid="filter-party-name" className="h-9">
-                <SelectValue placeholder={t("Party Name", "पार्टी का नाम")} />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <Select value={filterDirection} onValueChange={setFilterDirection}>
+              <SelectTrigger data-testid="filter-direction" className="h-9">
+                <SelectValue placeholder={t("Direction", "दिशा")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("All Parties", "सभी पार्टी")}</SelectItem>
+                <SelectItem value="all">{t("All", "सभी")}</SelectItem>
+                <SelectItem value="inward">{t("Inward Cash", "आवक नकद")}</SelectItem>
+                <SelectItem value="outflow">{t("Expense", "व्यय")}</SelectItem>
+                <SelectItem value="transfer">{t("Transfer", "ट्रांसफर")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterExpenseCategory} onValueChange={(val) => { setFilterExpenseCategory(val); setFilterExpenseType(""); }}>
+              <SelectTrigger data-testid="filter-expense-category" className="h-9">
+                <SelectValue placeholder={t("Expense Category", "व्यय श्रेणी")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All", "सभी")}</SelectItem>
+                <SelectItem value="revenue">{t("Revenue Expense", "राजस्व व्यय")}</SelectItem>
+                <SelectItem value="capital">{t("Capital Expense", "पूंजीगत व्यय")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filterPartyName} onValueChange={setFilterPartyName}>
+              <SelectTrigger data-testid="filter-buyer-name" className="h-9">
+                <SelectValue placeholder={t("Buyer Name", "खरीदार का नाम")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Buyers", "सभी खरीदार")}</SelectItem>
                 {uniquePartyNames.map((name) => (
                   <SelectItem key={name} value={name}>{name}</SelectItem>
                 ))}
@@ -1650,7 +1694,12 @@ export function CashManagementTab() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("All Types", "सभी प्रकार")}</SelectItem>
-                {EXPENSE_TYPES.map((type) => (
+                {(filterExpenseCategory === "capital"
+                  ? EXPENSE_TYPES.filter(type => type === "capital_expense")
+                  : filterExpenseCategory === "revenue"
+                    ? EXPENSE_TYPES.filter(type => type !== "capital_expense")
+                    : EXPENSE_TYPES
+                ).map((type) => (
                   <SelectItem key={type} value={type}>{getExpenseTypeLabel(type)}</SelectItem>
                 ))}
               </SelectContent>
@@ -1679,8 +1728,20 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
 
+            <Select value={filterSupplierName} onValueChange={setFilterSupplierName}>
+              <SelectTrigger data-testid="filter-supplier-name" className="h-9">
+                <SelectValue placeholder={t("Supplier Name", "आपूर्तिकर्ता का नाम")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All Suppliers", "सभी आपूर्तिकर्ता")}</SelectItem>
+                {uniqueSupplierNames.map((name) => (
+                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger data-testid="filter-month" className="h-9 w-[110px]">
+              <SelectTrigger data-testid="filter-month" className="h-9">
                 <SelectValue placeholder={t("Month", "महीना")} />
               </SelectTrigger>
               <SelectContent>
@@ -1701,7 +1762,7 @@ export function CashManagementTab() {
             </Select>
 
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger data-testid="filter-year" className="h-9 w-[90px]">
+              <SelectTrigger data-testid="filter-year" className="h-9">
                 <SelectValue placeholder={t("Year", "वर्ष")} />
               </SelectTrigger>
               <SelectContent>
