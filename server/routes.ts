@@ -5304,7 +5304,7 @@ export async function registerRoutes(
 
       for (const e of fyEntries) {
         const amt = parseFloat(e.amount);
-        if (e.direction === "inward" && e.revenueType) {
+        if (e.direction === "inward" && e.revenueType && e.revenueType !== "raw_potato" && e.revenueType !== "seed_sale") {
           revenueByType[e.revenueType] = (revenueByType[e.revenueType] || 0) + amt;
         } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense" && e.expenseType !== "aadhtiya" && e.expenseType !== "supplier") {
           expenseByType[e.expenseType] = (expenseByType[e.expenseType] || 0) + amt;
@@ -5338,6 +5338,24 @@ export async function registerRoutes(
       const totalCOGS = harvestCOGS + seedCOGS;
       if (totalCOGS > 0) {
         expenseByType["cost_of_goods_sold"] = totalCOGS;
+      }
+
+      const harvestRevenue = harvestTxns
+        .filter(tx => tx.dateOfLoading && tx.dateOfLoading >= fyStartDate && tx.dateOfLoading <= fyEndDate)
+        .reduce((sum, tx) => sum + (tx.revenue ? parseFloat(tx.revenue) : 0), 0);
+      if (harvestRevenue > 0) {
+        revenueByType["raw_potato"] = (revenueByType["raw_potato"] || 0) + harvestRevenue;
+      }
+
+      const seedRevenue = seedTxns
+        .filter(tx => {
+          if (!tx.createdAt) return false;
+          const d = typeof tx.createdAt === "string" ? tx.createdAt.slice(0, 10) : new Date(tx.createdAt).toISOString().slice(0, 10);
+          return d >= fyStartDate && d <= fyEndDate;
+        })
+        .reduce((sum: number, tx: any) => sum + (tx.totalRevenue ? parseFloat(tx.totalRevenue) : 0), 0);
+      if (seedRevenue > 0) {
+        revenueByType["seed_sale"] = (revenueByType["seed_sale"] || 0) + seedRevenue;
       }
 
       const depLogs = await storage.getDepreciationLogs(merchantId, undefined, fy);
