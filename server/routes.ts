@@ -5207,6 +5207,32 @@ export async function registerRoutes(
         liabilityDetails.push({ name: l.name, type: l.type, remaining });
       }
 
+      const allAadhats = await storage.getAadhatsByMerchant(merchantId);
+      const aadhatDuesMap = new Map<number, number>();
+      for (const entry of stockEntryList) {
+        if (!entry.aadhatDbId) continue;
+        const entryLots = lotsByEntryId.get(entry.id) || [];
+        let entryNetPayable = 0;
+        for (const lot of entryLots) {
+          entryNetPayable += parseFloat(lot.netPayable || "0");
+        }
+        const amountPaid = parseFloat(entry.amountPaid || "0");
+        const entryDue = Math.max(0, entryNetPayable - amountPaid);
+        aadhatDuesMap.set(entry.aadhatDbId, (aadhatDuesMap.get(entry.aadhatDbId) || 0) + entryDue);
+      }
+      let aadhtiyaPayables = 0;
+      for (const a of allAadhats) {
+        if (!a.isActive) continue;
+        const totalDue = parseFloat(a.pyPayable || "0") + (aadhatDuesMap.get(a.id) || 0);
+        if (totalDue > 0) aadhtiyaPayables += totalDue;
+      }
+
+      const seedSuppliers = await storage.getSeedSuppliersWithDue(merchantId);
+      let supplierPayables = 0;
+      for (const s of seedSuppliers) {
+        supplierPayables += s.totalDue;
+      }
+
       const unsoldHarvest = await storage.getUnsoldInventory(merchantId);
       let harvestStockValue = 0;
       for (const item of unsoldHarvest) {
@@ -5231,7 +5257,7 @@ export async function registerRoutes(
       const fixedAssetsNet = fixedAssetsGross - accumulatedDepreciation;
       const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables + inventoryValue;
       const totalAssets = fixedAssetsNet + currentAssets;
-      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + limitAccountLiabilities;
+      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + supplierPayables + aadhtiyaPayables + limitAccountLiabilities;
       const ownersEquity = totalAssets - totalLiabilities;
 
       res.json({
@@ -5244,7 +5270,7 @@ export async function registerRoutes(
         liabilities: {
           longTerm: { total: longTermLiabilities, details: liabilityDetails.filter(l => l.type === "long_term") },
           shortTerm: { total: shortTermLiabilities, details: liabilityDetails.filter(l => l.type === "short_term") },
-          currentLiabilities: { farmerPayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
+          currentLiabilities: { farmerPayables, supplierPayables, aadhtiyaPayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
           totalLiabilities,
         },
         ownersEquity,
