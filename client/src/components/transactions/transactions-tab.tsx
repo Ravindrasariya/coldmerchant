@@ -427,7 +427,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 {t("Total Cost", "कुल लागत")}
               </div>
               <p className="text-sm sm:text-lg font-bold">
-                ₹{filteredTransactions.reduce((sum, t) => sum + (parseFloat(t.totalCostOfGoods || "0")), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                ₹{filteredTransactions.reduce((sum, t) => sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.transportationCharges || "0") + parseFloat(t.otherCharges || "0"), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -556,17 +556,15 @@ interface TransactionCardProps {
 function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps) {
   const { t } = useLanguage();
 
-  const totalCost = parseFloat(transaction.totalCostOfGoods || "0");
-  // Use transaction revenue if set, otherwise aggregate from items
+  const totalCost = parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.transportationCharges || "0") + parseFloat(transaction.otherCharges || "0");
   const revenue = transaction.revenue 
     ? parseFloat(transaction.revenue) 
     : transaction.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
   const amountReceived = parseFloat(transaction.amountReceived || "0");
   const dueAmount = Math.max(0, revenue - amountReceived);
-  // Recalculate P&L if transaction revenue is null but items have revenue
   const profitLoss = transaction.revenue 
     ? parseFloat(transaction.profitLoss || "0")
-    : revenue - totalCost - parseFloat(transaction.transportationCharges || "0") - parseFloat(transaction.otherCharges || "0");
+    : revenue - totalCost;
   
   // Get unique potato types from transaction items (Wafer, Ration, Seed)
   const bagTypes = Array.from(new Set(transaction.items.map(item => item.potatoType).filter(Boolean))) as string[];
