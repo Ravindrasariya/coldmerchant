@@ -1712,7 +1712,8 @@ export function CashManagementTab() {
                   ))}
               </SelectContent>
             </Select>
-
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_auto_auto_1fr] gap-3 mt-3">
             <Select value={filterFarmerName} onValueChange={setFilterFarmerName}>
               <SelectTrigger data-testid="filter-farmer-name" className="h-9">
                 <SelectValue placeholder={t("Farmer Name", "किसान का नाम")} />
@@ -1749,7 +1750,7 @@ export function CashManagementTab() {
             </Select>
 
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger data-testid="filter-month" className="h-9">
+              <SelectTrigger data-testid="filter-month" className="h-9 w-[110px]">
                 <SelectValue placeholder={t("Month", "महीना")} />
               </SelectTrigger>
               <SelectContent>
@@ -1770,7 +1771,7 @@ export function CashManagementTab() {
             </Select>
 
             <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger data-testid="filter-year" className="h-9">
+              <SelectTrigger data-testid="filter-year" className="h-9 w-[90px]">
                 <SelectValue placeholder={t("Year", "वर्ष")} />
               </SelectTrigger>
               <SelectContent>
