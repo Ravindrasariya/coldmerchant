@@ -268,6 +268,7 @@ const outflowFormSchema = z.object({
   aadhatDbId: z.coerce.number().optional(),
   capitalAssetName: z.string().optional(),
   capitalAssetCategory: z.string().optional(),
+  capitalDepreciationRate: z.coerce.number().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative").optional().default(0),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -525,6 +526,7 @@ export function CashManagementTab() {
       aadhatDbId: undefined,
       capitalAssetName: "",
       capitalAssetCategory: "",
+      capitalDepreciationRate: "" as unknown as number,
       amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -612,6 +614,7 @@ export function CashManagementTab() {
           aadhatDbId: undefined,
           capitalAssetName: "",
           capitalAssetCategory: "",
+          capitalDepreciationRate: "" as unknown as number,
           amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -2062,6 +2065,7 @@ export function CashManagementTab() {
                               field.onChange("revenue");
                               outflowForm.setValue("capitalAssetName", "");
                               outflowForm.setValue("capitalAssetCategory", "");
+                              outflowForm.setValue("capitalDepreciationRate", "" as unknown as number);
                             }}
                             data-testid="btn-revenue-expense"
                           >
@@ -2106,7 +2110,7 @@ export function CashManagementTab() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>{t("Asset Category", "संपत्ति श्रेणी")} *</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <Select onValueChange={(val) => { field.onChange(val); outflowForm.setValue("capitalDepreciationRate", ASSET_DEPRECIATION_RATES[val] || 10); }} value={field.value}>
                               <FormControl>
                                 <SelectTrigger data-testid="select-capital-asset-category">
                                   <SelectValue placeholder={t("Select category", "श्रेणी चुनें")} />
@@ -2127,11 +2131,19 @@ export function CashManagementTab() {
                         )}
                       />
                       {capitalAssetCategory && (
-                        <div className="bg-muted/50 rounded-md p-3 text-sm" data-testid="depreciation-rate-display">
-                          <span className="text-muted-foreground">{t("Depreciation Rate", "मूल्यह्रास दर")}: </span>
-                          <span className="font-semibold">{ASSET_DEPRECIATION_RATES[capitalAssetCategory] || 10}%</span>
-                          <span className="text-muted-foreground ml-1">({t("per annum", "प्रति वर्ष")})</span>
-                        </div>
+                        <FormField
+                          control={outflowForm.control}
+                          name="capitalDepreciationRate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{t("Depreciation Rate", "मूल्यह्रास दर")} (% {t("per annum", "प्रति वर्ष")})</FormLabel>
+                              <FormControl>
+                                <Input type="number" step="0.5" min="0" max="100" {...field} data-testid="input-depreciation-rate" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
                     </>
                   )}
@@ -2973,7 +2985,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
                 ? getTransferLabel()
                 : isInward 
                   ? (entry.partyName || entry.farmerName || t("Unknown", "अज्ञात"))
-                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || entry.aadhatName || getExpenseTypeLabel(entry.expenseType))}
+                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || entry.aadhatName || entry.capitalAssetName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 
