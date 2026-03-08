@@ -20,7 +20,7 @@ const REVENUE_LABELS: Record<string, [string, string]> = {
 };
 
 const EXPENSE_LABELS: Record<string, [string, string]> = {
-  aadhtiya: ["Aadhat Payments", "आढ़तिया भुगतान"],
+  cost_of_goods_sold: ["Cost of Goods Sold", "बिकी वस्तुओं की लागत"],
   bag_charges: ["Bag Charges", "बोरी खर्च"],
   cold_store_charge: ["Cold Store Charges", "शीतगृह खर्च"],
   farmer: ["Farmer Payments", "किसान भुगतान"],
@@ -33,7 +33,6 @@ const EXPENSE_LABELS: Record<string, [string, string]> = {
   kata_charges: ["Kata Charges", "काटा खर्च"],
   pesticide_charges: ["Pesticide Charges", "कीटनाशक खर्च"],
   salary: ["Salary", "वेतन"],
-  supplier: ["Supplier Payments", "आपूर्तिकर्ता भुगतान"],
   warehouse_charges: ["Warehouse Charges", "गोदाम खर्च"],
   depreciation: ["Depreciation", "मूल्यह्रास"],
   interest_on_loans: ["Interest on Loans", "ऋण पर ब्याज"],

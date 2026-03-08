@@ -5306,9 +5306,28 @@ export async function registerRoutes(
         const amt = parseFloat(e.amount);
         if (e.direction === "inward" && e.revenueType) {
           revenueByType[e.revenueType] = (revenueByType[e.revenueType] || 0) + amt;
-        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense") {
+        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense" && e.expenseType !== "aadhtiya" && e.expenseType !== "supplier") {
           expenseByType[e.expenseType] = (expenseByType[e.expenseType] || 0) + amt;
         }
+      }
+
+      const harvestTxns = await storage.getTransactionsByMerchant(merchantId);
+      const harvestCOGS = harvestTxns
+        .filter(tx => tx.dateOfLoading && tx.dateOfLoading >= fyStartDate && tx.dateOfLoading <= fyEndDate)
+        .reduce((sum, tx) => sum + (tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0), 0);
+
+      const seedTxns = await storage.getSeedTransactionsByMerchant(merchantId);
+      const seedCOGS = seedTxns
+        .filter(tx => {
+          if (!tx.createdAt) return false;
+          const d = typeof tx.createdAt === "string" ? tx.createdAt.slice(0, 10) : new Date(tx.createdAt).toISOString().slice(0, 10);
+          return d >= fyStartDate && d <= fyEndDate;
+        })
+        .reduce((sum: number, tx: any) => sum + (tx.totalCost ? parseFloat(tx.totalCost) : 0), 0);
+
+      const totalCOGS = harvestCOGS + seedCOGS;
+      if (totalCOGS > 0) {
+        expenseByType["cost_of_goods_sold"] = totalCOGS;
       }
 
       const depLogs = await storage.getDepreciationLogs(merchantId, undefined, fy);
