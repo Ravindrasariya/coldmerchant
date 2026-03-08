@@ -428,22 +428,24 @@ export class DatabaseStorage implements IStorage {
     await db.delete(seedStockEntryEditHistory).where(eq(seedStockEntryEditHistory.merchantId, id));
     await db.delete(seedTransactionEditHistory).where(eq(seedTransactionEditHistory.merchantId, id));
     
-    // Delete breakdowns
+    // Delete transaction items first (they reference bag_breakdowns and lots via FK)
+    await db.delete(transactionItems).where(eq(transactionItems.merchantId, id));
+    await db.delete(seedTransactionItems).where(eq(seedTransactionItems.merchantId, id));
+    
+    // Delete transactions (before lots, since transaction_items are already gone)
+    await db.delete(transactions).where(eq(transactions.merchantId, id));
+    await db.delete(seedTransactions).where(eq(seedTransactions.merchantId, id));
+    
+    // Delete breakdowns (now safe since transaction_items are deleted)
     await db.delete(bagBreakdowns).where(eq(bagBreakdowns.merchantId, id));
     
     // Delete lots
     await db.delete(lots).where(eq(lots.merchantId, id));
     await db.delete(seedLots).where(eq(seedLots.merchantId, id));
     
-    // Delete transaction items
-    await db.delete(transactionItems).where(eq(transactionItems.merchantId, id));
-    await db.delete(seedTransactionItems).where(eq(seedTransactionItems.merchantId, id));
-    
-    // Delete main entries
+    // Delete stock entries
     await db.delete(stockEntries).where(eq(stockEntries.merchantId, id));
     await db.delete(seedStockEntries).where(eq(seedStockEntries.merchantId, id));
-    await db.delete(transactions).where(eq(transactions.merchantId, id));
-    await db.delete(seedTransactions).where(eq(seedTransactions.merchantId, id));
     
     // Delete cash and party data
     await db.delete(cashEntries).where(eq(cashEntries.merchantId, id));
