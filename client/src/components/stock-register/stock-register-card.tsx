@@ -79,6 +79,8 @@ interface StockEntryWithLots {
     adjustedAmountRate: string | null;
     adjustedAmountEffectiveDate: string | null;
     adjustedAmountRemark: string | null;
+    totalCogs: string | null;
+    costPerBag: string | null;
     totalCharges: string | null;
     netPayable: string | null;
     remarks: string | null;
@@ -456,6 +458,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Farmer Due ₹", "किसान बकाया ₹"),
       t("Cold Total ₹", "कोल्ड कुल ₹"),
       t("Cold Due ₹", "कोल्ड बकाया ₹"),
+      t("Total COGS ₹", "कुल लागत ₹"),
+      t("Cost/Bag ₹", "लागत/बोरी ₹"),
     ];
 
     const rows: string[][] = [];
@@ -572,6 +576,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           parseFloat(lotFarmerDue.toFixed(1)).toLocaleString('en-IN'),
           parseFloat(coldTotal.toFixed(1)).toLocaleString('en-IN'),
           parseFloat(coldDue.toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(parseFloat(lot.totalCogs || "0").toFixed(1)).toLocaleString('en-IN'),
+          parseFloat(parseFloat(lot.costPerBag || "0").toFixed(1)).toLocaleString('en-IN'),
         ]);
       });
     });

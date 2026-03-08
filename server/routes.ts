@@ -123,9 +123,18 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
   if (!entry) return;
   for (const lot of entry.lots) {
     const { totalCharges, netPayable } = computeHarvestLotCharges(lot);
+    const breakdowns = lot.bagBreakdowns || [];
+    const cpb = storage.computeLotCostPerBag(lot, breakdowns);
+    const wastageBags = breakdowns
+      .filter((bd: any) => bd.size === "Wastage")
+      .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
+    const actualSellableBags = lot.originalBags - wastageBags;
+    const totalCogs = (cpb * Math.max(actualSellableBags, 0)).toFixed(2);
     await storage.updateLot(lot.id, merchantId, {
       totalCharges,
       netPayable,
+      totalCogs,
+      costPerBag: cpb.toFixed(2),
     });
   }
 }
@@ -194,6 +203,41 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
+
+  // One-time backfill: compute totalCogs/costPerBag for lots that have 0 values
+  (async () => {
+    try {
+      const { db } = await import("./db");
+      const { stockEntries } = await import("@shared/schema");
+      const allEntries = await db.select({ id: stockEntries.id, merchantId: stockEntries.merchantId })
+        .from(stockEntries);
+      let updated = 0;
+      for (const entry of allEntries) {
+        const full = await storage.getStockEntryById(entry.id, entry.merchantId);
+        if (!full) continue;
+        for (const lot of full.lots) {
+          const existing = lot.costPerBag ? parseFloat(lot.costPerBag) : 0;
+          if (existing > 0) continue;
+          const breakdowns = lot.bagBreakdowns || [];
+          const cpb = storage.computeLotCostPerBag(lot, breakdowns);
+          if (cpb <= 0) continue;
+          const wastageBags = breakdowns
+            .filter((bd: any) => bd.size === "Wastage")
+            .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
+          const actualSellableBags = lot.originalBags - wastageBags;
+          const totalCogs = (cpb * Math.max(actualSellableBags, 0)).toFixed(2);
+          await storage.updateLot(lot.id, entry.merchantId, {
+            totalCogs,
+            costPerBag: cpb.toFixed(2),
+          });
+          updated++;
+        }
+      }
+      if (updated > 0) console.log(`[backfill] Updated totalCogs/costPerBag for ${updated} lots`);
+    } catch (err) {
+      console.error("[backfill] Error backfilling lot COGS:", err);
+    }
+  })();
 
   // Dashboard Timeseries endpoint
   app.get("/api/dashboard/timeseries", requireMerchant, async (req, res) => {

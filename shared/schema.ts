@@ -109,6 +109,8 @@ export const lots = pgTable("lots", {
   adjustedAmountRate: decimal("adjusted_amount_rate", { precision: 6, scale: 2 }), // annual rate % for simple interest
   adjustedAmountEffectiveDate: date("adjusted_amount_effective_date"), // effective date for interest calculation
   adjustedAmountRemark: text("adjusted_amount_remark"), // reason for adjustment
+  totalCogs: decimal("total_cogs", { precision: 12, scale: 2 }).default("0"),
+  costPerBag: decimal("cost_per_bag", { precision: 12, scale: 2 }).default("0"),
   totalCharges: decimal("total_charges", { precision: 12, scale: 2 }),
   netPayable: decimal("net_payable", { precision: 12, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),

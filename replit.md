@@ -195,6 +195,7 @@ The Books feature provides simplified accounting views:
   - **Farm Gate**: `costPerBag = (totalPayable + coldStoreCharges) / actualSellableBags` — cold/warehouse charges paid separately by merchant
   - **Cold Store**: `costPerBag = totalPayable / actualSellableBags` — all deductions still part of total cost
   - **Mandi**: `costPerBag = netPayable / actualSellableBags` — includes cost of goods + all mandi charges (commission, aadhat, hammali, extra)
+  - DB columns `total_cogs` and `cost_per_bag` are stored on the `lots` table, computed by `recomputeHarvestLotCharges` on create/update. Backfill runs on server startup for lots with zero values. Both columns included in stock register CSV export.
   - `actualSellableBags` = originalBags - wastageBags (wastage from grading reduces sellable count)
   - `totalPayable` = gross value from bag breakdowns = Σ(netWeight × pricePerKg) per non-wastage breakdown
   - `coldStoreCharges` = sum of "Cold Charges" + "Ware House Charges" from lot charges array
