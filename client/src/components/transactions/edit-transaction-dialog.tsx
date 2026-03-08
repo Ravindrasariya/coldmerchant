@@ -44,10 +44,19 @@ interface UnsoldInventoryItem {
   serialNumber: number;
   place?: string;
   coldStoreName: string;
+  farmerName: string;
+  farmerVillage: string;
   potatoType: string;
+  quality: string;
+  cutType: string;
   size: string | null;
-  remainingBags: number;
   pricePerKg: string | null;
+  remainingBags: number;
+  originalBags: number;
+  lotOriginalBags: number;
+  totalWeight: string | null;
+  breakdownWeight: string | null;
+  costPerBag: number;
 }
 
 interface EditableItem {
@@ -172,6 +181,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [selectedInventory, setSelectedInventory] = useState<string>("");
   const [newItemBags, setNewItemBags] = useState<number>(0);
   const [newItemWeight, setNewItemWeight] = useState<number>(0);
+  const [newItemRevenue, setNewItemRevenue] = useState<number>(0);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
@@ -321,31 +331,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
       const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
-      const newCostOfGoods = newWeight * item.pricePerKg;
-      const newRevenue = newWeight * item.pricePerKg;
       return {
         ...item,
         netWeight: newWeight,
-        costOfGoods: newCostOfGoods,
-        revenue: newRevenue,
-        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
-      };
-    }));
-  };
-
-  const handlePriceChange = (index: number, newPrice: number) => {
-    setEditableItems(items => items.map((item, i) => {
-      if (i !== index) return item;
-      const newCostOfGoods = item.netWeight * newPrice;
-      const newRevenue = item.netWeight * newPrice;
-      const hasChanges = item.bagsMoved !== item.originalBags || 
-                        item.netWeight !== item.originalNetWeight ||
-                        newRevenue !== item.originalRevenue;
-      return {
-        ...item,
-        pricePerKg: newPrice,
-        costOfGoods: newCostOfGoods,
-        revenue: newRevenue,
         action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
       };
     }));
@@ -391,6 +379,18 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setDeleteConfirmIndex(null);
   };
 
+  const handleInventorySelect = (value: string) => {
+    setSelectedInventory(value);
+    const inv = unsoldInventory?.find(i => 
+      `${i.lotId}-${i.breakdownId || 'lot'}` === value
+    );
+    if (inv) {
+      setNewItemBags(inv.remainingBags);
+      setNewItemWeight(0);
+      setNewItemRevenue(0);
+    }
+  };
+
   const handleAddItem = () => {
     if (!selectedInventory || newItemBags <= 0) return;
     
@@ -399,8 +399,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     );
     if (!inv) return;
     
-    const pricePerKg = parseFloat(inv.pricePerKg || "0");
-    const costOfGoods = newItemWeight * pricePerKg;
+    const costPerBag = inv.costPerBag || 0;
+    const costOfGoods = costPerBag * newItemBags;
     
     setEditableItems(items => [...items, {
       lotId: inv.lotId,
@@ -414,9 +414,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       originalBags: 0,
       netWeight: newItemWeight,
       originalNetWeight: 0,
-      pricePerKg: pricePerKg,
+      pricePerKg: costPerBag,
       costOfGoods: costOfGoods,
-      revenue: 0,
+      revenue: newItemRevenue,
       originalRevenue: 0,
       inventoryKey: selectedInventory,
       action: 'add' as const
@@ -425,6 +425,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setSelectedInventory("");
     setNewItemBags(0);
     setNewItemWeight(0);
+    setNewItemRevenue(0);
     setShowAddItem(false);
   };
 
@@ -505,13 +506,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         setSelectedInventory("");
                         setNewItemBags(0);
                         setNewItemWeight(0);
+                        setNewItemRevenue(0);
                       }}
                       data-testid="button-close-add-lot"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Select value={selectedInventory} onValueChange={setSelectedInventory}>
+                  <Select value={selectedInventory} onValueChange={handleInventorySelect}>
                     <SelectTrigger data-testid="select-inventory">
                       <SelectValue placeholder={t("Choose lot", "लॉट चुनें")} />
                     </SelectTrigger>
@@ -526,14 +528,19 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="flex gap-2 flex-wrap">
+                  {selectedInventory && (
+                    <div className="text-xs text-muted-foreground">
+                      {t("Cost/Bag", "लागत/बोरी")}: ₹{parseFloat((unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory)?.costPerBag || 0).toFixed(1)).toLocaleString('en-IN')}
+                    </div>
+                  )}
+                  <div className="flex gap-2 flex-wrap items-center">
                     <Input
                       type="number"
                       min="1"
                       placeholder={t("Bags", "बोरी")}
                       value={newItemBags || ""}
                       onChange={(e) => setNewItemBags(parseInt(e.target.value) || 0)}
-                      className="w-24 no-spinner"
+                      className="w-20 no-spinner"
                       data-testid="input-new-item-bags"
                     />
                     <Input
@@ -543,8 +550,18 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       placeholder={t("Weight (Kg)", "वजन (किग्रा)")}
                       value={newItemWeight || ""}
                       onChange={(e) => setNewItemWeight(parseFloat(e.target.value) || 0)}
-                      className="w-28 no-spinner"
+                      className="w-24 no-spinner"
                       data-testid="input-new-item-weight"
+                    />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder={t("Revenue (₹)", "राजस्व (₹)")}
+                      value={newItemRevenue || ""}
+                      onChange={(e) => setNewItemRevenue(parseFloat(e.target.value) || 0)}
+                      className="w-24 no-spinner"
+                      data-testid="input-new-item-revenue"
                     />
                     <Button type="button" size="sm" onClick={handleAddItem} data-testid="button-confirm-add">
                       {t("Add", "जोड़ें")}
