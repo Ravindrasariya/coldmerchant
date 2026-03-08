@@ -1047,7 +1047,13 @@ export function CashManagementTab() {
       if (filterExpenseCategory === "revenue" && entry.expenseCategory === "capital") return false;
     }
     if (filterPartyName && filterPartyName !== "all" && entry.partyName !== filterPartyName) return false;
-    if (filterExpenseType && filterExpenseType !== "all" && entry.expenseType !== filterExpenseType) return false;
+    if (filterExpenseType && filterExpenseType !== "all") {
+      if (filterExpenseCategory === "capital") {
+        if (entry.capitalAssetCategory !== filterExpenseType) return false;
+      } else {
+        if (entry.expenseType !== filterExpenseType) return false;
+      }
+    }
     if (filterFarmerName && filterFarmerName !== "all" && entry.farmerName !== filterFarmerName) return false;
     if (filterSupplierName && filterSupplierName !== "all" && entry.supplierName !== filterSupplierName) return false;
     if (filterMonth && filterMonth !== "all" && entryMonth !== filterMonth) return false;
@@ -1694,14 +1700,16 @@ export function CashManagementTab() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("All Types", "सभी प्रकार")}</SelectItem>
-                {(filterExpenseCategory === "capital"
-                  ? EXPENSE_TYPES.filter(type => type === "capital_expense")
-                  : filterExpenseCategory === "revenue"
+                {filterExpenseCategory === "capital"
+                  ? ASSET_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{getAssetCategoryLabel(cat)}</SelectItem>
+                  ))
+                  : (filterExpenseCategory === "revenue"
                     ? EXPENSE_TYPES.filter(type => type !== "capital_expense")
                     : EXPENSE_TYPES
-                ).map((type) => (
-                  <SelectItem key={type} value={type}>{getExpenseTypeLabel(type)}</SelectItem>
-                ))}
+                  ).map((type) => (
+                    <SelectItem key={type} value={type}>{getExpenseTypeLabel(type)}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
 

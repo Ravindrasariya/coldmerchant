@@ -157,7 +157,7 @@ When paying a supplier:
 - **Filter Order**: Direction → Expense Category → Buyer Name → Expense Type → Farmer Name → Supplier Name → Month → Year → Remarks
 - **Direction Filter**: All / Inward Cash / Expense / Transfer
 - **Expense Category Filter**: All / Revenue Expense / Capital Expense — selecting either restricts to outflow entries only; changing resets Expense Type filter
-- **Expense Type Dropdown**: Options conditioned by Expense Category (capital shows only `capital_expense`, revenue hides `capital_expense`, all shows everything)
+- **Expense Type Dropdown**: Options conditioned by Expense Category — capital shows asset categories (vehicle, building, plant_machinery, etc.) and filters by `capitalAssetCategory`; revenue hides `capital_expense`; all shows all expense types
 - **Buyer Name**: Renamed from "Party Name" in filter UI, view details dialog, and CSV headers
 - **Supplier Name Filter**: Filters by unique supplier names from entries
 - **All filters use AND conditions; CSV export respects active filters**
