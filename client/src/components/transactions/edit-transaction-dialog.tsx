@@ -379,14 +379,22 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setDeleteConfirmIndex(null);
   };
 
+  const getWeightPerBag = (inv: UnsoldInventoryItem): number => {
+    const weight = inv.breakdownWeight ? parseFloat(inv.breakdownWeight) : (inv.totalWeight ? parseFloat(inv.totalWeight) : 0);
+    const bags = inv.originalBags || inv.lotOriginalBags || 1;
+    return bags > 0 ? weight / bags : 0;
+  };
+
   const handleInventorySelect = (value: string) => {
     setSelectedInventory(value);
     const inv = unsoldInventory?.find(i => 
       `${i.lotId}-${i.breakdownId || 'lot'}` === value
     );
     if (inv) {
-      setNewItemBags(inv.remainingBags);
-      setNewItemWeight(0);
+      const bags = inv.remainingBags;
+      const wpb = getWeightPerBag(inv);
+      setNewItemBags(bags);
+      setNewItemWeight(parseFloat((wpb * bags).toFixed(1)));
       setNewItemRevenue(0);
     }
   };
@@ -539,7 +547,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       min="1"
                       placeholder={t("Bags", "बोरी")}
                       value={newItemBags || ""}
-                      onChange={(e) => setNewItemBags(parseInt(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const bags = parseInt(e.target.value) || 0;
+                        setNewItemBags(bags);
+                        const inv = unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory);
+                        if (inv) {
+                          const wpb = getWeightPerBag(inv);
+                          setNewItemWeight(parseFloat((wpb * bags).toFixed(1)));
+                        }
+                      }}
                       className="w-20 no-spinner"
                       data-testid="input-new-item-bags"
                     />
