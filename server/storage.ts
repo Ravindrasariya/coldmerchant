@@ -792,11 +792,6 @@ export class DatabaseStorage implements IStorage {
       const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
       const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
       const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
-      const isFarmGate = place === "farm_gate";
-      const farmGateDeductionTypes = ["Cold Charges", "Ware House Charges"];
-      const farmerDeductions = isFarmGate ? (lot.charges || [])
-        .filter((c: any) => c && !farmGateDeductionTypes.includes(c.type))
-        .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0) : 0;
 
       let totalCogs = 0;
       for (const bd of breakdowns) {
@@ -815,13 +810,11 @@ export class DatabaseStorage implements IStorage {
         } else if (place === "mandi") {
           const rowCharges = rowTotal * (mandiPct + aadhatPct) / 100;
           cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate;
-        } else if (isFarmGate) {
-          const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
-          const deductShare = actualSellableBags > 0 ? farmerDeductions / actualSellableBags : 0;
-          cpb = (rowTotal / bags) + coldShare + deductShare;
-        } else {
+        } else if (place === "farm_gate") {
           const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
           cpb = (rowTotal / bags) + coldShare;
+        } else {
+          cpb = rowTotal / bags;
         }
         result.set(bd.id, cpb);
         totalCogs += cpb * bags;
@@ -835,16 +828,12 @@ export class DatabaseStorage implements IStorage {
 
       let cpb: number;
       if (place === "farm_gate") {
-        const farmGateDeductionTypes = ["Cold Charges", "Ware House Charges"];
-        const farmerDeductions = (lot.charges || [])
-          .filter((c: any) => c && !farmGateDeductionTypes.includes(c.type))
-          .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-        cpb = actualSellableBags > 0 ? (totalPayable + coldStoreCharges + farmerDeductions) / actualSellableBags : 0;
+        cpb = actualSellableBags > 0 ? (totalPayable + coldStoreCharges) / actualSellableBags : 0;
       } else if (place === "mandi") {
         const lotNp = lot.netPayable ? parseFloat(lot.netPayable) : totalPayable;
         cpb = actualSellableBags > 0 ? lotNp / actualSellableBags : 0;
       } else {
-        cpb = actualSellableBags > 0 ? (totalPayable + coldStoreCharges) / actualSellableBags : 0;
+        cpb = actualSellableBags > 0 ? totalPayable / actualSellableBags : 0;
       }
       result.set(null, cpb);
       return { breakdownCosts: result, totalCogs: cpb * Math.max(actualSellableBags, 0) };

@@ -193,10 +193,10 @@ The Books feature provides simplified accounting views:
 - **Profit & Loss**: Auto-generated for selected FY using accrual-based accounting. Revenue recognized from actual sale transactions (harvest `transactions.revenue` as raw_potato; seed `seed_transactions.totalRevenue` as seed_sale), not from cash receipts. Other revenue types (commission, other) still come from cash entries. Expenses include: Cost of Goods Sold (COGS) from sale transactions (harvest `totalCostOfGoods` + `transportationCharges` + `otherCharges`; seed `totalCost` + `transportCharges` + `otherCharges`), operating expenses from cash outflows (excluding `capital_expense`, `aadhtiya`, `supplier`, and `raw_potato`/`seed_sale` revenue types which are all transaction-based), depreciation, and loan interest. Both revenue and COGS are transaction-based — cash received/paid is irrelevant for P&L recognition.
 - **COGS per bag (proportionate lot cost)**: When loading a truck, COGS uses proportionate stock register cost per bag instead of `netWeight × pricePerKg`. Formula varies by purchase type:
   - **Per-breakdown cost model**: `cost_per_bag` is stored on `bag_breakdowns` table (not `lots`). Each breakdown row gets its own cost based on its `totalAmount / numberOfBags` plus proportionate share of charges.
-  - **Cold Store**: `cpb = (totalAmount / bags) + (coldStoreCharges / actualSellableBags)`
-  - **Farm Gate**: `cpb = (totalAmount / bags) + (coldStoreCharges / actualSellableBags) + (farmerDeductions / actualSellableBags)`
-  - **Mandi**: `cpb = (totalAmount / bags) + totalAmount*(mandiPct+aadhatPct)/100 / bags + hammaliPerBag`
-  - **Wastage rows**: `cpb = totalAmount / bags` if totalAmount exists, else 0. No charges added.
+  - **Cold Store**: `cpb = rowTotal / bags` (no cold charges added — cold charges are a deduction from farmer, not extra merchant cost; totalCogs = totalPayable)
+  - **Farm Gate**: `cpb = (rowTotal / bags) + (coldStoreCharges / actualSellableBags)` (cold/warehouse are merchant storage costs added on top; Advance and other charges are NOT COGS)
+  - **Mandi**: `cpb = (rowTotal / bags) + rowTotal*(mandiPct+aadhatPct)/100 / bags + hammaliPerBag` (totalCogs = netPayable)
+  - **Wastage rows**: `cpb = rowTotal / bags` if rowTotal exists, else 0. No charges added.
   - `total_cogs` stored on `lots` table = Σ(costPerBag × numberOfBags) across all breakdowns
   - Computed by `storage.computeBreakdownCosts(lot, breakdowns)` → `{ breakdownCosts: Map<id|null, cpb>, totalCogs }`
   - `recomputeHarvestLotCharges` writes per-breakdown `costPerBag` and lot `totalCogs` on create/update
