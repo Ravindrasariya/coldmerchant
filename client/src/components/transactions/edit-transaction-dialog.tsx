@@ -614,7 +614,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
                         data-testid={`text-item-price-${index}`}
                       >
-                        {item.pricePerKg || 0}
+                        {parseFloat((item.pricePerKg || 0).toFixed(1)).toLocaleString('en-IN')}
                       </div>
                       <Input
                         type="number"
@@ -688,7 +688,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             className="h-8 flex items-center justify-center px-2 bg-muted/50 rounded-md text-sm text-muted-foreground"
                             data-testid={`text-item-price-m-${index}`}
                           >
-                            {item.pricePerKg || 0}
+                            {parseFloat((item.pricePerKg || 0).toFixed(1)).toLocaleString('en-IN')}
                           </div>
                         </div>
                       </div>
