@@ -416,47 +416,62 @@ export class DatabaseStorage implements IStorage {
   }
 
   async factoryResetMerchant(id: number): Promise<void> {
-    // Delete all merchant data in proper order (respecting foreign keys)
-    // First delete allocations and settlements
-    await db.delete(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, id));
-    await db.delete(cashEntryAllocations).where(eq(cashEntryAllocations.merchantId, id));
-    await db.delete(aadhatPaymentAllocations).where(eq(aadhatPaymentAllocations.merchantId, id));
+    // Delete all merchant data in FK-safe order (children before parents)
     
-    // Delete edit histories
+    // 1. Asset & liability leaf tables
+    await db.delete(assetDepreciationLog).where(eq(assetDepreciationLog.merchantId, id));
+    await db.delete(liabilityPayments).where(eq(liabilityPayments.merchantId, id));
+    
+    // 2. Cash entry allocations (reference cash_entries, transactions, lots, stock_entries)
+    await db.delete(aadhatPaymentAllocations).where(eq(aadhatPaymentAllocations.merchantId, id));
+    await db.delete(cashEntryAllocations).where(eq(cashEntryAllocations.merchantId, id));
+    await db.delete(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, id));
+    
+    // 3. All edit histories (reference main tables and users)
+    await db.delete(aadhatEditHistory).where(eq(aadhatEditHistory.merchantId, id));
+    await db.delete(buyerEditHistory).where(eq(buyerEditHistory.merchantId, id));
+    await db.delete(farmerEditHistory).where(eq(farmerEditHistory.merchantId, id));
     await db.delete(stockEntryEditHistory).where(eq(stockEntryEditHistory.merchantId, id));
     await db.delete(transactionEditHistory).where(eq(transactionEditHistory.merchantId, id));
     await db.delete(seedStockEntryEditHistory).where(eq(seedStockEntryEditHistory.merchantId, id));
     await db.delete(seedTransactionEditHistory).where(eq(seedTransactionEditHistory.merchantId, id));
     
-    // Delete transaction items first (they reference bag_breakdowns and lots via FK)
+    // 4. Transaction items (reference transactions, lots, bag_breakdowns, seed_lots)
     await db.delete(transactionItems).where(eq(transactionItems.merchantId, id));
     await db.delete(seedTransactionItems).where(eq(seedTransactionItems.merchantId, id));
     
-    // Delete transactions (before lots, since transaction_items are already gone)
-    await db.delete(transactions).where(eq(transactions.merchantId, id));
-    await db.delete(seedTransactions).where(eq(seedTransactions.merchantId, id));
-    
-    // Delete breakdowns (now safe since transaction_items are deleted)
+    // 5. Bag breakdowns (reference lots)
     await db.delete(bagBreakdowns).where(eq(bagBreakdowns.merchantId, id));
     
-    // Delete lots
+    // 6. Lots (reference stock_entries, seed_stock_entries)
     await db.delete(lots).where(eq(lots.merchantId, id));
     await db.delete(seedLots).where(eq(seedLots.merchantId, id));
     
-    // Delete stock entries
+    // 7. Transactions (reference buyers, farmers)
+    await db.delete(transactions).where(eq(transactions.merchantId, id));
+    await db.delete(seedTransactions).where(eq(seedTransactions.merchantId, id));
+    
+    // 8. Stock entries (reference farmers, aadhats)
     await db.delete(stockEntries).where(eq(stockEntries.merchantId, id));
     await db.delete(seedStockEntries).where(eq(seedStockEntries.merchantId, id));
     
-    // Delete cash and party data
+    // 9. Cash entries (reference farmers, buyers, aadhats)
     await db.delete(cashEntries).where(eq(cashEntries.merchantId, id));
+    
+    // 10. Junction/reference tables (reference buyers, farmers)
+    await db.delete(cashFarmers).where(eq(cashFarmers.merchantId, id));
+    await db.delete(parties).where(eq(parties.merchantId, id));
+    
+    // 11. Core entity tables
+    await db.delete(assets).where(eq(assets.merchantId, id));
+    await db.delete(liabilities).where(eq(liabilities.merchantId, id));
+    await db.delete(buyers).where(eq(buyers.merchantId, id));
+    await db.delete(farmers).where(eq(farmers.merchantId, id));
+    await db.delete(aadhats).where(eq(aadhats.merchantId, id));
+    
+    // 12. Settings
     await db.delete(cashSettings).where(eq(cashSettings.merchantId, id));
     await db.delete(bankAccounts).where(eq(bankAccounts.merchantId, id));
-    await db.delete(parties).where(eq(parties.merchantId, id));
-    await db.delete(cashFarmers).where(eq(cashFarmers.merchantId, id));
-    await db.delete(buyers).where(eq(buyers.merchantId, id));
-    
-    // Reset merchant serial numbers by updating them (if tracking exists in merchant record)
-    // The merchant record itself remains with status preserved
   }
 
   async invalidateMerchantSessions(merchantId: number): Promise<void> {
