@@ -141,14 +141,16 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
 function computeSeedLotCharges(lot: any) {
   const bags = lot.originalBags || 0;
   const pricePerBag = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
+  const coldStorePerBag = lot.coldStoreChargesPerBag ? parseFloat(lot.coldStoreChargesPerBag) : 0;
   const costOfGoods = bags * pricePerBag;
   
   const hammali = lot.hammaliCharges ? parseFloat(lot.hammaliCharges) : 0;
   const grading = lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0;
   const transport = lot.transportCharges ? parseFloat(lot.transportCharges) : 0;
   const totalCharges = hammali + grading + transport;
+  const coldStoreTotal = bags * coldStorePerBag;
   const netPayable = costOfGoods + totalCharges;
-  const avgCostPerBag = bags > 0 ? netPayable / bags : 0;
+  const avgCostPerBag = bags > 0 ? (netPayable + coldStoreTotal) / bags : 0;
   
   return {
     totalCharges: totalCharges.toFixed(2),
@@ -235,6 +237,32 @@ export async function registerRoutes(
       if (updatedBd > 0 || updatedLots > 0) console.log(`[backfill] Updated ${updatedBd} breakdown costPerBag, ${updatedLots} lot totalCogs`);
     } catch (err) {
       console.error("[backfill] Error backfilling breakdown costs:", err);
+    }
+  })();
+
+  // One-time backfill: recompute seed lot avgCostPerBag to include cold store charges
+  (async () => {
+    try {
+      const { db } = await import("./db");
+      const { seedStockEntries } = await import("@shared/schema");
+      const allSeedEntries = await db.select({ id: seedStockEntries.id, merchantId: seedStockEntries.merchantId })
+        .from(seedStockEntries);
+      let updatedSeedLots = 0;
+      for (const entry of allSeedEntries) {
+        const full = await storage.getSeedEntryById(entry.id, entry.merchantId);
+        if (!full) continue;
+        for (const lot of full.seedLots) {
+          const { avgCostPerBag } = computeSeedLotCharges(lot);
+          const existing = lot.avgCostPerBag ? parseFloat(lot.avgCostPerBag) : 0;
+          if (Math.abs(parseFloat(avgCostPerBag) - existing) > 0.01) {
+            await storage.updateSeedLot(lot.id, entry.merchantId, { avgCostPerBag });
+            updatedSeedLots++;
+          }
+        }
+      }
+      if (updatedSeedLots > 0) console.log(`[backfill] Updated ${updatedSeedLots} seed lot avgCostPerBag`);
+    } catch (err) {
+      console.error("[backfill] Error backfilling seed lot costs:", err);
     }
   })();
 
