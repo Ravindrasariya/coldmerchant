@@ -682,7 +682,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground">{t("Total Due", "कुल देय")}</div>
+                  <div className="text-xs text-muted-foreground">{t("Total Receivable", "कुल प्राप्य")}</div>
                   <div className="text-lg font-semibold text-orange-600 flex items-center justify-center gap-1">
                     <IndianRupee className="h-4 w-4" />
                     {totals.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}

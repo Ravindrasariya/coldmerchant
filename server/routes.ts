@@ -4160,13 +4160,7 @@ export async function registerRoutes(
         const entry = await storage.getSeedEntryById(seedLot.seedEntryId, merchantId);
         const serialNumber = entry?.serialNumber || 0;
         
-        const ppb = parseFloat(seedLot.pricePerBag) || 0;
-        const coldPerBag = parseFloat(seedLot.coldStoreChargesPerBag || "0");
-        const hammali = parseFloat(seedLot.hammaliCharges || "0");
-        const grading = parseFloat(seedLot.gradingCharges || "0");
-        const lotTransport = parseFloat(seedLot.transportCharges || "0");
-        const lotBags = seedLot.originalBags || 1;
-        const costPerBag = ppb + coldPerBag + (hammali + grading + lotTransport) / lotBags;
+        const costPerBag = parseFloat(seedLot.avgCostPerBag || "0");
         const pricePerBag = item.pricePerBag || 0;
         const bags = item.bagsMoved;
         const cost = bags * costPerBag;
@@ -4377,13 +4371,7 @@ export async function registerRoutes(
         const entry = await storage.getSeedEntryById(seedLot.seedEntryId, merchantId);
         const serialNumber = entry?.serialNumber || 0;
         
-        const ppb = parseFloat(seedLot.pricePerBag) || 0;
-        const coldPerBag = parseFloat(seedLot.coldStoreChargesPerBag || "0");
-        const hammali = parseFloat(seedLot.hammaliCharges || "0");
-        const grading = parseFloat(seedLot.gradingCharges || "0");
-        const lotTransport = parseFloat(seedLot.transportCharges || "0");
-        const lotBags = seedLot.originalBags || 1;
-        const costPerBag = ppb + coldPerBag + (hammali + grading + lotTransport) / lotBags;
+        const costPerBag = parseFloat(seedLot.avgCostPerBag || "0");
         const pricePerBag = item.pricePerBag || 0;
         const bags = item.bagsMoved;
         const cost = bags * costPerBag;

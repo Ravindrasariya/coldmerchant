@@ -229,7 +229,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
       t("Profit/Loss ₹", "लाभ/हानि ₹"),
       t("Transport ₹", "परिवहन ₹"),
       t("Other Charges ₹", "अन्य शुल्क ₹"),
-      t("Total Due ₹", "कुल देय ₹"),
+      t("Total Receivable ₹", "कुल प्राप्य ₹"),
     ];
 
     const rows = filteredForDownload.map(txn => {
@@ -543,7 +543,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
           <CardContent className="p-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs mb-1">
               <Clock className="h-3.5 w-3.5" />
-              {t("Total Due", "कुल बकाया")}
+              {t("Total Receivable", "कुल प्राप्य")}
             </div>
             <div className="text-lg font-semibold text-orange-600">₹{summary.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
           </CardContent>
