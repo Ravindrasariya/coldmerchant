@@ -264,7 +264,16 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     value: string | number | undefined
   ) => {
     const newLots = [...lots];
-    (newLots[lotIndex].bagBreakdowns[breakdownIndex] as any)[field] = value;
+    const bd = newLots[lotIndex].bagBreakdowns[breakdownIndex];
+    if (field === "numberOfBags" && typeof value === "number") {
+      const oldNumberOfBags = bd.numberOfBags || 0;
+      const oldRemaining = bd.remainingBags ?? oldNumberOfBags;
+      const soldBags = Math.max(0, oldNumberOfBags - oldRemaining);
+      bd.numberOfBags = value;
+      bd.remainingBags = Math.max(0, value - soldBags);
+    } else {
+      (bd as any)[field] = value;
+    }
     setLots(newLots);
   };
 

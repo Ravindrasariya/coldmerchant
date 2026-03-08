@@ -979,17 +979,24 @@ export async function registerRoutes(
                   if (existingBd) {
                     compareField('size', existingBd.size, bdData.size, bdLabel, 'breakdown', bdData.id);
                     compareField('numberOfBags', existingBd.numberOfBags, bdData.numberOfBags, bdLabel, 'breakdown', bdData.id);
-                    const newRemaining = bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags;
-                    compareField('remainingBags', existingBd.remainingBags, newRemaining, bdLabel, 'breakdown', bdData.id);
+                    let cappedRemaining = bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags;
+                    if (bdData.size !== "Wastage") {
+                      cappedRemaining = Math.min(cappedRemaining, bdData.numberOfBags);
+                    }
+                    compareField('remainingBags', existingBd.remainingBags, cappedRemaining, bdLabel, 'breakdown', bdData.id);
                     compareField('weight', existingBd.weight, weight > 0 ? weight : null, bdLabel, 'breakdown', bdData.id);
                     compareField('pricePerKg', existingBd.pricePerKg, pricePerKg > 0 ? pricePerKg : null, bdLabel, 'breakdown', bdData.id);
                   }
 
                   // Update existing breakdown
+                  let newRemaining = bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags;
+                  if (bdData.size !== "Wastage") {
+                    newRemaining = Math.min(newRemaining, bdData.numberOfBags);
+                  }
                   await storage.updateBagBreakdown(bdData.id, merchantId, {
                     size: bdData.size,
                     numberOfBags: bdData.numberOfBags,
-                    remainingBags: bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags,
+                    remainingBags: newRemaining,
                     weight: weight > 0 ? weight.toString() : null,
                     pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
                     totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
