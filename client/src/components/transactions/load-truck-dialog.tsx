@@ -44,6 +44,7 @@ interface UnsoldInventoryItem {
   lotOriginalBags: number;
   totalWeight: string | null;
   breakdownWeight: string | null;
+  costPerBag: number;
 }
 
 interface LotItem {
@@ -163,12 +164,12 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
 
       section.items.forEach((item) => {
         const invItem = findInventoryByKey(item.inventoryKey);
-        const pricePerKg = invItem?.pricePerKg ? parseFloat(invItem.pricePerKg) : 0;
+        const costPerBag = invItem?.costPerBag || 0;
+        const bags = Number(item.bagsMoved) || 0;
         const netWeight = Number(item.netWeight) || 0;
-        // Cost = Net Weight × Price per Kg
-        const costOfGoods = netWeight * pricePerKg;
+        const costOfGoods = costPerBag * bags;
 
-        totalBags += Number(item.bagsMoved) || 0;
+        totalBags += bags;
         totalNetWeight += netWeight;
         totalCostOfGoods += costOfGoods;
       });
@@ -586,11 +587,8 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
 
                           {section.items.map((item, itemIndex) => {
                             const selectedInv = findInventoryByKey(item.inventoryKey);
-                            const pricePerKg = selectedInv?.pricePerKg
-                              ? parseFloat(selectedInv.pricePerKg)
-                              : 0;
-                            // Cost = Net Weight × Price per Kg
-                            const itemCost = (Number(item.netWeight) || 0) * pricePerKg;
+                            const costPerBag = selectedInv?.costPerBag || 0;
+                            const itemCost = costPerBag * (Number(item.bagsMoved) || 0);
 
                             return (
                               <div

@@ -558,7 +558,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 <span>{t("Lot Details", "लॉट विवरण")}</span>
                 <span className="text-right">{t("Bags", "बोरी")}</span>
                 <span className="text-right">{t("Net Weight", "शुद्ध वजन")}</span>
-                <span className="text-right">{t("Price/kg", "मूल्य/किग्रा")}</span>
+                <span className="text-right">{t("Cost/Bag", "लागत/बोरी")}</span>
                 <span className="text-right">{t("Revenue", "राजस्व")}</span>
                 <span className="text-right">{t("P&L", "लाभ/हानि")}</span>
                 <span></span>
@@ -566,7 +566,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
               {editableItems.map((item, index) => {
                 if (item.action === 'remove') return null;
-                const itemCost = item.netWeight * item.pricePerKg;
+                const itemCost = item.pricePerKg * item.bagsMoved;
                 const itemPL = item.revenue - itemCost;
                 return (
                   <div key={item.id || `new-${index}`}>
@@ -715,12 +715,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
                 </span>
                 <span className={`text-right h-8 flex items-center justify-end ${
-                  editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 
+                  editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 
                     ? "text-green-600 dark:text-green-400" 
                     : "text-red-600 dark:text-red-400"
                 }`}>
-                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "+" : ""}
-                  ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0).toFixed(1)).toLocaleString('en-IN')}
+                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 ? "+" : ""}
+                  ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0).toFixed(1)).toLocaleString('en-IN')}
                 </span>
                 <span></span>
               </div>
@@ -741,9 +741,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   </div>
                   <div className="text-center">
                     <span className="text-muted-foreground block">{t("P&L", "लाभ/हानि")}</span>
-                    <span className={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                      {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0) >= 0 ? "+" : ""}
-                      ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.netWeight * i.pricePerKg), 0).toFixed(1)).toLocaleString('en-IN')}
+                    <span className={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                      {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 ? "+" : ""}
+                      ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0).toFixed(1)).toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>
@@ -917,7 +917,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </div>
 
                 <ProfitLossDisplay 
-                  totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight * i.pricePerKg), 0)}
+                  totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.pricePerKg * i.bagsMoved), 0)}
                   revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0)}
                   transportationCharges={form.watch("transportationCharges") || 0}
                   otherCharges={form.watch("otherCharges") || 0}

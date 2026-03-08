@@ -766,6 +766,52 @@ export class DatabaseStorage implements IStorage {
     return result ? result.transactionNumber + 1 : 1;
   }
 
+  computeLotCostPerBag(lot: any, breakdowns: any[]): number {
+    if (lot.originalBags <= 0) return 0;
+
+    let totalPayable = 0;
+    const sellableBreakdowns = breakdowns.filter((bd: any) => bd.size !== "Wastage");
+    const hasBreakdownData = sellableBreakdowns.some((bd: any) => {
+      const w = bd.weight ? parseFloat(bd.weight) : 0;
+      const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+      return w > 0 && p > 0;
+    });
+
+    if (hasBreakdownData) {
+      for (const bd of sellableBreakdowns) {
+        const weight = bd.weight ? parseFloat(bd.weight) : 0;
+        const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+        if (netWeight > 0 && price > 0) {
+          totalPayable += netWeight * price;
+        }
+      }
+    } else {
+      const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+      const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+      const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+      if (netWeight > 0 && price > 0) {
+        totalPayable = netWeight * price;
+      }
+    }
+
+    const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+    const coldStoreCharges = (lot.charges || [])
+      .filter((c: any) => c && coldStoreTypes.includes(c.type))
+      .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+
+    let lotCost: number;
+    if (lot.place === "farm_gate") {
+      lotCost = totalPayable + coldStoreCharges;
+    } else if (lot.place === "mandi") {
+      lotCost = lot.netPayable ? parseFloat(lot.netPayable) : totalPayable;
+    } else {
+      lotCost = totalPayable;
+    }
+
+    return lotCost / lot.originalBags;
+  }
+
   async getUnsoldInventory(merchantId: number): Promise<any[]> {
     const allLots = await db.select().from(lots)
       .where(eq(lots.merchantId, merchantId));
@@ -780,6 +826,8 @@ export class DatabaseStorage implements IStorage {
       
       const breakdowns = await db.select().from(bagBreakdowns)
         .where(eq(bagBreakdowns.lotId, lot.id));
+      
+      const costPerBag = this.computeLotCostPerBag(lot, breakdowns);
       
       if (breakdowns.length > 0) {
         // For bilty_cut: return one entry per non-wastage breakdown
@@ -807,6 +855,7 @@ export class DatabaseStorage implements IStorage {
             lotOriginalBags: lot.originalBags,
             totalWeight: breakdown.weight || lot.totalWeight || null,
             breakdownWeight: breakdown.weight || null,
+            costPerBag,
           });
         }
       } else {
@@ -830,6 +879,7 @@ export class DatabaseStorage implements IStorage {
             lotOriginalBags: lot.originalBags,
             totalWeight: lot.totalWeight || null,
             breakdownWeight: null,
+            costPerBag,
           });
         }
       }

@@ -1532,23 +1532,20 @@ export async function registerRoutes(
         const lot = await storage.getLotById(item.lotId, merchantId);
         const entry = await storage.getStockEntryById(lot!.stockEntryId, merchantId);
         
-        // Get price from breakdown if available, otherwise from lot
-        let pricePerKg = 0;
         let size: string | null = null;
         if (item.breakdownId) {
           const breakdown = await storage.getBagBreakdownById(item.breakdownId, merchantId);
-          pricePerKg = breakdown?.pricePerKg ? parseFloat(breakdown.pricePerKg) : 0;
           size = breakdown?.size || null;
-        }
-        if (pricePerKg === 0 && lot?.pricePerKg) {
-          pricePerKg = parseFloat(lot.pricePerKg);
         }
         if (!size) {
           size = lot?.size || null;
         }
         
+        const allBreakdowns = await storage.getBagBreakdownsByLot(item.lotId, merchantId);
+        const costPerBag = storage.computeLotCostPerBag(lot!, allBreakdowns);
+        
         const netWeight = item.netWeight || 0;
-        const costOfGoods = netWeight * pricePerKg;
+        const costOfGoods = costPerBag * item.bagsMoved;
 
         totalBags += item.bagsMoved;
         totalNetWeight += netWeight;
@@ -1564,7 +1561,7 @@ export async function registerRoutes(
           size,
           bagsMoved: item.bagsMoved,
           netWeight: netWeight.toString(),
-          pricePerKgSnapshot: pricePerKg.toString(),
+          pricePerKgSnapshot: costPerBag.toString(),
           costOfGoods: costOfGoods.toString(),
         };
       }));
@@ -1798,14 +1795,15 @@ export async function registerRoutes(
               await storage.adjustInventory(existingItem.lotId, existingItem.breakdownId, merchantId, bagsDelta);
             }
             
-            // Use provided netWeight if given, otherwise calculate
-            const pricePerKg = parseFloat(existingItem.pricePerKgSnapshot || "0");
             const newNetWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
               ? itemChange.netWeight
               : (existingItem.bagsMoved > 0 
                   ? parseFloat(existingItem.netWeight || "0") / existingItem.bagsMoved * itemChange.bagsMoved
                   : itemChange.bagsMoved * 50);
-            const newCostOfGoods = newNetWeight * pricePerKg;
+            const editLot = await storage.getLotById(existingItem.lotId, merchantId);
+            const editBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
+            const editCostPerBag = editLot ? storage.computeLotCostPerBag(editLot, editBreakdowns) : parseFloat(existingItem.pricePerKgSnapshot || "0");
+            const newCostOfGoods = editCostPerBag * itemChange.bagsMoved;
             
             const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
@@ -1858,13 +1856,11 @@ export async function registerRoutes(
           
           // Calculate available bags
           let availableBags = 0;
-          let pricePerKg = parseFloat(lot.pricePerKg || "0");
           let size = lot.size;
           
           if (breakdownId) {
             const breakdown = await storage.getBagBreakdownById(breakdownId, merchantId);
             availableBags = breakdown?.remainingBags ?? breakdown?.numberOfBags ?? 0;
-            pricePerKg = parseFloat(breakdown?.pricePerKg || lot.pricePerKg || "0");
             size = breakdown?.size || null;
           } else {
             availableBags = lot.remainingBags;
@@ -1874,14 +1870,15 @@ export async function registerRoutes(
             return res.status(400).json({ message: `Not enough bags available (${availableBags})` });
           }
           
-          // Deduct from inventory (negative delta = take bags)
           await storage.adjustInventory(lotId, breakdownId, merchantId, -itemChange.bagsMoved);
           
-          // Use provided netWeight if given, otherwise calculate with default
+          const addBreakdowns = await storage.getBagBreakdownsByLot(lotId, merchantId);
+          const addCostPerBag = storage.computeLotCostPerBag(lot, addBreakdowns);
+          
           const netWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
             ? itemChange.netWeight
-            : itemChange.bagsMoved * 50; // Default 50kg per bag
-          const costOfGoods = netWeight * pricePerKg;
+            : itemChange.bagsMoved * 50;
+          const costOfGoods = addCostPerBag * itemChange.bagsMoved;
           
           // Use provided revenue if given, default to 0
           const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : 0;
@@ -1898,7 +1895,7 @@ export async function registerRoutes(
             size,
             bagsMoved: itemChange.bagsMoved,
             netWeight: netWeight.toString(),
-            pricePerKgSnapshot: pricePerKg.toString(),
+            pricePerKgSnapshot: addCostPerBag.toString(),
             costOfGoods: costOfGoods.toString(),
             revenue: itemRevenue.toString()
           });
