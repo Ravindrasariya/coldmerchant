@@ -5279,12 +5279,9 @@ export async function registerRoutes(
       const unsoldHarvest = await storage.getUnsoldInventory(merchantId);
       let harvestStockValue = 0;
       for (const item of unsoldHarvest) {
-        const ppk = parseFloat(item.pricePerKg || "0");
-        const weight = parseFloat(item.breakdownWeight || item.totalWeight || "0");
-        const origBags = item.originalBags || item.lotOriginalBags || 1;
-        if (ppk > 0 && weight > 0 && origBags > 0) {
-          const weightPerBag = weight / origBags;
-          harvestStockValue += item.remainingBags * weightPerBag * ppk;
+        const cpb = parseFloat(item.costPerBag || "0");
+        if (cpb > 0) {
+          harvestStockValue += item.remainingBags * cpb;
         }
       }
 
