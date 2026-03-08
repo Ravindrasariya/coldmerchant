@@ -5314,7 +5314,12 @@ export async function registerRoutes(
       const harvestTxns = await storage.getTransactionsByMerchant(merchantId);
       const harvestCOGS = harvestTxns
         .filter(tx => tx.dateOfLoading && tx.dateOfLoading >= fyStartDate && tx.dateOfLoading <= fyEndDate)
-        .reduce((sum, tx) => sum + (tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0), 0);
+        .reduce((sum, tx) => {
+          const cost = tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0;
+          const transport = tx.transportationCharges ? parseFloat(tx.transportationCharges) : 0;
+          const other = tx.otherCharges ? parseFloat(tx.otherCharges) : 0;
+          return sum + cost + transport + other;
+        }, 0);
 
       const seedTxns = await storage.getSeedTransactionsByMerchant(merchantId);
       const seedCOGS = seedTxns
@@ -5323,7 +5328,12 @@ export async function registerRoutes(
           const d = typeof tx.createdAt === "string" ? tx.createdAt.slice(0, 10) : new Date(tx.createdAt).toISOString().slice(0, 10);
           return d >= fyStartDate && d <= fyEndDate;
         })
-        .reduce((sum: number, tx: any) => sum + (tx.totalCost ? parseFloat(tx.totalCost) : 0), 0);
+        .reduce((sum: number, tx: any) => {
+          const cost = tx.totalCost ? parseFloat(tx.totalCost) : 0;
+          const transport = tx.transportCharges ? parseFloat(tx.transportCharges) : 0;
+          const other = tx.otherCharges ? parseFloat(tx.otherCharges) : 0;
+          return sum + cost + transport + other;
+        }, 0);
 
       const totalCOGS = harvestCOGS + seedCOGS;
       if (totalCOGS > 0) {
