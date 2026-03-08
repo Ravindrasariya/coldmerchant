@@ -1658,7 +1658,7 @@ export function CashManagementTab() {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Select value={filterDirection} onValueChange={setFilterDirection}>
               <SelectTrigger data-testid="filter-direction" className="h-9">
                 <SelectValue placeholder={t("Direction", "दिशा")} />
