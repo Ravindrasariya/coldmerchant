@@ -1248,10 +1248,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid status. Must be active, inactive, or archived" });
       }
       
-      // Verify admin password
-      const { comparePasswords } = await import("./auth");
-      const adminUser = await storage.getUser(req.user!.id);
-      if (!adminUser || !(await comparePasswords(adminPassword, adminUser.password))) {
+      // Verify admin password against ADMIN_PASSWORD env var for system admin users
+      const envAdminPassword = process.env.ADMIN_PASSWORD;
+      if (!envAdminPassword || !adminPassword) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+      const { timingSafeEqual } = await import("crypto");
+      const suppliedBuf = Buffer.from(adminPassword);
+      const storedBuf = Buffer.from(envAdminPassword);
+      if (suppliedBuf.length !== storedBuf.length || !timingSafeEqual(suppliedBuf, storedBuf)) {
         return res.status(401).json({ message: "Invalid admin password" });
       }
       
@@ -1279,10 +1284,15 @@ export async function registerRoutes(
       const id = parseInt(req.params.id);
       const { adminPassword, resetPassword } = req.body;
       
-      // Verify admin password
-      const { comparePasswords } = await import("./auth");
-      const adminUser = await storage.getUser(req.user!.id);
-      if (!adminUser || !(await comparePasswords(adminPassword, adminUser.password))) {
+      // Verify admin password against ADMIN_PASSWORD env var for system admin users
+      const envAdminPassword = process.env.ADMIN_PASSWORD;
+      if (!envAdminPassword || !adminPassword) {
+        return res.status(401).json({ message: "Invalid admin password" });
+      }
+      const { timingSafeEqual } = await import("crypto");
+      const suppliedBuf = Buffer.from(adminPassword);
+      const storedBuf = Buffer.from(envAdminPassword);
+      if (suppliedBuf.length !== storedBuf.length || !timingSafeEqual(suppliedBuf, storedBuf)) {
         return res.status(401).json({ message: "Invalid admin password" });
       }
       
