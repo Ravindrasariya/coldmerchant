@@ -318,10 +318,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const handleBagCountChange = (index: number, newBags: number) => {
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
-      const hasChanges = newBags !== item.originalBags || item.netWeight !== item.originalNetWeight;
+      const weightPerBag = item.originalBags > 0 ? item.originalNetWeight / item.originalBags : 0;
+      const newWeight = parseFloat((weightPerBag * newBags).toFixed(1));
+      const hasChanges = newBags !== item.originalBags || newWeight !== item.originalNetWeight || item.revenue !== item.originalRevenue;
       return {
         ...item,
         bagsMoved: newBags,
+        netWeight: newWeight,
         action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
       };
     }));
