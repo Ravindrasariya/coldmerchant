@@ -168,6 +168,8 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       toast({
         title: t("Success", "सफल"),
         description: t("Seed transaction created successfully", "बीज लेनदेन सफलतापूर्वक बनाया गया"),

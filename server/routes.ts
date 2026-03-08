@@ -5281,6 +5281,12 @@ export async function registerRoutes(
         supplierPayables += s.totalDue;
       }
 
+      const coldStores = await storage.getColdStoresWithDue(merchantId);
+      let coldStorePayables = 0;
+      for (const cs of coldStores) {
+        coldStorePayables += cs.totalDue;
+      }
+
       const unsoldHarvest = await storage.getUnsoldInventory(merchantId);
       let harvestStockValue = 0;
       for (const item of unsoldHarvest) {
@@ -5302,7 +5308,7 @@ export async function registerRoutes(
       const fixedAssetsNet = fixedAssetsGross - accumulatedDepreciation;
       const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables + inventoryValue;
       const totalAssets = fixedAssetsNet + currentAssets;
-      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + supplierPayables + aadhtiyaPayables + limitAccountLiabilities;
+      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + supplierPayables + aadhtiyaPayables + coldStorePayables + limitAccountLiabilities;
       const ownersEquity = totalAssets - totalLiabilities;
 
       res.json({
@@ -5315,7 +5321,7 @@ export async function registerRoutes(
         liabilities: {
           longTerm: { total: longTermLiabilities, details: liabilityDetails.filter(l => l.type === "long_term") },
           shortTerm: { total: shortTermLiabilities, details: liabilityDetails.filter(l => l.type === "short_term") },
-          currentLiabilities: { farmerPayables, supplierPayables, aadhtiyaPayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
+          currentLiabilities: { farmerPayables, supplierPayables, aadhtiyaPayables, coldStorePayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
           totalLiabilities,
         },
         ownersEquity,

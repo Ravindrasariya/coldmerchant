@@ -178,6 +178,8 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       toast({
         title: t("Success", "सफल"),
         description: t("Seed transaction updated successfully", "बीज लेनदेन सफलतापूर्वक अपडेट किया गया"),

@@ -115,6 +115,8 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {

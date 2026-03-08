@@ -174,6 +174,7 @@ export function BalanceSheet({ financialYear }: BalanceSheetProps) {
               <LineItem label={t("Payables to Farmers", "किसानों को देय")} value={l.currentLiabilities.farmerPayables} indent />
               <LineItem label={t("Payables to Suppliers", "आपूर्तिकर्ताओं को देय")} value={l.currentLiabilities.supplierPayables || 0} indent />
               <LineItem label={t("Payables to Aadhtiyas", "आढ़तियाओं को देय")} value={l.currentLiabilities.aadhtiyaPayables || 0} indent />
+              <LineItem label={t("Payables to Cold Stores", "कोल्ड स्टोर को देय")} value={l.currentLiabilities.coldStorePayables || 0} indent />
               {l.currentLiabilities.limitAccountLiabilities > 0 && (
                 <>
                   {(l.currentLiabilities.limitAccountDetails || []).map((d: any, i: number) => (

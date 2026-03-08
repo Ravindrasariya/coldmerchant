@@ -259,6 +259,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);
@@ -297,6 +299,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);

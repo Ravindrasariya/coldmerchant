@@ -63,6 +63,8 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       form.reset();
       onSuccess?.();
     },
