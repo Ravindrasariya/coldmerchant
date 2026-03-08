@@ -124,17 +124,15 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
   for (const lot of entry.lots) {
     const { totalCharges, netPayable } = computeHarvestLotCharges(lot);
     const breakdowns = lot.bagBreakdowns || [];
-    const cpb = storage.computeLotCostPerBag(lot, breakdowns);
-    const wastageBags = breakdowns
-      .filter((bd: any) => bd.size === "Wastage")
-      .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
-    const actualSellableBags = lot.originalBags - wastageBags;
-    const totalCogs = (cpb * Math.max(actualSellableBags, 0)).toFixed(2);
+    const { breakdownCosts, totalCogs } = storage.computeBreakdownCosts(lot, breakdowns);
+    for (const bd of breakdowns) {
+      const cpb = breakdownCosts.get(bd.id) || 0;
+      await storage.updateBagBreakdown(bd.id, merchantId, { costPerBag: cpb.toFixed(2) });
+    }
     await storage.updateLot(lot.id, merchantId, {
       totalCharges,
       netPayable,
-      totalCogs,
-      costPerBag: cpb.toFixed(2),
+      totalCogs: totalCogs.toFixed(2),
     });
   }
 }
@@ -204,38 +202,39 @@ export async function registerRoutes(
   // Setup authentication routes
   setupAuth(app);
 
-  // One-time backfill: compute totalCogs/costPerBag for lots that have 0 values
+  // One-time backfill: compute per-breakdown costPerBag and lot totalCogs
   (async () => {
     try {
       const { db } = await import("./db");
       const { stockEntries } = await import("@shared/schema");
       const allEntries = await db.select({ id: stockEntries.id, merchantId: stockEntries.merchantId })
         .from(stockEntries);
-      let updated = 0;
+      let updatedBd = 0;
+      let updatedLots = 0;
       for (const entry of allEntries) {
         const full = await storage.getStockEntryById(entry.id, entry.merchantId);
         if (!full) continue;
         for (const lot of full.lots) {
-          const existing = lot.costPerBag ? parseFloat(lot.costPerBag) : 0;
-          if (existing > 0) continue;
           const breakdowns = lot.bagBreakdowns || [];
-          const cpb = storage.computeLotCostPerBag(lot, breakdowns);
-          if (cpb <= 0) continue;
-          const wastageBags = breakdowns
-            .filter((bd: any) => bd.size === "Wastage")
-            .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
-          const actualSellableBags = lot.originalBags - wastageBags;
-          const totalCogs = (cpb * Math.max(actualSellableBags, 0)).toFixed(2);
-          await storage.updateLot(lot.id, entry.merchantId, {
-            totalCogs,
-            costPerBag: cpb.toFixed(2),
-          });
-          updated++;
+          const { breakdownCosts, totalCogs } = storage.computeBreakdownCosts(lot, breakdowns);
+          for (const bd of breakdowns) {
+            const cpb = breakdownCosts.get(bd.id) || 0;
+            const existingCpb = bd.costPerBag ? parseFloat(bd.costPerBag) : 0;
+            if (Math.abs(cpb - existingCpb) > 0.01) {
+              await storage.updateBagBreakdown(bd.id, entry.merchantId, { costPerBag: cpb.toFixed(2) });
+              updatedBd++;
+            }
+          }
+          const existingCogs = lot.totalCogs ? parseFloat(lot.totalCogs) : 0;
+          if (Math.abs(totalCogs - existingCogs) > 0.01) {
+            await storage.updateLot(lot.id, entry.merchantId, { totalCogs: totalCogs.toFixed(2) });
+            updatedLots++;
+          }
         }
       }
-      if (updated > 0) console.log(`[backfill] Updated totalCogs/costPerBag for ${updated} lots`);
+      if (updatedBd > 0 || updatedLots > 0) console.log(`[backfill] Updated ${updatedBd} breakdown costPerBag, ${updatedLots} lot totalCogs`);
     } catch (err) {
-      console.error("[backfill] Error backfilling lot COGS:", err);
+      console.error("[backfill] Error backfilling breakdown costs:", err);
     }
   })();
 
@@ -1586,7 +1585,8 @@ export async function registerRoutes(
         }
         
         const allBreakdowns = await storage.getBagBreakdownsByLot(item.lotId, merchantId);
-        const costPerBag = storage.computeLotCostPerBag(lot!, allBreakdowns);
+        const { breakdownCosts } = storage.computeBreakdownCosts(lot!, allBreakdowns);
+        const costPerBag = breakdownCosts.get(item.breakdownId || null) || 0;
         
         const netWeight = item.netWeight || 0;
         const costOfGoods = costPerBag * item.bagsMoved;
@@ -1846,7 +1846,8 @@ export async function registerRoutes(
                   : itemChange.bagsMoved * 50);
             const editLot = await storage.getLotById(existingItem.lotId, merchantId);
             const editBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
-            const editCostPerBag = editLot ? storage.computeLotCostPerBag(editLot, editBreakdowns) : parseFloat(existingItem.pricePerKgSnapshot || "0");
+            const { breakdownCosts: editBdCosts } = editLot ? storage.computeBreakdownCosts(editLot, editBreakdowns) : { breakdownCosts: new Map() };
+            const editCostPerBag = editBdCosts.get(existingItem.breakdownId || null) || parseFloat(existingItem.pricePerKgSnapshot || "0");
             const newCostOfGoods = editCostPerBag * itemChange.bagsMoved;
             
             const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
@@ -1917,7 +1918,8 @@ export async function registerRoutes(
           await storage.adjustInventory(lotId, breakdownId, merchantId, -itemChange.bagsMoved);
           
           const addBreakdowns = await storage.getBagBreakdownsByLot(lotId, merchantId);
-          const addCostPerBag = storage.computeLotCostPerBag(lot, addBreakdowns);
+          const { breakdownCosts: addBdCosts } = storage.computeBreakdownCosts(lot, addBreakdowns);
+          const addCostPerBag = addBdCosts.get(breakdownId || null) || 0;
           
           const netWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
             ? itemChange.netWeight

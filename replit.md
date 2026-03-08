@@ -192,15 +192,16 @@ The Books feature provides simplified accounting views:
 - **Balance Sheet**: Auto-generated for selected FY. Assets = Fixed (after depreciation) + Current (cash, bank with positive balances only, buyer receivables, farmer receivables from netDue<0, unsold harvest stock value, unsold seed stock value). Liabilities = Long-term + Short-term + Farmer payables (netDue>0) + Supplier payables (seed supplier dues) + Aadhtiya payables (mandi stock dues + pyPayable) + Limit account overdrafts (negative bank balances). Owner's Equity = Assets - Liabilities. Farmer receivables/payables are computed from netDue = harvestDue - pyReceivable - seedDue per farmer. Inventory values calculated from remaining bags × cost (harvest: weightPerBag × pricePerKg; seed: avgCostPerBag including all charges).
 - **Profit & Loss**: Auto-generated for selected FY using accrual-based accounting. Revenue recognized from actual sale transactions (harvest `transactions.revenue` as raw_potato; seed `seed_transactions.totalRevenue` as seed_sale), not from cash receipts. Other revenue types (commission, other) still come from cash entries. Expenses include: Cost of Goods Sold (COGS) from sale transactions (harvest `totalCostOfGoods` + `transportationCharges` + `otherCharges`; seed `totalCost` + `transportCharges` + `otherCharges`), operating expenses from cash outflows (excluding `capital_expense`, `aadhtiya`, `supplier`, and `raw_potato`/`seed_sale` revenue types which are all transaction-based), depreciation, and loan interest. Both revenue and COGS are transaction-based — cash received/paid is irrelevant for P&L recognition.
 - **COGS per bag (proportionate lot cost)**: When loading a truck, COGS uses proportionate stock register cost per bag instead of `netWeight × pricePerKg`. Formula varies by purchase type:
-  - **Farm Gate**: `costPerBag = (totalPayable + coldStoreCharges) / actualSellableBags` — cold/warehouse charges paid separately by merchant
-  - **Cold Store**: `costPerBag = totalPayable / actualSellableBags` — all deductions still part of total cost
-  - **Mandi**: `costPerBag = netPayable / actualSellableBags` — includes cost of goods + all mandi charges (commission, aadhat, hammali, extra)
-  - DB columns `total_cogs` and `cost_per_bag` are stored on the `lots` table, computed by `recomputeHarvestLotCharges` on create/update. Backfill runs on server startup for lots with zero values. Both columns included in stock register CSV export.
-  - `actualSellableBags` = originalBags - wastageBags (wastage from grading reduces sellable count)
-  - `totalPayable` = gross value from bag breakdowns = Σ(netWeight × pricePerKg) per non-wastage breakdown
-  - `coldStoreCharges` = sum of "Cold Charges" + "Ware House Charges" from lot charges array
-  - `netPayable` = stored in DB for mandi lots (= costOfGoods + mandiCharges)
-  - Implemented in `storage.computeLotCostPerBag()` helper, used by unsold inventory API, transaction creation (POST), and transaction edit (PUT)
+  - **Per-breakdown cost model**: `cost_per_bag` is stored on `bag_breakdowns` table (not `lots`). Each breakdown row gets its own cost based on its `totalAmount / numberOfBags` plus proportionate share of charges.
+  - **Cold Store**: `cpb = (totalAmount / bags) + (coldStoreCharges / actualSellableBags)`
+  - **Farm Gate**: `cpb = (totalAmount / bags) + (coldStoreCharges / actualSellableBags) + (farmerDeductions / actualSellableBags)`
+  - **Mandi**: `cpb = (totalAmount / bags) + totalAmount*(mandiPct+aadhatPct)/100 / bags + hammaliPerBag`
+  - **Wastage rows**: `cpb = totalAmount / bags` if totalAmount exists, else 0. No charges added.
+  - `total_cogs` stored on `lots` table = Σ(costPerBag × numberOfBags) across all breakdowns
+  - Computed by `storage.computeBreakdownCosts(lot, breakdowns)` → `{ breakdownCosts: Map<id|null, cpb>, totalCogs }`
+  - `recomputeHarvestLotCharges` writes per-breakdown `costPerBag` and lot `totalCogs` on create/update
+  - Backfill runs on server startup for breakdowns with incorrect values
+  - CSV export includes Total COGS column (no Cost/Bag column)
 - All financial reports are derived (computed on the fly), never stored.
 - FY selector allows viewing any year (Indian FY: April–March).
 - Tables: `assets`, `asset_depreciation_log`, `liabilities`, `liability_payments`

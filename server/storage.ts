@@ -766,16 +766,21 @@ export class DatabaseStorage implements IStorage {
     return result ? result.transactionNumber + 1 : 1;
   }
 
-  computeLotCostPerBag(lot: any, breakdowns: any[]): number {
-    if (lot.originalBags <= 0) return 0;
+  computeBreakdownCosts(lot: any, breakdowns: any[]): { breakdownCosts: Map<number | null, number>, totalCogs: number } {
+    const result = new Map<number | null, number>();
+    if (lot.originalBags <= 0) return { breakdownCosts: result, totalCogs: 0 };
 
+    const place = lot.place || "cold_store";
     const wastageBags = breakdowns
       .filter((bd: any) => bd.size === "Wastage")
       .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
     const actualSellableBags = lot.originalBags - wastageBags;
-    if (actualSellableBags <= 0) return 0;
 
-    let totalPayable = 0;
+    const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+    const coldStoreCharges = (lot.charges || [])
+      .filter((c: any) => c && coldStoreTypes.includes(c.type))
+      .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+
     const sellableBreakdowns = breakdowns.filter((bd: any) => bd.size !== "Wastage");
     const hasBreakdownData = sellableBreakdowns.some((bd: any) => {
       const w = bd.weight ? parseFloat(bd.weight) : 0;
@@ -783,39 +788,67 @@ export class DatabaseStorage implements IStorage {
       return w > 0 && p > 0;
     });
 
-    if (hasBreakdownData) {
-      for (const bd of sellableBreakdowns) {
+    if (hasBreakdownData && breakdowns.length > 0) {
+      const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
+      const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
+      const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
+      const isFarmGate = place === "farm_gate";
+      const farmGateDeductionTypes = ["Cold Charges", "Ware House Charges"];
+      const farmerDeductions = isFarmGate ? (lot.charges || [])
+        .filter((c: any) => c && !farmGateDeductionTypes.includes(c.type))
+        .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0) : 0;
+
+      let totalCogs = 0;
+      for (const bd of breakdowns) {
+        const bags = bd.numberOfBags || 0;
+        if (bags <= 0) { result.set(bd.id, 0); continue; }
+
         const weight = bd.weight ? parseFloat(bd.weight) : 0;
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-        if (netWeight > 0 && price > 0) {
-          totalPayable += netWeight * price;
+        const netWeight = weight > 0 ? weight - bags : 0;
+        const rowTotal = (netWeight > 0 && price > 0) ? netWeight * price : 0;
+        const isWastage = bd.size === "Wastage";
+
+        let cpb: number;
+        if (isWastage) {
+          cpb = rowTotal > 0 ? rowTotal / bags : 0;
+        } else if (place === "mandi") {
+          const rowCharges = rowTotal * (mandiPct + aadhatPct) / 100;
+          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate;
+        } else if (isFarmGate) {
+          const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
+          const deductShare = actualSellableBags > 0 ? farmerDeductions / actualSellableBags : 0;
+          cpb = (rowTotal / bags) + coldShare + deductShare;
+        } else {
+          const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
+          cpb = (rowTotal / bags) + coldShare;
         }
+        result.set(bd.id, cpb);
+        totalCogs += cpb * bags;
       }
+      return { breakdownCosts: result, totalCogs };
     } else {
       const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
       const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
       const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
-      if (netWeight > 0 && price > 0) {
-        totalPayable = netWeight * price;
+      const totalPayable = (netWeight > 0 && price > 0) ? netWeight * price : 0;
+
+      let cpb: number;
+      if (place === "farm_gate") {
+        const farmGateDeductionTypes = ["Cold Charges", "Ware House Charges"];
+        const farmerDeductions = (lot.charges || [])
+          .filter((c: any) => c && !farmGateDeductionTypes.includes(c.type))
+          .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+        cpb = actualSellableBags > 0 ? (totalPayable + coldStoreCharges + farmerDeductions) / actualSellableBags : 0;
+      } else if (place === "mandi") {
+        const lotNp = lot.netPayable ? parseFloat(lot.netPayable) : totalPayable;
+        cpb = actualSellableBags > 0 ? lotNp / actualSellableBags : 0;
+      } else {
+        cpb = actualSellableBags > 0 ? (totalPayable + coldStoreCharges) / actualSellableBags : 0;
       }
+      result.set(null, cpb);
+      return { breakdownCosts: result, totalCogs: cpb * Math.max(actualSellableBags, 0) };
     }
-
-    const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
-    const coldStoreCharges = (lot.charges || [])
-      .filter((c: any) => c && coldStoreTypes.includes(c.type))
-      .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-
-    let lotCost: number;
-    if (lot.place === "farm_gate") {
-      lotCost = totalPayable + coldStoreCharges;
-    } else if (lot.place === "mandi") {
-      lotCost = lot.netPayable ? parseFloat(lot.netPayable) : totalPayable;
-    } else {
-      lotCost = totalPayable;
-    }
-
-    return lotCost / actualSellableBags;
   }
 
   async getUnsoldInventory(merchantId: number): Promise<any[]> {
@@ -833,10 +866,9 @@ export class DatabaseStorage implements IStorage {
       const breakdowns = await db.select().from(bagBreakdowns)
         .where(eq(bagBreakdowns.lotId, lot.id));
       
-      const costPerBag = this.computeLotCostPerBag(lot, breakdowns);
+      const { breakdownCosts } = this.computeBreakdownCosts(lot, breakdowns);
       
       if (breakdowns.length > 0) {
-        // For bilty_cut: return one entry per non-wastage breakdown
         for (const breakdown of breakdowns) {
           if (breakdown.size === "Wastage") continue;
           
@@ -861,11 +893,10 @@ export class DatabaseStorage implements IStorage {
             lotOriginalBags: lot.originalBags,
             totalWeight: breakdown.weight || lot.totalWeight || null,
             breakdownWeight: breakdown.weight || null,
-            costPerBag,
+            costPerBag: breakdownCosts.get(breakdown.id) || 0,
           });
         }
       } else {
-        // For gate_cut: return single entry for the lot
         if (lot.remainingBags > 0) {
           results.push({
             breakdownId: null,
@@ -885,7 +916,7 @@ export class DatabaseStorage implements IStorage {
             lotOriginalBags: lot.originalBags,
             totalWeight: lot.totalWeight || null,
             breakdownWeight: null,
-            costPerBag,
+            costPerBag: breakdownCosts.get(null) || 0,
           });
         }
       }
