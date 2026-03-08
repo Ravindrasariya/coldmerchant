@@ -1,0 +1,19 @@
+[TAILING] Tailing last 10 lines for [vyapar-vriddhi] process (change the value with --lines option)
+/root/.pm2/logs/vyapar-vriddhi-error-2.log last 10 lines:
+2|vyapar-v |     at check (node:internal/crypto/scrypt:84:10)
+2|vyapar-v |     at scrypt (node:internal/crypto/scrypt:46:13)
+2|vyapar-v |     at node:internal/util:441:7
+2|vyapar-v |     at new Promise (<anonymous>)
+2|vyapar-v |     at scrypt (node:internal/util:427:12)
+2|vyapar-v |     at fb (/var/www/vyapar-vriddhi/dist/index.cjs:76:88916)
+2|vyapar-v |     at /var/www/vyapar-vriddhi/dist/index.cjs:78:99217
+2|vyapar-v |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+2|vyapar-v |   code: 'ERR_INVALID_ARG_TYPE'
+2|vyapar-v | }
+
+/root/.pm2/logs/vyapar-vriddhi-out-2.log last 10 lines:
+2|vyapar-v | false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T15:57:36.614Z","merchantName":"Roop Laxmi Traders"},{"id":4,"username":"mpatidar","name":"Manoj Patidar","mobileNumber":"9098631186","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T15:58:23.833Z","merchantName":"Testing Merchant"},{"id":7,"username":"rsariya","name":"Ravindra Sariya","mobileNumber":"8882589392","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T16:01:10.990Z","merchantName":"Testing Merchant"},{"id":9,"username":"rampatidar","name":"Rambabu Patidar","mobileNumber":"9630609672","merchantId":3,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-16T18:55:13.189Z","merchantName":"RGP Dattotar"},{"id":8,"username":"rajpatidar","name":"Rajendra Patidar","mobileNumber":"9685327296","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-05T13:36:18.967Z","merchantName":"Testing Merchant"},{"id":5,"username":"dranasara","name":"Deepak Ranasara","mobileNumber":"6268432011","merchantId":1,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-04T15:59:11.286Z","merchantName":"Testing Merchant"},{"id":10,"username":"vjsingh","name":"Vijayendra singh","mobileNumber":"9179126405","merchantId":4,"isSystemAdmin":false,"canEdit":true,"mustChangePassword":false,"createdAt":"2026-02-20T14:11:07.138Z","merchantName":"Jay shree mahakal Traders"}]
+2|vyapar-v | 11:00:57 AM [express] PATCH /api/admin/merchants/1/status 500 in 21ms :: {"message":"Failed to update merchant status"}
+2|vyapar-v | 11:01:40 AM [express] POST /api/admin/merchants/1/reset 500 in 17ms :: {"message":"Failed to reset merchant"}
+2|vyapar-v | 11:01:51 AM [express] POST /api/admin/merchants/1/reset 500 in 22ms :: {"message":"Failed to reset merchant"}
+2|vyapar-v | 11:02:02 AM [express] POST /api/admin/merchants/1/reset 500 in 25ms :: {"message":"Failed to reset merchant"}
