@@ -84,7 +84,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   const [printEntry, setPrintEntry] = useState<SeedStockEntryWithLots | null>(null);
   const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
   
-  const downloadDialogOpen = externalDownloadOpen ?? internalDownloadOpen;
+  const downloadDialogOpen = externalDownloadOpen || internalDownloadOpen;
   const setDownloadDialogOpen = (open: boolean) => {
     if (!open && onDownloadDialogClose) {
       onDownloadDialogClose();

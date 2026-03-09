@@ -80,7 +80,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
   
   // Download dialog state - can be controlled externally or internally
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
-  const downloadDialogOpen = externalDownloadOpen ?? internalDownloadOpen;
+  const downloadDialogOpen = externalDownloadOpen || internalDownloadOpen;
   const setDownloadDialogOpen = (open: boolean) => {
     if (!open && onDownloadDialogClose) {
       onDownloadDialogClose();
