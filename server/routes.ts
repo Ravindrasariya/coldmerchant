@@ -5432,7 +5432,12 @@ export async function registerRoutes(
           const d = typeof tx.createdAt === "string" ? tx.createdAt.slice(0, 10) : new Date(tx.createdAt).toISOString().slice(0, 10);
           return d >= fyStartDate && d <= fyEndDate;
         })
-        .reduce((sum: number, tx: any) => sum + (tx.totalRevenue ? parseFloat(tx.totalRevenue) : 0), 0);
+        .reduce((sum: number, tx: any) => {
+          const rev = tx.totalRevenue ? parseFloat(tx.totalRevenue) : 0;
+          const transport = tx.transportCharges ? parseFloat(tx.transportCharges) : 0;
+          const other = tx.otherCharges ? parseFloat(tx.otherCharges) : 0;
+          return sum + rev + transport + other;
+        }, 0);
       if (seedRevenue > 0) {
         revenueByType["seed_sale"] = (revenueByType["seed_sale"] || 0) + seedRevenue;
       }
