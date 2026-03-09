@@ -5757,7 +5757,7 @@ export async function registerRoutes(
         const amt = parseFloat(e.amount);
         if (e.direction === "inward" && e.revenueType && e.revenueType !== "raw_potato" && e.revenueType !== "seed_sale") {
           revenueByType[e.revenueType] = (revenueByType[e.revenueType] || 0) + amt;
-        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense" && e.expenseType !== "aadhtiya" && e.expenseType !== "supplier") {
+        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense" && e.expenseType !== "aadhtiya" && e.expenseType !== "supplier" && e.expenseType !== "cold_store_charge" && e.expenseType !== "warehouse_charges") {
           expenseByType[e.expenseType] = (expenseByType[e.expenseType] || 0) + amt;
         }
       }
