@@ -405,7 +405,7 @@ export default function ColdStoreLedgerTab() {
           ) : (
             <div className="space-y-4">
               <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
-                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[1050px]" style={{ gridTemplateColumns: '36px minmax(90px, 0.9fr) minmax(100px, 1.2fr) minmax(80px, 0.9fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(60px, 0.6fr) 55px 48px minmax(90px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr)' }}>
+                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[800px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(120px, 1.3fr) minmax(90px, 1fr) minmax(80px, 0.8fr) 55px 48px minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr)' }}>
                   <div></div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -422,8 +422,6 @@ export default function ColdStoreLedgerTab() {
                   <div>{t("Name", "नाम")}</div>
                   <div>{t("Address", "पता")}</div>
                   <div>{t("Contact", "संपर्क")}</div>
-                  <div>{t("Bank", "बैंक")}</div>
-                  <div>{t("IFSC", "IFSC")}</div>
                   <div>{t("Red Flag", "रेड फ्लैग")}</div>
                   <div>{t("Active", "सक्रिय")}</div>
                   <div>{t("PY Payable", "पीवाय देय")}</div>
@@ -445,8 +443,8 @@ export default function ColdStoreLedgerTab() {
                 {filteredColdStores.map((cs, index) => (
                   <div 
                     key={cs.id} 
-                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[1050px]"
-                    style={{ gridTemplateColumns: '36px minmax(90px, 0.9fr) minmax(100px, 1.2fr) minmax(80px, 0.9fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(60px, 0.6fr) 55px 48px minmax(90px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr)' }}
+                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[800px]"
+                    style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(120px, 1.3fr) minmax(90px, 1fr) minmax(80px, 0.8fr) 55px 48px minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr)' }}
                     data-testid={`coldstore-row-${index}`}
                   >
                     <div className="flex items-center justify-center">
@@ -470,12 +468,6 @@ export default function ColdStoreLedgerTab() {
                     </div>
                     <div className="text-xs truncate" data-testid={`text-coldstore-contact-${index}`}>
                       {cs.contact || '-'}
-                    </div>
-                    <div className="text-xs truncate" title={cs.bankAccountNumber || undefined}>
-                      {cs.bankName || '-'}
-                    </div>
-                    <div className="text-xs font-mono truncate">
-                      {cs.ifscCode || '-'}
                     </div>
                     <div className="flex items-center">
                       {cs.redFlag ? (
