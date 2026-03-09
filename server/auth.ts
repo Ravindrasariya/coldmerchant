@@ -16,18 +16,26 @@ declare global {
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
+  if (!password || typeof password !== "string") {
+    throw new Error("Password must be a non-empty string");
+  }
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  if (!stored || !stored.includes(".")) return false;
+  if (!supplied || typeof supplied !== "string") return false;
+  if (!stored || typeof stored !== "string" || !stored.includes(".")) return false;
   const [hashed, salt] = stored.split(".");
   if (!hashed || !salt) return false;
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  try {
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch {
+    return false;
+  }
 }
 
 export function setupAuth(app: Express) {
