@@ -160,6 +160,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const [showColdStoreDropdown, setShowColdStoreDropdown] = useState<number | null>(null);
   const [coldStoreSearch, setColdStoreSearch] = useState("");
   const coldStoreDropdownRefs = useRef<{[key: number]: HTMLDivElement | null}>({});
+  const [chargeCSDropdownOpen, setChargeCSDropdownOpen] = useState<string | null>(null);
+  const [chargeCSSearch, setChargeCSSearch] = useState("");
+  const chargeCSDropdownRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
 
   useEffect(() => {
     const fetchColdStores = async () => {
@@ -307,11 +311,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     (newLots[lotIndex] as any)[field] = value;
     setLots(newLots);
   };
-
-  const [chargeCSDropdownOpen, setChargeCSDropdownOpen] = useState<string | null>(null);
-  const [chargeCSSearch, setChargeCSSearch] = useState("");
-  const chargeCSDropdownRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
-  const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
 
   const handleChargeAdd = (lotIndex: number) => {
     const newLots = [...lots];
