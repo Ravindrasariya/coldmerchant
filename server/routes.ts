@@ -566,7 +566,7 @@ export async function registerRoutes(
 
       const allSeedEntriesForCS = await storage.getSeedEntriesByMerchant(merchantId);
       for (const seedEntry of allSeedEntriesForCS) {
-        for (const sLot of (seedEntry.lots || [])) {
+        for (const sLot of (seedEntry.seedLots || [])) {
           const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
           const seedColdCharges = chargesPerBag * (sLot.originalBags || 0);
           const seedColdPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
