@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { calculateInterestOnly, calculateSimpleInterest } from "@/lib/interest-utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -156,38 +156,45 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   })));
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
-  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<{id: number, name: string}[]>([]);
-  const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState<number | null>(null);
-  const coldStoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [allColdStores, setAllColdStores] = useState<{id: number, name: string}[]>([]);
+  const [showColdStoreDropdown, setShowColdStoreDropdown] = useState<number | null>(null);
+  const [coldStoreSearch, setColdStoreSearch] = useState("");
+  const coldStoreDropdownRefs = useRef<{[key: number]: HTMLDivElement | null}>({});
 
-  const searchColdStores = useCallback(async (query: string, lotIndex: number) => {
-    if (query.length < 1) {
-      setColdStoreSuggestions([]);
-      return;
-    }
-    try {
-      const response = await fetch(`/api/cold-stores/search?q=${encodeURIComponent(query)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setColdStoreSuggestions(data);
-        setShowColdStoreSuggestions(lotIndex);
+  useEffect(() => {
+    const fetchColdStores = async () => {
+      try {
+        const response = await fetch("/api/cold-stores/search?q=");
+        if (response.ok) {
+          const data = await response.json();
+          setAllColdStores(data);
+        }
+      } catch (error) {
+        console.error("Error fetching cold stores:", error);
       }
-    } catch (error) {
-      console.error("Error searching cold stores:", error);
-    }
-  }, []);
+    };
+    if (open) fetchColdStores();
+  }, [open]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      const dropdowns = document.querySelectorAll('[data-edit-coldstore-dropdown]');
       let isInside = false;
-      dropdowns.forEach(el => { if (el.contains(target)) isInside = true; });
-      if (!isInside) setShowColdStoreSuggestions(null);
+      Object.values(coldStoreDropdownRefs.current).forEach(el => {
+        if (el && el.contains(target)) isInside = true;
+      });
+      if (!isInside) {
+        setShowColdStoreDropdown(null);
+        setColdStoreSearch("");
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const filteredColdStores = allColdStores.filter(cs =>
+    !coldStoreSearch || cs.name.toLowerCase().includes(coldStoreSearch.toLowerCase())
+  );
 
   // Fetch edit history
   const { data: editHistory = [], isLoading: historyLoading } = useQuery<Array<{
@@ -547,48 +554,54 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       ) : lot.place === "mandi" ? (
                         <CardTitle className="text-base font-medium">{t("Mandi", "मंडी")}</CardTitle>
                       ) : (
-                        <div className="relative flex-1 max-w-[220px]">
-                          <Input
-                            value={lot.coldStoreName}
-                            onChange={(e) => {
-                              const newLots = [...lots];
-                              newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: e.target.value, coldStoreDbId: null };
-                              setLots(newLots);
-                              if (coldStoreDebounceRef.current) clearTimeout(coldStoreDebounceRef.current);
-                              coldStoreDebounceRef.current = setTimeout(() => {
-                                searchColdStores(e.target.value, lotIndex);
-                              }, 300);
+                        <div className="relative flex-1 max-w-[220px]" ref={(el) => { coldStoreDropdownRefs.current[lotIndex] = el; }}>
+                          <div
+                            className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm cursor-pointer hover:bg-accent/50 transition-colors items-center"
+                            onClick={() => {
+                              setShowColdStoreDropdown(showColdStoreDropdown === lotIndex ? null : lotIndex);
+                              setColdStoreSearch("");
                             }}
-                            onFocus={() => {
-                              if (lot.coldStoreName && lot.coldStoreName.length >= 1) {
-                                searchColdStores(lot.coldStoreName, lotIndex);
-                              }
-                            }}
-                            placeholder={t("Cold Store Name", "कोल्ड स्टोर का नाम")}
-                            autoComplete="off"
-                            className="h-8 text-sm"
                             data-testid={`edit-cold-store-name-${lotIndex}`}
-                          />
-                          {showColdStoreSuggestions === lotIndex && coldStoreSuggestions.length > 0 && (
-                            <div
-                              data-edit-coldstore-dropdown
-                              className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md max-h-40 overflow-auto"
-                            >
-                              {coldStoreSuggestions.map((cs, idx) => (
-                                <div
-                                  key={idx}
-                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                                  onClick={() => {
-                                    const newLots = [...lots];
-                                    newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: cs.name, coldStoreDbId: cs.id };
-                                    setLots(newLots);
-                                    setShowColdStoreSuggestions(null);
-                                  }}
-                                  data-testid={`edit-coldstore-suggestion-${lotIndex}-${idx}`}
-                                >
-                                  {cs.name}
-                                </div>
-                              ))}
+                          >
+                            <span className={lot.coldStoreName ? "text-foreground truncate" : "text-muted-foreground"}>
+                              {lot.coldStoreName || t("Select cold store", "कोल्ड स्टोर चुनें")}
+                            </span>
+                          </div>
+                          {showColdStoreDropdown === lotIndex && (
+                            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg min-w-[200px]">
+                              <div className="p-2 border-b">
+                                <Input
+                                  placeholder={t("Search cold store...", "कोल्ड स्टोर खोजें...")}
+                                  value={coldStoreSearch}
+                                  onChange={(e) => setColdStoreSearch(e.target.value)}
+                                  autoFocus
+                                  className="h-7 text-sm"
+                                  data-testid={`search-edit-cold-store-${lotIndex}`}
+                                />
+                              </div>
+                              <div className="max-h-40 overflow-y-auto">
+                                {filteredColdStores.length > 0 ? filteredColdStores.map((cs, idx) => (
+                                  <div
+                                    key={cs.id}
+                                    className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      const newLots = [...lots];
+                                      newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: cs.name, coldStoreDbId: cs.id };
+                                      setLots(newLots);
+                                      setShowColdStoreDropdown(null);
+                                      setColdStoreSearch("");
+                                    }}
+                                    data-testid={`edit-coldstore-suggestion-${lotIndex}-${idx}`}
+                                  >
+                                    {cs.name}
+                                  </div>
+                                )) : (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">
+                                    {t("No cold stores found", "कोई कोल्ड स्टोर नहीं मिला")}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
