@@ -984,6 +984,8 @@ export const bagBreakdownFormSchema = z.object({
 export const chargeEntrySchema = z.object({
   type: z.string().min(1, "Charge type is required"),
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
+  coldStoreName: z.string().optional(),
+  coldStoreDbId: z.coerce.number().optional(),
 });
 
 export type ChargeEntry = z.infer<typeof chargeEntrySchema>;

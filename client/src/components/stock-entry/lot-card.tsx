@@ -111,8 +111,13 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   });
 
   const handleAddCharge = () => {
-    appendCharge({ type: "", amount: undefined as any });
+    appendCharge({ type: "", amount: undefined as any, coldStoreName: "", coldStoreDbId: undefined });
   };
+
+  const [chargeCSDropdownOpen, setChargeCSDropdownOpen] = useState<number | null>(null);
+  const [chargeCSSearch, setChargeCSSearch] = useState("");
+  const chargeCSDropdownRefs = useRef<{[key: number]: HTMLDivElement | null}>({});
+  const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
 
   const [allColdStores, setAllColdStores] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreDropdown, setShowColdStoreDropdown] = useState(false);
@@ -140,10 +145,17 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
         setShowColdStoreDropdown(false);
         setColdStoreSearch("");
       }
+      if (chargeCSDropdownOpen !== null) {
+        const ref = chargeCSDropdownRefs.current[chargeCSDropdownOpen];
+        if (ref && !ref.contains(event.target as Node)) {
+          setChargeCSDropdownOpen(null);
+          setChargeCSSearch("");
+        }
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [chargeCSDropdownOpen]);
 
   const filteredColdStores = allColdStores.filter(cs =>
     !coldStoreSearch || cs.name.toLowerCase().includes(coldStoreSearch.toLowerCase())
@@ -644,75 +656,148 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
 
             {chargeFields.length > 0 && (
               <div className="space-y-3">
-                {chargeFields.map((chargeField, chargeIndex) => (
-                  <div key={chargeField.id} className="flex items-end gap-3">
-                    <FormField
-                      control={form.control}
-                      name={`lots.${lotIndex}.charges.${chargeIndex}.type`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          {chargeIndex === 0 && (
-                            <FormLabel>{t("Charge Type", "शुल्क प्रकार")} *</FormLabel>
-                          )}
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="text-left" data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
-                                <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {CHARGE_TYPES.map((type) => (
-                                <SelectItem key={type} value={type}>
-                                  {type}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`lots.${lotIndex}.charges.${chargeIndex}.amount`}
-                      render={({ field }) => (
-                        <FormItem className="w-32">
-                          {chargeIndex === 0 && (
-                            <FormLabel>{t("Amount", "राशि")} *</FormLabel>
-                          )}
-                          <FormControl>
-                            <Input 
-                              type="number"
-                              step="any"
-                              placeholder="0" 
-                              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              {...field}
+                {chargeFields.map((chargeField, chargeIndex) => {
+                  const chargeType = form.watch(`lots.${lotIndex}.charges.${chargeIndex}.type`);
+                  const showCSDropdown = place === "farm_gate" && coldStoreChargeTypes.includes(chargeType);
+                  const chargeFilteredCS = allColdStores.filter(cs =>
+                    !chargeCSSearch || cs.name.toLowerCase().includes(chargeCSSearch.toLowerCase())
+                  );
+                  return (
+                  <div key={chargeField.id}>
+                    <div className="flex items-end gap-3">
+                      <FormField
+                        control={form.control}
+                        name={`lots.${lotIndex}.charges.${chargeIndex}.type`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            {chargeIndex === 0 && (
+                              <FormLabel>{t("Charge Type", "शुल्क प्रकार")} *</FormLabel>
+                            )}
+                            <Select 
+                              onValueChange={(v) => {
+                                field.onChange(v);
+                                if (!coldStoreChargeTypes.includes(v)) {
+                                  form.setValue(`lots.${lotIndex}.charges.${chargeIndex}.coldStoreName`, "");
+                                  form.setValue(`lots.${lotIndex}.charges.${chargeIndex}.coldStoreDbId`, undefined);
+                                }
+                              }} 
                               value={field.value || ""}
-                              onChange={(e) => {
-                                field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
-                              }}
-                              data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeCharge(chargeIndex)}
-                      className="text-destructive h-9 w-9"
-                      data-testid={`button-remove-charge-${lotIndex}-${chargeIndex}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                            >
+                              <FormControl>
+                                <SelectTrigger className="text-left" data-testid={`select-charge-type-${lotIndex}-${chargeIndex}`}>
+                                  <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {CHARGE_TYPES.map((type) => (
+                                  <SelectItem key={type} value={type}>
+                                    {type}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`lots.${lotIndex}.charges.${chargeIndex}.amount`}
+                        render={({ field }) => (
+                          <FormItem className="w-32">
+                            {chargeIndex === 0 && (
+                              <FormLabel>{t("Amount", "राशि")} *</FormLabel>
+                            )}
+                            <FormControl>
+                              <Input 
+                                type="number"
+                                step="any"
+                                placeholder="0" 
+                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                {...field}
+                                value={field.value || ""}
+                                onChange={(e) => {
+                                  field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
+                                }}
+                                data-testid={`input-charge-amount-${lotIndex}-${chargeIndex}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeCharge(chargeIndex)}
+                        className="text-destructive h-9 w-9"
+                        data-testid={`button-remove-charge-${lotIndex}-${chargeIndex}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {showCSDropdown && (
+                      <FormField
+                        control={form.control}
+                        name={`lots.${lotIndex}.charges.${chargeIndex}.coldStoreName`}
+                        render={({ field }) => (
+                          <FormItem className="mt-2 ml-0">
+                            <div ref={(el) => { chargeCSDropdownRefs.current[chargeIndex] = el; }} className="relative">
+                              <div
+                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:bg-accent/50 transition-colors"
+                                onClick={() => {
+                                  setChargeCSDropdownOpen(chargeCSDropdownOpen === chargeIndex ? null : chargeIndex);
+                                  setChargeCSSearch("");
+                                }}
+                                data-testid={`select-charge-coldstore-${lotIndex}-${chargeIndex}`}
+                              >
+                                <span className={field.value ? "text-foreground" : "text-muted-foreground"}>
+                                  {field.value || t("Select cold store", "कोल्ड स्टोर चुनें")}
+                                </span>
+                              </div>
+                              {chargeCSDropdownOpen === chargeIndex && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg">
+                                  <div className="p-2 border-b">
+                                    <Input
+                                      placeholder={t("Search cold store...", "कोल्ड स्टोर खोजें...")}
+                                      value={chargeCSSearch}
+                                      onChange={(e) => setChargeCSSearch(e.target.value)}
+                                      autoFocus
+                                      className="h-8"
+                                    />
+                                  </div>
+                                  <div className="max-h-36 overflow-y-auto">
+                                    {chargeFilteredCS.length > 0 ? chargeFilteredCS.map((cs) => (
+                                      <div
+                                        key={cs.id}
+                                        className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground border-b last:border-b-0"
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          form.setValue(`lots.${lotIndex}.charges.${chargeIndex}.coldStoreName`, cs.name);
+                                          form.setValue(`lots.${lotIndex}.charges.${chargeIndex}.coldStoreDbId`, cs.id);
+                                          setChargeCSDropdownOpen(null);
+                                          setChargeCSSearch("");
+                                        }}
+                                      >
+                                        <div className="font-medium">{cs.name}</div>
+                                      </div>
+                                    )) : (
+                                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                                        {t("No cold stores found", "कोई कोल्ड स्टोर नहीं मिला")}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
