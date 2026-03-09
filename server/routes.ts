@@ -2490,6 +2490,7 @@ export async function registerRoutes(
                         (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName) ||
+                        (direction === "outflow" && expenseType === "supplier" && !!supplierName) ||
                         (direction === "outflow" && expenseType === "aadhtiya" && !!aadhatName);
 
       // Generate cash flow code: CFYYYYMMDD{seq} - unique per merchant (MAX-based with retry)

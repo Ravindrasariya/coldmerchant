@@ -3509,6 +3509,61 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      // Supplier payment FIFO - update seed stock entries amountPaid
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "supplier" && entry.supplierName) {
+        let remainingAmount = parseFloat(entry.amount);
+        const normalizedSupplierName = normalizeName(entry.supplierName);
+        
+        const allSeedEntries = await tx.select().from(seedStockEntries)
+          .where(eq(seedStockEntries.merchantId, entry.merchantId))
+          .orderBy(asc(seedStockEntries.createdAt));
+        
+        const allSeedLots = await tx.select().from(seedLots)
+          .where(eq(seedLots.merchantId, entry.merchantId));
+        
+        const entriesWithDue = allSeedEntries.filter(se => {
+          if (normalizeName(se.supplierName) !== normalizedSupplierName) return false;
+          const entryLots = allSeedLots.filter(lot => lot.seedEntryId === se.id);
+          const totalCost = entryLots.reduce((sum, lot) => {
+            const bags = lot.originalBags || 0;
+            const pricePerBag = parseFloat(lot.pricePerBag || "0");
+            return sum + (bags * pricePerBag);
+          }, 0);
+          const amountPaid = parseFloat(se.amountPaid || "0");
+          return totalCost > amountPaid;
+        });
+        
+        for (const seedEntry of entriesWithDue) {
+          if (remainingAmount <= 0) break;
+          
+          const entryLots = allSeedLots.filter(lot => lot.seedEntryId === seedEntry.id);
+          const totalCost = entryLots.reduce((sum, lot) => {
+            const bags = lot.originalBags || 0;
+            const pricePerBag = parseFloat(lot.pricePerBag || "0");
+            return sum + (bags * pricePerBag);
+          }, 0);
+          
+          const currentPaid = parseFloat(seedEntry.amountPaid || "0");
+          const due = totalCost - currentPaid;
+          
+          if (due <= 0) continue;
+          
+          const toApply = Math.min(remainingAmount, due);
+          const newPaid = currentPaid + toApply;
+          const newDue = totalCost - newPaid;
+          const newStatus = newDue <= 0 ? "paid" : "partial";
+          
+          await tx.update(seedStockEntries)
+            .set({ 
+              amountPaid: newPaid.toString(),
+              paymentStatus: newStatus
+            })
+            .where(and(eq(seedStockEntries.id, seedEntry.id), eq(seedStockEntries.merchantId, entry.merchantId)));
+          
+          remainingAmount -= toApply;
+        }
+      }
+
       // If this is an aadhtiya payment with manual allocations, apply them precisely
       if (entry.direction === "outflow" && entry.expenseType === "aadhtiya" && entry.aadhatDbId && aadhatAllocationsInput && aadhatAllocationsInput.length > 0) {
         for (const alloc of aadhatAllocationsInput) {
