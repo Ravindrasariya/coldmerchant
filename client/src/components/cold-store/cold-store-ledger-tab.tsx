@@ -60,6 +60,9 @@ function invalidateAllColdStoreCaches() {
   queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
   queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
   queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
 }
 
 export default function ColdStoreLedgerTab() {

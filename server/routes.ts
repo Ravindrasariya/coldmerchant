@@ -564,6 +564,17 @@ export async function registerRoutes(
       const coldStoresWithDue = await storage.getColdStoresWithDue(merchantId);
       const coldStoreLedgerTotalDue = coldStoresWithDue.reduce((sum, cs) => sum + cs.totalDue, 0);
 
+      const allSeedEntriesForCS = await storage.getSeedEntriesByMerchant(merchantId);
+      for (const seedEntry of allSeedEntriesForCS) {
+        for (const sLot of (seedEntry.lots || [])) {
+          const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+          const seedColdCharges = chargesPerBag * (sLot.originalBags || 0);
+          const seedColdPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
+          summaryColdStoreTotalCharges += seedColdCharges;
+          summaryColdStoreDue += Math.max(seedColdCharges - seedColdPaid, 0);
+        }
+      }
+
       const aadhatBagsByName = Array.from(aadhatBagsMap.entries())
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1])
