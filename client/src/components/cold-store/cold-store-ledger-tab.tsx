@@ -405,7 +405,7 @@ export default function ColdStoreLedgerTab() {
           ) : (
             <div className="space-y-4">
               <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
-                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[1000px]" style={{ gridTemplateColumns: '36px minmax(90px, 0.9fr) minmax(100px, 1.2fr) minmax(90px, 1fr) minmax(70px, 0.7fr) minmax(80px, 0.9fr) minmax(70px, 0.7fr) minmax(60px, 0.5fr) 55px 48px minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr)' }}>
+                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[1050px]" style={{ gridTemplateColumns: '36px minmax(90px, 0.9fr) minmax(100px, 1.2fr) minmax(80px, 0.9fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(60px, 0.6fr) 55px 48px minmax(90px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr)' }}>
                   <div></div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -445,8 +445,8 @@ export default function ColdStoreLedgerTab() {
                 {filteredColdStores.map((cs, index) => (
                   <div 
                     key={cs.id} 
-                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[1000px]"
-                    style={{ gridTemplateColumns: '36px minmax(90px, 0.9fr) minmax(100px, 1.2fr) minmax(90px, 1fr) minmax(70px, 0.7fr) minmax(80px, 0.9fr) minmax(70px, 0.7fr) minmax(60px, 0.5fr) 55px 48px minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr)' }}
+                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[1050px]"
+                    style={{ gridTemplateColumns: '36px minmax(90px, 0.9fr) minmax(100px, 1.2fr) minmax(80px, 0.9fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(60px, 0.6fr) 55px 48px minmax(90px, 0.9fr) minmax(90px, 0.9fr) minmax(90px, 0.9fr)' }}
                     data-testid={`coldstore-row-${index}`}
                   >
                     <div className="flex items-center justify-center">
