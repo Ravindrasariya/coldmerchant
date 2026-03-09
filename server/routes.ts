@@ -4881,6 +4881,111 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/cold-store-ledger/sync", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+
+      const existingColdStores = await storage.getColdStoresByMerchant(merchantId);
+      const existingNameMap = new Map<string, number>();
+      for (const cs of existingColdStores) {
+        existingNameMap.set(cs.name.trim().toLowerCase(), cs.id);
+      }
+
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      const allSeedEntries = await storage.getSeedEntriesByMerchant(merchantId);
+
+      const coldStoreNames = new Map<string, string>();
+      for (const lot of allLots) {
+        if (lot.coldStoreName && lot.coldStoreName.trim()) {
+          const key = lot.coldStoreName.trim().toLowerCase();
+          if (!coldStoreNames.has(key)) {
+            coldStoreNames.set(key, titleCaseKeep(lot.coldStoreName.trim()));
+          }
+        }
+      }
+      for (const entry of allSeedEntries) {
+        for (const sLot of (entry.seedLots || [])) {
+          if (sLot.coldStoreName && sLot.coldStoreName.trim()) {
+            const key = sLot.coldStoreName.trim().toLowerCase();
+            if (!coldStoreNames.has(key)) {
+              coldStoreNames.set(key, titleCaseKeep(sLot.coldStoreName.trim()));
+            }
+          }
+        }
+      }
+
+      let created = 0;
+      const today = getISTDateString();
+      const dateStr = parseDateToCodeFormat(today);
+
+      for (const [key, displayName] of coldStoreNames) {
+        if (!existingNameMap.has(key)) {
+          const maxRetries = 3;
+          let newCS: any = null;
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            const maxSeq = await storage.getMaxColdStoreCodeSequence(merchantId, `CS${dateStr}`);
+            const csCode = `CS${dateStr}${maxSeq + 1 + attempt}`;
+            try {
+              newCS = await storage.createColdStore({
+                merchantId,
+                coldStoreId: csCode,
+                dateAdded: today,
+                name: displayName,
+                address: "",
+                contact: null,
+                pyPayable: "0",
+                originalPyPayable: "0",
+                redFlag: false,
+                isActive: true,
+                bankName: null,
+                bankAccountNumber: null,
+                ifscCode: null,
+              });
+              break;
+            } catch (error: any) {
+              if (error?.code === '23505' && error?.constraint?.includes('cold_store_id') && attempt < maxRetries - 1) {
+                continue;
+              }
+              throw error;
+            }
+          }
+          if (!newCS) throw new Error(`Failed to create cold store "${displayName}" after ${maxRetries} attempts`);
+          existingNameMap.set(key, newCS.id);
+          created++;
+        }
+      }
+
+      let linked = 0;
+      for (const lot of allLots) {
+        if (lot.coldStoreName && lot.coldStoreName.trim() && !lot.coldStoreDbId) {
+          const key = lot.coldStoreName.trim().toLowerCase();
+          const csId = existingNameMap.get(key);
+          if (csId) {
+            await storage.updateLot(lot.id, merchantId, { coldStoreDbId: csId });
+            linked++;
+          }
+        }
+      }
+      for (const entry of allSeedEntries) {
+        for (const sLot of (entry.seedLots || [])) {
+          if (sLot.coldStoreName && sLot.coldStoreName.trim() && !sLot.coldStoreDbId) {
+            const key = sLot.coldStoreName.trim().toLowerCase();
+            const csId = existingNameMap.get(key);
+            if (csId) {
+              await storage.updateSeedLot(sLot.id, merchantId, { coldStoreDbId: csId });
+              linked++;
+            }
+          }
+        }
+      }
+
+      res.json({ created, linked });
+    } catch (error) {
+      console.error("Error syncing cold stores:", error);
+      res.status(500).json({ message: "Failed to sync cold stores" });
+    }
+  });
+
   app.patch("/api/cold-store-ledger/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;

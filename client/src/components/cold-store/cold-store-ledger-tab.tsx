@@ -22,7 +22,8 @@ import {
   Search,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { type ColdStore, type ColdStoreEditHistory } from "@shared/schema";
@@ -215,6 +216,33 @@ export default function ColdStoreLedgerTab() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/cold-store-ledger/sync", {});
+      return response.json();
+    },
+    onSuccess: (data: { created: number; linked: number }) => {
+      invalidateAllColdStoreCaches();
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      toast({
+        title: t("Sync Complete", "सिंक पूरा"),
+        description: t(
+          `${data.created} cold store(s) created, ${data.linked} lot(s) linked`,
+          `${data.created} कोल्ड स्टोर बनाए, ${data.linked} लॉट जोड़े`
+        ),
+        variant: "success",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("Sync Failed", "सिंक विफल"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditClick = (cs: ColdStoreWithDues) => {
     setEditingColdStore(cs);
     setEditForm({
@@ -388,6 +416,20 @@ export default function ColdStoreLedgerTab() {
                   data-testid="input-coldstore-name-filter"
                 />
               </div>
+              <Button
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                variant="outline"
+                size="sm"
+                data-testid="button-sync-coldstores"
+              >
+                {syncMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                )}
+                {t("Sync", "सिंक")}
+              </Button>
               <Button
                 onClick={() => setAddDialogOpen(true)}
                 variant="outline"
