@@ -33,6 +33,7 @@ const EXPENSE_LABELS: Record<string, [string, string]> = {
   kata_charges: ["Kata Charges", "काटा खर्च"],
   pesticide_charges: ["Pesticide Charges", "कीटनाशक खर्च"],
   salary: ["Salary", "वेतन"],
+  transport_freight: ["Transport/Freight Charges", "परिवहन/भाड़ा खर्च"],
   warehouse_charges: ["Warehouse Charges", "गोदाम खर्च"],
   depreciation: ["Depreciation", "मूल्यह्रास"],
   interest_on_loans: ["Interest on Loans", "ऋण पर ब्याज"],

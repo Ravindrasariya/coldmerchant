@@ -1146,6 +1146,7 @@ export function CashManagementTab() {
       case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
+      case "transport_freight": return t("Transport/Freight", "परिवहन/भाड़ा");
       case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
       case "capital_expense": return t("Capital Expense", "पूंजीगत व्यय");
       default: return type;
@@ -3023,6 +3024,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
+      case "transport_freight": return t("Transport/Freight", "परिवहन/भाड़ा");
       case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
       default: return type || "";
     }

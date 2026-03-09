@@ -2386,7 +2386,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya", "capital_expense"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya", "capital_expense", "transport_freight"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
         }
         if (expenseType === "capital_expense") {
