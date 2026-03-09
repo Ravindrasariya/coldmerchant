@@ -698,6 +698,19 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                   <CommandList>
                     <CommandEmpty>{t("No match.", "कोई मिलान नहीं।")}</CommandEmpty>
                     <CommandGroup>
+                      {filterSerial && (
+                        <CommandItem
+                          value="__clear__"
+                          onSelect={() => {
+                            setFilterSerial("");
+                            setSerialPopoverOpen(false);
+                          }}
+                          className="text-muted-foreground"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          {t("Clear", "हटाएं")}
+                        </CommandItem>
+                      )}
                       {serialNumbers.map((num) => (
                         <CommandItem
                           key={num}

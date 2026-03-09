@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter, Share2, ChevronDown } from "lucide-react";
+import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter, Share2, ChevronDown, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +77,8 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   const { t } = useLanguage();
   const { toast } = useToast();
   const [filterSerial, setFilterSerial] = useState<string>("");
+  const [serialPopoverOpenDesktop, setSerialPopoverOpenDesktop] = useState(false);
+  const [serialPopoverOpenMobile, setSerialPopoverOpenMobile] = useState(false);
   const [filterSupplier, setFilterSupplier] = useState<string>("");
   const [filterPotatoType, setFilterPotatoType] = useState<string>("");
   const [filterColdStore, setFilterColdStore] = useState<string>("");
@@ -337,16 +342,63 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           <div className="hidden md:flex flex-wrap items-center gap-3">
             <Filter className="h-4 w-4 text-muted-foreground" />
 
-            <Select value={filterSerial} onValueChange={setFilterSerial}>
-              <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter">
-                <SelectValue placeholder={t("Serial #", "क्रमांक")} />
-              </SelectTrigger>
-              <SelectContent>
-                {serialNumbers.map((num) => (
-                  <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={serialPopoverOpenDesktop} onOpenChange={setSerialPopoverOpenDesktop}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={serialPopoverOpenDesktop}
+                  className={cn(
+                    "w-[100px] justify-between font-normal text-sm",
+                    !filterSerial && "text-muted-foreground"
+                  )}
+                  data-testid="select-seed-serial-filter"
+                >
+                  <span className="truncate">
+                    {filterSerial || t("Serial #", "क्रमांक")}
+                  </span>
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[120px] p-0">
+                <Command>
+                  <CommandInput placeholder={t("Search...", "खोजें...")} />
+                  <CommandList>
+                    <CommandEmpty>{t("No match.", "कोई मिलान नहीं।")}</CommandEmpty>
+                    <CommandGroup>
+                      {filterSerial && (
+                        <CommandItem
+                          value="__clear__"
+                          onSelect={() => {
+                            setFilterSerial("");
+                            setSerialPopoverOpenDesktop(false);
+                          }}
+                          className="text-muted-foreground"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          {t("Clear", "हटाएं")}
+                        </CommandItem>
+                      )}
+                      {serialNumbers.map((num) => (
+                        <CommandItem
+                          key={num}
+                          value={num.toString()}
+                          onSelect={(currentValue) => {
+                            setFilterSerial(currentValue === filterSerial ? "" : currentValue);
+                            setSerialPopoverOpenDesktop(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${filterSerial === num.toString() ? "opacity-100" : "opacity-0"}`}
+                          />
+                          {num}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <Select value={filterSupplier} onValueChange={setFilterSupplier}>
               <SelectTrigger className="w-[160px]" data-testid="select-seed-supplier-filter">
@@ -415,16 +467,63 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
             <div className="flex flex-wrap items-center gap-3">
               <Filter className="h-4 w-4 text-muted-foreground" />
 
-              <Select value={filterSerial} onValueChange={setFilterSerial}>
-                <SelectTrigger className="w-[100px]" data-testid="select-seed-serial-filter-mobile">
-                  <SelectValue placeholder={t("Serial #", "क्रमांक")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {serialNumbers.map((num) => (
-                    <SelectItem key={num} value={num.toString()}>{num}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={serialPopoverOpenMobile} onOpenChange={setSerialPopoverOpenMobile}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={serialPopoverOpenMobile}
+                    className={cn(
+                      "w-[100px] justify-between font-normal text-sm",
+                      !filterSerial && "text-muted-foreground"
+                    )}
+                    data-testid="select-seed-serial-filter-mobile"
+                  >
+                    <span className="truncate">
+                      {filterSerial || t("Serial #", "क्रमांक")}
+                    </span>
+                    <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[120px] p-0">
+                  <Command>
+                    <CommandInput placeholder={t("Search...", "खोजें...")} />
+                    <CommandList>
+                      <CommandEmpty>{t("No match.", "कोई मिलान नहीं।")}</CommandEmpty>
+                      <CommandGroup>
+                        {filterSerial && (
+                          <CommandItem
+                            value="__clear__"
+                            onSelect={() => {
+                              setFilterSerial("");
+                              setSerialPopoverOpenMobile(false);
+                            }}
+                            className="text-muted-foreground"
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            {t("Clear", "हटाएं")}
+                          </CommandItem>
+                        )}
+                        {serialNumbers.map((num) => (
+                          <CommandItem
+                            key={num}
+                            value={num.toString()}
+                            onSelect={(currentValue) => {
+                              setFilterSerial(currentValue === filterSerial ? "" : currentValue);
+                              setSerialPopoverOpenMobile(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${filterSerial === num.toString() ? "opacity-100" : "opacity-0"}`}
+                            />
+                            {num}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
 
               <Select value={filterSupplier} onValueChange={setFilterSupplier}>
                 <SelectTrigger className="w-[140px]" data-testid="select-seed-supplier-filter-mobile">
