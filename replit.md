@@ -61,11 +61,23 @@ All four record types have globally unique IDs for backend matching purposes (no
 - **Separate counters**: Potato, Onion, Garlic, and Seed each have their own serial/transaction number sequences
 - Serial numbers reset yearly while uniqueIds remain globally unique
 
+### Cold Store Ledger System
+- **Cold Stores Table**: Master ledger of cold stores per merchant with unique ID (CSYYYYMMDD#), composite key (name + address), PY balances, flags
+- **Extra Fields vs Aadhat**: Bank Name (stored uppercase), Bank Account #, IFSC Code (all optional)
+- **ID-Based Matching**: All cold store matching (FIFO, dues, cash flow) uses `cold_store_db_id` (integer FK), never string matching
+- **coldStoreDbId FK**: Added to `lots`, `seed_lots`, and `cash_entries` tables for referential integrity
+- **Cold Store Edit with Propagation**: PATCH /api/cold-store-ledger/:id/details updates cold store and propagates name changes to all linked lots, seed_lots, transaction_items, seed_transaction_items, cash_entries
+- **Cold Store Merge**: When editing to match existing composite key, offers merge (lower ID survives, pyPayable aggregated, all linked records transferred)
+- **Cold Store Edit History**: All edits tracked in coldStoreEditHistory table
+- **Searchable Dropdown**: All forms (lot card, seed lot card, edit dialogs, cash management) use searchable dropdown from cold store ledger instead of free-text input
+- **API Routes**: GET/POST /api/cold-store-ledger, PATCH /api/cold-store-ledger/:id, PATCH /api/cold-store-ledger/:id/details, POST /api/cold-store-ledger/merge, GET /api/cold-store-ledger/:id/history
+- **Accessible via**: "Cold Store" tab in main navigation
+
 ### Cold Store Dues Calculation
 Cold store dues are calculated from the `charges` array on each lot:
 - Only charge types "Cold Charges" and "Ware House Charges" are included
 - FIFO allocation applies payments to oldest outstanding lots first
-- Dues are grouped by normalized cold store name (case-insensitive)
+- Dues are grouped by `cold_store_db_id` (integer FK) for accurate matching
 
 ### Aadhat Payment (Manual Allocation)
 Aadhat (aadhtiya) payments use manual transaction-level allocation instead of FIFO:

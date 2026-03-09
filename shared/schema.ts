@@ -84,6 +84,7 @@ export const lots = pgTable("lots", {
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   place: text("place").default("cold_store"), // farm_gate, cold_store, mandi
   coldStoreName: text("cold_store_name"), // required only for cold_store place (made nullable)
+  coldStoreDbId: integer("cold_store_db_id"), // links to cold store ledger
   coldStoreLotNumber: text("cold_store_lot_number"), // lot number at cold store
   crop: text("crop").default("potato"), // potato, onion, garlic
   originalBags: integer("original_bags").notNull(),
@@ -223,6 +224,7 @@ export const cashEntries = pgTable("cash_entries", {
   farmerContact: text("farmer_contact"), // For farmer composite key matching
   farmerId: integer("farmer_id").references(() => farmers.id), // resolved farmer ledger ID for reliable matching
   coldStoreName: text("cold_store_name"), // For cold store charge payment outflow
+  coldStoreDbId: integer("cold_store_db_id"), // links to cold store ledger for cold_store_charge payments
   supplierName: text("supplier_name"), // For supplier outflow (seed stock suppliers)
   aadhatName: text("aadhat_name"), // For aadhtiya outflow
   aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // resolved aadhat ledger ID
@@ -426,6 +428,7 @@ export const seedLots = pgTable("seed_lots", {
   seedEntryId: integer("seed_entry_id").notNull().references(() => seedStockEntries.id, { onDelete: "cascade" }),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   coldStoreName: text("cold_store_name").notNull(),
+  coldStoreDbId: integer("cold_store_db_id"), // links to cold store ledger
   originalBags: integer("original_bags").notNull(),
   potatoType: text("potato_type").notNull(), // Jyoti, Pukhraj, Lakar, CS1, CS3, Torus, LR
   bagType: text("bag_type").notNull(), // Wafer, Ration
@@ -986,6 +989,7 @@ export type ChargeEntry = z.infer<typeof chargeEntrySchema>;
 export const lotFormSchema = z.object({
   place: z.enum(["farm_gate", "cold_store", "mandi"]).default("cold_store"),
   coldStoreName: z.string().optional(),
+  coldStoreDbId: z.coerce.number().optional(),
   coldStoreLotNumber: z.string().optional(),
   crop: z.enum(["potato", "onion", "garlic"]).default("potato"),
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
@@ -1115,6 +1119,7 @@ export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 // Seed form schemas for frontend
 export const seedLotFormSchema = z.object({
   coldStoreName: z.string().min(1, "Cold store name is required"),
+  coldStoreDbId: z.coerce.number().optional(),
   originalBags: z.coerce.number().min(1, "Original bags must be at least 1"),
   potatoType: z.string().min(1, "Potato type is required"),
   bagType: z.string().optional().default(""),
@@ -1143,6 +1148,7 @@ export type SeedStockEntryForm = z.infer<typeof seedStockEntryFormSchema>;
 export const seedLotUpdateSchema = z.object({
   id: z.number(),
   coldStoreName: z.string().min(1).optional(),
+  coldStoreDbId: z.coerce.number().optional().nullable(),
   originalBags: z.coerce.number().min(1).optional(),
   remainingBags: z.coerce.number().min(0).optional(),
   potatoType: z.string().min(1).optional(),
@@ -1317,3 +1323,52 @@ export const insertAadhatPaymentAllocationSchema = createInsertSchema(aadhatPaym
 
 export type InsertAadhatPaymentAllocation = z.infer<typeof insertAadhatPaymentAllocationSchema>;
 export type AadhatPaymentAllocation = typeof aadhatPaymentAllocations.$inferSelect;
+
+// ==================== Cold Store Ledger ====================
+export const coldStores = pgTable("cold_stores", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  coldStoreId: text("cold_store_id"),
+  dateAdded: date("date_added").notNull(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  contact: text("contact"),
+  pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"),
+  redFlag: boolean("red_flag").default(false),
+  isActive: boolean("is_active").default(true),
+  bankName: text("bank_name"),
+  bankAccountNumber: text("bank_account_number"),
+  ifscCode: text("ifsc_code"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  merchantColdStoreIdUnique: uniqueIndex("cold_stores_merchant_cold_store_id_unique").on(table.merchantId, table.coldStoreId),
+}));
+
+export const coldStoreEditHistory = pgTable("cold_store_edit_history", {
+  id: serial("id").primaryKey(),
+  serialNumber: integer("serial_number").notNull(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  coldStoreId: integer("cold_store_id").notNull().references(() => coldStores.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changedBy: integer("changed_by").references(() => users.id),
+  fieldName: text("field_name").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+});
+
+export const coldStoresRelations = relations(coldStores, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [coldStores.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const insertColdStoreSchema = createInsertSchema(coldStores).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertColdStoreEditHistorySchema = createInsertSchema(coldStoreEditHistory).omit({ id: true, changedAt: true });
+
+export type ColdStore = typeof coldStores.$inferSelect;
+export type InsertColdStore = z.infer<typeof insertColdStoreSchema>;
+
+export type ColdStoreEditHistory = typeof coldStoreEditHistory.$inferSelect;
+export type InsertColdStoreEditHistory = z.infer<typeof insertColdStoreEditHistorySchema>;

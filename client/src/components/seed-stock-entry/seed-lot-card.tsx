@@ -32,7 +32,7 @@ interface SeedLotCardProps {
 export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCardProps) {
   const { t } = useLanguage();
 
-  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState(false);
   const [coldStoreQuery, setColdStoreQuery] = useState("");
   const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
@@ -86,8 +86,9 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectColdStore = (name: string) => {
-    form.setValue(`seedLots.${lotIndex}.coldStoreName`, name);
+  const handleSelectColdStore = (selected: {id: number, name: string}) => {
+    form.setValue(`seedLots.${lotIndex}.coldStoreName`, selected.name);
+    form.setValue(`seedLots.${lotIndex}.coldStoreDbId`, selected.id);
     setShowColdStoreSuggestions(false);
     setColdStoreSuggestions([]);
     setColdStoreQuery("");
@@ -146,6 +147,7 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
                     {...field}
                     onChange={(e) => {
                       field.onChange(e);
+                      form.setValue(`seedLots.${lotIndex}.coldStoreDbId`, undefined);
                       setColdStoreQuery(e.target.value);
                       setShowColdStoreSuggestions(true);
                     }}
@@ -164,17 +166,17 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
                     data-seed-coldstore-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
-                    {coldStoreSuggestions.map((name, index) => (
+                    {coldStoreSuggestions.map((store, index) => (
                       <div
-                        key={`${name}-${index}`}
+                        key={`${store.id}-${index}`}
                         className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          handleSelectColdStore(name);
+                          handleSelectColdStore(store);
                         }}
                         data-testid={`suggestion-seed-coldstore-${lotIndex}-${index}`}
                       >
-                        <div className="font-medium">{name}</div>
+                        <div className="font-medium">{store.name}</div>
                       </div>
                     ))}
                   </div>

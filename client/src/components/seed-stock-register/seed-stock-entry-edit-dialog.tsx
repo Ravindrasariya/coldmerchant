@@ -43,9 +43,10 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     hammaliCharges: lot.hammaliCharges ? parseFloat(lot.hammaliCharges) : 0,
     gradingCharges: lot.gradingCharges ? parseFloat(lot.gradingCharges) : 0,
     transportCharges: lot.transportCharges ? parseFloat(lot.transportCharges) : 0,
+    coldStoreDbId: (lot as any).coldStoreDbId ?? null,
   })));
 
-  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState<number | null>(null);
   const coldStoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -81,6 +82,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
   interface SeedLotUpdate {
     id: number;
     coldStoreName: string;
+    coldStoreDbId: number | null;
     originalBags: number;
     remainingBags: number;
     potatoType: string;
@@ -131,7 +133,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
   const handleLotChange = (
     lotIndex: number,
     field: string,
-    value: number | string
+    value: number | string | null
   ) => {
     const newLots = [...seedLots];
     (newLots[lotIndex] as any)[field] = value;
@@ -144,6 +146,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
       seedLots: seedLots.map(lot => ({
         id: lot.id,
         coldStoreName: lot.coldStoreName,
+        coldStoreDbId: lot.coldStoreDbId,
         originalBags: lot.originalBags,
         remainingBags: lot.remainingBags,
         potatoType: lot.potatoType,
@@ -227,6 +230,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                         value={lot.coldStoreName}
                         onChange={(e) => {
                           handleLotChange(lotIndex, "coldStoreName", e.target.value);
+                          handleLotChange(lotIndex, "coldStoreDbId", null);
                           if (coldStoreDebounceRef.current) clearTimeout(coldStoreDebounceRef.current);
                           coldStoreDebounceRef.current = setTimeout(() => {
                             searchColdStores(e.target.value, lotIndex);
@@ -247,17 +251,18 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                           data-seed-edit-coldstore-dropdown
                           className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md max-h-40 overflow-auto"
                         >
-                          {coldStoreSuggestions.map((name, idx) => (
+                          {coldStoreSuggestions.map((cs, idx) => (
                             <div
                               key={idx}
                               className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
                               onClick={() => {
-                                handleLotChange(lotIndex, "coldStoreName", name);
+                                handleLotChange(lotIndex, "coldStoreName", cs.name);
+                                handleLotChange(lotIndex, "coldStoreDbId", cs.id);
                                 setShowColdStoreSuggestions(null);
                               }}
                               data-testid={`seed-edit-coldstore-suggestion-${lotIndex}-${idx}`}
                             >
-                              {name}
+                              {cs.name}
                             </div>
                           ))}
                         </div>

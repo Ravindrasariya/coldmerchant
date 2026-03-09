@@ -114,7 +114,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
     appendCharge({ type: "", amount: undefined as any });
   };
 
-  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState(false);
   const [coldStoreQuery, setColdStoreQuery] = useState("");
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -167,8 +167,9 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectColdStore = (name: string) => {
-    form.setValue(`lots.${lotIndex}.coldStoreName`, name);
+  const handleSelectColdStore = (selected: {id: number, name: string}) => {
+    form.setValue(`lots.${lotIndex}.coldStoreName`, selected.name);
+    form.setValue(`lots.${lotIndex}.coldStoreDbId`, selected.id);
     setShowColdStoreSuggestions(false);
     setColdStoreSuggestions([]);
     setColdStoreQuery("");
@@ -264,6 +265,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                         value={field.value || ""}
                         onChange={(e) => {
                           field.onChange(e);
+                          form.setValue(`lots.${lotIndex}.coldStoreDbId`, undefined);
                           setColdStoreQuery(e.target.value);
                           setShowColdStoreSuggestions(true);
                         }}
@@ -282,17 +284,17 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                         data-coldstore-suggestion-dropdown
                         className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                       >
-                        {coldStoreSuggestions.map((name, index) => (
+                        {coldStoreSuggestions.map((suggestion, index) => (
                           <div
-                            key={`${name}-${index}`}
+                            key={`${suggestion.id}-${index}`}
                             className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
                             onMouseDown={(e) => {
                               e.preventDefault();
-                              handleSelectColdStore(name);
+                              handleSelectColdStore(suggestion);
                             }}
                             data-testid={`suggestion-coldstore-${lotIndex}-${index}`}
                           >
-                            <div className="font-medium">{name}</div>
+                            <div className="font-medium">{suggestion.name}</div>
                           </div>
                         ))}
                       </div>

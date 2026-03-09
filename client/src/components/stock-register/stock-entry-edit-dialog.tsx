@@ -55,6 +55,7 @@ interface StockEntryWithLots {
     id: number;
     place: string | null;
     coldStoreName: string | null;
+    coldStoreDbId: number | null;
     coldStoreLotNumber: string | null;
     crop?: string;
     originalBags: number;
@@ -111,6 +112,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     ...lot,
     place: lot.place || "cold_store",
     coldStoreName: lot.coldStoreName || "",
+    coldStoreDbId: lot.coldStoreDbId || null,
     coldStoreLotNumber: lot.coldStoreLotNumber || "",
     crop: lot.crop || "potato",
     potatoType: lot.potatoType || "",
@@ -154,7 +156,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   })));
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
-  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<string[]>([]);
+  const [coldStoreSuggestions, setColdStoreSuggestions] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreSuggestions, setShowColdStoreSuggestions] = useState<number | null>(null);
   const coldStoreDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -550,7 +552,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                             value={lot.coldStoreName}
                             onChange={(e) => {
                               const newLots = [...lots];
-                              newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: e.target.value };
+                              newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: e.target.value, coldStoreDbId: null };
                               setLots(newLots);
                               if (coldStoreDebounceRef.current) clearTimeout(coldStoreDebounceRef.current);
                               coldStoreDebounceRef.current = setTimeout(() => {
@@ -572,19 +574,19 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               data-edit-coldstore-dropdown
                               className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md max-h-40 overflow-auto"
                             >
-                              {coldStoreSuggestions.map((name, idx) => (
+                              {coldStoreSuggestions.map((cs, idx) => (
                                 <div
                                   key={idx}
                                   className="px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
                                   onClick={() => {
                                     const newLots = [...lots];
-                                    newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: name };
+                                    newLots[lotIndex] = { ...newLots[lotIndex], coldStoreName: cs.name, coldStoreDbId: cs.id };
                                     setLots(newLots);
                                     setShowColdStoreSuggestions(null);
                                   }}
                                   data-testid={`edit-coldstore-suggestion-${lotIndex}-${idx}`}
                                 >
-                                  {name}
+                                  {cs.name}
                                 </div>
                               ))}
                             </div>

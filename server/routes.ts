@@ -713,6 +713,7 @@ export async function registerRoutes(
           merchantId,
           place: lotData.place || "cold_store",
           coldStoreName: lotData.place === "cold_store" ? (titleCase(lotData.coldStoreName) || null) : null,
+          coldStoreDbId: lotData.place === "cold_store" ? (lotData.coldStoreDbId || null) : null,
           coldStoreLotNumber: lotData.place === "cold_store" ? (lotData.coldStoreLotNumber || null) : null,
           crop: lotData.crop || "potato",
           originalBags: lotData.originalBags,
@@ -968,6 +969,9 @@ export async function registerRoutes(
                 : undefined,
               coldStoreName: lotData.coldStoreName !== undefined
                 ? (titleCase(lotData.coldStoreName) || null)
+                : undefined,
+              coldStoreDbId: lotData.coldStoreDbId !== undefined
+                ? (lotData.coldStoreDbId || null)
                 : undefined,
               coldStoreLotNumber: lotData.coldStoreLotNumber !== undefined
                 ? (lotData.coldStoreLotNumber || null)
@@ -2327,7 +2331,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2527,6 +2531,7 @@ export async function registerRoutes(
             farmerContact: farmerContact || null,
             farmerId: resolvedFarmerId,
             coldStoreName: titleCase(coldStoreName) || null,
+            coldStoreDbId: expenseType === "cold_store_charge" ? (requestColdStoreDbId || null) : null,
             supplierName: titleCase(supplierName) || null,
             aadhatName: expenseType === "aadhtiya" ? (aadhatName || null) : null,
             aadhatDbId: expenseType === "aadhtiya" ? resolvedAadhatDbId : null,
@@ -3883,6 +3888,7 @@ export async function registerRoutes(
           seedEntryId: seedEntry.id,
           merchantId,
           coldStoreName: titleCaseKeep(lotData.coldStoreName),
+          coldStoreDbId: lotData.coldStoreDbId || null,
           originalBags: lotData.originalBags,
           potatoType: lotData.potatoType,
           bagType: lotData.bagType,
@@ -4028,6 +4034,7 @@ export async function registerRoutes(
             // Update existing lot
             await storage.updateSeedLot(lotData.id, merchantId, {
               coldStoreName: titleCase(lotData.coldStoreName) || lotData.coldStoreName,
+              coldStoreDbId: lotData.coldStoreDbId !== undefined ? (lotData.coldStoreDbId || null) : undefined,
               originalBags: lotData.originalBags,
               potatoType: lotData.potatoType,
               bagType: lotData.bagType,
@@ -4054,6 +4061,7 @@ export async function registerRoutes(
               seedEntryId: id,
               merchantId,
               coldStoreName: titleCaseKeep(lotData.coldStoreName),
+              coldStoreDbId: lotData.coldStoreDbId || null,
               originalBags: lotData.originalBags,
               potatoType: lotData.potatoType,
               bagType: lotData.bagType,
@@ -4765,6 +4773,238 @@ export async function registerRoutes(
       res.json(history);
     } catch (error) {
       console.error("Error fetching aadhat edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
+    }
+  });
+
+  // ==================== Cold Store Ledger ====================
+
+  app.get("/api/cold-store-ledger", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const coldStoreList = await storage.getColdStoresByMerchant(merchantId);
+      const coldStoresWithDue = await storage.getColdStoresWithDue(merchantId);
+      
+      const dueMap = new Map<number, number>();
+      for (const cs of coldStoresWithDue) {
+        if (cs.coldStoreDbId) dueMap.set(cs.coldStoreDbId, cs.totalDue);
+      }
+      
+      const result = coldStoreList.map(cs => {
+        const pyPayable = parseFloat(cs.pyPayable || "0");
+        const coldStoreDue = dueMap.get(cs.id) || 0;
+        return {
+          ...cs,
+          coldStoreDue,
+          totalDue: pyPayable + coldStoreDue,
+        };
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching cold store ledger:", error);
+      res.status(500).json({ message: "Failed to fetch cold store ledger" });
+    }
+  });
+
+  app.post("/api/cold-store-ledger", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, address, contact, pyPayable, redFlag, isActive, bankName, bankAccountNumber, ifscCode } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Cold store name is required" });
+      }
+      if (!address && address !== '') {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      const today = getISTDateString();
+      const dateStr = parseDateToCodeFormat(today);
+      const codePrefix = `CS${dateStr}`;
+      
+      const maxRetries = 3;
+      let coldStore: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxColdStoreCodeSequence(merchantId, codePrefix);
+        const csCode = `CS${dateStr}${maxSeq + 1 + attempt}`;
+        try {
+          coldStore = await storage.createColdStore({
+            merchantId,
+            coldStoreId: csCode,
+            dateAdded: today,
+            name: titleCaseKeep(name.trim()),
+            address: (address || "").trim(),
+            contact: contact?.trim() || null,
+            pyPayable: pyPayable || "0",
+            redFlag: redFlag ?? false,
+            isActive: isActive ?? true,
+            bankName: bankName ? bankName.trim().toUpperCase() : null,
+            bankAccountNumber: bankAccountNumber?.trim() || null,
+            ifscCode: ifscCode?.trim() || null,
+          });
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('cold_store_id') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!coldStore) throw new Error("Failed to generate unique cold store code after multiple attempts");
+      res.status(201).json(coldStore);
+    } catch (error) {
+      console.error("Error creating cold store:", error);
+      res.status(500).json({ message: "Failed to create cold store" });
+    }
+  });
+
+  app.patch("/api/cold-store-ledger/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      
+      const allowedFields: Record<string, any> = {};
+      if (req.body.isActive !== undefined) allowedFields.isActive = req.body.isActive;
+      const updated = await storage.updateColdStore(id, merchantId, allowedFields);
+      if (!updated) {
+        return res.status(404).json({ message: "Cold store not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating cold store:", error);
+      res.status(500).json({ message: "Failed to update cold store" });
+    }
+  });
+
+  app.patch("/api/cold-store-ledger/:id/details", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      const { name, address, contact, pyPayable, redFlag, bankName, bankAccountNumber, ifscCode } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Cold store name is required" });
+      }
+
+      const existingCS = await storage.getColdStoreById(id, merchantId);
+      if (!existingCS) {
+        return res.status(404).json({ message: "Cold store not found" });
+      }
+
+      const newName = name.trim();
+
+      const matchingCS = await storage.getColdStoreByCompositeKey(merchantId, newName);
+      if (matchingCS && matchingCS.id !== id) {
+        return res.status(409).json({
+          message: "A cold store with this name already exists",
+          requiresMerge: true,
+          existingColdStore: matchingCS,
+        });
+      }
+
+      const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
+      const newAddress = (address || "").trim();
+      const newContact = contact?.trim() || null;
+      const newPyPayable = pyPayable ?? "0";
+      const newRedFlag = redFlag ?? existingCS.redFlag;
+      const newBankName = bankName ? bankName.trim().toUpperCase() : null;
+      const newBankAccountNumber = bankAccountNumber?.trim() || null;
+      const newIfscCode = ifscCode?.trim() || null;
+
+      if (existingCS.name !== newName) changes.push({ fieldName: "name", oldValue: existingCS.name, newValue: newName });
+      if (existingCS.address !== newAddress) changes.push({ fieldName: "address", oldValue: existingCS.address, newValue: newAddress });
+      if (existingCS.contact !== newContact) changes.push({ fieldName: "contact", oldValue: existingCS.contact, newValue: newContact });
+      if (existingCS.pyPayable !== newPyPayable) changes.push({ fieldName: "pyPayable", oldValue: existingCS.pyPayable, newValue: newPyPayable });
+      if (existingCS.redFlag !== newRedFlag) changes.push({ fieldName: "redFlag", oldValue: String(existingCS.redFlag), newValue: String(newRedFlag) });
+      if (existingCS.bankName !== newBankName) changes.push({ fieldName: "bankName", oldValue: existingCS.bankName, newValue: newBankName });
+      if (existingCS.bankAccountNumber !== newBankAccountNumber) changes.push({ fieldName: "bankAccountNumber", oldValue: existingCS.bankAccountNumber, newValue: newBankAccountNumber });
+      if (existingCS.ifscCode !== newIfscCode) changes.push({ fieldName: "ifscCode", oldValue: existingCS.ifscCode, newValue: newIfscCode });
+
+      if (changes.length > 0) {
+        const nextSerial = await storage.getNextColdStoreEditHistorySerialNumber(merchantId);
+        for (const change of changes) {
+          await storage.createColdStoreEditHistory({
+            serialNumber: nextSerial,
+            merchantId,
+            coldStoreId: id,
+            changedBy: userId,
+            fieldName: change.fieldName,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          });
+        }
+      }
+
+      const result = await storage.updateColdStoreWithPropagation(id, merchantId, {
+        name: newName,
+        address: newAddress,
+        contact: newContact,
+      });
+
+      if (existingCS.pyPayable !== newPyPayable || existingCS.redFlag !== newRedFlag || 
+          existingCS.bankName !== newBankName || existingCS.bankAccountNumber !== newBankAccountNumber ||
+          existingCS.ifscCode !== newIfscCode) {
+        await storage.updateColdStore(id, merchantId, {
+          pyPayable: newPyPayable,
+          redFlag: newRedFlag,
+          bankName: newBankName,
+          bankAccountNumber: newBankAccountNumber,
+          ifscCode: newIfscCode,
+        });
+      }
+
+      if (!result.coldStore) {
+        return res.status(404).json({ message: "Cold store not found" });
+      }
+
+      const totalUpdated = result.lotsUpdated + result.seedLotsUpdated + result.cashEntriesUpdated;
+      res.json({
+        coldStore: result.coldStore,
+        lotsUpdated: result.lotsUpdated,
+        seedLotsUpdated: result.seedLotsUpdated,
+        cashEntriesUpdated: result.cashEntriesUpdated,
+        changesRecorded: changes.length,
+        message: `Cold store updated. ${totalUpdated} linked record(s) updated.`
+      });
+    } catch (error) {
+      console.error("Error updating cold store details:", error);
+      res.status(500).json({ message: "Failed to update cold store" });
+    }
+  });
+
+  app.post("/api/cold-store-ledger/merge", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const { sourceId, targetId } = req.body;
+
+      if (!sourceId || !targetId) {
+        return res.status(400).json({ message: "sourceId and targetId are required" });
+      }
+
+      const result = await storage.mergeColdStores(merchantId, userId, sourceId, targetId);
+      res.json({
+        coldStore: result.survivingColdStore,
+        mergedCount: result.mergedCount,
+        message: `Cold stores merged successfully. ${result.mergedCount} linked records transferred.`
+      });
+    } catch (error) {
+      console.error("Error merging cold stores:", error);
+      res.status(500).json({ message: "Failed to merge cold stores" });
+    }
+  });
+
+  app.get("/api/cold-store-ledger/:id/history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const coldStoreId = parseInt(req.params.id);
+      
+      const history = await storage.getColdStoreEditHistory(coldStoreId, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching cold store edit history:", error);
       res.status(500).json({ message: "Failed to fetch edit history" });
     }
   });

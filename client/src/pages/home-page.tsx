@@ -41,7 +41,8 @@ import {
   Phone,
   LayoutDashboard,
   PlayCircle,
-  BookOpen
+  BookOpen,
+  Building2
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -49,6 +50,7 @@ import { CashManagementTab } from "@/components/cash-management/cash-management-
 import { FarmerLedgerTab } from "@/components/farmer-ledger/farmer-ledger-tab";
 import BuyersTab from "@/components/buyers/buyers-tab";
 import AadhatLedgerTab from "@/components/aadhat/aadhat-ledger-tab";
+import ColdStoreLedgerTab from "@/components/cold-store/cold-store-ledger-tab";
 import { DashboardTab } from "@/components/dashboard/dashboard-tab";
 import { DemoVideosTab } from "@/components/demo-videos/demo-videos-tab";
 import { BooksTab } from "@/components/books/books-tab";
@@ -234,6 +236,14 @@ export default function HomePage() {
                   {t("Aadhat", "आढ़त")}
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="cold-store" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                  data-testid="tab-cold-store"
+                >
+                  <Building2 className="h-4 w-4" />
+                  {t("Cold Store", "कोल्ड स्टोर")}
+                </TabsTrigger>
+                <TabsTrigger 
                   value="books" 
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                   data-testid="tab-books"
@@ -403,6 +413,15 @@ export default function HomePage() {
                           {t("Aadhat", "आढ़त")}
                         </TabsTrigger>
                         <TabsTrigger 
+                          value="cold-store" 
+                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
+                          data-testid="tab-cold-store-mobile"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <Building2 className="h-4 w-4" />
+                          {t("Cold Store", "कोल्ड स्टोर")}
+                        </TabsTrigger>
+                        <TabsTrigger 
                           value="books" 
                           className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
                           data-testid="tab-books-mobile"
@@ -533,6 +552,10 @@ export default function HomePage() {
 
           <div className={activeTab === "aadhat" ? "block" : "hidden"}>
             <AadhatLedgerTab />
+          </div>
+
+          <div className={activeTab === "cold-store" ? "block" : "hidden"}>
+            <ColdStoreLedgerTab />
           </div>
 
           <div className={activeTab === "books" ? "block" : "hidden"}>

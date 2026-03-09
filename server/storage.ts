@@ -38,7 +38,10 @@ import {
   assets, type Asset, type InsertAsset,
   assetDepreciationLog, type AssetDepreciationLog, type InsertAssetDepreciationLog,
   liabilities, type Liability, type InsertLiability,
-  liabilityPayments, type LiabilityPayment, type InsertLiabilityPayment
+  liabilityPayments, type LiabilityPayment, type InsertLiabilityPayment,
+  coldStores, coldStoreEditHistory,
+  type ColdStore, type InsertColdStore,
+  type ColdStoreEditHistory as ColdStoreEditHistoryType, type InsertColdStoreEditHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
@@ -144,7 +147,7 @@ export interface IStorage {
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
   getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]>;
-  getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]>;
+  getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]>;
   getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]>;
   getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
@@ -217,6 +220,19 @@ export interface IStorage {
   getNextAadhatEditHistorySerialNumber(merchantId: number): Promise<number>;
   createAadhatEditHistory(data: InsertAadhatEditHistory): Promise<AadhatEditHistory>;
 
+  // Cold Store Ledger operations
+  getColdStoresByMerchant(merchantId: number): Promise<ColdStore[]>;
+  getColdStoreById(id: number, merchantId: number): Promise<ColdStore | undefined>;
+  getMaxColdStoreCodeSequence(merchantId: number, prefix: string): Promise<number>;
+  createColdStore(coldStore: InsertColdStore): Promise<ColdStore>;
+  updateColdStore(id: number, merchantId: number, data: Partial<ColdStore>): Promise<ColdStore | undefined>;
+  getColdStoreByCompositeKey(merchantId: number, name: string): Promise<ColdStore | undefined>;
+  mergeColdStores(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingColdStore: ColdStore; mergedCount: number }>;
+  updateColdStoreWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; contact: string | null }): Promise<{ coldStore: ColdStore | undefined; lotsUpdated: number; seedLotsUpdated: number; cashEntriesUpdated: number }>;
+  getColdStoreEditHistory(coldStoreId: number, merchantId: number): Promise<ColdStoreEditHistoryType[]>;
+  getNextColdStoreEditHistorySerialNumber(merchantId: number): Promise<number>;
+  createColdStoreEditHistory(data: InsertColdStoreEditHistory): Promise<ColdStoreEditHistoryType>;
+
   // Bank Account operations
   getBankAccountsByMerchant(merchantId: number): Promise<BankAccount[]>;
   createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
@@ -285,7 +301,7 @@ export interface IStorage {
   }[]>;
   
   // Cold Store Lookup operations (for autocomplete in lot forms)
-  searchColdStores(merchantId: number, query: string): Promise<string[]>;
+  searchColdStores(merchantId: number, query: string): Promise<{ id: number; name: string }[]>;
   
   // Brand name lookup operations (for autocomplete in seed lot forms)
   searchSeedBrands(merchantId: number, query: string): Promise<string[]>;
@@ -1237,10 +1253,11 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; totalDue: number; lotCount: number }[]> {
-    const [allHarvestLots, allSeedLots] = await Promise.all([
+  async getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]> {
+    const [allHarvestLots, allSeedLots, allColdStores] = await Promise.all([
       db.select().from(lots).where(eq(lots.merchantId, merchantId)),
       db.select().from(seedLots).where(eq(seedLots.merchantId, merchantId)),
+      db.select().from(coldStores).where(eq(coldStores.merchantId, merchantId)),
     ]);
     
     const getColdStoreChargesFromArray = (charges: unknown): number => {
@@ -1251,46 +1268,51 @@ export class DatabaseStorage implements IStorage {
         .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
     };
     
-    const coldStoreMap = new Map<string, { displayName: string; totalDue: number; lotCount: number }>();
+    const coldStoreMap = new Map<number, { displayName: string; coldStoreDbId: number; totalDue: number; lotCount: number }>();
     
-    const addToMap = (normalizedName: string, displayName: string, due: number) => {
-      const existing = coldStoreMap.get(normalizedName);
-      if (existing) {
-        existing.totalDue += due;
-        existing.lotCount += 1;
-      } else {
-        coldStoreMap.set(normalizedName, { displayName, totalDue: due, lotCount: 1 });
-      }
-    };
+    const csNameMap = new Map<number, string>();
+    for (const cs of allColdStores) {
+      csNameMap.set(cs.id, cs.name);
+      coldStoreMap.set(cs.id, { displayName: cs.name, coldStoreDbId: cs.id, totalDue: 0, lotCount: 0 });
+    }
     
     for (const lot of allHarvestLots) {
-      const normalizedName = normalizeName(lot.coldStoreName || "");
-      if (!normalizedName) continue;
+      if (!lot.coldStoreDbId) continue;
       const totalCharges = getColdStoreChargesFromArray(lot.charges);
       if (totalCharges <= 0) continue;
       const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
       const due = totalCharges - paidAmount;
       if (due <= 0) continue;
-      addToMap(normalizedName, (lot.coldStoreName || "").trim(), due);
+      const existing = coldStoreMap.get(lot.coldStoreDbId);
+      if (existing) {
+        existing.totalDue += due;
+        existing.lotCount += 1;
+      }
     }
     
     for (const sLot of allSeedLots) {
-      const normalizedName = normalizeName(sLot.coldStoreName || "");
-      if (!normalizedName) continue;
+      if (!sLot.coldStoreDbId) continue;
       const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
       const totalCharges = chargesPerBag * (sLot.originalBags || 0);
       if (totalCharges <= 0) continue;
       const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
       const due = totalCharges - paidAmount;
       if (due <= 0) continue;
-      addToMap(normalizedName, (sLot.coldStoreName || "").trim(), due);
+      const existing = coldStoreMap.get(sLot.coldStoreDbId);
+      if (existing) {
+        existing.totalDue += due;
+        existing.lotCount += 1;
+      }
     }
     
-    return Array.from(coldStoreMap.entries()).map(([_, data]) => ({
-      coldStoreName: data.displayName,
-      totalDue: data.totalDue,
-      lotCount: data.lotCount,
-    }));
+    return Array.from(coldStoreMap.values())
+      .filter(data => data.totalDue > 0)
+      .map(data => ({
+        coldStoreName: data.displayName,
+        coldStoreDbId: data.coldStoreDbId,
+        totalDue: data.totalDue,
+        lotCount: data.lotCount,
+      }));
   }
 
   async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]> {
@@ -1695,9 +1717,8 @@ export class DatabaseStorage implements IStorage {
       }
       
       // If this is a cold store charge payment, apply FIFO to lots
-      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && entry.coldStoreName) {
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && (entry.coldStoreDbId || entry.coldStoreName)) {
         let remainingAmount = parseFloat(entry.amount);
-        const normalizedColdStoreName = normalizeName(entry.coldStoreName);
         
         // Get all lots for this merchant (FIFO order by createdAt)
         const allLots = await tx.select().from(lots)
@@ -1713,11 +1734,15 @@ export class DatabaseStorage implements IStorage {
             .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
         };
         
-        // Filter to only those matching cold store name (case-insensitive, trimmed) with remaining due
+        // Filter to matching cold store by DB ID (preferred) or fallback to name matching
         const lotsWithDue = allLots.filter(lot => {
-          if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
+          if (entry.coldStoreDbId) {
+            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
+          } else {
+            const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
+            if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
+          }
           const totalCharges = getColdStoreChargesFromArray(lot.charges);
-          // Check if there are any charges
           if (totalCharges <= 0) return false;
           const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
           return totalCharges > paidAmount;
@@ -3455,15 +3480,13 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Cold store charge FIFO
-      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && entry.coldStoreName) {
+      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && (entry.coldStoreDbId || entry.coldStoreName)) {
         let remainingAmount = parseFloat(entry.amount);
-        const normalizedColdStoreName = normalizeName(entry.coldStoreName);
         
         const allLots = await tx.select().from(lots)
           .where(eq(lots.merchantId, entry.merchantId))
           .orderBy(asc(lots.createdAt));
         
-        // Helper to calculate cold store related charges from the charges array
         const getColdStoreChargesFromArray = (charges: unknown): number => {
           if (!Array.isArray(charges)) return 0;
           const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
@@ -3473,7 +3496,12 @@ export class DatabaseStorage implements IStorage {
         };
         
         const lotsWithDue = allLots.filter(lot => {
-          if (normalizeName(lot.coldStoreName) !== normalizedColdStoreName) return false;
+          if (entry.coldStoreDbId) {
+            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
+          } else {
+            const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
+            if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
+          }
           const totalCharges = getColdStoreChargesFromArray(lot.charges);
           if (totalCharges <= 0) return false;
           const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
@@ -4183,45 +4211,20 @@ export class DatabaseStorage implements IStorage {
     return results.sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }
 
-  async searchColdStores(merchantId: number, query: string): Promise<string[]> {
+  async searchColdStores(merchantId: number, query: string): Promise<{ id: number; name: string }[]> {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return [];
-
-    // Get cold store names from raw potato lots
-    const rawLots = await db.select({
-      coldStoreName: lots.coldStoreName,
-    })
-    .from(lots)
-    .where(eq(lots.merchantId, merchantId));
-
-    // Get cold store names from seed lots
-    const seedLotsData = await db.select({
-      coldStoreName: seedLots.coldStoreName,
-    })
-    .from(seedLots)
-    .where(eq(seedLots.merchantId, merchantId));
-
-    // Create a set to deduplicate cold store names
-    const coldStoreSet = new Set<string>();
-
-    for (const lot of rawLots) {
-      if (lot.coldStoreName) {
-        coldStoreSet.add(lot.coldStoreName);
-      }
+    
+    const allColdStores = await db.select()
+      .from(coldStores)
+      .where(and(eq(coldStores.merchantId, merchantId), eq(coldStores.isActive, true)));
+    
+    if (!normalizedQuery) {
+      return allColdStores.map(cs => ({ id: cs.id, name: cs.name }));
     }
-
-    for (const lot of seedLotsData) {
-      if (lot.coldStoreName) {
-        coldStoreSet.add(lot.coldStoreName);
-      }
-    }
-
-    // Filter by query and sort alphabetically
-    const results = Array.from(coldStoreSet)
-      .filter(name => name.toLowerCase().includes(normalizedQuery))
-      .sort((a, b) => a.localeCompare(b));
-
-    return results;
+    
+    return allColdStores
+      .filter(cs => cs.name.toLowerCase().includes(normalizedQuery))
+      .map(cs => ({ id: cs.id, name: cs.name }));
   }
 
   async searchSeedBrands(merchantId: number, query: string): Promise<string[]> {
@@ -4577,6 +4580,195 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLiabilityPayment(id: number, merchantId: number): Promise<void> {
     await db.delete(liabilityPayments).where(and(eq(liabilityPayments.id, id), eq(liabilityPayments.merchantId, merchantId)));
+  }
+
+  async getColdStoresByMerchant(merchantId: number): Promise<ColdStore[]> {
+    return await db.select().from(coldStores).where(eq(coldStores.merchantId, merchantId)).orderBy(desc(coldStores.createdAt));
+  }
+
+  async getColdStoreById(id: number, merchantId: number): Promise<ColdStore | undefined> {
+    const [cs] = await db.select().from(coldStores).where(and(eq(coldStores.id, id), eq(coldStores.merchantId, merchantId)));
+    return cs;
+  }
+
+  async getMaxColdStoreCodeSequence(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select({ coldStoreId: coldStores.coldStoreId })
+      .from(coldStores)
+      .where(and(
+        eq(coldStores.merchantId, merchantId),
+        sql`${coldStores.coldStoreId} LIKE ${prefix + '%'}`
+      ));
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.coldStoreId) {
+        const seq = parseInt(row.coldStoreId.substring(prefix.length), 10);
+        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+      }
+    }
+    return maxSeq;
+  }
+
+  async createColdStore(coldStore: InsertColdStore): Promise<ColdStore> {
+    const [created] = await db.insert(coldStores).values(coldStore).returning();
+    return created;
+  }
+
+  async updateColdStore(id: number, merchantId: number, data: Partial<ColdStore>): Promise<ColdStore | undefined> {
+    const [updated] = await db.update(coldStores)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(coldStores.id, id), eq(coldStores.merchantId, merchantId)))
+      .returning();
+    return updated;
+  }
+
+  async getColdStoreByCompositeKey(merchantId: number, name: string): Promise<ColdStore | undefined> {
+    const normalizedName = normalizeName(name);
+    const allCS = await db.select().from(coldStores)
+      .where(eq(coldStores.merchantId, merchantId));
+    return allCS.find(cs => normalizeName(cs.name) === normalizedName);
+  }
+
+  async updateColdStoreWithPropagation(
+    id: number,
+    merchantId: number,
+    data: { name: string; address: string | null; contact: string | null }
+  ): Promise<{ coldStore: ColdStore | undefined; lotsUpdated: number; seedLotsUpdated: number; cashEntriesUpdated: number }> {
+    const [updatedCS] = await db.update(coldStores)
+      .set({
+        name: data.name,
+        address: data.address ?? undefined,
+        contact: data.contact ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(coldStores.id, id), eq(coldStores.merchantId, merchantId)))
+      .returning();
+
+    if (!updatedCS) {
+      return { coldStore: undefined, lotsUpdated: 0, seedLotsUpdated: 0, cashEntriesUpdated: 0 };
+    }
+
+    const lotsResult = await db.update(lots)
+      .set({ coldStoreName: data.name })
+      .where(and(eq(lots.merchantId, merchantId), eq(lots.coldStoreDbId, id)))
+      .returning({ id: lots.id });
+
+    const seedLotsResult = await db.update(seedLots)
+      .set({ coldStoreName: data.name })
+      .where(and(eq(seedLots.merchantId, merchantId), eq(seedLots.coldStoreDbId, id)))
+      .returning({ id: seedLots.id });
+
+    const cashResult = await db.update(cashEntries)
+      .set({ coldStoreName: data.name })
+      .where(and(eq(cashEntries.merchantId, merchantId), eq(cashEntries.coldStoreDbId, id)))
+      .returning({ id: cashEntries.id });
+
+    return {
+      coldStore: updatedCS,
+      lotsUpdated: lotsResult.length,
+      seedLotsUpdated: seedLotsResult.length,
+      cashEntriesUpdated: cashResult.length,
+    };
+  }
+
+  async mergeColdStores(merchantId: number, userId: number | null, sourceId: number, targetId: number): Promise<{ survivingColdStore: ColdStore; mergedCount: number }> {
+    const [lowerId, higherId] = sourceId < targetId ? [sourceId, targetId] : [targetId, sourceId];
+
+    const [survivingCS] = await db.select().from(coldStores)
+      .where(and(eq(coldStores.id, lowerId), eq(coldStores.merchantId, merchantId)));
+    const [mergingCS] = await db.select().from(coldStores)
+      .where(and(eq(coldStores.id, higherId), eq(coldStores.merchantId, merchantId)));
+
+    if (!survivingCS || !mergingCS) {
+      throw new Error("One or both cold stores not found");
+    }
+
+    let mergedCount = 0;
+
+    const lotsResult = await db.update(lots)
+      .set({ coldStoreDbId: lowerId, coldStoreName: survivingCS.name })
+      .where(and(eq(lots.coldStoreDbId, higherId), eq(lots.merchantId, merchantId)))
+      .returning();
+    mergedCount += lotsResult.length;
+
+    const seedLotsResult = await db.update(seedLots)
+      .set({ coldStoreDbId: lowerId, coldStoreName: survivingCS.name })
+      .where(and(eq(seedLots.coldStoreDbId, higherId), eq(seedLots.merchantId, merchantId)))
+      .returning();
+    mergedCount += seedLotsResult.length;
+
+    const cashResult = await db.update(cashEntries)
+      .set({ coldStoreDbId: lowerId, coldStoreName: survivingCS.name })
+      .where(and(eq(cashEntries.coldStoreDbId, higherId), eq(cashEntries.merchantId, merchantId)))
+      .returning();
+    mergedCount += cashResult.length;
+
+    const allocResult = await db.update(coldStoreChargeAllocations)
+      .set({})
+      .where(and(
+        sql`${coldStoreChargeAllocations.lotId} IN (SELECT id FROM lots WHERE cold_store_db_id = ${lowerId} AND merchant_id = ${merchantId})`,
+        eq(coldStoreChargeAllocations.merchantId, merchantId)
+      ))
+      .returning();
+
+    const newPyPayable = (parseFloat(survivingCS.pyPayable || "0") + parseFloat(mergingCS.pyPayable || "0")).toString();
+
+    const [updatedSurvivor] = await db.update(coldStores)
+      .set({
+        pyPayable: newPyPayable,
+        address: survivingCS.address || mergingCS.address,
+        contact: survivingCS.contact || mergingCS.contact,
+        bankName: survivingCS.bankName || mergingCS.bankName,
+        bankAccountNumber: survivingCS.bankAccountNumber || mergingCS.bankAccountNumber,
+        ifscCode: survivingCS.ifscCode || mergingCS.ifscCode,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(coldStores.id, lowerId), eq(coldStores.merchantId, merchantId)))
+      .returning();
+
+    const nextSerial = await this.getNextColdStoreEditHistorySerialNumber(merchantId);
+    const mergingPyPayable = parseFloat(mergingCS.pyPayable || "0");
+    const pyInfo = mergingPyPayable > 0 ? ` | PY: ₹${mergingPyPayable.toFixed(0)} payable` : '';
+
+    await this.createColdStoreEditHistory({
+      serialNumber: nextSerial,
+      merchantId,
+      coldStoreId: lowerId,
+      changedBy: userId,
+      fieldName: 'merge',
+      oldValue: `${mergingCS.coldStoreId} (${mergingCS.name})${pyInfo}`,
+      newValue: `${mergedCount} linked records transferred`,
+    });
+
+    await db.update(coldStoreEditHistory)
+      .set({ coldStoreId: lowerId })
+      .where(and(eq(coldStoreEditHistory.coldStoreId, higherId), eq(coldStoreEditHistory.merchantId, merchantId)));
+
+    await db.delete(coldStores)
+      .where(and(eq(coldStores.id, higherId), eq(coldStores.merchantId, merchantId)));
+
+    return { survivingColdStore: updatedSurvivor, mergedCount };
+  }
+
+  async getColdStoreEditHistory(coldStoreId: number, merchantId: number): Promise<ColdStoreEditHistoryType[]> {
+    return await db.select()
+      .from(coldStoreEditHistory)
+      .where(and(
+        eq(coldStoreEditHistory.coldStoreId, coldStoreId),
+        eq(coldStoreEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(coldStoreEditHistory.changedAt));
+  }
+
+  async getNextColdStoreEditHistorySerialNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: sql<number>`COALESCE(MAX(${coldStoreEditHistory.serialNumber}), 0)` })
+      .from(coldStoreEditHistory)
+      .where(eq(coldStoreEditHistory.merchantId, merchantId));
+    return (result?.maxSerial || 0) + 1;
+  }
+
+  async createColdStoreEditHistory(data: InsertColdStoreEditHistory): Promise<ColdStoreEditHistoryType> {
+    const [created] = await db.insert(coldStoreEditHistory).values(data).returning();
+    return created;
   }
 }
 

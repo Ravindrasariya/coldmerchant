@@ -57,6 +57,7 @@ interface CashEntry {
   farmerName: string | null;
   farmerVillage: string | null;
   coldStoreName: string | null;
+  coldStoreDbId: number | null;
   supplierName: string | null;
   aadhatName: string | null;
   aadhatDbId: number | null;
@@ -98,6 +99,7 @@ interface FarmerWithDue {
 
 interface ColdStoreWithDue {
   coldStoreName: string;
+  coldStoreDbId: number | null;
   totalDue: number;
   lotCount: number;
 }
@@ -905,6 +907,7 @@ export function CashManagementTab() {
       farmerContact: selectedLedgerFarmerOut?.contact || null,
       farmerId: selectedLedgerFarmerOut?.id || null,
       coldStoreName: effectiveExpenseType === "cold_store_charge" ? values.coldStoreName : null,
+      coldStoreDbId: effectiveExpenseType === "cold_store_charge" ? (coldStores.find(cs => cs.coldStoreName === values.coldStoreName)?.coldStoreDbId || null) : null,
       supplierName: effectiveExpenseType === "supplier" ? values.supplierName : null,
       aadhatName: isAadhtiya ? values.aadhatName : null,
       aadhatDbId: selectedAadhat?.id || values.aadhatDbId || null,
