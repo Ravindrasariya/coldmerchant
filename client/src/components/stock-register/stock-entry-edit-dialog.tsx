@@ -237,6 +237,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
