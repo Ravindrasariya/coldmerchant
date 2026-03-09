@@ -120,6 +120,7 @@ interface TimeseriesData {
     farmerSeedDue: number;
     coldStoreTotalCharges: number;
     coldStoreDue: number;
+    coldStoreLedgerDue: number;
     buyerTotalRevenue: number;
     buyerTotalDue: number;
     farmerPyReceivableTotal: number;
@@ -439,7 +440,7 @@ export function DashboardTab() {
     if (!timeseries?.summary) return { totalCharges: 0, totalDue: 0 };
     return {
       totalCharges: timeseries.summary.coldStoreTotalCharges,
-      totalDue: timeseries.summary.coldStoreDue,
+      totalDue: timeseries.summary.coldStoreLedgerDue || timeseries.summary.coldStoreDue,
     };
   }, [timeseries]);
 

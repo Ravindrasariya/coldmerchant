@@ -270,7 +270,8 @@ export const aadhatPaymentAllocations = pgTable("aadhat_payment_allocations", {
 export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations", {
   id: serial("id").primaryKey(),
   cashEntryId: integer("cash_entry_id").notNull().references(() => cashEntries.id, { onDelete: "cascade" }),
-  lotId: integer("lot_id").notNull().references(() => lots.id),
+  lotId: integer("lot_id").references(() => lots.id),
+  seedLotId: integer("seed_lot_id").references(() => seedLots.id),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),

@@ -561,6 +561,9 @@ export async function registerRoutes(
         }
       }
 
+      const coldStoresWithDue = await storage.getColdStoresWithDue(merchantId);
+      const coldStoreLedgerTotalDue = coldStoresWithDue.reduce((sum, cs) => sum + cs.totalDue, 0);
+
       const aadhatBagsByName = Array.from(aadhatBagsMap.entries())
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1])
@@ -583,6 +586,7 @@ export async function registerRoutes(
           farmerSeedDue: Math.round(summaryFarmerSeedDue),
           coldStoreTotalCharges: Math.round(summaryColdStoreTotalCharges),
           coldStoreDue: Math.round(summaryColdStoreDue),
+          coldStoreLedgerDue: Math.round(coldStoreLedgerTotalDue),
           buyerTotalRevenue: Math.round(summaryBuyerTotalRevenue),
           buyerTotalDue: Math.round(summaryBuyerTotalDue),
           farmerPyReceivableTotal: Math.round(farmerPyReceivableTotal),
@@ -4792,11 +4796,12 @@ export async function registerRoutes(
       
       const result = coldStoreList.map(cs => {
         const pyPayable = parseFloat(cs.pyPayable || "0");
-        const coldStoreDue = dueMap.get(cs.id) || 0;
+        const totalDue = dueMap.get(cs.id) || pyPayable;
+        const coldStoreDue = totalDue - pyPayable;
         return {
           ...cs,
           coldStoreDue,
-          totalDue: pyPayable + coldStoreDue,
+          totalDue,
         };
       });
       

@@ -76,8 +76,12 @@ All four record types have globally unique IDs for backend matching purposes (no
 ### Cold Store Dues Calculation
 Cold store dues are calculated from the `charges` array on each lot:
 - Only charge types "Cold Charges" and "Ware House Charges" are included
-- FIFO allocation applies payments to oldest outstanding lots first
+- Total due per cold store = pyPayable + harvest lot cold charges due + seed lot cold charges due
+- `getColdStoresWithDue()` returns the full total (pyPayable + stock dues) — single source of truth for cash tab, ledger, and dashboard
+- FIFO allocation applies payments to oldest harvest lots first, then seed lots
 - Dues are grouped by `cold_store_db_id` (integer FK) for accurate matching
+- `coldStoreChargeAllocations` table has nullable `lotId` (harvest) and `seedLotId` (seed) — one must be set per allocation
+- Reversal logic handles both harvest and seed lot allocations
 
 ### Aadhat Payment (Manual Allocation)
 Aadhat (aadhtiya) payments use manual transaction-level allocation instead of FIFO:

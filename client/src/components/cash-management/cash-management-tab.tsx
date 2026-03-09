@@ -592,6 +592,8 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
       toast({
         title: t("Success", "सफलता"),
         description: t("Entry recorded successfully", "प्रविष्टि सफलतापूर्वक दर्ज की गई"),
@@ -2981,6 +2983,8 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
     },
     onError: (error: any) => {
       toast({

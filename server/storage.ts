@@ -1273,7 +1273,7 @@ export class DatabaseStorage implements IStorage {
     const csNameMap = new Map<number, string>();
     for (const cs of allColdStores) {
       csNameMap.set(cs.id, cs.name);
-      coldStoreMap.set(cs.id, { displayName: cs.name, coldStoreDbId: cs.id, totalDue: 0, lotCount: 0 });
+      coldStoreMap.set(cs.id, { displayName: cs.name, coldStoreDbId: cs.id, totalDue: parseFloat(cs.pyPayable || "0"), lotCount: 0 });
     }
     
     for (const lot of allHarvestLots) {
@@ -3535,6 +3535,55 @@ export class DatabaseStorage implements IStorage {
           
           remainingAmount -= toApply;
         }
+
+        if (remainingAmount > 0) {
+          const allSeedLotsForCS = await tx.select().from(seedLots)
+            .where(eq(seedLots.merchantId, entry.merchantId))
+            .orderBy(asc(seedLots.createdAt));
+
+          const seedLotsWithDue = allSeedLotsForCS.filter(sLot => {
+            if (entry.coldStoreDbId) {
+              if (sLot.coldStoreDbId !== entry.coldStoreDbId) return false;
+            } else {
+              const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
+              if (normalizeName(sLot.coldStoreName || "") !== normalizedColdStoreName) return false;
+            }
+            const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+            const totalCharges = chargesPerBag * (sLot.originalBags || 0);
+            if (totalCharges <= 0) return false;
+            const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
+            return totalCharges > paidAmount;
+          });
+
+          for (const sLot of seedLotsWithDue) {
+            if (remainingAmount <= 0) break;
+
+            const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+            const totalCharges = chargesPerBag * (sLot.originalBags || 0);
+            const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
+            const due = totalCharges - currentPaid;
+
+            if (due <= 0) continue;
+
+            const toApply = Math.min(remainingAmount, due);
+
+            const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
+              cashEntryId: createdEntry.id,
+              seedLotId: sLot.id,
+              merchantId: entry.merchantId,
+              appliedAmount: toApply.toString(),
+            }).returning();
+
+            coldStoreAllocations.push(allocation);
+
+            const newPaid = currentPaid + toApply;
+            await tx.update(seedLots)
+              .set({ coldStoreChargesPaid: newPaid.toString() })
+              .where(eq(seedLots.id, sLot.id));
+
+            remainingAmount -= toApply;
+          }
+        }
       }
 
       // Supplier payment FIFO - update seed stock entries amountPaid
@@ -4074,16 +4123,30 @@ export class DatabaseStorage implements IStorage {
       // 4f. Reverse cold store charge allocations (only for cold_store_charge outflows)
       if (entry.direction === "outflow" && entry.expenseType === "cold_store_charge") {
         for (const alloc of coldStoreAllocs) {
-          const [lot] = await tx.select().from(lots)
-            .where(eq(lots.id, alloc.lotId));
-          
-          if (lot) {
-            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-            const newPaid = Math.max(0, currentPaid - parseFloat(alloc.appliedAmount));
+          if (alloc.lotId) {
+            const [lot] = await tx.select().from(lots)
+              .where(eq(lots.id, alloc.lotId));
             
-            await tx.update(lots)
-              .set({ coldStorageChargesPaid: newPaid.toString() })
-              .where(eq(lots.id, lot.id));
+            if (lot) {
+              const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+              const newPaid = Math.max(0, currentPaid - parseFloat(alloc.appliedAmount));
+              
+              await tx.update(lots)
+                .set({ coldStorageChargesPaid: newPaid.toString() })
+                .where(eq(lots.id, lot.id));
+            }
+          } else if (alloc.seedLotId) {
+            const [sLot] = await tx.select().from(seedLots)
+              .where(eq(seedLots.id, alloc.seedLotId));
+            
+            if (sLot) {
+              const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
+              const newPaid = Math.max(0, currentPaid - parseFloat(alloc.appliedAmount));
+              
+              await tx.update(seedLots)
+                .set({ coldStoreChargesPaid: newPaid.toString() })
+                .where(eq(seedLots.id, sLot.id));
+            }
           }
         }
       }
