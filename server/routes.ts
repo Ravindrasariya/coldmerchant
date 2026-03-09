@@ -575,6 +575,11 @@ export async function registerRoutes(
         }
       }
 
+      const allColdStoreRecords = await storage.getColdStoresByMerchant(merchantId);
+      for (const cs of allColdStoreRecords) {
+        summaryColdStoreTotalCharges += parseFloat(cs.originalPyPayable || "0");
+      }
+
       const aadhatBagsByName = Array.from(aadhatBagsMap.entries())
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1])
@@ -4853,6 +4858,7 @@ export async function registerRoutes(
             address: (address || "").trim(),
             contact: contact?.trim() || null,
             pyPayable: pyPayable || "0",
+            originalPyPayable: pyPayable || "0",
             redFlag: redFlag ?? false,
             isActive: isActive ?? true,
             bankName: bankName ? bankName.trim().toUpperCase() : null,
@@ -4962,13 +4968,19 @@ export async function registerRoutes(
       if (existingCS.pyPayable !== newPyPayable || existingCS.redFlag !== newRedFlag || 
           existingCS.bankName !== newBankName || existingCS.bankAccountNumber !== newBankAccountNumber ||
           existingCS.ifscCode !== newIfscCode) {
-        await storage.updateColdStore(id, merchantId, {
+        const updateData: any = {
           pyPayable: newPyPayable,
           redFlag: newRedFlag,
           bankName: newBankName,
           bankAccountNumber: newBankAccountNumber,
           ifscCode: newIfscCode,
-        });
+        };
+        const newPyVal = parseFloat(newPyPayable || "0");
+        const currentOriginal = parseFloat(existingCS.originalPyPayable || "0");
+        if (newPyVal > currentOriginal) {
+          updateData.originalPyPayable = newPyPayable;
+        }
+        await storage.updateColdStore(id, merchantId, updateData);
       }
 
       if (!result.coldStore) {

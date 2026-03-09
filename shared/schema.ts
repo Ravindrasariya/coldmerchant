@@ -1336,6 +1336,7 @@ export const coldStores = pgTable("cold_stores", {
   address: text("address").notNull(),
   contact: text("contact"),
   pyPayable: decimal("py_payable", { precision: 12, scale: 2 }).default("0"),
+  originalPyPayable: decimal("original_py_payable", { precision: 12, scale: 2 }).default("0"),
   redFlag: boolean("red_flag").default(false),
   isActive: boolean("is_active").default(true),
   bankName: text("bank_name"),

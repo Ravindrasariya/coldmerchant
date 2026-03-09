@@ -78,6 +78,7 @@ Cold store dues are calculated from the `charges` array on each lot:
 - Only charge types "Cold Charges" and "Ware House Charges" are included
 - Total due per cold store = pyPayable + harvest lot cold charges due + seed lot cold charges due
 - `getColdStoresWithDue()` returns the full total (pyPayable + stock dues) — single source of truth for cash tab, ledger, and dashboard
+- `originalPyPayable` field on cold_stores stores the initial PY payable value (never reduced by payments); used for dashboard "Total" which never decreases
 - FIFO allocation priority: PY Payable first → harvest lots (oldest first) → seed lots (oldest first)
 - Dues are grouped by `cold_store_db_id` (integer FK) for accurate matching
 - `coldStoreChargeAllocations` table has nullable `lotId` (harvest), `seedLotId` (seed), `coldStoreId` (pyPayable) — exactly one must be set per allocation
