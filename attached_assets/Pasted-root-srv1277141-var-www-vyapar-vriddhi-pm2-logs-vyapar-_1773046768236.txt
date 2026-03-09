@@ -1,0 +1,21 @@
+root@srv1277141:/var/www/vyapar-vriddhi# pm2 logs vyapar-vriddhi --lines 10
+[TAILING] Tailing last 10 lines for [vyapar-vriddhi] process (change the value with --lines option)
+/root/.pm2/logs/vyapar-vriddhi-error-2.log last 10 lines:
+2|vyapar-v |     at check (node:internal/crypto/scrypt:84:10)
+2|vyapar-v |     at scrypt (node:internal/crypto/scrypt:46:13)
+2|vyapar-v |     at node:internal/util:441:7
+2|vyapar-v |     at new Promise (<anonymous>)
+2|vyapar-v |     at scrypt (node:internal/util:427:12)
+2|vyapar-v |     at fb (/var/www/vyapar-vriddhi/dist/index.cjs:76:88916)
+2|vyapar-v |     at /var/www/vyapar-vriddhi/dist/index.cjs:78:99217
+2|vyapar-v |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+2|vyapar-v |   code: 'ERR_INVALID_ARG_TYPE'
+2|vyapar-v | }
+
+/root/.pm2/logs/vyapar-vriddhi-out-2.log last 10 lines:
+2|vyapar-v | de":null,"createdAt":"2026-03-09T08:13:22.656Z","updatedAt":"2026-03-09T08:13:22.656Z","coldStoreDue":215250,"totalDue":215250},{"id":1,"merchantId":1,"coldStoreId":"CS202603091","dateAdded":"2026-03-09","name":"Balaji Cold Store","address":"","contact":null,"pyPayable":"0.00","originalPyPayable":"0.00","redFlag":false,"isActive":true,"bankName":null,"bankAccountNumber":null,"ifscCode":null,"createdAt":"2026-03-09T08:13:22.653Z","updatedAt":"2026-03-09T08:13:22.653Z","coldStoreDue":60000,"totalDue":60000}]
+2|vyapar-v | 8:56:12 AM [express] GET /api/demo-videos 304 in 19ms :: [{"id":1,"filename":"1772132219773-560147930.mp4","originalName":"1st-Stock Entry_STock_Register.mp4","caption":"Stock Entry and Register","mimeType":"video/mp4","fileSize":46161210,"uploadedAt":"2026-02-26T18:57:00.802Z"}]
+2|vyapar-v | 8:56:12 AM [express] GET /api/books/profit-loss 304 in 38ms :: {"financialYear":"2025-26","revenue":{"byType":{"raw_potato":355000,"seed_sale":151100},"total":506100},"expenses":{"byType":{"cost_of_goods_sold":469820},"total":469820},"netProfitLoss":36280}
+2|vyapar-v | 8:56:12 AM [express] GET /api/books/balance-sheet 304 in 61ms :: {"financialYear":"2025-26","assets":{"fixedAssets":{"gross":0,"depreciation":0,"net":0,"details":[]},"currentAssets":{"cashInHand":-139500,"bankBalances":[{"name":"ICICI-Current-#3637474","balance":100000}],"totalBankBalance":100000,"buyerReceivables":365000,"farmerReceivables":0,"harvestStockValue":181400,"seedStockValue":4307750,"total":4814650},"totalAssets":4814650},"liabilities":{"longTerm":{"total":0,"details":[]},"shortTerm":{"total":0,"details":[]},"currentLiabilities":{"farmerPayables":85520,"supplierPayables":3875000,"aadhtiyaPayables":156400,"coldStorePayables":515250,"limitAccountLiabilities":100000,"limitAccountDetails":[{"name":"SBI-Limit -#637577","balance":100000}]},"totalLiabilities":4732170},"ownersEquity":82480,"balanceCheck":true}
+2|vyapar-v | 8:56:13 AM [express] GET /api/demo-videos/1/stream 206 in 6ms
+2|vyapar-v | 8:56:16 AM [express] GET /api/demo-videos/1/stream 206 in 7ms
