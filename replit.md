@@ -82,6 +82,8 @@ Cold store dues are calculated from the `charges` array on each lot:
 - FIFO allocation priority: PY Payable first → harvest lots (oldest first) → seed lots (oldest first)
 - Dues are grouped by `cold_store_db_id` (integer FK) for accurate matching
 - `coldStoreChargeAllocations` table has nullable `lotId` (harvest), `seedLotId` (seed), `coldStoreId` (pyPayable) — exactly one must be set per allocation
+- **Farm gate lots**: lot-level `coldStoreDbId` is null; cold store is specified per-charge via `charge.coldStoreDbId`. Allocations for farm_gate lots set both `lotId` AND `coldStoreId` on the allocation record so payments can be tracked per lot-per-cold-store
+- **Farm gate paid tracking**: `getColdStoresWithDue` and both FIFO methods build a `farmGatePaidMap` keyed by `lotId-coldStoreId` from `coldStoreChargeAllocations` (excluding reversed entries) to correctly subtract paid amounts from farm_gate charges
 - Reversal logic handles pyPayable restoration, harvest and seed lot allocations
 - Both `createCashEntry` and `createCashEntryWithFIFO` follow the same PY → harvest → seed FIFO logic
 

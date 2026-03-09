@@ -1256,11 +1256,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]> {
-    const [allHarvestLots, allSeedLots, allColdStores] = await Promise.all([
+    const [allHarvestLots, allSeedLots, allColdStores, allAllocations, allCashEntries] = await Promise.all([
       db.select().from(lots).where(eq(lots.merchantId, merchantId)),
       db.select().from(seedLots).where(eq(seedLots.merchantId, merchantId)),
       db.select().from(coldStores).where(eq(coldStores.merchantId, merchantId)),
+      db.select().from(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, merchantId)),
+      db.select({ id: cashEntries.id, isReversed: cashEntries.isReversed }).from(cashEntries).where(eq(cashEntries.merchantId, merchantId)),
     ]);
+    
+    const reversedEntryIds = new Set(allCashEntries.filter(e => e.isReversed).map(e => e.id));
+    
+    const farmGatePaidMap = new Map<string, number>();
+    for (const alloc of allAllocations) {
+      if (reversedEntryIds.has(alloc.cashEntryId)) continue;
+      if (alloc.lotId && alloc.coldStoreId) {
+        const key = `${alloc.lotId}-${alloc.coldStoreId}`;
+        farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0"));
+      }
+    }
     
     const getColdStoreChargesFromArray = (charges: unknown): number => {
       if (!Array.isArray(charges)) return 0;
@@ -1279,16 +1292,37 @@ export class DatabaseStorage implements IStorage {
     }
     
     for (const lot of allHarvestLots) {
-      if (!lot.coldStoreDbId) continue;
-      const totalCharges = getColdStoreChargesFromArray(lot.charges);
-      if (totalCharges <= 0) continue;
-      const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
-      const due = totalCharges - paidAmount;
-      if (due <= 0) continue;
-      const existing = coldStoreMap.get(lot.coldStoreDbId);
-      if (existing) {
-        existing.totalDue += due;
-        existing.lotCount += 1;
+      if (lot.coldStoreDbId) {
+        const totalCharges = getColdStoreChargesFromArray(lot.charges);
+        if (totalCharges <= 0) continue;
+        const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+        const due = totalCharges - paidAmount;
+        if (due <= 0) continue;
+        const existing = coldStoreMap.get(lot.coldStoreDbId);
+        if (existing) {
+          existing.totalDue += due;
+          existing.lotCount += 1;
+        }
+      } else if (lot.place === "farm_gate" && Array.isArray(lot.charges)) {
+        const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+        const csChargeMap = new Map<number, number>();
+        for (const charge of lot.charges as any[]) {
+          if (!charge || !coldStoreTypes.includes(charge.type) || !charge.coldStoreDbId) continue;
+          const chargeAmount = parseFloat(charge.amount) || 0;
+          if (chargeAmount <= 0) continue;
+          csChargeMap.set(charge.coldStoreDbId, (csChargeMap.get(charge.coldStoreDbId) || 0) + chargeAmount);
+        }
+        for (const [csId, totalCharge] of csChargeMap) {
+          const paidKey = `${lot.id}-${csId}`;
+          const paidAmount = farmGatePaidMap.get(paidKey) || 0;
+          const due = totalCharge - paidAmount;
+          if (due <= 0) continue;
+          const existing = coldStoreMap.get(csId);
+          if (existing) {
+            existing.totalDue += due;
+            existing.lotCount += 1;
+          }
+        }
       }
     }
     
@@ -1762,25 +1796,59 @@ export class DatabaseStorage implements IStorage {
             .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
         };
         
-        const lotsWithDue = allLots.filter(lot => {
-          if (entry.coldStoreDbId) {
-            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
-          } else {
-            const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
-            if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
+        const getColdStoreChargesForCS = (charges: unknown, coldStoreDbId: number | null): number => {
+          if (!Array.isArray(charges)) return 0;
+          const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+          return charges
+            .filter((c: any) => c && coldStoreTypes.includes(c.type) && c.coldStoreDbId === coldStoreDbId)
+            .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+        };
+
+        const existingAllocations = await tx.select().from(coldStoreChargeAllocations)
+          .where(eq(coldStoreChargeAllocations.merchantId, entry.merchantId));
+        const existingCashEntries = await tx.select({ id: cashEntries.id, isReversed: cashEntries.isReversed })
+          .from(cashEntries).where(eq(cashEntries.merchantId, entry.merchantId));
+        const reversedIds = new Set(existingCashEntries.filter(e => e.isReversed).map(e => e.id));
+        const farmGatePaidMap = new Map<string, number>();
+        for (const alloc of existingAllocations) {
+          if (reversedIds.has(alloc.cashEntryId)) continue;
+          if (alloc.lotId && alloc.coldStoreId) {
+            const key = `${alloc.lotId}-${alloc.coldStoreId}`;
+            farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0"));
           }
-          const totalCharges = getColdStoreChargesFromArray(lot.charges);
-          if (totalCharges <= 0) return false;
-          const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
-          return totalCharges > paidAmount;
+        }
+
+        const lotsWithDue = allLots.filter(lot => {
+          if (lot.coldStoreDbId) {
+            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
+            const totalCharges = getColdStoreChargesFromArray(lot.charges);
+            if (totalCharges <= 0) return false;
+            const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+            return totalCharges > paidAmount;
+          } else if (lot.place === "farm_gate" && entry.coldStoreDbId) {
+            const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId);
+            if (csCharges <= 0) return false;
+            const paidKey = `${lot.id}-${entry.coldStoreDbId}`;
+            const paid = farmGatePaidMap.get(paidKey) || 0;
+            return csCharges > paid;
+          }
+          return false;
         });
         
         for (const lot of lotsWithDue) {
           if (remainingAmount <= 0) break;
           
-          const totalCharges = getColdStoreChargesFromArray(lot.charges);
-          const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-          const due = totalCharges - currentPaid;
+          let due: number;
+          if (lot.coldStoreDbId) {
+            const totalCharges = getColdStoreChargesFromArray(lot.charges);
+            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+            due = totalCharges - currentPaid;
+          } else {
+            const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId || null);
+            const paidKey = `${lot.id}-${entry.coldStoreDbId}`;
+            const paid = farmGatePaidMap.get(paidKey) || 0;
+            due = csCharges - paid;
+          }
           
           if (due <= 0) continue;
           
@@ -1789,16 +1857,20 @@ export class DatabaseStorage implements IStorage {
           const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
             cashEntryId: createdEntry.id,
             lotId: lot.id,
+            coldStoreId: lot.coldStoreDbId ? undefined : (entry.coldStoreDbId || undefined),
             merchantId: entry.merchantId,
             appliedAmount: toApply.toString(),
           }).returning();
           
           coldStoreAllocations.push(allocation);
           
-          const newPaid = currentPaid + toApply;
-          await tx.update(lots)
-            .set({ coldStorageChargesPaid: newPaid.toString() })
-            .where(and(eq(lots.id, lot.id), eq(lots.merchantId, entry.merchantId)));
+          if (lot.coldStoreDbId) {
+            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+            const newPaid = currentPaid + toApply;
+            await tx.update(lots)
+              .set({ coldStorageChargesPaid: newPaid.toString() })
+              .where(and(eq(lots.id, lot.id), eq(lots.merchantId, entry.merchantId)));
+          }
           
           remainingAmount -= toApply;
         }
@@ -1809,12 +1881,7 @@ export class DatabaseStorage implements IStorage {
             .orderBy(asc(seedLots.createdAt));
 
           const seedLotsWithDue = allSeedLotsForCS.filter(sLot => {
-            if (entry.coldStoreDbId) {
-              if (sLot.coldStoreDbId !== entry.coldStoreDbId) return false;
-            } else {
-              const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
-              if (normalizeName(sLot.coldStoreName || "") !== normalizedColdStoreName) return false;
-            }
+            if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== entry.coldStoreDbId) return false;
             const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
             const totalCharges = chargesPerBag * (sLot.originalBags || 0);
             if (totalCharges <= 0) return false;
@@ -3596,25 +3663,59 @@ export class DatabaseStorage implements IStorage {
             .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
         };
         
-        const lotsWithDue = allLots.filter(lot => {
-          if (entry.coldStoreDbId) {
-            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
-          } else {
-            const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
-            if (normalizeName(lot.coldStoreName || "") !== normalizedColdStoreName) return false;
+        const getColdStoreChargesForCS = (charges: unknown, coldStoreDbId: number | null): number => {
+          if (!Array.isArray(charges)) return 0;
+          const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+          return charges
+            .filter((c: any) => c && coldStoreTypes.includes(c.type) && c.coldStoreDbId === coldStoreDbId)
+            .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+        };
+
+        const existingAllocations = await tx.select().from(coldStoreChargeAllocations)
+          .where(eq(coldStoreChargeAllocations.merchantId, entry.merchantId));
+        const existingCashEntries = await tx.select({ id: cashEntries.id, isReversed: cashEntries.isReversed })
+          .from(cashEntries).where(eq(cashEntries.merchantId, entry.merchantId));
+        const reversedIds = new Set(existingCashEntries.filter(e => e.isReversed).map(e => e.id));
+        const farmGatePaidMap = new Map<string, number>();
+        for (const alloc of existingAllocations) {
+          if (reversedIds.has(alloc.cashEntryId)) continue;
+          if (alloc.lotId && alloc.coldStoreId) {
+            const key = `${alloc.lotId}-${alloc.coldStoreId}`;
+            farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0"));
           }
-          const totalCharges = getColdStoreChargesFromArray(lot.charges);
-          if (totalCharges <= 0) return false;
-          const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
-          return totalCharges > paidAmount;
+        }
+
+        const lotsWithDue = allLots.filter(lot => {
+          if (lot.coldStoreDbId) {
+            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
+            const totalCharges = getColdStoreChargesFromArray(lot.charges);
+            if (totalCharges <= 0) return false;
+            const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+            return totalCharges > paidAmount;
+          } else if (lot.place === "farm_gate" && entry.coldStoreDbId) {
+            const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId);
+            if (csCharges <= 0) return false;
+            const paidKey = `${lot.id}-${entry.coldStoreDbId}`;
+            const paid = farmGatePaidMap.get(paidKey) || 0;
+            return csCharges > paid;
+          }
+          return false;
         });
         
         for (const lot of lotsWithDue) {
           if (remainingAmount <= 0) break;
           
-          const totalCharges = getColdStoreChargesFromArray(lot.charges);
-          const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-          const due = totalCharges - currentPaid;
+          let due: number;
+          if (lot.coldStoreDbId) {
+            const totalCharges = getColdStoreChargesFromArray(lot.charges);
+            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+            due = totalCharges - currentPaid;
+          } else {
+            const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId || null);
+            const paidKey = `${lot.id}-${entry.coldStoreDbId}`;
+            const paid = farmGatePaidMap.get(paidKey) || 0;
+            due = csCharges - paid;
+          }
           
           if (due <= 0) continue;
           
@@ -3623,16 +3724,20 @@ export class DatabaseStorage implements IStorage {
           const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
             cashEntryId: createdEntry.id,
             lotId: lot.id,
+            coldStoreId: lot.coldStoreDbId ? undefined : (entry.coldStoreDbId || undefined),
             merchantId: entry.merchantId,
             appliedAmount: toApply.toString(),
           }).returning();
           
           coldStoreAllocations.push(allocation);
           
-          const newPaid = currentPaid + toApply;
-          await tx.update(lots)
-            .set({ coldStorageChargesPaid: newPaid.toString() })
-            .where(eq(lots.id, lot.id));
+          if (lot.coldStoreDbId) {
+            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
+            const newPaid = currentPaid + toApply;
+            await tx.update(lots)
+              .set({ coldStorageChargesPaid: newPaid.toString() })
+              .where(eq(lots.id, lot.id));
+          }
           
           remainingAmount -= toApply;
         }
@@ -3643,12 +3748,7 @@ export class DatabaseStorage implements IStorage {
             .orderBy(asc(seedLots.createdAt));
 
           const seedLotsWithDue = allSeedLotsForCS.filter(sLot => {
-            if (entry.coldStoreDbId) {
-              if (sLot.coldStoreDbId !== entry.coldStoreDbId) return false;
-            } else {
-              const normalizedColdStoreName = normalizeName(entry.coldStoreName || "");
-              if (normalizeName(sLot.coldStoreName || "") !== normalizedColdStoreName) return false;
-            }
+            if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== entry.coldStoreDbId) return false;
             const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
             const totalCharges = chargesPerBag * (sLot.originalBags || 0);
             if (totalCharges <= 0) return false;
