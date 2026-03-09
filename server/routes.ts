@@ -2155,6 +2155,28 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/farmers/villages", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const villages = await storage.getDistinctVillages(merchantId);
+      res.json(villages);
+    } catch (error) {
+      console.error("Error fetching distinct villages:", error);
+      res.status(500).json({ message: "Failed to fetch villages" });
+    }
+  });
+
+  app.get("/api/farmers/tehsils", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const tehsils = await storage.getDistinctTehsils(merchantId);
+      res.json(tehsils);
+    } catch (error) {
+      console.error("Error fetching distinct tehsils:", error);
+      res.status(500).json({ message: "Failed to fetch tehsils" });
+    }
+  });
+
   // GET /api/suppliers/search - Search suppliers for autocomplete (from seed stock entries)
   app.get("/api/suppliers/search", requireMerchant, async (req, res) => {
     try {

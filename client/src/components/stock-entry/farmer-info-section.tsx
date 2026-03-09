@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { UseFormReturn } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -40,11 +41,31 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
   const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<FarmerSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
+  const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | 'tehsil' | null>(null);
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [villageSearch, setVillageSearch] = useState("");
+  const [tehsilSearch, setTehsilSearch] = useState("");
+  const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
+  const [showTehsilSuggestions, setShowTehsilSuggestions] = useState(false);
+
+  const { data: distinctVillages = [] } = useQuery<string[]>({
+    queryKey: ["/api/farmers/villages"],
+  });
+
+  const { data: distinctTehsils = [] } = useQuery<string[]>({
+    queryKey: ["/api/farmers/tehsils"],
+  });
+
+  const filteredVillages = distinctVillages.filter(v =>
+    !villageSearch || v.toLowerCase().includes(villageSearch.toLowerCase())
+  );
+
+  const filteredTehsils = distinctTehsils.filter(t =>
+    !tehsilSearch || t.toLowerCase().includes(tehsilSearch.toLowerCase())
+  );
 
   const searchFarmers = useCallback(async (query: string) => {
     if (query.length < 1) {
@@ -88,6 +109,8 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
       });
       if (!isInsideSuggestion) {
         setShowSuggestions(false);
+        setShowVillageSuggestions(false);
+        setShowTehsilSuggestions(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -318,40 +341,38 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                     value={field.value || ""}
                     onChange={(e) => {
                       field.onChange(e);
-                      handleInputChange(e.target.value, 'village');
+                      setVillageSearch(e.target.value);
+                      setShowVillageSuggestions(true);
                     }}
                     onFocus={() => {
-                      setActiveField('village');
-                      if (field.value && field.value.length >= 1) {
-                        setSearchQuery(field.value);
-                        setShowSuggestions(true);
-                      }
+                      setVillageSearch(field.value || "");
+                      setShowVillageSuggestions(true);
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setShowVillageSuggestions(false), 200);
                     }}
                     className={cn(getHighlightClass("village"))}
                     autoComplete="off"
                     data-testid="input-village"
                   />
                 </FormControl>
-                {showSuggestions && activeField === 'village' && suggestions.length > 0 && (
+                {showVillageSuggestions && filteredVillages.length > 0 && (
                   <div 
                     data-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
-                    {suggestions.map((farmer, index) => (
+                    {filteredVillages.map((village, index) => (
                       <div
-                        key={`${farmer.farmerName}-${farmer.village}-${index}`}
+                        key={village}
                         className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          handleSelectFarmer(farmer);
+                          field.onChange(village);
+                          setShowVillageSuggestions(false);
                         }}
                         data-testid={`suggestion-village-${index}`}
                       >
-                        <div className="text-sm font-medium">{farmer.village || farmer.farmerName}</div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {farmer.farmerName}
-                          {farmer.farmerContact && <span> • {farmer.farmerContact}</span>}
-                        </div>
+                        <div className="text-sm font-medium">{village}</div>
                       </div>
                     ))}
                   </div>
@@ -365,17 +386,51 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
             control={form.control}
             name="tehsil"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="relative">
                 <FormLabel>{t("Tehsil", "तहसील")} *</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter tehsil", "तहसील दर्ज करें")} 
                     {...field} 
                     value={field.value || ""}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      setTehsilSearch(e.target.value);
+                      setShowTehsilSuggestions(true);
+                    }}
+                    onFocus={() => {
+                      setTehsilSearch(field.value || "");
+                      setShowTehsilSuggestions(true);
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setShowTehsilSuggestions(false), 200);
+                    }}
                     className={cn(getHighlightClass("tehsil"))}
+                    autoComplete="off"
                     data-testid="input-tehsil"
                   />
                 </FormControl>
+                {showTehsilSuggestions && filteredTehsils.length > 0 && (
+                  <div 
+                    data-suggestion-dropdown
+                    className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
+                  >
+                    {filteredTehsils.map((tehsil, index) => (
+                      <div
+                        key={tehsil}
+                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          field.onChange(tehsil);
+                          setShowTehsilSuggestions(false);
+                        }}
+                        data-testid={`suggestion-tehsil-${index}`}
+                      >
+                        <div className="text-sm font-medium">{tehsil}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <FormMessage />
               </FormItem>
             )}

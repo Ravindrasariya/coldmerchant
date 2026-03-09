@@ -45,7 +45,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
-import { eq, and, or, desc, asc, sql, gt, ne, isNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql, gt, ne, isNull, isNotNull, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -301,6 +301,8 @@ export interface IStorage {
   }[]>;
   
   // Cold Store Lookup operations (for autocomplete in lot forms)
+  getDistinctVillages(merchantId: number): Promise<string[]>;
+  getDistinctTehsils(merchantId: number): Promise<string[]>;
   searchColdStores(merchantId: number, query: string): Promise<{ id: number; name: string }[]>;
   
   // Brand name lookup operations (for autocomplete in seed lot forms)
@@ -4328,6 +4330,26 @@ export class DatabaseStorage implements IStorage {
         source: 'stock_entry' as const,
       }))
       .sort((a, b) => a.farmerName.localeCompare(b.farmerName));
+  }
+
+  async getDistinctVillages(merchantId: number): Promise<string[]> {
+    const results = await db.selectDistinct({ village: farmers.village })
+      .from(farmers)
+      .where(and(eq(farmers.merchantId, merchantId), isNotNull(farmers.village)));
+    return results
+      .map(r => r.village!)
+      .filter(v => v.trim().length > 0)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  async getDistinctTehsils(merchantId: number): Promise<string[]> {
+    const results = await db.selectDistinct({ tehsil: farmers.tehsil })
+      .from(farmers)
+      .where(and(eq(farmers.merchantId, merchantId), isNotNull(farmers.tehsil)));
+    return results
+      .map(r => r.tehsil!)
+      .filter(v => v.trim().length > 0)
+      .sort((a, b) => a.localeCompare(b));
   }
 
   async searchSuppliers(merchantId: number, query: string): Promise<{
