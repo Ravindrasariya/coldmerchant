@@ -47,6 +47,10 @@ interface StockEntryWithLots {
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
     charges: Array<{ type: string; amount: number | string }> | null;
+    mandiCommissionPercent: string | null;
+    aadhatCommissionPercent: string | null;
+    hammaliPerBag: string | null;
+    mandiExtraCharges: string | null;
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -124,7 +128,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const grandTotal = calculateGrandTotal();
 
   const calculateLotTotals = (lot: StockEntryWithLots["lots"][0]) => {
-    // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
     const totalPayable = lot.bagBreakdowns
       .filter(bd => bd.size !== "Wastage")
       .reduce((sum, bd) => {
@@ -144,6 +147,19 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
         return sum + amt;
       }, 0);
+
+    const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
+    const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
+    const hammaliRate = lot.hammaliPerBag ? parseFloat(lot.hammaliPerBag) : 0;
+    const mandiExtra = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
+    const mandiCommission = totalPayable * mandiPct / 100;
+    const aadhatCommission = totalPayable * aadhatPct / 100;
+    const totalBagsForMandi = lot.bagBreakdowns
+      .filter(bd => bd.size !== "Wastage")
+      .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
+    const mandiHammali = totalBagsForMandi * hammaliRate;
+    const totalMandiCharges = mandiCommission + aadhatCommission + mandiHammali + mandiExtra;
+
     const totalDeductions = hammali + dynamicCharges;
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
@@ -155,9 +171,9 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       adjustedValue = lot.adjustedAmountType === "credit" ? interest : -interest;
     }
     
-    const netPayable = totalPayable - totalDeductions + adjustedValue;
+    const netPayable = totalPayable - totalDeductions + totalMandiCharges + adjustedValue;
     
-    return { totalPayable, hammali, charges, dynamicCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
+    return { totalPayable, hammali, charges, dynamicCharges, mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalMandiCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
   };
 
   const overallTotals = entry.lots.reduce((acc, lot) => {
@@ -165,10 +181,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return {
       totalPayable: acc.totalPayable + lotTotals.totalPayable,
       totalDeductions: acc.totalDeductions + lotTotals.totalDeductions,
+      totalMandiCharges: acc.totalMandiCharges + lotTotals.totalMandiCharges,
       adjustedValue: acc.adjustedValue + lotTotals.adjustedValue,
       netPayable: acc.netPayable + lotTotals.netPayable,
     };
-  }, { totalPayable: 0, totalDeductions: 0, adjustedValue: 0, netPayable: 0 });
+  }, { totalPayable: 0, totalDeductions: 0, totalMandiCharges: 0, adjustedValue: 0, netPayable: 0 });
 
   const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
 
@@ -240,6 +257,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
       const lotTotals = calculateLotTotals(lot);
       const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
+      const hasMandiCharges = lotTotals.totalMandiCharges > 0;
       
       const chargesHtml = lotTotals.charges.filter(c => {
         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
@@ -253,6 +271,18 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         ? `Adjustment / समायोजन (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
         : `Adjustment / समायोजन${lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}`;
       
+      const mandiChargesBlockHtml = hasMandiCharges ? `
+        <div style="margin-top: 6px; padding: 8px; background: #eff6ff; border-radius: 4px; border-left: 3px solid #3b82f6;">
+          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Mandi Charges / मंडी शुल्क</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
+            ${lotTotals.mandiCommission > 0 ? `<div><span style="color: #666;">Mandi Commission / मंडी कमीशन:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
+            ${lotTotals.aadhatCommission > 0 ? `<div><span style="color: #666;">Aadhat Commission / आढ़त कमीशन:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
+            ${lotTotals.mandiHammali > 0 ? `<div><span style="color: #666;">Hammali / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
+            ${lotTotals.mandiExtra > 0 ? `<div><span style="color: #666;">Extra Charges / अतिरिक्त शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
+          </div>
+        </div>
+      ` : "";
+
       const deductionsHtml = hasDeductions ? `
         <div style="margin-top: 6px; padding: 8px; background: #fff7ed; border-radius: 4px; border-left: 3px solid #f97316;">
           <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Deductions / कटौती</p>
@@ -266,11 +296,15 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       
       const lotSummaryHtml = `
         <div style="margin-top: 6px; padding: 8px; background: #f0fdf4; border-radius: 4px; border-left: 3px solid #22c55e;">
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 11px; text-align: center;">
+          <div style="display: grid; grid-template-columns: repeat(${hasMandiCharges ? 4 : 3}, 1fr); gap: 6px; font-size: 11px; text-align: center;">
             <div>
               <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Total Payable / कुल देय</p>
               <p style="font-family: monospace; font-weight: 600; margin: 0; color: #15803d;">₹${lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
+            ${hasMandiCharges ? `<div>
+              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Mandi Charges / मंडी शुल्क</p>
+              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #3b82f6;">₹${lotTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            </div>` : ""}
             <div>
               <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Deductions / कटौती</p>
               <p style="font-family: monospace; font-weight: 600; margin: 0; color: #ea580c;">₹${lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
@@ -297,6 +331,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             </div>
           </div>
           ${breakdownHtml}
+          ${mandiChargesBlockHtml}
           ${deductionsHtml}
           ${lotSummaryHtml}
           ${lotRemarksHtml}
@@ -366,7 +401,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <!-- Totals Summary -->
             <div style="margin-top: 12px; padding: 10px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border: 1px solid #0ea5e9;">
               <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 8px 0; font-weight: 700; letter-spacing: 0.05em;">${summaryLabel}</h3>
-              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+              <div style="display: grid; grid-template-columns: repeat(${overallTotals.totalMandiCharges > 0 ? 5 : 4}, 1fr); gap: 8px; text-align: center;">
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
                   <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0;">${totalBagsExcludingWastage}</p>
@@ -375,6 +410,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Payable / कुल देय</p>
                   <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
+                ${overallTotals.totalMandiCharges > 0 ? `<div>
+                  <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Mandi Charges / मंडी शुल्क</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #3b82f6;">₹${overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                </div>` : ""}
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Deductions / कटौती</p>
                   <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
@@ -492,8 +531,40 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             {(() => {
               const lotTotals = calculateLotTotals(lot);
               const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
+              const hasMandiCharges = lotTotals.totalMandiCharges > 0;
               return (
                 <>
+                  {hasMandiCharges && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                      <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Mandi Charges / मंडी शुल्क</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {lotTotals.mandiCommission > 0 && (
+                          <>
+                            <span className="text-gray-600">Mandi Commission / मंडी कमीशन:</span>
+                            <span className="text-right font-mono">₹{lotTotals.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                          </>
+                        )}
+                        {lotTotals.aadhatCommission > 0 && (
+                          <>
+                            <span className="text-gray-600">Aadhat Commission / आढ़त कमीशन:</span>
+                            <span className="text-right font-mono">₹{lotTotals.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                          </>
+                        )}
+                        {lotTotals.mandiHammali > 0 && (
+                          <>
+                            <span className="text-gray-600">Hammali / हम्माली:</span>
+                            <span className="text-right font-mono">₹{lotTotals.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                          </>
+                        )}
+                        {lotTotals.mandiExtra > 0 && (
+                          <>
+                            <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
+                            <span className="text-right font-mono">₹{lotTotals.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {hasDeductions && (
                     <div className="mt-2 p-2 bg-orange-50 rounded border-l-4 border-orange-400">
                       <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Deductions / कटौती</p>
@@ -533,11 +604,17 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     </div>
                   )}
                   <div className="mt-2 p-2 bg-green-50 rounded border-l-4 border-green-500">
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className={`grid ${hasMandiCharges ? 'grid-cols-4' : 'grid-cols-3'} gap-2 text-center text-xs`}>
                       <div>
                         <p className="text-gray-600 mb-1">Total Payable / कुल देय</p>
                         <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                       </div>
+                      {hasMandiCharges && (
+                        <div>
+                          <p className="text-gray-600 mb-1">Mandi Charges / मंडी शुल्क</p>
+                          <p className="font-mono font-semibold text-blue-600">₹{lotTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-gray-600 mb-1">Deductions / कटौती</p>
                         <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
@@ -563,7 +640,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
       <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
         <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">{isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश"}</h3>
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className={`grid ${overallTotals.totalMandiCharges > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2 text-center`}>
           <div>
             <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
             <p className="font-mono font-semibold text-base">{totalBagsExcludingWastage}</p>
@@ -572,6 +649,12 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
             <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </div>
+          {overallTotals.totalMandiCharges > 0 && (
+            <div>
+              <p className="text-xs text-gray-600 mb-1">Mandi Charges / मंडी शुल्क</p>
+              <p className="font-mono font-semibold text-base text-blue-600">₹{overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
             <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
