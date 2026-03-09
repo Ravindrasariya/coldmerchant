@@ -4975,9 +4975,7 @@ export async function registerRoutes(
           bankAccountNumber: newBankAccountNumber,
           ifscCode: newIfscCode,
         };
-        const newPyVal = parseFloat(newPyPayable || "0");
-        const currentOriginal = parseFloat(existingCS.originalPyPayable || "0");
-        if (newPyVal > currentOriginal) {
+        if (existingCS.pyPayable !== newPyPayable) {
           updateData.originalPyPayable = newPyPayable;
         }
         await storage.updateColdStore(id, merchantId, updateData);
