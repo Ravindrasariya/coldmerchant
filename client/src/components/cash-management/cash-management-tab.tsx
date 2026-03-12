@@ -874,7 +874,7 @@ export function CashManagementTab() {
         row.pettyAdjustment = value;
       }
       if (field === 'amount' || field === 'discountPercent') {
-        if (row.amount > 0 && row.discountPercent > 0) {
+        if (row.amount > 0) {
           row.pettyAdjustment = Math.round((row.dueAmount - row.amount - row.discountAmount) * 100) / 100;
         }
       }
