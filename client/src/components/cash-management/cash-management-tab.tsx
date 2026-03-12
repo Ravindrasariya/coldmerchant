@@ -359,13 +359,6 @@ const outflowFormSchema = z.object({
       path: ["bankAccountId"],
     });
   }
-  if (data.paymentMode === "cheque" && (!data.chequeNumber || data.chequeNumber.trim().length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Cheque number is required",
-      path: ["chequeNumber"],
-    });
-  }
 });
 
 type InwardFormValues = z.infer<typeof inwardFormSchema>;
@@ -3009,7 +3002,7 @@ export function CashManagementTab() {
                       name="chequeNumber"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("Cheque Number", "चेक नंबर")} *</FormLabel>
+                          <FormLabel>{t("Cheque Number", "चेक नंबर")}</FormLabel>
                           <FormControl>
                             <Input {...field} placeholder={t("Enter cheque number", "चेक नंबर दर्ज करें")} data-testid="input-outflow-cheque-number" />
                           </FormControl>
