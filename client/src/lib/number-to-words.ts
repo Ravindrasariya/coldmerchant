@@ -58,7 +58,7 @@ export function numberToIndianWords(amount: number): string {
       parts.push(convertChunk(rupees));
     }
 
-    words = (isNegative ? "Minus " : "") + "Rupees " + parts.join(" ");
+    words = (isNegative ? "Minus " : "") + parts.join(" ");
   }
 
   if (paise > 0) {
