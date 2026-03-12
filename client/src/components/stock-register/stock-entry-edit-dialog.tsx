@@ -244,6 +244,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       onOpenChange(false);
     },
     onError: (error: Error) => {

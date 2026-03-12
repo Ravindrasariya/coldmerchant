@@ -776,7 +776,7 @@ export function CashManagementTab() {
             }
             .amount-box {
               position: absolute;
-              top: 0.72in;
+              top: 1.08in;
               right: 0.12in;
               width: 1.55in;
               height: 0.34in;
