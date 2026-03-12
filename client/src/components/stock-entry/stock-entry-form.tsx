@@ -58,7 +58,7 @@ function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic", selec
   };
 }
 
-function loadSavedFormData(selectedCrop: "potato" | "onion" | "garlic"): StockEntryFormType {
+function loadSavedFormData(selectedCrop: "potato" | "onion" | "garlic", selectedPlace?: "farm_gate" | "cold_store" | "mandi"): StockEntryFormType {
   try {
     const saved = localStorage.getItem(getStorageKey(selectedCrop));
     if (saved) {
@@ -70,7 +70,7 @@ function loadSavedFormData(selectedCrop: "potato" | "onion" | "garlic"): StockEn
   } catch (e) {
     console.error("Failed to load saved form data:", e);
   }
-  return getDefaultFormValues(selectedCrop);
+  return getDefaultFormValues(selectedCrop, selectedPlace);
 }
 
 function saveFormData(data: StockEntryFormType, crop: "potato" | "onion" | "garlic") {
@@ -104,7 +104,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   
   const form = useForm<StockEntryFormType>({
     resolver: zodResolver(stockEntryFormSchema),
-    defaultValues: loadSavedFormData(selectedCrop),
+    defaultValues: loadSavedFormData(selectedCrop, selectedPlace),
   });
 
   useEffect(() => {
@@ -117,41 +117,38 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   }, [form, selectedCrop]);
 
   useEffect(() => {
-    form.reset(loadSavedFormData(selectedCrop));
-  }, [selectedCrop, form]);
-
-  useEffect(() => {
-    form.setValue("place", selectedPlace);
-    const lots = form.getValues("lots");
-    lots.forEach((_, index) => {
-      form.setValue(`lots.${index}.place`, selectedPlace);
-      if (selectedPlace === "mandi") {
-        form.setValue(`lots.${index}.cutType`, "gate_cut");
-        form.setValue(`lots.${index}.coldStoreName`, "");
-        form.setValue(`lots.${index}.coldStoreLotNumber`, "");
-        form.setValue(`lots.${index}.charges`, []);
-      } else if (selectedPlace === "farm_gate") {
-        form.setValue(`lots.${index}.coldStoreName`, "");
-        form.setValue(`lots.${index}.coldStoreLotNumber`, "");
-        form.setValue(`lots.${index}.mandiCommissionPercent`, undefined);
-        form.setValue(`lots.${index}.aadhatCommissionPercent`, undefined);
-        form.setValue(`lots.${index}.hammaliPerBag`, undefined);
-        form.setValue(`lots.${index}.mandiExtraCharges`, undefined);
-      } else {
-        form.setValue(`lots.${index}.mandiCommissionPercent`, undefined);
-        form.setValue(`lots.${index}.aadhatCommissionPercent`, undefined);
-        form.setValue(`lots.${index}.hammaliPerBag`, undefined);
-        form.setValue(`lots.${index}.mandiExtraCharges`, undefined);
-      }
-    });
-  }, [selectedPlace, form]);
-
-  useEffect(() => {
-    const lots = form.getValues("lots");
-    lots.forEach((_, index) => {
-      form.setValue(`lots.${index}.crop`, selectedCrop);
-    });
-  }, [selectedCrop, form]);
+    const draft = loadSavedFormData(selectedCrop, selectedPlace);
+    draft.place = selectedPlace;
+    if (draft.lots && Array.isArray(draft.lots)) {
+      draft.lots.forEach((lot) => {
+        lot.place = selectedPlace;
+        lot.crop = selectedCrop;
+        if (selectedPlace === "mandi") {
+          lot.coldStoreName = "";
+          lot.coldStoreLotNumber = "";
+          lot.coldStoreDbId = undefined;
+          lot.charges = [];
+          lot.cutType = "gate_cut";
+        } else if (selectedPlace === "farm_gate") {
+          lot.coldStoreName = "";
+          lot.coldStoreLotNumber = "";
+          lot.coldStoreDbId = undefined;
+          lot.mandiCommissionPercent = undefined;
+          lot.aadhatCommissionPercent = undefined;
+          lot.hammaliPerBag = undefined;
+          lot.mandiExtraCharges = undefined;
+        } else {
+          lot.mandiCommissionPercent = undefined;
+          lot.aadhatCommissionPercent = undefined;
+          lot.hammaliPerBag = undefined;
+          lot.mandiExtraCharges = undefined;
+        }
+      });
+    }
+    isPausingAutoSaveRef.current = true;
+    form.reset(draft);
+    isPausingAutoSaveRef.current = false;
+  }, [selectedCrop, selectedPlace, form]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
