@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer } from "lucide-react";
+import { numberToIndianWords, escapeHtml } from "@/lib/number-to-words";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -679,6 +680,150 @@ export function CashManagementTab() {
   }, [selectedAadhatDbId]);
 
   const aadhatGrandTotalCash = aadhatAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const handlePrintCheque = () => {
+    const aadhatName = outflowForm.getValues("aadhatName") || "";
+    const amount = aadhatGrandTotalCash;
+    if (!aadhatName || amount <= 0) return;
+
+    const safeName = escapeHtml(aadhatName);
+    const now = new Date();
+    const dateStr = format(now, "dd/MM/yyyy");
+    const dateParts = dateStr.split("/");
+    const amountInWords = numberToIndianWords(amount);
+    const rupees = Math.floor(amount);
+    const paise = Math.round((amount - rupees) * 100);
+    const amountFigures = rupees.toLocaleString("en-IN") + "=" + (paise > 0 ? String(paise).padStart(2, "0") : "00");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cheque - ${safeName}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            @page {
+              size: 8in 3.66in;
+              margin: 0;
+            }
+            body {
+              width: 8in;
+              height: 3.66in;
+              position: relative;
+              font-family: 'Consolas', 'Courier New', monospace;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .cheque {
+              width: 8in;
+              height: 3.66in;
+              position: relative;
+            }
+            .date-field {
+              position: absolute;
+              top: 0.28in;
+              right: 0.3in;
+              font-size: 16px;
+              font-weight: 600;
+              letter-spacing: 4px;
+              display: flex;
+              gap: 2px;
+            }
+            .date-field span {
+              display: inline-block;
+              width: 18px;
+              text-align: center;
+            }
+            .date-field .sep {
+              width: 8px;
+              color: transparent;
+            }
+            .payee-name {
+              position: absolute;
+              top: 0.72in;
+              left: 0.7in;
+              right: 1.2in;
+              font-size: 16px;
+              font-weight: 700;
+              text-transform: uppercase;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .amount-words {
+              position: absolute;
+              top: 1.08in;
+              left: 0.35in;
+              right: 1.8in;
+              font-size: 13px;
+              font-weight: 600;
+              line-height: 1.4;
+              overflow: hidden;
+            }
+            .amount-words-line2 {
+              position: absolute;
+              top: 1.36in;
+              left: 0.1in;
+              right: 1.8in;
+              font-size: 13px;
+              font-weight: 600;
+              line-height: 1.4;
+              overflow: hidden;
+            }
+            .amount-box {
+              position: absolute;
+              top: 0.72in;
+              right: 0.12in;
+              width: 1.55in;
+              height: 0.34in;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 16px;
+              font-weight: 700;
+              font-family: 'Consolas', 'Courier New', monospace;
+              letter-spacing: 1px;
+            }
+            @media screen {
+              body { background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+              .cheque {
+                background: #fff;
+                border: 1px dashed #ccc;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              }
+              .guide { border: 1px dashed rgba(200,200,200,0.5); }
+            }
+            @media print {
+              .guide { border: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="cheque">
+            <div class="date-field">
+              ${dateParts[0].split("").map(d => `<span>${d}</span>`).join("")}
+              <span class="sep"></span>
+              ${dateParts[1].split("").map(d => `<span>${d}</span>`).join("")}
+              <span class="sep"></span>
+              ${dateParts[2].split("").map(d => `<span>${d}</span>`).join("")}
+            </div>
+            <div class="payee-name">${safeName}</div>
+            ${amountInWords.length > 50
+              ? `<div class="amount-words">${amountInWords.substring(0, amountInWords.lastIndexOf(" ", 50)) || amountInWords.substring(0, 50)}</div>
+                 <div class="amount-words-line2">${amountInWords.substring((amountInWords.lastIndexOf(" ", 50) || 50) + 1)}</div>`
+              : `<div class="amount-words">${amountInWords}</div>`
+            }
+            <div class="amount-box guide">${amountFigures}</div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 300);
+  };
 
   const toggleAadhatEntry = (entry: AadhatPendingEntry | { isPyPayable: true; dueAmount: number }) => {
     if ('isPyPayable' in entry && entry.isPyPayable) {
@@ -2755,19 +2900,34 @@ export function CashManagementTab() {
                     )}
                   />
 
-                  <FormField
-                    control={outflowForm.control}
-                    name="remarks"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
-                        <FormControl>
-                          <Input placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-outflow-remarks" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <div className={cn(expenseType === "aadhtiya" ? "flex gap-3 items-end" : "")}>
+                    <FormField
+                      control={outflowForm.control}
+                      name="remarks"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
+                          <FormControl>
+                            <Input placeholder={t("Remarks", "टिप्पणी")} {...field} data-testid="input-outflow-remarks" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {expenseType === "aadhtiya" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mb-0 shrink-0"
+                        disabled={!outflowForm.watch("aadhatName") || aadhatGrandTotalCash <= 0}
+                        onClick={handlePrintCheque}
+                        data-testid="button-print-cheque"
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        {t("Print Check", "चेक प्रिंट")}
+                      </Button>
                     )}
-                  />
+                  </div>
 
                   <Button 
                     type="submit" 
