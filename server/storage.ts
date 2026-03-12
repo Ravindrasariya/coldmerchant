@@ -1075,15 +1075,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Cash Entry operations
-  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[] })[]> {
+  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[]; aadhatAllocations: any[] })[]> {
     const entries = await db.select().from(cashEntries)
       .where(eq(cashEntries.merchantId, merchantId))
       .orderBy(desc(cashEntries.createdAt));
     
+    const allAadhatAllocs = entries.length > 0
+      ? await db.select({
+          id: aadhatPaymentAllocations.id,
+          cashEntryId: aadhatPaymentAllocations.cashEntryId,
+          stockEntryId: aadhatPaymentAllocations.stockEntryId,
+          appliedAmount: aadhatPaymentAllocations.appliedAmount,
+          discountPercent: aadhatPaymentAllocations.discountPercent,
+          discountAmount: aadhatPaymentAllocations.discountAmount,
+          pettyAdjustment: aadhatPaymentAllocations.pettyAdjustment,
+          isPyPayable: aadhatPaymentAllocations.isPyPayable,
+          serialNumber: stockEntries.serialNumber,
+        })
+        .from(aadhatPaymentAllocations)
+        .leftJoin(stockEntries, eq(aadhatPaymentAllocations.stockEntryId, stockEntries.id))
+        .where(eq(aadhatPaymentAllocations.merchantId, merchantId))
+      : [];
+
+    const aadhatAllocsByEntry = new Map<number, any[]>();
+    for (const alloc of allAadhatAllocs) {
+      const list = aadhatAllocsByEntry.get(alloc.cashEntryId) || [];
+      list.push(alloc);
+      aadhatAllocsByEntry.set(alloc.cashEntryId, list);
+    }
+
     const result = await Promise.all(entries.map(async (entry) => {
       const allocations = await db.select().from(cashEntryAllocations)
         .where(eq(cashEntryAllocations.cashEntryId, entry.id));
-      return { ...entry, allocations };
+      const aadhatAllocations = aadhatAllocsByEntry.get(entry.id) || [];
+      return { ...entry, allocations, aadhatAllocations };
     }));
     
     return result;

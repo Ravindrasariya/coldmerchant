@@ -73,6 +73,7 @@ interface CashEntry {
   reversedAt: string | null;
   createdAt: string;
   allocations: CashEntryAllocation[];
+  aadhatAllocations: AadhatPaymentAllocationDetail[];
 }
 
 interface CashEntryAllocation {
@@ -81,6 +82,18 @@ interface CashEntryAllocation {
   transactionId: number;
   merchantId: number;
   appliedAmount: string;
+}
+
+interface AadhatPaymentAllocationDetail {
+  id: number;
+  cashEntryId: number;
+  stockEntryId: number | null;
+  appliedAmount: string;
+  discountPercent: string;
+  discountAmount: string;
+  pettyAdjustment: string;
+  isPyPayable: boolean;
+  serialNumber: number | null;
 }
 
 interface PartyWithDue {
@@ -1381,6 +1394,7 @@ export function CashManagementTab() {
       t("Cold Store", "शीत भंडार"),
       t("Supplier Name", "आपूर्तिकर्ता का नाम"),
       t("Aadhtiya Name", "आढ़तिया का नाम"),
+      t("Aadhtiya Payment Details", "आढ़तिया भुगतान विवरण"),
       t("Expense Category", "व्यय श्रेणी"),
       t("Asset Name", "संपत्ति का नाम"),
       t("Asset Category", "संपत्ति श्रेणी"),
@@ -1408,6 +1422,26 @@ export function CashManagementTab() {
       entry.coldStoreName || "",
       entry.supplierName || "",
       entry.aadhatName || "",
+      (() => {
+        if (!entry.aadhatAllocations || entry.aadhatAllocations.length === 0) return "";
+        const parts: string[] = [];
+        const allocLabel = (a: AadhatPaymentAllocationDetail) => a.isPyPayable ? "PY" : `SR #${a.serialNumber || "?"}`;
+        const discountParts = entry.aadhatAllocations
+          .filter(a => parseFloat(a.discountPercent || "0") > 0)
+          .map(a => `${allocLabel(a)} - ${parseFloat(a.discountPercent)}%`);
+        if (discountParts.length > 0) parts.push(`Discount % - (${discountParts.join(", ")})`);
+        const pettyParts = entry.aadhatAllocations
+          .filter(a => parseFloat(a.pettyAdjustment || "0") !== 0)
+          .map(a => `${allocLabel(a)} - ₹${parseFloat(a.pettyAdjustment).toLocaleString("en-IN")}`);
+        if (pettyParts.length > 0) parts.push(`Petty Adj - (${pettyParts.join(", ")})`);
+        const entryRefs = entry.aadhatAllocations.map(a => {
+          const label = allocLabel(a);
+          const amt = parseFloat(a.appliedAmount || "0");
+          return `${label}: ₹${amt.toLocaleString("en-IN")}`;
+        });
+        if (entryRefs.length > 0) parts.unshift(`Entries - (${entryRefs.join(", ")})`);
+        return parts.join(". ");
+      })(),
       entry.expenseCategory === "capital" ? t("Capital", "पूंजीगत") : entry.expenseCategory === "revenue" ? t("Revenue", "राजस्व") : "",
       entry.capitalAssetName || "",
       entry.capitalAssetCategory ? getAssetCategoryLabel(entry.capitalAssetCategory) : "",
@@ -1606,6 +1640,38 @@ export function CashManagementTab() {
                     <div>
                       <Label className="text-xs text-muted-foreground">{t("Aadhtiya Name", "आढ़तिया का नाम")}</Label>
                       <p className="font-medium">{viewDetailsEntry.aadhatName}</p>
+                    </div>
+                  )}
+
+                  {viewDetailsEntry.aadhatAllocations && viewDetailsEntry.aadhatAllocations.length > 0 && (
+                    <div className="border-t pt-3">
+                      <h4 className="font-semibold text-sm mb-2">{t("Payment Allocations", "भुगतान आवंटन")}</h4>
+                      <div className="space-y-2">
+                        {viewDetailsEntry.aadhatAllocations.map((alloc, idx) => {
+                          const appliedAmt = parseFloat(alloc.appliedAmount || "0");
+                          const discPct = parseFloat(alloc.discountPercent || "0");
+                          const discAmt = parseFloat(alloc.discountAmount || "0");
+                          const pettyAdj = parseFloat(alloc.pettyAdjustment || "0");
+                          const totalSettled = appliedAmt + discAmt + pettyAdj;
+                          return (
+                            <div key={idx} className="p-2 bg-muted rounded-md text-sm" data-testid={`alloc-detail-${idx}`}>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-semibold">
+                                  {alloc.isPyPayable ? t("PY Payable", "पिछला शेष") : `SR #${alloc.serialNumber || "?"}`}
+                                </span>
+                                <span className="font-semibold">₹{totalSettled.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-1 text-xs text-muted-foreground">
+                                <span>{t("Cash", "नकद")}: ₹{appliedAmt.toLocaleString("en-IN")}</span>
+                                <span>{t("Disc", "छूट")}: {discPct}% (₹{discAmt.toLocaleString("en-IN")})</span>
+                                <span className={cn(pettyAdj > 1000 ? "text-red-600" : pettyAdj >= 100 ? "text-orange-600" : "")}>
+                                  {t("Petty", "पेटी")}: ₹{pettyAdj.toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </>
