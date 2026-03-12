@@ -68,7 +68,8 @@ interface StockEntryWithLots {
     totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
-    charges: Array<{ type: string; amount: number | string }> | null;
+    coldStoreDbId: number | null;
+    charges: Array<{ type: string; amount: number | string; coldStoreName?: string; coldStoreDbId?: number | null }> | null;
     mandiCommissionPercent: string | null;
     aadhatCommissionPercent: string | null;
     hammaliPerBag: string | null;
@@ -233,6 +234,20 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const { data: entries, isLoading, error } = useQuery<StockEntryWithLots[]>({
     queryKey: ["/api/stock-entries"],
   });
+
+  const { data: coldStoreLedger } = useQuery<Array<{ id: number; coldStoreId: string | null; name: string }>>({
+    queryKey: ["/api/cold-store-ledger"],
+  });
+
+  const coldStoreIdMap = useMemo(() => {
+    const map = new Map<number, string>();
+    if (coldStoreLedger) {
+      for (const cs of coldStoreLedger) {
+        if (cs.coldStoreId) map.set(cs.id, cs.coldStoreId);
+      }
+    }
+    return map;
+  }, [coldStoreLedger]);
 
   const availableYears = useMemo(() => {
     if (!entries) return [currentYear];
@@ -437,6 +452,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Farmer Name", "किसान का नाम"),
       t("Village", "गाँव"),
       t("Cold Store", "कोल्ड स्टोर"),
+      t("Cold Store ID", "कोल्ड स्टोर आईडी"),
       t("Potato Type", "आलू का प्रकार"),
       t("Quality", "गुणवत्ता"),
       t("Cut Type", "कट प्रकार"),
@@ -553,7 +569,31 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           placeLabel,
           entry.farmerName,
           entry.village || "-",
-          lot.place === "farm_gate" ? "Farm Gate" : (lot.coldStoreName || "-"),
+          (() => {
+            if (lot.place === "farm_gate") {
+              const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+              const names = new Set<string>();
+              for (const c of (lot.charges || [])) {
+                if (coldStoreTypes.includes(c.type) && c.coldStoreName) names.add(c.coldStoreName);
+              }
+              return names.size > 0 ? Array.from(names).join(", ") : "Farm Gate";
+            }
+            return lot.coldStoreName || "-";
+          })(),
+          (() => {
+            if (lot.place === "farm_gate") {
+              const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+              const codes = new Set<string>();
+              for (const c of (lot.charges || [])) {
+                if (coldStoreTypes.includes(c.type) && c.coldStoreDbId) {
+                  const code = coldStoreIdMap.get(c.coldStoreDbId);
+                  if (code) codes.add(code);
+                }
+              }
+              return codes.size > 0 ? Array.from(codes).join(", ") : "-";
+            }
+            return lot.coldStoreDbId ? (coldStoreIdMap.get(lot.coldStoreDbId) || "-") : "-";
+          })(),
           lot.potatoType || "-",
           lot.quality,
           cutTypeDisplay,
