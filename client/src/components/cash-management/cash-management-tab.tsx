@@ -2468,13 +2468,13 @@ export function CashManagementTab() {
                                       )}
                                     </div>
                                     <div>
-                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 1000 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 100 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
+                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 1000 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) >= 100 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
                                       <Input
                                         type="number"
                                         step="any"
                                         value={alloc.pettyAdjustment || ""}
                                         onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
-                                        className={cn((alloc.pettyAdjustment || 0) > 1000 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 100 ? "border-orange-400 text-orange-600" : "")}
+                                        className={cn((alloc.pettyAdjustment || 0) > 1000 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) >= 100 ? "border-orange-400 text-orange-600" : "")}
                                         data-testid={`input-alloc-petty-${idx}`}
                                       />
                                     </div>
