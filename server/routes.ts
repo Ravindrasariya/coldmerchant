@@ -2373,7 +2373,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2389,7 +2389,7 @@ export async function registerRoutes(
       
       // Validate direction-specific fields
       if (direction === "inward") {
-        if (!receiptType || !["cash_received", "account_received"].includes(receiptType)) {
+        if (!receiptType || !["cash_received", "account_received", "cheque_received"].includes(receiptType)) {
           return res.status(400).json({ message: "Valid receipt type is required for inward entries" });
         }
         // Validate revenue type for inward entries
@@ -2416,7 +2416,7 @@ export async function registerRoutes(
             return res.status(400).json({ message: "Asset name and category are required for capital expenses" });
           }
         }
-        if (!paymentMode || !["cash", "account_transfer"].includes(paymentMode)) {
+        if (!paymentMode || !["cash", "account_transfer", "cheque"].includes(paymentMode)) {
           return res.status(400).json({ message: "Valid payment mode is required for outflow entries" });
         }
         const farmerExpenseTypes = ["farmer", "farmer_advance", "farmer_freight", "farmer_others"];
@@ -2580,6 +2580,7 @@ export async function registerRoutes(
             expenseCategory: expenseCategory || null,
             capitalAssetName: capitalAssetName || null,
             capitalAssetCategory: capitalAssetCategory || null,
+            chequeNumber: chequeNumber || null,
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,
@@ -5544,10 +5545,10 @@ export async function registerRoutes(
         const amt = parseFloat(e.amount);
         if (e.direction === "inward") {
           if (e.receiptType === "cash_received") cashInHand += amt;
-          else if (e.receiptType === "account_received") bankBalance += amt;
+          else if (e.receiptType === "account_received" || e.receiptType === "cheque_received") bankBalance += amt;
         } else if (e.direction === "outflow") {
           if (e.paymentMode === "cash") cashInHand -= amt;
-          else if (e.paymentMode === "account_transfer") bankBalance -= amt;
+          else if (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") bankBalance -= amt;
         } else if (e.direction === "transfer") {
           if (e.fromAccountType === "cash_in_hand") cashInHand -= amt;
           if (e.toAccountType === "cash_in_hand") cashInHand += amt;
@@ -5564,8 +5565,8 @@ export async function registerRoutes(
           let bal = parseFloat(acct.openingBalance || "0");
           for (const e of fyEntries) {
             const amt = parseFloat(e.amount);
-            if (e.direction === "inward" && e.receiptType === "account_received" && e.bankAccountId === acct.id) bal += amt;
-            if (e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === acct.id) bal -= amt;
+            if (e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && e.bankAccountId === acct.id) bal += amt;
+            if (e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && e.bankAccountId === acct.id) bal -= amt;
             if (e.direction === "transfer" && e.toBankAccountId === acct.id) bal += amt;
             if (e.direction === "transfer" && e.fromBankAccountId === acct.id) bal -= amt;
           }

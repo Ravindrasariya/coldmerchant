@@ -232,6 +232,7 @@ export const cashEntries = pgTable("cash_entries", {
   capitalAssetName: text("capital_asset_name"), // Asset name for capital expenses
   capitalAssetCategory: text("capital_asset_category"), // Asset category for capital expenses
   capitalAssetId: integer("capital_asset_id"), // Reference to auto-created asset in asset register
+  chequeNumber: text("cheque_number"),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
@@ -1115,9 +1116,9 @@ export const SEED_SIZE_OPTIONS = ["Small", "Medium", "Large"] as const;
 export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
-export const RECEIPT_TYPES = ["cash_received", "account_received"] as const;
+export const RECEIPT_TYPES = ["cash_received", "account_received", "cheque_received"] as const;
 export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "capital_expense", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "pesticide_charges", "salary", "supplier", "transport_freight", "warehouse_charges"] as const;
-export const PAYMENT_MODES = ["cash", "account_transfer"] as const;
+export const PAYMENT_MODES = ["cash", "account_transfer", "cheque"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 
 // Seed form schemas for frontend

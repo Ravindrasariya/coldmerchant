@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer, FileText } from "lucide-react";
 import { numberToIndianWords, escapeHtml } from "@/lib/number-to-words";
 import {
   AlertDialog,
@@ -62,6 +62,7 @@ interface CashEntry {
   supplierName: string | null;
   aadhatName: string | null;
   aadhatDbId: number | null;
+  chequeNumber: string | null;
   expenseCategory: string | null;
   capitalAssetName: string | null;
   capitalAssetCategory: string | null;
@@ -245,6 +246,7 @@ const inwardFormSchema = z.object({
   partyName: z.string().optional(),
   seedFarmerName: z.string().optional(),
   bankAccountId: z.coerce.number().optional(),
+  chequeNumber: z.string().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -263,11 +265,18 @@ const inwardFormSchema = z.object({
       path: ["seedFarmerName"],
     });
   }
-  if (data.receiptType === "account_received" && !data.bankAccountId) {
+  if ((data.receiptType === "account_received" || data.receiptType === "cheque_received") && !data.bankAccountId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Bank account is required for account transfers",
       path: ["bankAccountId"],
+    });
+  }
+  if (data.receiptType === "cheque_received" && (!data.chequeNumber || data.chequeNumber.trim().length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Cheque number is required",
+      path: ["chequeNumber"],
     });
   }
 });
@@ -277,6 +286,7 @@ const outflowFormSchema = z.object({
   expenseType: z.string().optional().default(""),
   paymentMode: z.string().min(1, "Payment mode is required"),
   bankAccountId: z.coerce.number().optional(),
+  chequeNumber: z.string().optional(),
   farmerName: z.string().optional(),
   coldStoreName: z.string().optional(),
   supplierName: z.string().optional(),
@@ -342,11 +352,18 @@ const outflowFormSchema = z.object({
       });
     }
   }
-  if (data.paymentMode === "account_transfer" && !data.bankAccountId) {
+  if ((data.paymentMode === "account_transfer" || data.paymentMode === "cheque") && !data.bankAccountId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Bank account is required for account transfers",
       path: ["bankAccountId"],
+    });
+  }
+  if (data.paymentMode === "cheque" && (!data.chequeNumber || data.chequeNumber.trim().length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Cheque number is required",
+      path: ["chequeNumber"],
     });
   }
 });
@@ -518,6 +535,7 @@ export function CashManagementTab() {
       partyName: "",
       seedFarmerName: "",
       bankAccountId: undefined,
+      chequeNumber: "",
       amount: "" as unknown as number,
       entryDate: format(new Date(), "yyyy-MM-dd"),
       remarks: "",
@@ -538,6 +556,7 @@ export function CashManagementTab() {
       expenseType: "",
       paymentMode: "cash",
       bankAccountId: undefined,
+      chequeNumber: "",
       farmerName: "",
       coldStoreName: "",
       supplierName: "",
@@ -621,6 +640,7 @@ export function CashManagementTab() {
           revenueType: "raw_potato",
           partyName: "",
           seedFarmerName: "",
+          chequeNumber: "",
           amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
           remarks: "",
@@ -630,6 +650,7 @@ export function CashManagementTab() {
           expenseCategory: "revenue",
           expenseType: "",
           paymentMode: "cash",
+          chequeNumber: "",
           farmerName: "",
           coldStoreName: "",
           supplierName: "",
@@ -968,7 +989,8 @@ export function CashManagementTab() {
         partyName: values.partyName,
         partyVillage: selectedBuyer?.address || null,
         buyerId: selectedBuyer?.id || null,
-        bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
+        bankAccountId: (values.receiptType === "account_received" || values.receiptType === "cheque_received") ? values.bankAccountId : null,
+        chequeNumber: values.receiptType === "cheque_received" ? (values.chequeNumber || null) : null,
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
@@ -993,7 +1015,8 @@ export function CashManagementTab() {
         farmerVillage: selectedLedgerFarmer?.village || null,
         farmerContact: selectedLedgerFarmer?.contact || null,
         farmerId: selectedLedgerFarmer?.id || null,
-        bankAccountId: values.receiptType === "account_received" ? values.bankAccountId : null,
+        bankAccountId: (values.receiptType === "account_received" || values.receiptType === "cheque_received") ? values.bankAccountId : null,
+        chequeNumber: values.receiptType === "cheque_received" ? (values.chequeNumber || null) : null,
         amount: values.amount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
@@ -1069,7 +1092,8 @@ export function CashManagementTab() {
       expenseType: effectiveExpenseType,
       expenseCategory: isCapital ? "capital" : "revenue",
       paymentMode: values.paymentMode,
-      bankAccountId: values.paymentMode === "account_transfer" ? values.bankAccountId : null,
+      bankAccountId: (values.paymentMode === "account_transfer" || values.paymentMode === "cheque") ? values.bankAccountId : null,
+      chequeNumber: values.paymentMode === "cheque" ? (values.chequeNumber || null) : null,
       farmerName: isFarmerType ? values.farmerName : null,
       farmerVillage: selectedLedgerFarmerOut?.village || null,
       farmerContact: selectedLedgerFarmerOut?.contact || null,
@@ -1127,7 +1151,7 @@ export function CashManagementTab() {
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const totalAccountReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "account_received" && !e.isReversed)
+    .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const totalCashExpense = entries
@@ -1135,7 +1159,7 @@ export function CashManagementTab() {
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const totalAccountExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && !e.isReversed)
+    .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   // Include opening balance from settings
@@ -1155,11 +1179,11 @@ export function CashManagementTab() {
   // Calculate account-wise breakdown for entries that have bankAccountId (exclude reversed entries)
   const accountWiseBreakdown = bankAccounts.map(account => {
     const inward = entries
-      .filter(e => e.direction === "inward" && e.receiptType === "account_received" && e.bankAccountId === account.id && !e.isReversed)
+      .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && e.bankAccountId === account.id && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
     
     const outflow = entries
-      .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && e.bankAccountId === account.id && !e.isReversed)
+      .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && e.bankAccountId === account.id && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
     
     const transferIn = entries
@@ -1186,11 +1210,11 @@ export function CashManagementTab() {
 
   // Calculate unassigned account transactions (older entries without bankAccountId, exclude reversed)
   const unassignedAccountReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "account_received" && !e.bankAccountId && !e.isReversed)
+    .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && !e.bankAccountId && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
   
   const unassignedAccountExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "account_transfer" && !e.bankAccountId && !e.isReversed)
+    .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && !e.bankAccountId && !e.isReversed)
     .reduce((sum, e) => sum + parseFloat(e.amount), 0);
 
   // Unassigned net uses legacy opening balance (from cash settings) 
@@ -1290,6 +1314,7 @@ export function CashManagementTab() {
     switch (type) {
       case "cash_received": return t("Cash Received", "नकद प्राप्त");
       case "account_received": return t("Account Received", "खाते में प्राप्त");
+      case "cheque_received": return t("Cheque Received", "चेक प्राप्त");
       default: return type;
     }
   };
@@ -1335,6 +1360,7 @@ export function CashManagementTab() {
     switch (mode) {
       case "cash": return t("Cash", "नकद");
       case "account_transfer": return t("Account Transfer", "खाता स्थानांतरण");
+      case "cheque": return t("Cheque", "चेक");
       default: return mode;
     }
   };
@@ -1402,6 +1428,7 @@ export function CashManagementTab() {
       t("To Account", "गंतव्य खाता"),
       t("Amount", "राशि"),
       t("Status", "स्थिति"),
+      t("Cheque Number", "चेक नंबर"),
       t("Remarks", "टिप्पणी"),
       t("Created At", "बनाया गया"),
     ];
@@ -1449,6 +1476,7 @@ export function CashManagementTab() {
       getToAccountLabel(entry),
       entry.amount,
       entry.isReversed ? t("Reversed", "उलट दिया गया") : t("Active", "सक्रिय"),
+      entry.chequeNumber || "",
       entry.remarks || "",
       format(new Date(entry.createdAt), "dd/MM/yyyy HH:mm"),
     ]);
@@ -1535,6 +1563,12 @@ export function CashManagementTab() {
                         <p className="font-medium">{viewDetailsEntry.bankAccountName}</p>
                       </div>
                     )}
+                    {viewDetailsEntry.chequeNumber && (
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">{t("Cheque Number", "चेक नंबर")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.chequeNumber}</p>
+                      </div>
+                    )}
                   </div>
                   
                   {viewDetailsEntry.partyName && (
@@ -1587,6 +1621,12 @@ export function CashManagementTab() {
                       <div className="mt-2">
                         <Label className="text-xs text-muted-foreground">{t("Bank Account", "बैंक खाता")}</Label>
                         <p className="font-medium">{viewDetailsEntry.bankAccountName}</p>
+                      </div>
+                    )}
+                    {viewDetailsEntry.chequeNumber && (
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">{t("Cheque Number", "चेक नंबर")}</Label>
+                        <p className="font-medium">{viewDetailsEntry.chequeNumber}</p>
                       </div>
                     )}
                     {viewDetailsEntry.expenseType === "capital_expense" && (
@@ -2089,6 +2129,12 @@ export function CashManagementTab() {
                                 {t("Account Received", "खाते में प्राप्त")}
                               </div>
                             </SelectItem>
+                            <SelectItem value="cheque_received">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                {t("Cheque Received", "चेक प्राप्त")}
+                              </div>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -2096,7 +2142,7 @@ export function CashManagementTab() {
                     )}
                   />
 
-                  {receiptType === "account_received" && bankAccounts.length > 0 && (
+                  {(receiptType === "account_received" || receiptType === "cheque_received") && bankAccounts.length > 0 && (
                     <FormField
                       control={inwardForm.control}
                       name="bankAccountId"
@@ -2123,10 +2169,26 @@ export function CashManagementTab() {
                     />
                   )}
 
-                  {receiptType === "account_received" && bankAccounts.length === 0 && (
+                  {(receiptType === "account_received" || receiptType === "cheque_received") && bankAccounts.length === 0 && (
                     <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
                       {t("No bank accounts configured. Add accounts in Settings.", "कोई बैंक खाता कॉन्फ़िगर नहीं है। सेटिंग्स में खाते जोड़ें।")}
                     </div>
+                  )}
+
+                  {receiptType === "cheque_received" && (
+                    <FormField
+                      control={inwardForm.control}
+                      name="chequeNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Cheque Number", "चेक नंबर")} *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder={t("Enter cheque number", "चेक नंबर दर्ज करें")} data-testid="input-inward-cheque-number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
 
                   <FormField
@@ -2895,6 +2957,12 @@ export function CashManagementTab() {
                                 {t("Account Transfer", "खाता स्थानांतरण")}
                               </div>
                             </SelectItem>
+                            <SelectItem value="cheque">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                {t("Cheque", "चेक")}
+                              </div>
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -2902,7 +2970,7 @@ export function CashManagementTab() {
                     )}
                   />
 
-                  {paymentMode === "account_transfer" && bankAccounts.length > 0 && (
+                  {(paymentMode === "account_transfer" || paymentMode === "cheque") && bankAccounts.length > 0 && (
                     <FormField
                       control={outflowForm.control}
                       name="bankAccountId"
@@ -2929,10 +2997,26 @@ export function CashManagementTab() {
                     />
                   )}
 
-                  {paymentMode === "account_transfer" && bankAccounts.length === 0 && (
+                  {(paymentMode === "account_transfer" || paymentMode === "cheque") && bankAccounts.length === 0 && (
                     <div className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
                       {t("No bank accounts configured. Add accounts in Settings.", "कोई बैंक खाता कॉन्फ़िगर नहीं है। सेटिंग्स में खाते जोड़ें।")}
                     </div>
+                  )}
+
+                  {paymentMode === "cheque" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="chequeNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Cheque Number", "चेक नंबर")} *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder={t("Enter cheque number", "चेक नंबर दर्ज करें")} data-testid="input-outflow-cheque-number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
 
                   {expenseType !== "aadhtiya" && (
@@ -3236,6 +3320,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
     switch (type) {
       case "cash_received": return t("Cash", "नकद");
       case "account_received": return t("Account", "खाता");
+      case "cheque_received": return t("Cheque", "चेक");
       default: return type || "";
     }
   };
@@ -3384,14 +3469,16 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
           <span className={isReversed ? "line-through" : ""}>{format(new Date(entry.entryDate), "dd/MM/yyyy")}</span>
           {isInward && entry.receiptType && (
             <Badge variant="secondary" className="text-xs py-0">
-              {entry.receiptType === "account_received" && entry.bankAccountName 
+              {(entry.receiptType === "account_received" || entry.receiptType === "cheque_received") && entry.bankAccountName 
                 ? entry.bankAccountName 
                 : getReceiptTypeLabel(entry.receiptType)}
+              {entry.receiptType === "cheque_received" && entry.chequeNumber ? ` #${entry.chequeNumber}` : ""}
             </Badge>
           )}
           {!isInward && !isTransfer && entry.paymentMode && (
             <Badge variant="secondary" className="text-xs py-0">
-              {entry.paymentMode === "cash" ? t("Cash", "नकद") : (entry.bankAccountName || t("Account", "खाता"))}
+              {entry.paymentMode === "cash" ? t("Cash", "नकद") : (entry.bankAccountName || (entry.paymentMode === "cheque" ? t("Cheque", "चेक") : t("Account", "खाता")))}
+              {entry.paymentMode === "cheque" && entry.chequeNumber ? ` #${entry.chequeNumber}` : ""}
             </Badge>
           )}
           {isTransfer && (
