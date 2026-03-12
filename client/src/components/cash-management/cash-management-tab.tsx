@@ -691,8 +691,9 @@ export function CashManagementTab() {
     const dateStr = format(now, "dd/MM/yyyy");
     const dateParts = dateStr.split("/");
     const amountInWords = numberToIndianWords(amount);
-    const rupees = Math.floor(amount);
-    const paise = Math.round((amount - rupees) * 100);
+    let rupees = Math.floor(amount);
+    let paise = Math.round((amount - rupees) * 100);
+    if (paise >= 100) { rupees += 1; paise = 0; }
     const amountFigures = rupees.toLocaleString("en-IN") + "=" + (paise > 0 ? String(paise).padStart(2, "0") : "00");
 
     const printWindow = window.open("", "_blank");
