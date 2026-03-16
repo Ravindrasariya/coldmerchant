@@ -44,6 +44,7 @@ export function FarmerLedgerTab() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [farmerNameSearch, setFarmerNameSearch] = useState("");
+  const [selectedFarmerId, setSelectedFarmerId] = useState<number | null>(null);
   const [villageSearch, setVillageSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('farmerId');
@@ -289,6 +290,7 @@ export function FarmerLedgerTab() {
     } else if (e.key === "Enter" && selectedNameIndex >= 0) {
       e.preventDefault();
       setFarmerNameSearch(filteredNameSuggestions[selectedNameIndex].name);
+      setSelectedFarmerId(filteredNameSuggestions[selectedNameIndex].id);
       setShowNameSuggestions(false);
     } else if (e.key === "Escape") {
       setShowNameSuggestions(false);
@@ -390,7 +392,9 @@ export function FarmerLedgerTab() {
       });
     }
     
-    if (farmerNameSearch.trim()) {
+    if (selectedFarmerId != null) {
+      result = result.filter(f => f.id === selectedFarmerId);
+    } else if (farmerNameSearch.trim()) {
       const term = farmerNameSearch.toLowerCase();
       result = result.filter(f => f.name.toLowerCase().includes(term));
     }
@@ -405,7 +409,7 @@ export function FarmerLedgerTab() {
     }
 
     return result;
-  }, [farmers, farmerNameSearch, villageSearch, showArchived, selectedYear]);
+  }, [farmers, farmerNameSearch, selectedFarmerId, villageSearch, showArchived, selectedYear]);
 
   const sortedFarmers = useMemo(() => {
     const active = filteredFarmers.filter(f => !f.isArchived);
@@ -702,6 +706,7 @@ export function FarmerLedgerTab() {
                 value={farmerNameSearch}
                 onChange={(e) => {
                   setFarmerNameSearch(e.target.value);
+                  setSelectedFarmerId(null);
                   setShowNameSuggestions(true);
                 }}
                 onFocus={() => setShowNameSuggestions(true)}
@@ -722,6 +727,7 @@ export function FarmerLedgerTab() {
                       className={`w-full px-3 py-2 text-left text-sm hover-elevate ${idx === selectedNameIndex ? 'bg-accent' : ''}`}
                       onClick={() => {
                         setFarmerNameSearch(farmer.name);
+                        setSelectedFarmerId(farmer.id);
                         setShowNameSuggestions(false);
                       }}
                       data-suggestion-item
@@ -780,6 +786,7 @@ export function FarmerLedgerTab() {
                 size="sm"
                 onClick={() => {
                   setFarmerNameSearch("");
+                  setSelectedFarmerId(null);
                   setVillageSearch("");
                   setSelectedYear("all");
                 }}

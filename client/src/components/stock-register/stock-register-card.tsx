@@ -214,6 +214,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [filterSerial, setFilterSerial] = useState<string>("");
   const [serialPopoverOpen, setSerialPopoverOpen] = useState(false);
   const [filterFarmer, setFilterFarmer] = useState<string>("");
+  const [filterFarmerId, setFilterFarmerId] = useState<number | null>(null);
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
@@ -285,11 +286,11 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
   const farmerOptions = useMemo(() => {
     if (!entries) return [];
-    const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
+    const farmerMap = new Map<number, { id: number; name: string; village: string | null; contact: string | null }>();
     entries.forEach(entry => {
-      const key = entry.farmerName.toLowerCase();
-      if (!farmerMap.has(key)) {
-        farmerMap.set(key, {
+      if (entry.farmerId && !farmerMap.has(entry.farmerId)) {
+        farmerMap.set(entry.farmerId, {
+          id: entry.farmerId,
           name: entry.farmerName,
           village: entry.village,
           contact: entry.farmerContact,
@@ -321,7 +322,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         return false;
       }
 
-      if (filterFarmer && entry.farmerName !== filterFarmer) {
+      if (filterFarmerId != null && entry.farmerId !== filterFarmerId) {
         return false;
       }
 
@@ -350,12 +351,13 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
       return true;
     });
-  }, [entries, selectedCrop, filterYear, filterSerial, filterFarmer, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, selectedCrop, filterYear, filterSerial, filterFarmerId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const clearFilters = () => {
     setFilterYear(currentYear.toString());
     setFilterSerial("");
     setFilterFarmer("");
+    setFilterFarmerId(null);
     setFilterPaymentStatus("");
     setFilterQuality("");
     setFilterUnsold(false);
@@ -798,15 +800,21 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                     <CommandGroup>
                       {farmerOptions.map((farmer) => (
                         <CommandItem
-                          key={farmer.name}
+                          key={farmer.id}
                           value={farmer.name}
-                          onSelect={(currentValue) => {
-                            setFilterFarmer(currentValue === filterFarmer ? "" : currentValue);
+                          onSelect={() => {
+                            if (filterFarmerId === farmer.id) {
+                              setFilterFarmer("");
+                              setFilterFarmerId(null);
+                            } else {
+                              setFilterFarmer(farmer.name);
+                              setFilterFarmerId(farmer.id);
+                            }
                             setFarmerPopoverOpen(false);
                           }}
                         >
                           <Check
-                            className={`mr-2 h-4 w-4 ${filterFarmer === farmer.name ? "opacity-100" : "opacity-0"}`}
+                            className={`mr-2 h-4 w-4 ${filterFarmerId === farmer.id ? "opacity-100" : "opacity-0"}`}
                           />
                           <div className="flex flex-col flex-1">
                             <span className="font-medium">{farmer.name}</span>

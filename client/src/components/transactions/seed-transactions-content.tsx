@@ -92,6 +92,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterFarmer, setFilterFarmer] = useState("");
+  const [filterFarmerId, setFilterFarmerId] = useState<number | null>(null);
   const [filterPaymentDue, setFilterPaymentDue] = useState("all");
   const [farmerDropdownOpen, setFarmerDropdownOpen] = useState(false);
 
@@ -109,20 +110,18 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
 
   const farmerOptions = useMemo(() => {
     if (!transactions) return [];
-    const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
+    const farmerMap = new Map<number, { id: number; name: string; village: string | null; contact: string | null }>();
     transactions.forEach(t => {
-      if (t.farmerName) {
-        const key = t.farmerName.toLowerCase();
-        if (!farmerMap.has(key)) {
-          farmerMap.set(key, {
-            name: t.farmerName,
-            village: t.village,
-            contact: t.farmerContact,
-          });
-        }
+      if (t.farmerName && t.farmerId && !farmerMap.has(t.farmerId)) {
+        farmerMap.set(t.farmerId, {
+          id: t.farmerId,
+          name: t.farmerName,
+          village: t.village,
+          contact: t.farmerContact,
+        });
       }
     });
-    return Array.from(farmerMap.values());
+    return Array.from(farmerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions]);
 
   const farmerNames = useMemo(() => {
@@ -146,7 +145,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
         );
         if (!hasMatchingSerial) return false;
       }
-      if (filterFarmer && !txn.farmerName.toLowerCase().includes(filterFarmer.toLowerCase())) {
+      if (filterFarmerId != null && txn.farmerId !== filterFarmerId) {
         return false;
       }
       if (filterPaymentDue !== "all") {
@@ -156,7 +155,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
       }
       return true;
     });
-  }, [transactions, filterYear, filterTxnNumber, filterSerialNumber, filterFarmer, filterPaymentDue]);
+  }, [transactions, filterYear, filterTxnNumber, filterSerialNumber, filterFarmerId, filterPaymentDue]);
 
   const currentYear = new Date().getFullYear().toString();
   const hasActiveFilters = filterYear !== currentYear || filterTxnNumber || filterSerialNumber || filterFarmer || filterPaymentDue !== "all";
@@ -166,6 +165,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
     setFilterTxnNumber("");
     setFilterSerialNumber("");
     setFilterFarmer("");
+    setFilterFarmerId(null);
     setFilterPaymentDue("all");
   };
 
@@ -417,24 +417,27 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                     <Command>
                       <CommandInput 
                         placeholder={t("Search farmer...", "किसान खोजें...")} 
-                        value={filterFarmer}
-                        onValueChange={setFilterFarmer}
                       />
                       <CommandList>
                         <CommandEmpty>{t("No farmer found", "कोई किसान नहीं मिला")}</CommandEmpty>
                         <CommandGroup>
                           {farmerOptions
-                            .filter(f => f.name.toLowerCase().includes(filterFarmer.toLowerCase()))
                             .map(farmer => (
                               <CommandItem
-                                key={farmer.name}
+                                key={farmer.id}
                                 value={farmer.name}
-                                onSelect={(value) => {
-                                  setFilterFarmer(value === filterFarmer ? "" : value);
+                                onSelect={() => {
+                                  if (filterFarmerId === farmer.id) {
+                                    setFilterFarmer("");
+                                    setFilterFarmerId(null);
+                                  } else {
+                                    setFilterFarmer(farmer.name);
+                                    setFilterFarmerId(farmer.id);
+                                  }
                                   setFarmerDropdownOpen(false);
                                 }}
                               >
-                                <Check className={cn("mr-2 h-4 w-4", filterFarmer === farmer.name ? "opacity-100" : "opacity-0")} />
+                                <Check className={cn("mr-2 h-4 w-4", filterFarmerId === farmer.id ? "opacity-100" : "opacity-0")} />
                                 <div className="flex flex-col flex-1">
                                   <span className="font-medium">{farmer.name}</span>
                                   <span className="text-xs text-muted-foreground">

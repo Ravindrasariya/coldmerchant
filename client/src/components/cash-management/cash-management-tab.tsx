@@ -56,6 +56,7 @@ interface CashEntry {
   partyName: string | null;
   partyVillage: string | null;
   farmerName: string | null;
+  farmerId: number | null;
   farmerVillage: string | null;
   coldStoreName: string | null;
   coldStoreDbId: number | null;
@@ -105,6 +106,7 @@ interface PartyWithDue {
 }
 
 interface FarmerWithDue {
+  farmerId: number | null;
   farmerName: string;
   farmerContact: string | null;
   village: string | null;
@@ -404,6 +406,7 @@ export function CashManagementTab() {
   const [filterPartyName, setFilterPartyName] = useState<string>("");
   const [filterExpenseType, setFilterExpenseType] = useState<string>("");
   const [filterFarmerName, setFilterFarmerName] = useState<string>("");
+  const [filterFarmerId, setFilterFarmerId] = useState<number | null>(null);
   const [filterSupplierName, setFilterSupplierName] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
@@ -1320,7 +1323,7 @@ export function CashManagementTab() {
         if (entry.expenseType !== filterExpenseType) return false;
       }
     }
-    if (filterFarmerName && filterFarmerName !== "all" && entry.farmerName !== filterFarmerName) return false;
+    if (filterFarmerId != null && entry.farmerId !== filterFarmerId) return false;
     if (filterSupplierName && filterSupplierName !== "all" && entry.supplierName !== filterSupplierName) return false;
     if (filterMonth && filterMonth !== "all" && entryMonth !== filterMonth) return false;
     if (filterYear && filterYear !== "all" && entryYear !== filterYear) return false;
@@ -1341,20 +1344,19 @@ export function CashManagementTab() {
   const uniquePartyNames = Array.from(new Set(entries.filter(e => e.partyName).map(e => e.partyName!)));
   const uniqueSupplierNames = Array.from(new Set(entries.filter(e => e.supplierName).map(e => e.supplierName!)));
   const uniqueFarmerOptions = (() => {
-    const farmerMap = new Map<string, { name: string; village: string | null; contact: string | null }>();
-    entries.filter(e => e.farmerName).forEach(e => {
-      const key = e.farmerName!.toLowerCase();
-      if (!farmerMap.has(key)) {
-        // Try to find contact info from the farmers query data
-        const farmerWithDue = farmers.find(f => f.farmerName.toLowerCase() === key);
-        farmerMap.set(key, {
+    const farmerMap = new Map<number, { id: number; name: string; village: string | null; contact: string | null }>();
+    entries.filter(e => e.farmerName && e.farmerId).forEach(e => {
+      if (!farmerMap.has(e.farmerId!)) {
+        const farmerWithDue = farmers.find(f => f.farmerName.toLowerCase() === e.farmerName!.toLowerCase());
+        farmerMap.set(e.farmerId!, {
+          id: e.farmerId!,
           name: e.farmerName!,
           village: e.farmerVillage || farmerWithDue?.village || null,
           contact: farmerWithDue?.farmerContact || null,
         });
       }
     });
-    return Array.from(farmerMap.values());
+    return Array.from(farmerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
   })();
   const uniqueFarmerNames = uniqueFarmerOptions.map(f => f.name);
   const uniqueYears = Array.from(new Set(entries.map(e => new Date(e.entryDate).getFullYear().toString()))).sort().reverse();
@@ -1363,7 +1365,7 @@ export function CashManagementTab() {
     (filterExpenseCategory && filterExpenseCategory !== "all") ||
     (filterPartyName && filterPartyName !== "all") || 
     (filterExpenseType && filterExpenseType !== "all") || 
-    (filterFarmerName && filterFarmerName !== "all") || 
+    filterFarmerId != null || 
     (filterSupplierName && filterSupplierName !== "all") ||
     (filterMonth && filterMonth !== "all") || 
     (filterYear && filterYear !== "all") ||
@@ -1375,6 +1377,7 @@ export function CashManagementTab() {
     setFilterPartyName("");
     setFilterExpenseType("");
     setFilterFarmerName("");
+    setFilterFarmerId(null);
     setFilterSupplierName("");
     setFilterMonth("");
     setFilterYear("");
@@ -2050,14 +2053,26 @@ export function CashManagementTab() {
             </Select>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_auto_auto_1fr] gap-3 mt-3">
-            <Select value={filterFarmerName} onValueChange={setFilterFarmerName}>
+            <Select value={filterFarmerId != null ? String(filterFarmerId) : "all"} onValueChange={(val) => {
+              if (val === "all") {
+                setFilterFarmerName("");
+                setFilterFarmerId(null);
+              } else {
+                const id = parseInt(val);
+                const farmer = uniqueFarmerOptions.find(f => f.id === id);
+                setFilterFarmerName(farmer?.name || "");
+                setFilterFarmerId(id);
+              }
+            }}>
               <SelectTrigger data-testid="filter-farmer-name" className="h-9">
-                <SelectValue placeholder={t("Farmer Name", "किसान का नाम")} />
+                <SelectValue placeholder={t("Farmer Name", "किसान का नाम")}>
+                  {filterFarmerId != null ? filterFarmerName : t("Farmer Name", "किसान का नाम")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
                 {uniqueFarmerOptions.map((farmer) => (
-                  <SelectItem key={farmer.name} value={farmer.name}>
+                  <SelectItem key={farmer.id} value={String(farmer.id)}>
                     <div className="flex flex-col">
                       <span>{farmer.name}</span>
                       {(farmer.contact || farmer.village) && (

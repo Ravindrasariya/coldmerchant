@@ -145,7 +145,7 @@ export interface IStorage {
   getMaxCashCodeSequence(merchantId: number, prefix: string): Promise<number>;
   createCashEntryAllocation(allocation: InsertCashEntryAllocation): Promise<CashEntryAllocation>;
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
-  getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
+  getFarmersWithDue(merchantId: number): Promise<{ farmerId: number | null; farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]>;
   getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]>;
@@ -1199,7 +1199,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]> {
+  async getFarmersWithDue(merchantId: number): Promise<{ farmerId: number | null; farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]> {
     // Get stock entries with payment status "due" or "partial" 
     const entries = await db.select().from(stockEntries)
       .where(and(
@@ -1208,7 +1208,7 @@ export class DatabaseStorage implements IStorage {
       ));
     
     // Group by farmerId (primary) or composite key name+contact+village (fallback)
-    const farmerMap = new Map<string, { displayName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }>();
+    const farmerMap = new Map<string, { farmerId: number | null; displayName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }>();
     
     const getFarmerKey = (entry: typeof entries[0]): string | null => {
       if (entry.farmerId) return `id:${entry.farmerId}`;
@@ -1264,6 +1264,7 @@ export class DatabaseStorage implements IStorage {
         }
       } else {
         farmerMap.set(key, {
+          farmerId: entry.farmerId || null,
           displayName: entry.farmerName.trim(),
           farmerContact: entry.farmerContact || null,
           village: entry.village,
@@ -1274,6 +1275,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     return Array.from(farmerMap.entries()).map(([_, data]) => ({
+      farmerId: data.farmerId,
       farmerName: data.displayName,
       farmerContact: data.farmerContact,
       village: data.village,
