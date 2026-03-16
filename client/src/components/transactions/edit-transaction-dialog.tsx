@@ -206,10 +206,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     defaultValues: {
       partyName: "",
       vehicleNumber: "",
-      advancePayment: 0,
-      amountReceived: 0,
-      transportationCharges: 0,
-      otherCharges: 0,
+      advancePayment: undefined,
+      amountReceived: undefined,
+      transportationCharges: undefined,
+      otherCharges: undefined,
       remarks: "",
     },
   });
@@ -221,8 +221,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         vehicleNumber: transaction.vehicleNumber || "",
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
-        transportationCharges: transaction.transportationCharges ? parseFloat(transaction.transportationCharges) : undefined,
-        otherCharges: transaction.otherCharges ? parseFloat(transaction.otherCharges) : undefined,
+        transportationCharges: transaction.transportationCharges && parseFloat(transaction.transportationCharges) !== 0 ? parseFloat(transaction.transportationCharges) : undefined,
+        otherCharges: transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? parseFloat(transaction.otherCharges) : undefined,
         remarks: transaction.remarks || "",
       });
       setSelectedBuyerId(transaction.buyerId || null);

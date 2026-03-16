@@ -147,8 +147,8 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       setDistrict(transaction.district);
       setState(transaction.state);
       setVehicleNumber(transaction.vehicleNumber || "");
-      setTransportCharges(transaction.transportCharges || "");
-      setOtherCharges(transaction.otherCharges || "");
+      setTransportCharges(transaction.transportCharges && parseFloat(transaction.transportCharges) !== 0 ? transaction.transportCharges : "");
+      setOtherCharges(transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? transaction.otherCharges : "");
       setOtherChargesRemarks(transaction.otherChargesRemarks || "");
       setAdjustmentType(transaction.adjustmentType || "");
       setAdjustmentAmount(transaction.adjustmentAmount || "");
