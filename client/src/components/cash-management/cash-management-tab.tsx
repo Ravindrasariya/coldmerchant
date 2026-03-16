@@ -407,6 +407,7 @@ export function CashManagementTab() {
   const [filterExpenseType, setFilterExpenseType] = useState<string>("");
   const [filterFarmerName, setFilterFarmerName] = useState<string>("");
   const [filterFarmerId, setFilterFarmerId] = useState<number | null>(null);
+  const [farmerFilterPopoverOpen, setFarmerFilterPopoverOpen] = useState(false);
   const [filterSupplierName, setFilterSupplierName] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
@@ -2053,40 +2054,63 @@ export function CashManagementTab() {
             </Select>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_auto_auto_1fr] gap-3 mt-3">
-            <Select value={filterFarmerId != null ? String(filterFarmerId) : "all"} onValueChange={(val) => {
-              if (val === "all") {
-                setFilterFarmerName("");
-                setFilterFarmerId(null);
-              } else {
-                const id = parseInt(val);
-                const farmer = uniqueFarmerOptions.find(f => f.id === id);
-                setFilterFarmerName(farmer?.name || "");
-                setFilterFarmerId(id);
-              }
-            }}>
-              <SelectTrigger data-testid="filter-farmer-name" className="h-9">
-                <SelectValue placeholder={t("Farmer Name", "किसान का नाम")}>
-                  {filterFarmerId != null ? filterFarmerName : t("Farmer Name", "किसान का नाम")}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("All Farmers", "सभी किसान")}</SelectItem>
-                {uniqueFarmerOptions.map((farmer) => (
-                  <SelectItem key={farmer.id} value={String(farmer.id)}>
-                    <div className="flex flex-col">
-                      <span>{farmer.name}</span>
-                      {(farmer.contact || farmer.village) && (
-                        <span className="text-xs text-muted-foreground">
-                          {farmer.contact || ""}
-                          {farmer.contact && farmer.village && " • "}
-                          {farmer.village || ""}
-                        </span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={farmerFilterPopoverOpen} onOpenChange={setFarmerFilterPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={farmerFilterPopoverOpen}
+                  className={cn(
+                    "justify-between font-normal text-sm h-9",
+                    !filterFarmerName && "text-muted-foreground"
+                  )}
+                  data-testid="filter-farmer-name"
+                >
+                  <span className="truncate">
+                    {filterFarmerName || t("Farmer Name", "किसान का नाम")}
+                  </span>
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-0">
+                <Command>
+                  <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
+                  <CommandList>
+                    <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
+                    <CommandGroup>
+                      {uniqueFarmerOptions.map((farmer) => (
+                        <CommandItem
+                          key={farmer.id}
+                          value={farmer.name}
+                          onSelect={() => {
+                            if (filterFarmerId === farmer.id) {
+                              setFilterFarmerName("");
+                              setFilterFarmerId(null);
+                            } else {
+                              setFilterFarmerName(farmer.name);
+                              setFilterFarmerId(farmer.id);
+                            }
+                            setFarmerFilterPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${filterFarmerId === farmer.id ? "opacity-100" : "opacity-0"}`}
+                          />
+                          <div className="flex flex-col flex-1">
+                            <span className="font-medium">{farmer.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {farmer.contact || ""}
+                              {farmer.contact && farmer.village && " • "}
+                              {farmer.village || ""}
+                            </span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <Select value={filterSupplierName} onValueChange={setFilterSupplierName}>
               <SelectTrigger data-testid="filter-supplier-name" className="h-9">
