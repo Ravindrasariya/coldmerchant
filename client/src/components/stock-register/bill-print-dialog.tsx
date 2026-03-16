@@ -256,7 +256,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   })();
 
   const allTableRows = (() => {
-    const rows: Array<{ crop: string; bags: number; weight: number; price: number; amount: number }> = [];
+    const rows: Array<{ crop: string; bags: number; grossWeight: number; netWeight: number; price: number; amount: number }> = [];
     entry.lots.forEach(lot => {
       if (lot.bagBreakdowns.length > 0) {
         lot.bagBreakdowns.forEach(bd => {
@@ -264,13 +264,13 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-          rows.push({ crop: lot.crop || "potato", bags: bd.numberOfBags, weight, price, amount: netWeight * price });
+          rows.push({ crop: lot.crop || "potato", bags: bd.numberOfBags, grossWeight: weight, netWeight, price, amount: netWeight * price });
         });
       } else {
         const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
         const netWeight = weight > 0 ? weight - lot.originalBags : 0;
         const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-        rows.push({ crop: lot.crop || "potato", bags: lot.originalBags, weight, price, amount: netWeight * price });
+        rows.push({ crop: lot.crop || "potato", bags: lot.originalBags, grossWeight: weight, netWeight, price, amount: netWeight * price });
       }
     });
     return rows;
@@ -440,7 +440,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <tr>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(r.crop)}</td>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.bags}</td>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.weight > 0 ? r.weight.toFixed(2) : "—"}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.grossWeight > 0 ? r.grossWeight.toFixed(2) : "—"}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.netWeight > 0 ? r.netWeight.toFixed(2) : "—"}</td>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.price > 0 ? "₹" + parseFloat((Math.trunc(r.price * 100) / 100).toFixed(2)) : "—"}</td>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${r.amount > 0 ? "₹" + parseFloat(r.amount.toFixed(1)).toLocaleString('en-IN') : "—"}</td>
         </tr>
@@ -459,10 +460,23 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       if (aggregatedMandiCharges.mandiExtra > 0) {
         mandiChargesLines += '<div><span style="color: #666;">Extra Charges / अतिरिक्त शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
       }
+      if (aggregatedMandiCharges.totalHammali > 0) {
+        mandiChargesLines += '<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.totalHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
+      Object.entries(aggregatedMandiCharges.chargesByType).forEach(([type, amt]) => {
+        if (amt > 0) {
+          mandiChargesLines += '<div><span style="color: #666;">' + type + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+        }
+      });
+      if (aggregatedMandiCharges.totalAdjustedValue !== 0) {
+        const adjColor = aggregatedMandiCharges.totalAdjustedValue > 0 ? '#15803d' : '#dc2626';
+        const adjSign = aggregatedMandiCharges.totalAdjustedValue > 0 ? '+' : '';
+        mandiChargesLines += '<div><span style="color: #666;">Adjustment / समायोजन:</span></div><div style="text-align: right; font-family: monospace; color: ' + adjColor + ';">' + adjSign + '₹' + Math.abs(aggregatedMandiCharges.totalAdjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
 
       const mandiChargesBlockHtmlMandi = mandiChargesLines ? `
         <div style="margin-top: 6px; padding: 8px; background: #eff6ff; border-radius: 4px; border-left: 3px solid #3b82f6;">
-          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Mandi Charges / मंडी शुल्क</p>
+          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Charges & Deductions / शुल्क एवं कटौती</p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
             ${mandiChargesLines}
           </div>
@@ -476,7 +490,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <tr style="background: #f5f5f5;">
                 <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Gross Wt / कुल वजन</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Net Wt / शुद्ध वजन</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
               </tr>
@@ -638,7 +653,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                 <tr className="border-b bg-gray-100">
                   <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
                   <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Gross Wt / कुल वजन</th>
+                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Net Wt / शुद्ध वजन</th>
                   <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
                   <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
                 </tr>
@@ -648,16 +664,17 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                   <tr key={idx} className="border-b border-gray-200">
                     <td className="py-1 px-2">{getCropBilingual(r.crop)}</td>
                     <td className="py-1 px-2 text-right font-mono">{r.bags}</td>
-                    <td className="py-1 px-2 text-right font-mono">{r.weight > 0 ? r.weight.toFixed(2) : "—"}</td>
+                    <td className="py-1 px-2 text-right font-mono">{r.grossWeight > 0 ? r.grossWeight.toFixed(2) : "—"}</td>
+                    <td className="py-1 px-2 text-right font-mono">{r.netWeight > 0 ? r.netWeight.toFixed(2) : "—"}</td>
                     <td className="py-1 px-2 text-right font-mono">{r.price > 0 ? `₹${parseFloat((Math.trunc(r.price * 100) / 100).toFixed(2))}` : "—"}</td>
                     <td className="py-1 px-2 text-right font-mono font-medium">{r.amount > 0 ? `₹${parseFloat(r.amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {overallTotals.totalMandiCharges > 0 && (
+            {(overallTotals.totalMandiCharges > 0 || aggregatedMandiCharges.totalHammali > 0 || Object.keys(aggregatedMandiCharges.chargesByType).length > 0 || aggregatedMandiCharges.totalAdjustedValue !== 0) && (
               <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Mandi Charges / मंडी शुल्क</p>
+                <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Charges & Deductions / शुल्क एवं कटौती</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {aggregatedMandiCharges.mandiCommission > 0 && (
                     <>
@@ -681,6 +698,28 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     <>
                       <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
                       <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
+                  )}
+                  {aggregatedMandiCharges.totalHammali > 0 && (
+                    <>
+                      <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
+                      <span className="text-right font-mono">₹{aggregatedMandiCharges.totalHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
+                  )}
+                  {Object.entries(aggregatedMandiCharges.chargesByType).map(([type, amt]) => (
+                    amt > 0 ? (
+                      <React.Fragment key={type}>
+                        <span className="text-gray-600">{type}:</span>
+                        <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                      </React.Fragment>
+                    ) : null
+                  ))}
+                  {aggregatedMandiCharges.totalAdjustedValue !== 0 && (
+                    <>
+                      <span className="text-gray-600">Adjustment / समायोजन:</span>
+                      <span className={`text-right font-mono ${aggregatedMandiCharges.totalAdjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                        {aggregatedMandiCharges.totalAdjustedValue > 0 ? '+' : ''}₹{Math.abs(aggregatedMandiCharges.totalAdjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                      </span>
                     </>
                   )}
                 </div>
