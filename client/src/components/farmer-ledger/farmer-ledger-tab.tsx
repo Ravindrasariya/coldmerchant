@@ -52,6 +52,8 @@ export function FarmerLedgerTab() {
   
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
+  const [selectedNameIndex, setSelectedNameIndex] = useState(-1);
+  const [selectedVillageIndex, setSelectedVillageIndex] = useState(-1);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const villageInputRef = useRef<HTMLInputElement>(null);
   const nameSuggestionsRef = useRef<HTMLDivElement>(null);
@@ -270,6 +272,47 @@ export function FarmerLedgerTab() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => { setSelectedNameIndex(-1); }, [farmerNameSearch]);
+  useEffect(() => { setSelectedVillageIndex(-1); }, [villageSearch]);
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (!showNameSuggestions || filteredNameSuggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedNameIndex(prev => (prev < filteredNameSuggestions.length - 1 ? prev + 1 : 0));
+      setTimeout(() => nameSuggestionsRef.current?.querySelector('[data-suggestion-item].bg-accent')?.scrollIntoView({ block: 'nearest' }), 0);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedNameIndex(prev => (prev > 0 ? prev - 1 : filteredNameSuggestions.length - 1));
+      setTimeout(() => nameSuggestionsRef.current?.querySelector('[data-suggestion-item].bg-accent')?.scrollIntoView({ block: 'nearest' }), 0);
+    } else if (e.key === "Enter" && selectedNameIndex >= 0) {
+      e.preventDefault();
+      setFarmerNameSearch(filteredNameSuggestions[selectedNameIndex].name);
+      setShowNameSuggestions(false);
+    } else if (e.key === "Escape") {
+      setShowNameSuggestions(false);
+    }
+  };
+
+  const handleVillageKeyDown = (e: React.KeyboardEvent) => {
+    if (!showVillageSuggestions || filteredVillageSuggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedVillageIndex(prev => (prev < filteredVillageSuggestions.length - 1 ? prev + 1 : 0));
+      setTimeout(() => villageSuggestionsRef.current?.querySelector('[data-suggestion-item].bg-accent')?.scrollIntoView({ block: 'nearest' }), 0);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedVillageIndex(prev => (prev > 0 ? prev - 1 : filteredVillageSuggestions.length - 1));
+      setTimeout(() => villageSuggestionsRef.current?.querySelector('[data-suggestion-item].bg-accent')?.scrollIntoView({ block: 'nearest' }), 0);
+    } else if (e.key === "Enter" && selectedVillageIndex >= 0) {
+      e.preventDefault();
+      setVillageSearch(filteredVillageSuggestions[selectedVillageIndex]);
+      setShowVillageSuggestions(false);
+    } else if (e.key === "Escape") {
+      setShowVillageSuggestions(false);
+    }
+  };
 
   const handleToggleRedFlag = (id: number, currentValue: boolean) => {
     updateMutation.mutate({ id, data: { redFlag: !currentValue } });
@@ -662,6 +705,7 @@ export function FarmerLedgerTab() {
                   setShowNameSuggestions(true);
                 }}
                 onFocus={() => setShowNameSuggestions(true)}
+                onKeyDown={handleNameKeyDown}
                 className="w-40"
                 autoComplete="off"
                 data-testid="input-search-farmer-name"
@@ -675,11 +719,12 @@ export function FarmerLedgerTab() {
                     <button
                       key={farmer.id}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover-elevate"
+                      className={`w-full px-3 py-2 text-left text-sm hover-elevate ${idx === selectedNameIndex ? 'bg-accent' : ''}`}
                       onClick={() => {
                         setFarmerNameSearch(farmer.name);
                         setShowNameSuggestions(false);
                       }}
+                      data-suggestion-item
                       data-testid={`suggestion-name-${idx}`}
                     >
                       <div className="font-medium">{farmer.name}</div>
@@ -701,6 +746,7 @@ export function FarmerLedgerTab() {
                   setShowVillageSuggestions(true);
                 }}
                 onFocus={() => setShowVillageSuggestions(true)}
+                onKeyDown={handleVillageKeyDown}
                 className="w-40"
                 autoComplete="off"
                 data-testid="input-search-village"
@@ -714,11 +760,12 @@ export function FarmerLedgerTab() {
                     <button
                       key={village}
                       type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover-elevate"
+                      className={`w-full px-3 py-2 text-left text-sm hover-elevate ${idx === selectedVillageIndex ? 'bg-accent' : ''}`}
                       onClick={() => {
                         setVillageSearch(village);
                         setShowVillageSuggestions(false);
                       }}
+                      data-suggestion-item
                       data-testid={`suggestion-village-${idx}`}
                     >
                       {village}

@@ -438,9 +438,9 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                                 <div className="flex flex-col flex-1">
                                   <span className="font-medium">{farmer.name}</span>
                                   <span className="text-xs text-muted-foreground">
-                                    {farmer.village || ""}
-                                    {farmer.village && farmer.contact && " • "}
                                     {farmer.contact || ""}
+                                    {farmer.contact && farmer.village && " • "}
+                                    {farmer.village || ""}
                                   </span>
                                 </div>
                               </CommandItem>

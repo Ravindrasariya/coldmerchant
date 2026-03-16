@@ -355,9 +355,9 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                           )}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
-                          {farmer.village && <span>{farmer.village}</span>}
-                          {farmer.village && farmer.farmerContact && <span> • </span>}
                           {farmer.farmerContact && <span>{farmer.farmerContact}</span>}
+                          {farmer.farmerContact && farmer.village && <span> • </span>}
+                          {farmer.village && <span>{farmer.village}</span>}
                         </div>
                       </div>
                     ))}

@@ -2060,11 +2060,11 @@ export function CashManagementTab() {
                   <SelectItem key={farmer.name} value={farmer.name}>
                     <div className="flex flex-col">
                       <span>{farmer.name}</span>
-                      {(farmer.village || farmer.contact) && (
+                      {(farmer.contact || farmer.village) && (
                         <span className="text-xs text-muted-foreground">
-                          {farmer.village || ""}
-                          {farmer.village && farmer.contact && " • "}
                           {farmer.contact || ""}
+                          {farmer.contact && farmer.village && " • "}
+                          {farmer.village || ""}
                         </span>
                       )}
                     </div>
@@ -2400,9 +2400,9 @@ export function CashManagementTab() {
                                               <div className="flex flex-col flex-1">
                                                 <span className="font-medium">{farmer.name}</span>
                                                 <span className="text-xs text-muted-foreground">
-                                                  {farmer.village || ""}
-                                                  {farmer.village && farmer.contact && " • "}
                                                   {farmer.contact || ""}
+                                                  {farmer.contact && farmer.village && " • "}
+                                                  {farmer.village || ""}
                                                 </span>
                                               </div>
                                               <Badge variant="secondary" className="ml-2">
@@ -2893,9 +2893,9 @@ export function CashManagementTab() {
                                         <div className="flex items-center justify-between gap-4">
                                           <span>{farmer.name}</span>
                                           <span className="text-xs text-muted-foreground">
-                                            {farmer.village || ""}
-                                            {farmer.village && farmer.contact && " • "}
                                             {farmer.contact || ""}
+                                            {farmer.contact && farmer.village && " • "}
+                                            {farmer.village || ""}
                                           </span>
                                           <Badge variant="secondary">
                                             {t("Due", "बकाया")}: ₹{parseFloat(farmer.netDue.toFixed(1)).toLocaleString('en-IN')}
