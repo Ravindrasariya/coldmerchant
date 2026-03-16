@@ -569,6 +569,8 @@ export function CashManagementTab() {
   // Watch payment mode for conditional bank account dropdown
   const paymentMode = outflowForm.watch("paymentMode");
   const selectedOutflowFarmerName = outflowForm.watch("farmerName");
+  const selectedOutflowColdStore = outflowForm.watch("coldStoreName");
+  const selectedOutflowSupplier = outflowForm.watch("supplierName");
 
   const transferForm = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema),
@@ -986,6 +988,18 @@ export function CashManagementTab() {
     return farmer?.netDue > 0 ? farmer.netDue : 0;
   }, [selectedOutflowFarmerName, ledgerFarmers]);
 
+  const outflowColdStoreDue = useMemo(() => {
+    if (!selectedOutflowColdStore) return 0;
+    const store = coldStores.find(cs => cs.coldStoreName === selectedOutflowColdStore);
+    return store?.totalDue || 0;
+  }, [selectedOutflowColdStore, coldStores]);
+
+  const outflowSupplierDue = useMemo(() => {
+    if (!selectedOutflowSupplier) return 0;
+    const supplier = seedSuppliers.find(s => s.supplierName === selectedOutflowSupplier);
+    return supplier?.totalDue || 0;
+  }, [selectedOutflowSupplier, seedSuppliers]);
+
   const onInwardSubmit = (values: InwardFormValues) => {
     if (values.revenueType === "raw_potato") {
       // Raw potato inward always requires amount > 0
@@ -1125,15 +1139,18 @@ export function CashManagementTab() {
         });
         return;
       }
-      if (effectiveExpenseType === "farmer" && selectedLedgerFarmerOut) {
-        const farmerDueAmt = selectedLedgerFarmerOut.netDue > 0 ? selectedLedgerFarmerOut.netDue : 0;
-        if (farmerDueAmt > 0 && values.amount > farmerDueAmt) {
-          outflowForm.setError("amount", {
-            type: "manual",
-            message: t(`Amount cannot exceed due amount (₹${farmerDueAmt.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${farmerDueAmt.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
-          });
-          return;
-        }
+      const dueLimitMap: Record<string, number> = {
+        farmer: outflowFarmerDue,
+        cold_store_charge: outflowColdStoreDue,
+        supplier: outflowSupplierDue,
+      };
+      const dueLimit = dueLimitMap[effectiveExpenseType] || 0;
+      if (dueLimit > 0 && values.amount > dueLimit) {
+        outflowForm.setError("amount", {
+          type: "manual",
+          message: t(`Amount cannot exceed due amount (₹${dueLimit.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${dueLimit.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
+        });
+        return;
       }
     }
     
@@ -2945,7 +2962,10 @@ export function CashManagementTab() {
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-cold-store-name">
-                                <SelectValue placeholder={t("Select Cold Store", "शीत भंडार चुनें")} />
+                                {field.value ? (() => {
+                                  const cs = coldStores.find(s => s.coldStoreName === field.value);
+                                  return <span>{cs?.coldStoreName || field.value}{cs && cs.totalDue > 0 ? ` — ${t("Due", "बकाया")}: ₹${cs.totalDue.toLocaleString('en-IN')}` : ""}</span>;
+                                })() : <SelectValue placeholder={t("Select Cold Store", "शीत भंडार चुनें")} />}
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -2980,7 +3000,10 @@ export function CashManagementTab() {
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-supplier-name">
-                                <SelectValue placeholder={t("Select Supplier", "आपूर्तिकर्ता चुनें")} />
+                                {field.value ? (() => {
+                                  const sup = seedSuppliers.find(s => s.supplierName === field.value);
+                                  return <span>{sup?.supplierName || field.value}{sup && sup.totalDue > 0 ? ` — ${t("Due", "बकाया")}: ₹${sup.totalDue.toLocaleString('en-IN')}` : ""}</span>;
+                                })() : <SelectValue placeholder={t("Select Supplier", "आपूर्तिकर्ता चुनें")} />}
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -3100,7 +3123,10 @@ export function CashManagementTab() {
                       control={outflowForm.control}
                       name="amount"
                       render={({ field }) => {
-                        const maxDue = expenseType === "farmer" ? outflowFarmerDue : 0;
+                        const maxDue = expenseType === "farmer" ? outflowFarmerDue
+                          : expenseType === "cold_store_charge" ? outflowColdStoreDue
+                          : expenseType === "supplier" ? outflowSupplierDue
+                          : 0;
                         return (
                           <FormItem>
                             <FormLabel>
