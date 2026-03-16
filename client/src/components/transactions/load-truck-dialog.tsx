@@ -30,6 +30,7 @@ interface UnsoldInventoryItem {
   breakdownId: number | null;
   lotId: number;
   serialNumber: number;
+  crop: string;
   place: string;
   coldStoreName: string;
   farmerName: string;
@@ -69,6 +70,7 @@ interface BuyerSection {
 interface LoadTruckDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  selectedCrop?: string;
 }
 
 const createEmptyBuyerSection = (): BuyerSection => ({
@@ -83,7 +85,7 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   isExpanded: true,
 });
 
-export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
+export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }: LoadTruckDialogProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
 
@@ -635,10 +637,9 @@ export function LoadTruckDialog({ open, onOpenChange }: LoadTruckDialogProps) {
                                     <SelectContent className="max-w-[400px]">
                                       {inventory
                                         .filter((inv) => {
+                                          if (selectedCrop && inv.crop !== selectedCrop) return false;
                                           const key = getInventoryKey(inv);
-                                          // Calculate available bags for this lot (excluding current item)
                                           const availableBags = getAvailableBagsForLot(key, section.id, itemIndex);
-                                          // Show lot if: it's the currently selected one, OR there are available bags
                                           return key === item.inventoryKey || availableBags > 0;
                                         })
                                         .map((inv) => {

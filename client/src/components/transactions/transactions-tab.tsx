@@ -524,7 +524,8 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
 
       <LoadTruckDialog 
         open={showLoadDialog} 
-        onOpenChange={setShowLoadDialog} 
+        onOpenChange={setShowLoadDialog}
+        selectedCrop={selectedCrop}
       />
 
       <EditTransactionDialog
