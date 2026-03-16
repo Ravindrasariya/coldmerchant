@@ -172,6 +172,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   const crop = form.watch(`lots.${lotIndex}.crop`) || "potato";
   const cutType = form.watch(`lots.${lotIndex}.cutType`);
   const originalBags = form.watch(`lots.${lotIndex}.originalBags`) || 0;
+  const totalWeight = form.watch(`lots.${lotIndex}.totalWeight`);
 
   const mandiCommission = form.watch(`lots.${lotIndex}.mandiCommissionPercent`);
   const aadhatCommission = form.watch(`lots.${lotIndex}.aadhatCommissionPercent`);
@@ -523,6 +524,11 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                         data-testid={`input-total-weight-${lotIndex}`}
                       />
                     </FormControl>
+                    {totalWeight && originalBags > 0 && (
+                      <p className="text-xs font-semibold text-orange-600 mt-1" data-testid={`text-avg-weight-${lotIndex}`}>
+                        {t("Avg. Weight", "औसत वजन")} {parseFloat((totalWeight / originalBags).toFixed(1))} Kg
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
