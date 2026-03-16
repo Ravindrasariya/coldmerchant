@@ -249,7 +249,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           const amount = netWeight * price;
           return `
             <tr>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getPlaceBilingual(lot)}</td>
+              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bd.numberOfBags}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${weight > 0 ? weight.toFixed(2) : "—"}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
@@ -262,7 +262,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
             <thead>
               <tr style="background: #f5f5f5;">
-                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Place / स्थान</th>
+                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
@@ -283,7 +283,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
             <thead>
               <tr style="background: #f5f5f5;">
-                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Place / स्थान</th>
+                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
@@ -292,7 +292,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             </thead>
             <tbody>
               <tr>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getPlaceBilingual(lot)}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lot.originalBags}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
@@ -400,7 +400,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                 <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">Bill Details / बिल विवरण</h3>
                 <p style="margin: 0 0 4px 0;"><span style="color: #666;">Bill No / बिल नंबर:</span> <span style="font-family: monospace; font-weight: 600;">#${entry.serialNumber}</span></p>
                 <p style="margin: 0 0 4px 0;"><span style="color: #666;">Date / दिनांक:</span> <span style="font-weight: 500;">${new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
-                <p style="margin: 0;"><span style="color: #666;">Crop / फसल:</span> <span style="font-weight: 500;">${getCropBilingual(entry.lots[0]?.crop)}</span></p>
+                <p style="margin: 0;"><span style="color: #666;">Place / स्थान:</span> <span style="font-weight: 500;">${entry.lots[0] ? getPlaceBilingual(entry.lots[0]) : "—"}</span></p>
               </div>
               <div style="flex: 1; text-align: right;">
                 <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">${detailsLabel}</h3>
@@ -486,7 +486,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <div className="space-y-1 text-sm">
             <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span></p>
             <p><span className="text-gray-600">Date / दिनांक:</span> <span className="font-medium">{new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
-            <p><span className="text-gray-600">Crop / फसल:</span> <span className="font-medium">{getCropBilingual(entry.lots[0]?.crop)}</span></p>
+            <p><span className="text-gray-600">Place / स्थान:</span> <span className="font-medium">{entry.lots[0] ? getPlaceBilingual(entry.lots[0]) : "—"}</span></p>
           </div>
         </div>
         <div>
@@ -511,7 +511,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <table className="w-full text-sm mt-1 border-collapse">
                 <thead>
                   <tr className="border-b bg-gray-100">
-                    <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Place / स्थान</th>
+                    <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
                     <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
                     <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
                     <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
@@ -526,7 +526,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     const amount = netWeight * price;
                     return (
                       <tr key={bd.id || bdIndex} className="border-b border-gray-200">
-                        <td className="py-1 px-2">{getPlaceBilingual(lot)}</td>
+                        <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
                         <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
                         <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
                         <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
@@ -546,7 +546,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                   <table className="w-full text-sm mt-1 border-collapse">
                     <thead>
                       <tr className="border-b bg-gray-100">
-                        <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Place / स्थान</th>
+                        <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
                         <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
                         <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
                         <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
@@ -555,7 +555,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     </thead>
                     <tbody>
                       <tr className="border-b border-gray-200">
-                        <td className="py-1 px-2">{getPlaceBilingual(lot)}</td>
+                        <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
                         <td className="py-1 px-2 text-right font-mono">{lot.originalBags}</td>
                         <td className="py-1 px-2 text-right font-mono">{lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
                         <td className="py-1 px-2 text-right font-mono">{lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
