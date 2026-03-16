@@ -367,6 +367,23 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   // Year filter is not included in hasActiveFilters since it always has a value (current year by default)
   const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString());
 
+  const lotMetricsMap = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof computeLotMetrics>>();
+    if (!entries) return map;
+    entries.forEach(entry => {
+      entry.lots.forEach(lot => {
+        if (!map.has(lot.id)) {
+          map.set(lot.id, computeLotMetrics(lot));
+        }
+      });
+    });
+    return map;
+  }, [entries]);
+
+  const getLotMetrics = (lot: StockEntryWithLots['lots'][0]) => {
+    return lotMetricsMap.get(lot.id) || computeLotMetrics(lot);
+  };
+
   // Compute summary totals from filtered entries
   const summaryTotals = useMemo(() => {
     let bagsTotal = 0;
@@ -391,7 +408,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       let entryMandiNetPayable = 0;
 
       entry.lots.forEach(lot => {
-        const metrics = computeLotMetrics(lot);
+        const metrics = getLotMetrics(lot);
         bagsTotal += metrics.actualSellableBags;
         bagsRemaining += metrics.remainingToSell;
 
@@ -431,7 +448,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     });
 
     return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions, mandiTotal, mandiDue };
-  }, [filteredEntries]);
+  }, [filteredEntries, lotMetricsMap]);
 
   const handleDownloadCSV = () => {
     // Use already-filtered entries based on applied filters
@@ -481,7 +498,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     const rows: string[][] = [];
     filteredForDownload.forEach(entry => {
       // Calculate entry-level totals for proration
-      const entryLotMetrics = entry.lots.map(lot => computeLotMetrics(lot));
+      const entryLotMetrics = entry.lots.map(lot => getLotMetrics(lot));
       const entryFarmerTotal = entryLotMetrics.reduce((sum, m) => sum + (m.totalAmount ?? 0), 0);
       const entryAdjustment = entryLotMetrics.reduce((sum, m) => {
         if (m.adjustedAmount > 0 && m.adjustedAmountType) {
@@ -492,7 +509,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       const entryAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
       
       entry.lots.forEach((lot, lotIndex) => {
-        const metrics = computeLotMetrics(lot);
+        const metrics = getLotMetrics(lot);
         
         // Get size distribution from sellable breakdowns
         const largeBags = metrics.sellableBreakdowns
@@ -986,7 +1003,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           {filteredEntries.map((entry) => {
             const lotsWithMetrics = entry.lots.map(lot => ({
               lot,
-              metrics: computeLotMetrics(lot),
+              metrics: getLotMetrics(lot),
             }));
             
             const entryStatus = computeEntryStatusFromMetrics(lotsWithMetrics);

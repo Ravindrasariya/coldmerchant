@@ -184,6 +184,17 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
     return baseDue + dynamicAdjustment;
   };
 
+  const txnDueMap = useMemo(() => {
+    const map = new Map<number, { dueAmount: number; dynamicAdjustment: number }>();
+    if (!transactions) return map;
+    transactions.forEach(txn => {
+      const dynamicAdjustment = calculateDynamicAdjustment(txn);
+      const baseDue = parseFloat(txn.totalDueToFarmer || "0");
+      map.set(txn.id, { dueAmount: baseDue + dynamicAdjustment, dynamicAdjustment });
+    });
+    return map;
+  }, [transactions]);
+
   const summary = useMemo(() => {
     let totalBags = 0;
     let totalRevenue = 0;
@@ -196,11 +207,12 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
       totalRevenue += parseFloat(txn.totalRevenue || "0");
       totalCost += parseFloat(txn.totalCost || "0");
       totalProfitLoss += parseFloat(txn.totalProfitLoss || "0");
-      totalDue += getTotalDueWithAdjustment(txn);
+      const txnDue = txnDueMap.get(txn.id);
+      totalDue += txnDue?.dueAmount ?? getTotalDueWithAdjustment(txn);
     });
 
     return { totalBags, totalRevenue, totalCost, totalProfitLoss, totalDue, count: filteredTransactions.length };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, txnDueMap]);
 
   const handleDownloadCSV = () => {
     // Use already-filtered transactions based on applied filters
@@ -572,8 +584,9 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             const profitLoss = parseFloat(txn.totalProfitLoss || "0");
             const revenue = parseFloat(txn.totalRevenue || "0");
             const cost = parseFloat(txn.totalCost || "0");
-            const dueAmount = getTotalDueWithAdjustment(txn);
-            const dynamicAdjustment = calculateDynamicAdjustment(txn);
+            const txnDue = txnDueMap.get(txn.id);
+            const dueAmount = txnDue?.dueAmount ?? getTotalDueWithAdjustment(txn);
+            const dynamicAdjustment = txnDue?.dynamicAdjustment ?? calculateDynamicAdjustment(txn);
             const transportCharges = parseFloat(txn.transportCharges || "0");
             const otherCharges = parseFloat(txn.otherCharges || "0");
             const extraCharges = transportCharges + otherCharges;

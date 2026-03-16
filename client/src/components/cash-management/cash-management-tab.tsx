@@ -1221,87 +1221,65 @@ export function CashManagementTab() {
   };
 
   // Calculate summary values (exclude reversed entries from balance calculations)
-  const totalCashReceived = entries
-    .filter(e => e.direction === "inward" && e.receiptType === "cash_received" && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const totalAccountReceived = entries
-    .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const totalCashExpense = entries
-    .filter(e => e.direction === "outflow" && e.paymentMode === "cash" && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const totalAccountExpense = entries
-    .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  // Include opening balance from settings
-  const openingCashInHand = cashSettings ? parseFloat(cashSettings.openingCashInHand || "0") : 0;
-  const legacyOpeningCashInAccount = cashSettings ? parseFloat(cashSettings.openingCashInAccount || "0") : 0;
-  
-  const transfersFromCash = entries
-    .filter(e => e.direction === "transfer" && e.fromAccountType === "cash_in_hand" && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const transfersToCash = entries
-    .filter(e => e.direction === "transfer" && e.toAccountType === "cash_in_hand" && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense - transfersFromCash + transfersToCash;
+  const { totalCashReceived, totalAccountReceived, totalCashExpense, totalAccountExpense, transfersFromCash, transfersToCash, openingCashInHand, legacyOpeningCashInAccount, netCashInHand } = useMemo(() => {
+    const totalCashReceived = entries
+      .filter(e => e.direction === "inward" && e.receiptType === "cash_received" && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const totalAccountReceived = entries
+      .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const totalCashExpense = entries
+      .filter(e => e.direction === "outflow" && e.paymentMode === "cash" && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const totalAccountExpense = entries
+      .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const openingCashInHand = cashSettings ? parseFloat(cashSettings.openingCashInHand || "0") : 0;
+    const legacyOpeningCashInAccount = cashSettings ? parseFloat(cashSettings.openingCashInAccount || "0") : 0;
+    const transfersFromCash = entries
+      .filter(e => e.direction === "transfer" && e.fromAccountType === "cash_in_hand" && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const transfersToCash = entries
+      .filter(e => e.direction === "transfer" && e.toAccountType === "cash_in_hand" && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const netCashInHand = openingCashInHand + totalCashReceived - totalCashExpense - transfersFromCash + transfersToCash;
+    return { totalCashReceived, totalAccountReceived, totalCashExpense, totalAccountExpense, transfersFromCash, transfersToCash, openingCashInHand, legacyOpeningCashInAccount, netCashInHand };
+  }, [entries, cashSettings]);
 
   // Calculate account-wise breakdown for entries that have bankAccountId (exclude reversed entries)
-  const accountWiseBreakdown = bankAccounts.map(account => {
-    const inward = entries
-      .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && e.bankAccountId === account.id && !e.isReversed)
+  const { accountWiseBreakdown, unassignedAccountReceived, unassignedAccountExpense, unassignedAccountNet, netCashInAccount } = useMemo(() => {
+    const accountWiseBreakdown = bankAccounts.map(account => {
+      const inward = entries
+        .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && e.bankAccountId === account.id && !e.isReversed)
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+      const outflow = entries
+        .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && e.bankAccountId === account.id && !e.isReversed)
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+      const transferIn = entries
+        .filter(e => e.direction === "transfer" && e.toBankAccountId === account.id && !e.isReversed)
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+      const transferOut = entries
+        .filter(e => e.direction === "transfer" && e.fromBankAccountId === account.id && !e.isReversed)
+        .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+      const openingBalance = parseFloat(account.openingBalance || "0");
+      const net = openingBalance + inward - outflow + transferIn - transferOut;
+      return { id: account.id, name: account.name, accountType: account.accountType, openingBalance, inward, outflow, net };
+    });
+    const unassignedAccountReceived = entries
+      .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && !e.bankAccountId && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-    
-    const outflow = entries
-      .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && e.bankAccountId === account.id && !e.isReversed)
+    const unassignedAccountExpense = entries
+      .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && !e.bankAccountId && !e.isReversed)
       .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-    
-    const transferIn = entries
-      .filter(e => e.direction === "transfer" && e.toBankAccountId === account.id && !e.isReversed)
-      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-    
-    const transferOut = entries
-      .filter(e => e.direction === "transfer" && e.fromBankAccountId === account.id && !e.isReversed)
-      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-    
-    const openingBalance = parseFloat(account.openingBalance || "0");
-    const net = openingBalance + inward - outflow + transferIn - transferOut;
-    
-    return {
-      id: account.id,
-      name: account.name,
-      accountType: account.accountType,
-      openingBalance,
-      inward,
-      outflow,
-      net
-    };
-  });
-
-  // Calculate unassigned account transactions (older entries without bankAccountId, exclude reversed)
-  const unassignedAccountReceived = entries
-    .filter(e => e.direction === "inward" && (e.receiptType === "account_received" || e.receiptType === "cheque_received") && !e.bankAccountId && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const unassignedAccountExpense = entries
-    .filter(e => e.direction === "outflow" && (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") && !e.bankAccountId && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-
-  // Unassigned net uses legacy opening balance (from cash settings) 
-  const unassignedAccountNet = legacyOpeningCashInAccount + unassignedAccountReceived - unassignedAccountExpense;
-
-  // Calculate total net in account (sum of all per-account nets + unassigned net, or legacy calculation if no accounts)
-  const netCashInAccount = bankAccounts.length > 0
-    ? accountWiseBreakdown.reduce((sum, a) => sum + a.net, 0) + unassignedAccountNet
-    : legacyOpeningCashInAccount + totalAccountReceived - totalAccountExpense;
+    const unassignedAccountNet = legacyOpeningCashInAccount + unassignedAccountReceived - unassignedAccountExpense;
+    const netCashInAccount = bankAccounts.length > 0
+      ? accountWiseBreakdown.reduce((sum, a) => sum + a.net, 0) + unassignedAccountNet
+      : legacyOpeningCashInAccount + totalAccountReceived - totalAccountExpense;
+    return { accountWiseBreakdown, unassignedAccountReceived, unassignedAccountExpense, unassignedAccountNet, netCashInAccount };
+  }, [entries, bankAccounts, legacyOpeningCashInAccount, totalAccountReceived, totalAccountExpense]);
 
   // Filter entries
-  const filteredEntries = entries.filter(entry => {
+  const filteredEntries = useMemo(() => entries.filter(entry => {
     const entryDate = new Date(entry.entryDate);
     const entryMonth = (entryDate.getMonth() + 1).toString();
     const entryYear = entryDate.getFullYear().toString();
@@ -1330,21 +1308,22 @@ export function CashManagementTab() {
     if (filterYear && filterYear !== "all" && entryYear !== filterYear) return false;
     if (filterRemarks && !(entry.remarks || "").toLowerCase().includes(filterRemarks.toLowerCase())) return false;
     return true;
-  });
+  }), [entries, filterDirection, filterExpenseCategory, filterPartyName, filterExpenseType, filterFarmerId, filterSupplierName, filterMonth, filterYear, filterRemarks]);
 
   // Filtered summary (exclude reversed entries)
-  const filteredInflow = filteredEntries
-    .filter(e => e.direction === "inward" && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
-  
-  const filteredOutflow = filteredEntries
-    .filter(e => e.direction === "outflow" && !e.isReversed)
-    .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  const { filteredInflow, filteredOutflow } = useMemo(() => ({
+    filteredInflow: filteredEntries
+      .filter(e => e.direction === "inward" && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0),
+    filteredOutflow: filteredEntries
+      .filter(e => e.direction === "outflow" && !e.isReversed)
+      .reduce((sum, e) => sum + parseFloat(e.amount), 0),
+  }), [filteredEntries]);
 
   // Get unique values for filter dropdowns
-  const uniquePartyNames = Array.from(new Set(entries.filter(e => e.partyName).map(e => e.partyName!)));
-  const uniqueSupplierNames = Array.from(new Set(entries.filter(e => e.supplierName).map(e => e.supplierName!)));
-  const uniqueFarmerOptions = (() => {
+  const { uniquePartyNames, uniqueSupplierNames, uniqueFarmerOptions, uniqueFarmerNames, uniqueYears } = useMemo(() => {
+    const uniquePartyNames = Array.from(new Set(entries.filter(e => e.partyName).map(e => e.partyName!)));
+    const uniqueSupplierNames = Array.from(new Set(entries.filter(e => e.supplierName).map(e => e.supplierName!)));
     const farmerMap = new Map<number, { id: number; name: string; village: string | null; contact: string | null }>();
     entries.filter(e => e.farmerName && e.farmerId).forEach(e => {
       if (!farmerMap.has(e.farmerId!)) {
@@ -1357,10 +1336,11 @@ export function CashManagementTab() {
         });
       }
     });
-    return Array.from(farmerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  })();
-  const uniqueFarmerNames = uniqueFarmerOptions.map(f => f.name);
-  const uniqueYears = Array.from(new Set(entries.map(e => new Date(e.entryDate).getFullYear().toString()))).sort().reverse();
+    const uniqueFarmerOptions = Array.from(farmerMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    const uniqueFarmerNames = uniqueFarmerOptions.map(f => f.name);
+    const uniqueYears = Array.from(new Set(entries.map(e => new Date(e.entryDate).getFullYear().toString()))).sort().reverse();
+    return { uniquePartyNames, uniqueSupplierNames, uniqueFarmerOptions, uniqueFarmerNames, uniqueYears };
+  }, [entries, farmers]);
 
   const hasActiveFilters = (filterDirection && filterDirection !== "all") ||
     (filterExpenseCategory && filterExpenseCategory !== "all") ||
