@@ -309,35 +309,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         </div>
       ` : "";
       
-      const lotSummaryHtml = `
-        <div style="margin-top: 6px; padding: 8px; background: #f0fdf4; border-radius: 4px; border-left: 3px solid #22c55e;">
-          <div style="display: grid; grid-template-columns: repeat(${hasMandiCharges ? 4 : 3}, 1fr); gap: 6px; font-size: 11px; text-align: center;">
-            <div>
-              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Total Payable / कुल देय</p>
-              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #15803d;">₹${lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-            </div>
-            ${hasMandiCharges ? `<div>
-              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Mandi Charges / मंडी शुल्क</p>
-              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #3b82f6;">₹${lotTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-            </div>` : ""}
-            <div>
-              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Deductions / कटौती</p>
-              <p style="font-family: monospace; font-weight: 600; margin: 0; color: #ea580c;">₹${lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-            </div>
-            <div>
-              <p style="color: #666; margin: 0 0 2px 0; font-size: 10px;">Net Payable / शुद्ध देय</p>
-              <p style="font-family: monospace; font-weight: 700; margin: 0; color: #0d9488; font-size: 13px;">₹${lotTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-            </div>
-          </div>
-        </div>
-      `;
-
       return `
         <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; page-break-inside: avoid;">
           ${breakdownHtml}
           ${mandiChargesBlockHtml}
           ${deductionsHtml}
-          ${lotSummaryHtml}
           ${lotRemarksHtml}
         </div>
       `;
@@ -595,28 +571,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                       </div>
                     </div>
                   )}
-                  <div className="mt-2 p-2 bg-green-50 rounded border-l-4 border-green-500">
-                    <div className={`grid ${hasMandiCharges ? 'grid-cols-4' : 'grid-cols-3'} gap-2 text-center text-xs`}>
-                      <div>
-                        <p className="text-gray-600 mb-1">Total Payable / कुल देय</p>
-                        <p className="font-mono font-semibold text-green-700">₹{lotTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                      </div>
-                      {hasMandiCharges && (
-                        <div>
-                          <p className="text-gray-600 mb-1">Mandi Charges / मंडी शुल्क</p>
-                          <p className="font-mono font-semibold text-blue-600">₹{lotTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-gray-600 mb-1">Deductions / कटौती</p>
-                        <p className="font-mono font-semibold text-orange-600">₹{lotTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600 mb-1">Net Payable / शुद्ध देय</p>
-                        <p className="font-mono font-bold text-teal-700 text-sm">₹{lotTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                      </div>
-                    </div>
-                  </div>
                 </>
               );
             })()}
