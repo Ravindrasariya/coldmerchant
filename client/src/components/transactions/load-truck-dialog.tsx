@@ -470,7 +470,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                   <Label className="text-xs">{t("Transporter Name", "ट्रांसपोर्टर का नाम")}</Label>
                   <Input
                     value={transporterName}
-                    onChange={(e) => setTransporterName(e.target.value)}
+                    onChange={(e) => { setTransporterName(e.target.value); setShowTransporterSuggestions(true); }}
                     onFocus={() => setShowTransporterSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowTransporterSuggestions(false), 200)}
                     onKeyDown={handleTransporterKeyDown}
