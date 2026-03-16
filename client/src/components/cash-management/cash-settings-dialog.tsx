@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -431,6 +431,8 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
   const [formData, setFormData] = useState({ name: "", contactNumber: "", address: "", pendingDues: "" });
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [buyerSearchQuery, setBuyerSearchQuery] = useState("");
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const filteredParties = parties.filter((party) => {
     if (!buyerSearchQuery.trim()) return true;
@@ -478,6 +480,37 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
   // Check if buyer name already exists in managed parties
   const existingPartyNames = parties.map(p => p.name.toLowerCase());
 
+  useEffect(() => {
+    setSelectedSuggestionIndex(-1);
+  }, [filteredSuggestions.length, formData.name]);
+
+  useEffect(() => {
+    if (selectedSuggestionIndex >= 0 && suggestionsRef.current) {
+      const items = suggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedSuggestionIndex]);
+
+  const handleBuyerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || filteredSuggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev + 1) % filteredSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev <= 0 ? filteredSuggestions.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      const buyer = filteredSuggestions[selectedSuggestionIndex];
+      if (buyer && !existingPartyNames.includes(buyer.name.toLowerCase())) {
+        handleSelectSuggestion(buyer);
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  };
+
   const handleSelectSuggestion = (buyer: LedgerBuyer) => {
     setFormData({
       ...formData,
@@ -486,6 +519,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
       address: buyer.address || "",
     });
     setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
   };
 
   const createMutation = useMutation({
@@ -588,19 +622,21 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
                   }}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onKeyDown={handleBuyerKeyDown}
                   placeholder={t("Buyer name", "खरीदार का नाम")}
                   data-testid="input-party-name"
                   autoComplete="off"
                 />
                 {showSuggestions && filteredSuggestions.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                    {filteredSuggestions.map((buyer) => {
+                  <div ref={suggestionsRef} className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {filteredSuggestions.map((buyer, idx) => {
                       const isAlreadyAdded = existingPartyNames.includes(buyer.name.toLowerCase());
                       return (
                         <div
                           key={buyer.id}
+                          data-suggestion-item
                           data-testid={`suggestion-buyer-${buyer.id}`}
-                          className={`px-3 py-2 cursor-pointer hover-elevate text-sm ${isAlreadyAdded ? 'opacity-50' : ''}`}
+                          className={`px-3 py-2 cursor-pointer hover:bg-muted text-sm ${isAlreadyAdded ? 'opacity-50' : ''} ${idx === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                           onMouseDown={(e) => {
                             e.preventDefault();
                             if (!isAlreadyAdded) {
@@ -827,6 +863,8 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedFarmerSuggestionIndex, setSelectedFarmerSuggestionIndex] = useState(-1);
+  const farmerSuggestionsRef = useRef<HTMLDivElement>(null);
 
   const { data: farmerSuggestions = [] } = useQuery<FarmerSuggestion[]>({
     queryKey: ["/api/farmers/suggestions"],
@@ -842,6 +880,42 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     }).slice(0, 8);
   };
 
+  const getCurrentSuggestions = () => {
+    if (!activeField) return [];
+    const valueMap = { name: formData.name, contact: formData.contactNumber, village: formData.village } as const;
+    return getFilteredSuggestions(activeField, valueMap[activeField]);
+  };
+
+  useEffect(() => {
+    setSelectedFarmerSuggestionIndex(-1);
+  }, [activeField, formData.name, formData.contactNumber, formData.village]);
+
+  useEffect(() => {
+    if (selectedFarmerSuggestionIndex >= 0 && farmerSuggestionsRef.current) {
+      const items = farmerSuggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedFarmerSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedFarmerSuggestionIndex]);
+
+  const handleFarmerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const currentSuggestions = getCurrentSuggestions();
+    if (!showSuggestions || currentSuggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedFarmerSuggestionIndex(prev => (prev + 1) % currentSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedFarmerSuggestionIndex(prev => (prev <= 0 ? currentSuggestions.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedFarmerSuggestionIndex >= 0) {
+      e.preventDefault();
+      const farmer = currentSuggestions[selectedFarmerSuggestionIndex];
+      if (farmer) handleSelectFarmer(farmer);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedFarmerSuggestionIndex(-1);
+    }
+  };
+
   const handleSelectFarmer = (farmer: FarmerSuggestion) => {
     setFormData({
       ...formData,
@@ -853,6 +927,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
       state: farmer.state,
     });
     setShowSuggestions(false);
+    setSelectedFarmerSuggestionIndex(-1);
   };
 
   const createMutation = useMutation({
@@ -1008,16 +1083,18 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                     setShowSuggestions(true);
                   }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onKeyDown={handleFarmerKeyDown}
                   placeholder={t("Farmer name", "किसान का नाम")}
                   autoComplete="off"
                   data-testid="input-farmer-name"
                 />
                 {showSuggestions && activeField === 'name' && getFilteredSuggestions('name', formData.name).length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  <div ref={farmerSuggestionsRef} className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
                     {getFilteredSuggestions('name', formData.name).map((farmer, index) => (
                       <div
                         key={farmer.id}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedFarmerSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectFarmer(farmer);
@@ -1059,16 +1136,18 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                     setShowSuggestions(true);
                   }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onKeyDown={handleFarmerKeyDown}
                   placeholder={t("Contact number", "संपर्क नंबर")}
                   autoComplete="off"
                   data-testid="input-farmer-contact"
                 />
                 {showSuggestions && activeField === 'contact' && getFilteredSuggestions('contact', formData.contactNumber).length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  <div ref={farmerSuggestionsRef} className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
                     {getFilteredSuggestions('contact', formData.contactNumber).map((farmer, index) => (
                       <div
                         key={farmer.id}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedFarmerSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectFarmer(farmer);
@@ -1104,16 +1183,18 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                     setShowSuggestions(true);
                   }}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onKeyDown={handleFarmerKeyDown}
                   placeholder={t("Village", "गाँव")}
                   autoComplete="off"
                   data-testid="input-farmer-village"
                 />
                 {showSuggestions && activeField === 'village' && getFilteredSuggestions('village', formData.village).length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  <div ref={farmerSuggestionsRef} className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
                     {getFilteredSuggestions('village', formData.village).map((farmer, index) => (
                       <div
                         key={farmer.id}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedFarmerSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectFarmer(farmer);

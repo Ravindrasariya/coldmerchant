@@ -33,6 +33,8 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
   const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const searchSuppliers = useCallback(async (query: string) => {
     if (query.length < 1) {
@@ -81,6 +83,35 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setSelectedSuggestionIndex(-1);
+  }, [suggestions.length, activeField, searchQuery]);
+
+  useEffect(() => {
+    if (selectedSuggestionIndex >= 0 && suggestionsRef.current) {
+      const items = suggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedSuggestionIndex]);
+
+  const handleSupplierKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev + 1) % suggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      const supplier = suggestions[selectedSuggestionIndex];
+      if (supplier) handleSelectSupplier(supplier);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  };
 
   const handleSelectSupplier = (supplier: SupplierSuggestion) => {
     const fieldsToHighlight = new Set<string>();
@@ -175,19 +206,22 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                         setShowSuggestions(true);
                       }
                     }}
+                    onKeyDown={handleSupplierKeyDown}
                     autoComplete="off"
                     data-testid="input-supplier-name"
                   />
                 </FormControl>
                 {showSuggestions && activeField === 'name' && suggestions.length > 0 && (
                   <div 
+                    ref={suggestionsRef}
                     data-supplier-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {suggestions.map((supplier, index) => (
                       <div
                         key={`${supplier.supplierName}-${supplier.address}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectSupplier(supplier);
@@ -237,19 +271,22 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                         setShowSuggestions(true);
                       }
                     }}
+                    onKeyDown={handleSupplierKeyDown}
                     autoComplete="off"
                     data-testid="input-supplier-contact"
                   />
                 </FormControl>
                 {showSuggestions && activeField === 'contact' && suggestions.length > 0 && (
                   <div 
+                    ref={suggestionsRef}
                     data-supplier-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {suggestions.map((supplier, index) => (
                       <div
                         key={`${supplier.supplierName}-${supplier.address}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectSupplier(supplier);
@@ -300,19 +337,22 @@ export function SupplierInfoSection({ form }: SupplierInfoSectionProps) {
                         setShowSuggestions(true);
                       }
                     }}
+                    onKeyDown={handleSupplierKeyDown}
                     autoComplete="off"
                     data-testid="input-supplier-address"
                   />
                 </FormControl>
                 {showSuggestions && activeField === 'address' && suggestions.length > 0 && (
                   <div 
+                    ref={suggestionsRef}
                     data-supplier-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {suggestions.map((supplier, index) => (
                       <div
                         key={`${supplier.supplierName}-${supplier.address}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectSupplier(supplier);

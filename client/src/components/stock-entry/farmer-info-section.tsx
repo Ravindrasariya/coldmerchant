@@ -50,6 +50,12 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
   const [tehsilSearch, setTehsilSearch] = useState("");
   const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
   const [showTehsilSuggestions, setShowTehsilSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const [selectedVillageIndex, setSelectedVillageIndex] = useState(-1);
+  const villageSuggestionsRef = useRef<HTMLDivElement>(null);
+  const [selectedTehsilIndex, setSelectedTehsilIndex] = useState(-1);
+  const tehsilSuggestionsRef = useRef<HTMLDivElement>(null);
 
   const { data: distinctVillages = [] } = useQuery<string[]>({
     queryKey: ["/api/farmers/villages"],
@@ -116,6 +122,101 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setSelectedSuggestionIndex(-1);
+  }, [suggestions.length, activeField, searchQuery]);
+
+  useEffect(() => {
+    setSelectedVillageIndex(-1);
+  }, [filteredVillages.length, villageSearch]);
+
+  useEffect(() => {
+    setSelectedTehsilIndex(-1);
+  }, [filteredTehsils.length, tehsilSearch]);
+
+  useEffect(() => {
+    if (selectedSuggestionIndex >= 0 && suggestionsRef.current) {
+      const items = suggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedSuggestionIndex]);
+
+  useEffect(() => {
+    if (selectedVillageIndex >= 0 && villageSuggestionsRef.current) {
+      const items = villageSuggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedVillageIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedVillageIndex]);
+
+  useEffect(() => {
+    if (selectedTehsilIndex >= 0 && tehsilSuggestionsRef.current) {
+      const items = tehsilSuggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedTehsilIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedTehsilIndex]);
+
+  const handleFarmerKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev + 1) % suggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      const farmer = suggestions[selectedSuggestionIndex];
+      if (farmer) handleSelectFarmer(farmer);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  };
+
+  const handleVillageKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, fieldOnChange: (val: string) => void) => {
+    if (!showVillageSuggestions || filteredVillages.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedVillageIndex(prev => (prev + 1) % filteredVillages.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedVillageIndex(prev => (prev <= 0 ? filteredVillages.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedVillageIndex >= 0) {
+      e.preventDefault();
+      const village = filteredVillages[selectedVillageIndex];
+      if (village) {
+        fieldOnChange(village);
+        setShowVillageSuggestions(false);
+        setSelectedVillageIndex(-1);
+      }
+    } else if (e.key === 'Escape') {
+      setShowVillageSuggestions(false);
+      setSelectedVillageIndex(-1);
+    }
+  };
+
+  const handleTehsilKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, fieldOnChange: (val: string) => void) => {
+    if (!showTehsilSuggestions || filteredTehsils.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedTehsilIndex(prev => (prev + 1) % filteredTehsils.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedTehsilIndex(prev => (prev <= 0 ? filteredTehsils.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedTehsilIndex >= 0) {
+      e.preventDefault();
+      const tehsil = filteredTehsils[selectedTehsilIndex];
+      if (tehsil) {
+        fieldOnChange(tehsil);
+        setShowTehsilSuggestions(false);
+        setSelectedTehsilIndex(-1);
+      }
+    } else if (e.key === 'Escape') {
+      setShowTehsilSuggestions(false);
+      setSelectedTehsilIndex(-1);
+    }
+  };
 
   const handleSelectFarmer = (farmer: FarmerSuggestion) => {
     const fieldsToHighlight = new Set<string>();
@@ -222,6 +323,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                         setShowSuggestions(true);
                       }
                     }}
+                    onKeyDown={handleFarmerKeyDown}
                     className={cn(getHighlightClass("farmerName"))}
                     autoComplete="off"
                     data-testid="input-farmer-name"
@@ -229,13 +331,15 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                 </FormControl>
                 {showSuggestions && activeField === 'name' && suggestions.length > 0 && (
                   <div 
+                    ref={suggestionsRef}
                     data-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {suggestions.map((farmer, index) => (
                       <div
                         key={`${farmer.farmerName}-${farmer.village}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectFarmer(farmer);
@@ -289,6 +393,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                         setShowSuggestions(true);
                       }
                     }}
+                    onKeyDown={handleFarmerKeyDown}
                     className={cn(getHighlightClass("farmerContact"))}
                     autoComplete="off"
                     data-testid="input-farmer-contact"
@@ -296,13 +401,15 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                 </FormControl>
                 {showSuggestions && activeField === 'contact' && suggestions.length > 0 && (
                   <div 
+                    ref={suggestionsRef}
                     data-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {suggestions.map((farmer, index) => (
                       <div
                         key={`${farmer.farmerName}-${farmer.village}-${index}`}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           handleSelectFarmer(farmer);
@@ -351,6 +458,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                     onBlur={() => {
                       setTimeout(() => setShowVillageSuggestions(false), 200);
                     }}
+                    onKeyDown={(e) => handleVillageKeyDown(e, field.onChange)}
                     className={cn(getHighlightClass("village"))}
                     autoComplete="off"
                     data-testid="input-village"
@@ -358,17 +466,20 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                 </FormControl>
                 {showVillageSuggestions && filteredVillages.length > 0 && (
                   <div 
+                    ref={villageSuggestionsRef}
                     data-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {filteredVillages.map((village, index) => (
                       <div
                         key={village}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedVillageIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           field.onChange(village);
                           setShowVillageSuggestions(false);
+                          setSelectedVillageIndex(-1);
                         }}
                         data-testid={`suggestion-village-${index}`}
                       >
@@ -405,6 +516,7 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                     onBlur={() => {
                       setTimeout(() => setShowTehsilSuggestions(false), 200);
                     }}
+                    onKeyDown={(e) => handleTehsilKeyDown(e, field.onChange)}
                     className={cn(getHighlightClass("tehsil"))}
                     autoComplete="off"
                     data-testid="input-tehsil"
@@ -412,17 +524,20 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                 </FormControl>
                 {showTehsilSuggestions && filteredTehsils.length > 0 && (
                   <div 
+                    ref={tehsilSuggestionsRef}
                     data-suggestion-dropdown
                     className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto"
                   >
                     {filteredTehsils.map((tehsil, index) => (
                       <div
                         key={tehsil}
-                        className="px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                        data-suggestion-item
+                        className={`px-3 py-2 hover:bg-muted cursor-pointer border-b last:border-b-0 ${index === selectedTehsilIndex ? 'bg-accent' : ''}`}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           field.onChange(tehsil);
                           setShowTehsilSuggestions(false);
+                          setSelectedTehsilIndex(-1);
                         }}
                         data-testid={`suggestion-tehsil-${index}`}
                       >
