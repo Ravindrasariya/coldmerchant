@@ -23,6 +23,7 @@ interface Transaction {
   transactionNumber: number;
   merchantId: number;
   partyName: string | null;
+  partyAddress: string | null;
   vehicleNumber: string | null;
   advancePayment: string | null;
   totalBags: number;
@@ -284,6 +285,9 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               <div className="text-right">
                 {transaction.partyName && (
                   <p><strong>Sent to / भेजा गया:</strong> {transaction.partyName}</p>
+                )}
+                {transaction.partyAddress && (
+                  <p className="text-sm text-gray-600">{transaction.partyAddress}</p>
                 )}
               </div>
             </div>
