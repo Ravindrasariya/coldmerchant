@@ -425,23 +425,23 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <div style="display: grid; grid-template-columns: repeat(${overallTotals.totalMandiCharges > 0 ? 5 : 4}, 1fr); gap: 8px; text-align: center;">
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0;">${totalBagsExcludingWastage}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0;">${totalBagsExcludingWastage}</p>
                 </div>
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Payable / कुल देय</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 ${overallTotals.totalMandiCharges > 0 ? `<div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Mandi Charges / मंडी शुल्क</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #3b82f6;">₹${overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #3b82f6;">₹${overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>` : ""}
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Deductions / कटौती</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 16px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
                 <div style="background: #0d9488; padding: 8px; border-radius: 6px; margin: -8px;">
                   <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">${netDueLabel}</p>
-                  <p style="font-family: monospace; font-weight: 700; font-size: 20px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                  <p style="font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>
               </div>
             </div>
@@ -660,25 +660,25 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <div className={`grid ${overallTotals.totalMandiCharges > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2 text-center`}>
           <div>
             <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
-            <p className="font-mono font-semibold text-base">{totalBagsExcludingWastage}</p>
+            <p className="font-mono font-semibold text-xs">{totalBagsExcludingWastage}</p>
           </div>
           <div>
             <p className="text-xs text-gray-600 mb-1">Total Payable / कुल देय</p>
-            <p className="font-mono font-semibold text-base text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="font-mono font-semibold text-xs text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </div>
           {overallTotals.totalMandiCharges > 0 && (
             <div>
               <p className="text-xs text-gray-600 mb-1">Mandi Charges / मंडी शुल्क</p>
-              <p className="font-mono font-semibold text-base text-blue-600">₹{overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+              <p className="font-mono font-semibold text-xs text-blue-600">₹{overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
           )}
           <div>
             <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
-            <p className="font-mono font-semibold text-base text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="font-mono font-semibold text-xs text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </div>
           <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
             <p className="text-xs opacity-90 mb-1">{isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय"}</p>
-            <p className="font-mono font-bold text-xl">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="font-mono font-bold text-sm">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
           </div>
         </div>
       </div>
