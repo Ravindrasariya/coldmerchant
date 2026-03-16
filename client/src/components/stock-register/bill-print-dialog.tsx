@@ -349,7 +349,9 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <div style="max-width: 800px; margin: 0 auto;">
             <!-- Header -->
             <div style="text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #1a1a1a;">
-              <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 4px;">${user?.merchantName || "Merchant"}</h1>
+              <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
+              ${user?.merchantAddress ? `<p style="font-size: 11px; color: #444; margin-bottom: 2px;">${user.merchantAddress}</p>` : ""}
+              ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}
               <p style="font-size: 13px; font-weight: 600; color: #333;">Purchase Receipt / खरीद रसीद</p>
             </div>
 
@@ -428,7 +430,13 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     <div className="bill-container">
       <div className="text-center mb-3 pb-2 border-b-2 border-black">
         {user?.merchantName && (
-          <h1 className="text-2xl font-bold mb-2">{user.merchantName}</h1>
+          <h1 className="text-2xl font-bold mb-1">{user.merchantName}</h1>
+        )}
+        {user?.merchantAddress && (
+          <p className="text-xs text-gray-500 mb-0.5">{user.merchantAddress}</p>
+        )}
+        {user?.merchantContact && (
+          <p className="text-xs text-gray-500 mb-1">Ph: {user.merchantContact}</p>
         )}
         <p className="text-lg font-semibold">Purchase Receipt / खरीद रसीद</p>
       </div>
