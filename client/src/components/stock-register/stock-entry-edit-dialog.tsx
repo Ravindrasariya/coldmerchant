@@ -678,7 +678,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           const netWeight = (bd.weight || 0) - (bd.numberOfBags || 0);
                           const total = netWeight > 0 ? netWeight * (bd.pricePerKg || 0) : 0;
                           return (
-                            <div key={bd.id || bdIndex} className="grid grid-cols-2 md:grid-cols-8 gap-2 p-2 bg-muted/30 rounded-md items-end md:items-center">
+                            <div key={bd.id || bdIndex} className="p-2 bg-muted/30 rounded-md space-y-1">
+                            <div className="grid grid-cols-2 md:grid-cols-8 gap-2 items-end md:items-center">
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Size", "आकार")}</label>
                                 <Select
@@ -736,11 +737,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 <div className="font-mono text-sm text-muted-foreground">
                                   {bd.weight && bd.numberOfBags ? parseFloat(netWeight.toFixed(1)) : "—"}
                                 </div>
-                                {bd.weight && bd.numberOfBags && bd.numberOfBags > 0 && netWeight > 0 && (
-                                  <div className="text-xs font-semibold text-orange-600 mt-0.5" data-testid={`edit-breakdown-avgwt-${lotIndex}-${bdIndex}`}>
-                                    {t("Avg. Weight", "औसत वजन")} {parseFloat((netWeight / bd.numberOfBags).toFixed(1))} Kg
-                                  </div>
-                                )}
                               </div>
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Price/kg", "मूल्य/किलो")}</label>
@@ -774,6 +770,15 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </div>
+                            </div>
+                            {bd.weight && bd.numberOfBags && bd.numberOfBags > 0 && netWeight > 0 && (
+                              <div className="grid grid-cols-2 md:grid-cols-8 gap-2">
+                                <div className="hidden md:block col-span-3" />
+                                <div className="col-span-2 text-xs font-semibold text-orange-600" data-testid={`edit-breakdown-avgwt-${lotIndex}-${bdIndex}`}>
+                                  {t("Avg. Weight", "औसत वजन")} {parseFloat((netWeight / bd.numberOfBags).toFixed(1))} Kg
+                                </div>
+                              </div>
+                            )}
                             </div>
                           );
                         })}
