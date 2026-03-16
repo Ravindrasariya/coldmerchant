@@ -541,6 +541,8 @@ export function CashManagementTab() {
   // Watch revenue type and receipt type for conditional rendering
   const revenueType = inwardForm.watch("revenueType");
   const receiptType = inwardForm.watch("receiptType");
+  const selectedPartyName = inwardForm.watch("partyName");
+  const selectedSeedFarmerName = inwardForm.watch("seedFarmerName");
 
   const outflowForm = useForm<OutflowFormValues>({
     resolver: zodResolver(outflowFormSchema),
@@ -566,6 +568,7 @@ export function CashManagementTab() {
 
   // Watch payment mode for conditional bank account dropdown
   const paymentMode = outflowForm.watch("paymentMode");
+  const selectedOutflowFarmerName = outflowForm.watch("farmerName");
 
   const transferForm = useForm<TransferFormValues>({
     resolver: zodResolver(transferFormSchema),
@@ -964,6 +967,24 @@ export function CashManagementTab() {
     return Array.from(farmerMap.values());
   })();
 
+  const inwardPartyDue = useMemo(() => {
+    if (!selectedPartyName) return 0;
+    const party = mergedPartiesForRawPotato.find(p => p.name.toLowerCase() === selectedPartyName.toLowerCase());
+    return party?.overallDue || 0;
+  }, [selectedPartyName, mergedPartiesForRawPotato]);
+
+  const inwardSeedFarmerDue = useMemo(() => {
+    if (!selectedSeedFarmerName) return 0;
+    const farmer = ledgerFarmers.find(f => f.name.toLowerCase() === selectedSeedFarmerName.toLowerCase());
+    return farmer ? Math.abs(Math.min(farmer.netDue, 0)) : 0;
+  }, [selectedSeedFarmerName, ledgerFarmers]);
+
+  const outflowFarmerDue = useMemo(() => {
+    if (!selectedOutflowFarmerName) return 0;
+    const farmer = ledgerFarmers.find(f => f.name.toLowerCase() === selectedOutflowFarmerName.toLowerCase());
+    return farmer?.netDue > 0 ? farmer.netDue : 0;
+  }, [selectedOutflowFarmerName, ledgerFarmers]);
+
   const onInwardSubmit = (values: InwardFormValues) => {
     if (values.revenueType === "raw_potato") {
       // Raw potato inward always requires amount > 0
@@ -1092,6 +1113,16 @@ export function CashManagementTab() {
           message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
         });
         return;
+      }
+      if (effectiveExpenseType === "farmer" && selectedLedgerFarmerOut) {
+        const farmerDueAmt = selectedLedgerFarmerOut.netDue > 0 ? selectedLedgerFarmerOut.netDue : 0;
+        if (farmerDueAmt > 0 && values.amount > farmerDueAmt) {
+          outflowForm.setError("amount", {
+            type: "manual",
+            message: t(`Amount cannot exceed due amount (₹${farmerDueAmt.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${farmerDueAmt.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
+          });
+          return;
+        }
       }
     }
     
@@ -2249,7 +2280,10 @@ export function CashManagementTab() {
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger data-testid="select-party-name">
-                                <SelectValue placeholder={t("Select Buyer", "खरीदार चुनें")} />
+                                {field.value ? (() => {
+                                  const p = mergedPartiesForRawPotato.find(p => p.name === field.value);
+                                  return <span>{p?.name || field.value}{p && p.overallDue > 0 ? ` — ${t("Due", "बकाया")}: ₹${p.overallDue.toLocaleString('en-IN')}` : ""}</span>;
+                                })() : <SelectValue placeholder={t("Select Buyer", "खरीदार चुनें")} />}
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -2297,7 +2331,13 @@ export function CashManagementTab() {
                                     data-testid="select-seed-farmer"
                                   >
                                     {field.value
-                                      ? ledgerFarmers.find(f => f.name === field.value)?.name || field.value
+                                      ? (() => {
+                                          const f = ledgerFarmers.find(f => f.name === field.value);
+                                          const due = f ? Math.abs(Math.min(f.netDue, 0)) : 0;
+                                          return due > 0
+                                            ? `${f?.name || field.value} — ${t("Due", "बकाया")}: ₹${due.toLocaleString('en-IN')}`
+                                            : f?.name || field.value;
+                                        })()
                                       : t("Select Farmer", "किसान चुनें")}
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
@@ -2359,17 +2399,25 @@ export function CashManagementTab() {
                   <FormField
                     control={inwardForm.control}
                     name="amount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          {t("Amount", "राशि")} (₹) *
-                        </FormLabel>
-                        <FormControl>
-                          <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-amount" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const currentDue = revenueType === "raw_potato" ? inwardPartyDue : inwardSeedFarmerDue;
+                      return (
+                        <FormItem>
+                          <FormLabel>
+                            {t("Amount", "राशि")} (₹) *
+                            {currentDue > 0 && (
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                ({t("Max", "अधिकतम")}: ₹{currentDue.toLocaleString('en-IN')})
+                              </span>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" placeholder="0" min="0" max={currentDue > 0 ? currentDue : undefined} {...field} data-testid="input-amount" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
@@ -2800,7 +2848,11 @@ export function CashManagementTab() {
                             >
                               <FormControl>
                                 <SelectTrigger data-testid="select-farmer-name">
-                                  <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />
+                                  {field.value ? (() => {
+                                    const f = ledgerFarmers.find(f => f.name === field.value);
+                                    const due = f?.netDue > 0 ? f.netDue : 0;
+                                    return <span>{f?.name || field.value}{due > 0 ? ` — ${t("Due", "बकाया")}: ₹${due.toLocaleString('en-IN')}` : ""}</span>;
+                                  })() : <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />}
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
@@ -3035,17 +3087,25 @@ export function CashManagementTab() {
                     <FormField
                       control={outflowForm.control}
                       name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            {t("Amount", "राशि")} (₹) *
-                          </FormLabel>
-                          <FormControl>
-                            <Input type="number" step="any" placeholder="0" min="0" {...field} data-testid="input-outflow-amount" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const maxDue = expenseType === "farmer" ? outflowFarmerDue : 0;
+                        return (
+                          <FormItem>
+                            <FormLabel>
+                              {t("Amount", "राशि")} (₹) *
+                              {maxDue > 0 && (
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  ({t("Max", "अधिकतम")}: ₹{maxDue.toLocaleString('en-IN')})
+                                </span>
+                              )}
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" min="0" max={maxDue > 0 ? maxDue : undefined} {...field} data-testid="input-outflow-amount" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   )}
 
