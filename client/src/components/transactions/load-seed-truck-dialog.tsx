@@ -77,10 +77,12 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   
   const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
   const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
-  const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
+  const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | 'tehsil' | null>(null);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const farmerInputRef = useRef<HTMLInputElement>(null);
   const contactInputRef = useRef<HTMLInputElement>(null);
   const villageInputRef = useRef<HTMLInputElement>(null);
+  const tehsilInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const { data: unsoldInventory } = useQuery<SeedLotOption[]>({
@@ -110,15 +112,43 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       ).slice(0, 8);
     }
     
-    if (activeField === 'village' && village.trim()) {
-      const searchTerm = village.toLowerCase().trim();
-      return farmers.filter(f => 
-        f.village?.toLowerCase().includes(searchTerm)
-      ).slice(0, 8);
-    }
-    
     return [];
-  }, [farmers, farmerName, farmerContact, village, activeField]);
+  }, [farmers, farmerName, farmerContact, activeField]);
+
+  const filteredVillages = useMemo(() => {
+    if (!farmers || activeField !== 'village' || !village.trim()) return [];
+    const searchTerm = village.toLowerCase().trim();
+    const unique = new Set<string>();
+    farmers.forEach(f => {
+      if (f.village && f.village.toLowerCase().includes(searchTerm)) {
+        unique.add(f.village);
+      }
+    });
+    return Array.from(unique).slice(0, 8);
+  }, [farmers, village, activeField]);
+
+  const filteredTehsils = useMemo(() => {
+    if (!farmers || activeField !== 'tehsil' || !tehsil.trim()) return [];
+    const searchTerm = tehsil.toLowerCase().trim();
+    const unique = new Set<string>();
+    farmers.forEach(f => {
+      if (f.tehsil && f.tehsil.toLowerCase().includes(searchTerm)) {
+        unique.add(f.tehsil);
+      }
+    });
+    return Array.from(unique).slice(0, 8);
+  }, [farmers, tehsil, activeField]);
+
+  const currentSuggestionCount = useMemo(() => {
+    if (activeField === 'name' || activeField === 'contact') return filteredFarmers.length;
+    if (activeField === 'village') return filteredVillages.length;
+    if (activeField === 'tehsil') return filteredTehsils.length;
+    return 0;
+  }, [activeField, filteredFarmers.length, filteredVillages.length, filteredTehsils.length]);
+
+  useEffect(() => {
+    setSelectedSuggestionIndex(-1);
+  }, [currentSuggestionCount, activeField]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,7 +160,9 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
         contactInputRef.current &&
         !contactInputRef.current.contains(event.target as Node) &&
         villageInputRef.current &&
-        !villageInputRef.current.contains(event.target as Node)
+        !villageInputRef.current.contains(event.target as Node) &&
+        tehsilInputRef.current &&
+        !tehsilInputRef.current.contains(event.target as Node)
       ) {
         setShowFarmerSuggestions(false);
         setActiveField(null);
@@ -154,7 +186,42 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       setRedFlagWarning(null);
     }
     setShowFarmerSuggestions(false);
+    setSelectedSuggestionIndex(-1);
   };
+
+  const handleSuggestionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showFarmerSuggestions || currentSuggestionCount === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev + 1) % currentSuggestionCount);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => (prev <= 0 ? currentSuggestionCount - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
+      e.preventDefault();
+      if (activeField === 'name' || activeField === 'contact') {
+        const farmer = filteredFarmers[selectedSuggestionIndex];
+        if (farmer) handleFarmerSelect(farmer);
+      } else if (activeField === 'village') {
+        const v = filteredVillages[selectedSuggestionIndex];
+        if (v) { setVillage(v); setShowFarmerSuggestions(false); setSelectedSuggestionIndex(-1); }
+      } else if (activeField === 'tehsil') {
+        const t = filteredTehsils[selectedSuggestionIndex];
+        if (t) { setTehsil(t); setShowFarmerSuggestions(false); setSelectedSuggestionIndex(-1); }
+      }
+    } else if (e.key === 'Escape') {
+      setShowFarmerSuggestions(false);
+      setSelectedSuggestionIndex(-1);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedSuggestionIndex >= 0 && suggestionsRef.current) {
+      const items = suggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedSuggestionIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedSuggestionIndex]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -398,6 +465,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                     setActiveField('name');
                     setShowFarmerSuggestions(true);
                   }}
+                  onKeyDown={handleSuggestionKeyDown}
                   placeholder={t("Enter name", "नाम दर्ज करें")}
                   data-testid="input-seed-farmer-name"
                   autoComplete="off"
@@ -407,11 +475,12 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                     ref={suggestionsRef}
                     className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
                   >
-                    {filteredFarmers.map((farmer) => (
+                    {filteredFarmers.map((farmer, idx) => (
                       <button
                         key={farmer.id}
                         type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
+                        data-suggestion-item
+                        className={`w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col ${idx === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onClick={() => handleFarmerSelect(farmer)}
                       >
                         <span className="font-medium flex items-center">
@@ -448,6 +517,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                     setActiveField('contact');
                     setShowFarmerSuggestions(true);
                   }}
+                  onKeyDown={handleSuggestionKeyDown}
                   placeholder={t("Enter number", "नंबर दर्ज करें")}
                   autoComplete="off"
                   data-testid="input-seed-farmer-contact"
@@ -457,11 +527,12 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                     ref={suggestionsRef}
                     className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
                   >
-                    {filteredFarmers.map((farmer) => (
+                    {filteredFarmers.map((farmer, idx) => (
                       <button
                         key={farmer.id}
                         type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
+                        data-suggestion-item
+                        className={`w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col ${idx === selectedSuggestionIndex ? 'bg-accent' : ''}`}
                         onClick={() => handleFarmerSelect(farmer)}
                       >
                         <span className="font-medium">{farmer.contact}</span>
@@ -488,40 +559,67 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                     setActiveField('village');
                     setShowFarmerSuggestions(true);
                   }}
+                  onKeyDown={handleSuggestionKeyDown}
                   placeholder={t("Enter village", "गाँव दर्ज करें")}
                   autoComplete="off"
                   data-testid="input-seed-village"
                 />
-                {showFarmerSuggestions && activeField === 'village' && filteredFarmers.length > 0 && (
+                {showFarmerSuggestions && activeField === 'village' && filteredVillages.length > 0 && (
                   <div 
                     ref={suggestionsRef}
                     className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
                   >
-                    {filteredFarmers.map((farmer) => (
+                    {filteredVillages.map((v, idx) => (
                       <button
-                        key={farmer.id}
+                        key={v}
                         type="button"
-                        className="w-full px-3 py-2 text-left text-sm hover-elevate flex flex-col"
-                        onClick={() => handleFarmerSelect(farmer)}
+                        data-suggestion-item
+                        className={`w-full px-3 py-2 text-left text-sm hover-elevate ${idx === selectedSuggestionIndex ? 'bg-accent' : ''}`}
+                        onClick={() => { setVillage(v); setShowFarmerSuggestions(false); setSelectedSuggestionIndex(-1); }}
                       >
-                        <span className="font-medium">{farmer.village}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {farmer.name}
-                          {farmer.contact && ` | ${farmer.contact}`}
-                        </span>
+                        <span className="font-medium">{v}</span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label>{t("Tehsil", "तहसील")} *</Label>
                 <Input
+                  ref={tehsilInputRef}
                   value={tehsil}
-                  onChange={(e) => setTehsil(e.target.value)}
+                  onChange={(e) => {
+                    setTehsil(e.target.value);
+                    setActiveField('tehsil');
+                    setShowFarmerSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    setActiveField('tehsil');
+                    setShowFarmerSuggestions(true);
+                  }}
+                  onKeyDown={handleSuggestionKeyDown}
                   placeholder={t("Enter tehsil", "तहसील दर्ज करें")}
+                  autoComplete="off"
                   data-testid="input-seed-tehsil"
                 />
+                {showFarmerSuggestions && activeField === 'tehsil' && filteredTehsils.length > 0 && (
+                  <div 
+                    ref={suggestionsRef}
+                    className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                  >
+                    {filteredTehsils.map((t, idx) => (
+                      <button
+                        key={t}
+                        type="button"
+                        data-suggestion-item
+                        className={`w-full px-3 py-2 text-left text-sm hover-elevate ${idx === selectedSuggestionIndex ? 'bg-accent' : ''}`}
+                        onClick={() => { setTehsil(t); setShowFarmerSuggestions(false); setSelectedSuggestionIndex(-1); }}
+                      >
+                        <span className="font-medium">{t}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>{t("District", "जिला")} *</Label>
