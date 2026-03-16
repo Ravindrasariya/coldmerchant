@@ -199,6 +199,21 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return sizeMap[size] || size;
   };
 
+  const getCropBilingual = (crop?: string) => {
+    const cropMap: Record<string, string> = {
+      "potato": "Potato / आलू",
+      "garlic": "Garlic / लहसुन",
+      "onion": "Onion / प्याज",
+    };
+    return cropMap[crop || "potato"] || crop || "Potato / आलू";
+  };
+
+  const getPlaceBilingual = (lot: StockEntryWithLots["lots"][0]) => {
+    if (lot.place === "farm_gate") return "Farm Gate / फार्म गेट";
+    if (lot.place === "mandi") return "Mandi / मंडी";
+    return lot.coldStoreName || "Cold Store";
+  };
+
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -215,7 +230,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           const amount = netWeight * price;
           return `
             <tr>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getSizeBilingual(bd.size)}</td>
+              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getPlaceBilingual(lot)}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bd.numberOfBags}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${weight > 0 ? weight.toFixed(2) : "—"}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
@@ -228,7 +243,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
             <thead>
               <tr style="background: #f5f5f5;">
-                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Size / आकार</th>
+                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Place / स्थान</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
@@ -319,17 +334,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
       return `
         <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; page-break-inside: avoid;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
-            <div>
-              <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0;">${lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.place === "mandi" ? "Mandi / मंडी" : lot.coldStoreName}</p>
-              <p style="font-size: 11px; color: #666; margin: 0;">
-                ${lot.potatoType} • ${lot.bagType} • ${lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
-              </p>
-            </div>
-            <div style="text-align: right;">
-              <p style="font-family: monospace; font-size: 13px; margin: 0;"><span style="font-weight: 600;">${lot.remainingBags}</span>/${lot.originalBags} bags / बोरी</p>
-            </div>
-          </div>
           ${breakdownHtml}
           ${mandiChargesBlockHtml}
           ${deductionsHtml}
@@ -379,7 +383,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                 <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">Bill Details / बिल विवरण</h3>
                 <p style="margin: 0 0 4px 0;"><span style="color: #666;">Bill No / बिल नंबर:</span> <span style="font-family: monospace; font-weight: 600;">#${entry.serialNumber}</span></p>
                 <p style="margin: 0 0 4px 0;"><span style="color: #666;">Date / दिनांक:</span> <span style="font-weight: 500;">${new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
-                <p style="margin: 0;"><span style="color: #666;">Status / स्थिति:</span> <span style="font-weight: 500; color: ${entry.paymentStatus === "paid" ? "#15803d" : "#c2410c"};">${entry.paymentStatus === "paid" ? "Paid / भुगतान हुआ" : "Due / बाकी"}</span></p>
+                <p style="margin: 0;"><span style="color: #666;">Crop / फसल:</span> <span style="font-weight: 500;">${getCropBilingual(entry.lots[0]?.crop)}</span></p>
               </div>
               <div style="flex: 1; text-align: right;">
                 <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">${detailsLabel}</h3>
@@ -459,7 +463,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <div className="space-y-1 text-sm">
             <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span></p>
             <p><span className="text-gray-600">Date / दिनांक:</span> <span className="font-medium">{new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
-            <p><span className="text-gray-600">Status / स्थिति:</span> <span className={`font-medium ${entry.paymentStatus === "paid" ? "text-green-700" : "text-orange-600"}`}>{entry.paymentStatus === "paid" ? "Paid / भुगतान हुआ" : "Due / बाकी"}</span></p>
+            <p><span className="text-gray-600">Crop / फसल:</span> <span className="font-medium">{getCropBilingual(entry.lots[0]?.crop)}</span></p>
           </div>
         </div>
         <div>
@@ -480,23 +484,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">Lot Details / लॉट विवरण</h3>
         {entry.lots.map((lot) => (
           <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
-            <div className="flex justify-between items-start mb-1">
-              <div>
-                <p className="font-semibold">{lot.place === "farm_gate" ? "Farm Gate / फार्म गेट" : lot.place === "mandi" ? "Mandi / मंडी" : lot.coldStoreName}</p>
-                <p className="text-xs text-gray-600">
-                  {lot.potatoType} • {lot.bagType} • {lot.cutType === "gate_cut" ? "Gate Cut / गेट कट" : "Bilty Cut / बिल्टी कट"}
-                </p>
-              </div>
-              <div className="text-right text-sm">
-                <p className="font-mono"><span className="font-semibold">{lot.remainingBags}</span>/{lot.originalBags} bags / बोरी</p>
-              </div>
-            </div>
-
             {lot.bagBreakdowns.length > 0 ? (
               <table className="w-full text-sm mt-1 border-collapse">
                 <thead>
                   <tr className="border-b bg-gray-100">
-                    <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Size / आकार</th>
+                    <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Place / स्थान</th>
                     <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
                     <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
                     <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
@@ -511,7 +503,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     const amount = netWeight * price;
                     return (
                       <tr key={bd.id || bdIndex} className="border-b border-gray-200">
-                        <td className="py-1 px-2">{getSizeBilingual(bd.size)}</td>
+                        <td className="py-1 px-2">{getPlaceBilingual(lot)}</td>
                         <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
                         <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
                         <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
