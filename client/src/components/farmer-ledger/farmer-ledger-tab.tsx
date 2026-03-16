@@ -729,7 +729,7 @@ export function FarmerLedgerTab() {
                     >
                       <div className="font-medium">{farmer.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {farmer.contact || '-'} | {farmer.village || '-'}
+                        {farmer.contact || '-'} • {farmer.village || '-'}
                       </div>
                     </button>
                   ))}
