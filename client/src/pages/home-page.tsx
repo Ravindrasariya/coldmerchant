@@ -86,6 +86,9 @@ export default function HomePage() {
   const setSelectedPlace = (place: "farm_gate" | "cold_store" | "mandi") => {
     setSelectedPlaceState(place);
     localStorage.setItem("vyapar_selected_place", place);
+    if (place === "cold_store") {
+      setSelectedCrop("potato");
+    }
   };
   const [passwordForm, setPasswordForm] = useState({
     mobileNumber: "",
