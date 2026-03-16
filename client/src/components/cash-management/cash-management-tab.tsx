@@ -905,7 +905,8 @@ export function CashManagementTab() {
       }
       if (field === 'amount' || field === 'discountPercent') {
         if (row.amount > 0) {
-          row.pettyAdjustment = Math.round((row.dueAmount - row.amount - row.discountAmount) * 100) / 100;
+          const remainder = Math.round((row.dueAmount - row.amount - row.discountAmount) * 100) / 100;
+          row.pettyAdjustment = Math.min(Math.max(remainder, 0), 1000);
         }
       }
       updated[index] = row;
@@ -1093,6 +1094,16 @@ export function CashManagementTab() {
           toast({
             title: t("Error", "त्रुटि"),
             description: t("Total settled cannot exceed due amount for an entry", "कुल निपटान एक प्रविष्टि की बकाया राशि से अधिक नहीं हो सकता"),
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      for (const alloc of aadhatAllocations) {
+        if ((alloc.pettyAdjustment || 0) > 1000) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Petty adjustment cannot exceed ₹1,000", "पेटी समायोजन ₹1,000 से अधिक नहीं हो सकता"),
             variant: "destructive",
           });
           return;
@@ -2802,13 +2813,14 @@ export function CashManagementTab() {
                                       )}
                                     </div>
                                     <div>
-                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 1000 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) >= 100 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
+                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) >= 500 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) >= 100 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
                                       <Input
                                         type="number"
                                         step="any"
+                                        max="1000"
                                         value={alloc.pettyAdjustment || ""}
-                                        onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
-                                        className={cn((alloc.pettyAdjustment || 0) > 1000 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) >= 100 ? "border-orange-400 text-orange-600" : "")}
+                                        onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', Math.min(parseFloat(e.target.value) || 0, 1000))}
+                                        className={cn((alloc.pettyAdjustment || 0) >= 500 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) >= 100 ? "border-orange-400 text-orange-600" : "")}
                                         data-testid={`input-alloc-petty-${idx}`}
                                       />
                                     </div>
