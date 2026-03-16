@@ -5799,8 +5799,9 @@ export async function registerRoutes(
       const seedCOGS = seedTxns
         .filter(tx => {
           if (!tx.createdAt) return false;
-          const d = typeof tx.createdAt === "string" ? tx.createdAt.slice(0, 10) : new Date(tx.createdAt).toISOString().slice(0, 10);
-          return d >= fyStartDate && d <= fyEndDate;
+          const dt = new Date(tx.createdAt);
+          const createdDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+          return createdDate >= fyStartDate && createdDate <= fyEndDate;
         })
         .reduce((sum: number, tx: any) => {
           const cost = tx.totalCost ? parseFloat(tx.totalCost) : 0;
@@ -5824,8 +5825,9 @@ export async function registerRoutes(
       const seedRevenue = seedTxns
         .filter(tx => {
           if (!tx.createdAt) return false;
-          const d = typeof tx.createdAt === "string" ? tx.createdAt.slice(0, 10) : new Date(tx.createdAt).toISOString().slice(0, 10);
-          return d >= fyStartDate && d <= fyEndDate;
+          const dt = new Date(tx.createdAt);
+          const createdDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+          return createdDate >= fyStartDate && createdDate <= fyEndDate;
         })
         .reduce((sum: number, tx: any) => {
           const rev = tx.totalRevenue ? parseFloat(tx.totalRevenue) : 0;

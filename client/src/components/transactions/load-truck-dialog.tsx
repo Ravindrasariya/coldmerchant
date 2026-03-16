@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getTodayIST } from "@/lib/date-utils";
 import {
   Dialog,
   DialogContent,
@@ -95,7 +96,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
   // Header state
   const [transporterName, setTransporterName] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState("");
-  const [dateOfLoading, setDateOfLoading] = useState(new Date().toISOString().split("T")[0]);
+  const [dateOfLoading, setDateOfLoading] = useState(getTodayIST());
   const [showTransporterSuggestions, setShowTransporterSuggestions] = useState(false);
   const [selectedTransporterIndex, setSelectedTransporterIndex] = useState(-1);
   const transporterSuggestionsRef = useRef<HTMLDivElement>(null);
@@ -358,7 +359,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
   const resetForm = () => {
     setTransporterName("");
     setVehicleNumber("");
-    setDateOfLoading(new Date().toISOString().split("T")[0]);
+    setDateOfLoading(getTodayIST());
     setBuyerSections([createEmptyBuyerSection()]);
   };
 

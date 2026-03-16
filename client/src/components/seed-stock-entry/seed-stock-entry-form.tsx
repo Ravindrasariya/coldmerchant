@@ -1,6 +1,7 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { getTodayIST } from "@/lib/date-utils";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Plus, Save, X, Loader2 } from "lucide-react";
@@ -23,7 +24,7 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
   const form = useForm<SeedStockEntryFormType>({
     resolver: zodResolver(seedStockEntryFormSchema),
     defaultValues: {
-      purchaseDate: new Date().toISOString().split("T")[0],
+      purchaseDate: getTodayIST(),
       supplierName: "",
       supplierContact: "",
       address: "",

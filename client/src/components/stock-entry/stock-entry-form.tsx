@@ -1,6 +1,7 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
+import { getTodayIST } from "@/lib/date-utils";
 import { useEffect, useRef } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ function getStorageKey(crop: "potato" | "onion" | "garlic") {
 
 function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic", selectedPlace: "farm_gate" | "cold_store" | "mandi" = "cold_store"): StockEntryFormType {
   return {
-    purchaseDate: new Date().toISOString().split("T")[0],
+    purchaseDate: getTodayIST(),
     place: selectedPlace,
     farmerName: "",
     farmerContact: "",

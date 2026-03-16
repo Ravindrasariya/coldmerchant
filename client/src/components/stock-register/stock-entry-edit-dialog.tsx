@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { getTodayIST } from "@/lib/date-utils";
 import { calculateInterestOnly, calculateSimpleInterest } from "@/lib/interest-utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -840,7 +841,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                             const newRate = e.target.value === "" ? null : parseFloat(e.target.value);
                             handleLotFieldChange(lotIndex, "adjustedAmountRate", newRate);
                             if (newRate && newRate > 0 && !lot.adjustedAmountEffectiveDate) {
-                              handleLotFieldChange(lotIndex, "adjustedAmountEffectiveDate", new Date().toISOString().split('T')[0]);
+                              handleLotFieldChange(lotIndex, "adjustedAmountEffectiveDate", getTodayIST());
                             }
                           }}
                           data-testid={`edit-adjustment-rate-${lotIndex}`}

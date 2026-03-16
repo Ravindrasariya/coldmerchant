@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getTodayIST } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,7 +74,7 @@ export default function BuyersTab() {
   const createMutation = useMutation({
     mutationFn: async (buyer: typeof addForm) => {
       const response = await apiRequest("POST", "/api/buyers", {
-        dateAdded: new Date().toISOString().split('T')[0],
+        dateAdded: getTodayIST(),
         name: buyer.name,
         address: buyer.address,
         mandiCode: buyer.mandiCode || null,

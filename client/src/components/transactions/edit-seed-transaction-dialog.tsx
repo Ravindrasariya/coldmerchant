@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { getTodayIST } from "@/lib/date-utils";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -620,7 +621,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                     const val = e.target.value;
                     setAdjustmentRate(val);
                     if (val && parseFloat(val) > 0 && !adjustmentEffectiveDate) {
-                      setAdjustmentEffectiveDate(new Date().toISOString().split('T')[0]);
+                      setAdjustmentEffectiveDate(getTodayIST());
                     }
                   }}
                   data-testid="input-edit-seed-adjustment-rate"

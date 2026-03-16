@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getTodayIST } from "@/lib/date-utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -460,7 +461,7 @@ function PartiesSection({ parties, isLoading }: PartiesSectionProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `buyer_receivables_${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `buyer_receivables_${getTodayIST()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -858,7 +859,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
   const { toast } = useToast();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const emptyFormData = { name: "", contactNumber: "", village: "", tehsil: "", district: "", state: "", pendingDueToBePaid: "", rateOfInterest: "", effectiveDate: new Date().toISOString().split('T')[0] };
+  const emptyFormData = { name: "", contactNumber: "", village: "", tehsil: "", district: "", state: "", pendingDueToBePaid: "", rateOfInterest: "", effectiveDate: getTodayIST() };
   const [formData, setFormData] = useState(emptyFormData);
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -995,7 +996,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
       state: farmer.state || "",
       pendingDueToBePaid: farmer.pendingDueToBePaid || "0",
       rateOfInterest: farmer.rateOfInterest || "0",
-      effectiveDate: farmer.effectiveDate || new Date().toISOString().split('T')[0],
+      effectiveDate: farmer.effectiveDate || getTodayIST(),
     });
   };
 
@@ -1041,7 +1042,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `farmer_receivables_${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `farmer_receivables_${getTodayIST()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
