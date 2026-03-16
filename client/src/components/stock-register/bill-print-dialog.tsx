@@ -104,23 +104,31 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const totalRemainingBags = entry.lots.reduce((sum, lot) => sum + lot.remainingBags, 0);
   
   const totalBagsExcludingWastage = entry.lots.reduce((sum, lot) => {
-    return sum + lot.bagBreakdowns
-      .filter(bd => bd.size !== "Wastage")
-      .reduce((bdSum, bd) => bdSum + (bd.numberOfBags || 0), 0);
+    if (lot.bagBreakdowns.length > 0) {
+      return sum + lot.bagBreakdowns
+        .filter(bd => bd.size !== "Wastage")
+        .reduce((bdSum, bd) => bdSum + (bd.numberOfBags || 0), 0);
+    }
+    return sum + lot.originalBags;
   }, 0);
 
   const calculateGrandTotal = () => {
     let total = 0;
     entry.lots.forEach(lot => {
-      lot.bagBreakdowns.forEach(bd => {
-        if (bd.size === "Wastage") return;
-        // Always calculate from netWeight * price (Net Weight = Total Weight - numberOfBags)
-        if (bd.weight && bd.pricePerKg) {
-          const weight = parseFloat(bd.weight);
-          const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-          total += netWeight * parseFloat(bd.pricePerKg);
-        }
-      });
+      if (lot.bagBreakdowns.length > 0) {
+        lot.bagBreakdowns.forEach(bd => {
+          if (bd.size === "Wastage") return;
+          if (bd.weight && bd.pricePerKg) {
+            const weight = parseFloat(bd.weight);
+            const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+            total += netWeight * parseFloat(bd.pricePerKg);
+          }
+        });
+      } else if (lot.totalWeight && lot.pricePerKg) {
+        const weight = parseFloat(lot.totalWeight);
+        const netWeight = weight > 0 ? weight - lot.originalBags : 0;
+        total += netWeight * parseFloat(lot.pricePerKg);
+      }
     });
     return total;
   };
@@ -128,14 +136,28 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const grandTotal = calculateGrandTotal();
 
   const calculateLotTotals = (lot: StockEntryWithLots["lots"][0]) => {
-    const totalPayable = lot.bagBreakdowns
-      .filter(bd => bd.size !== "Wastage")
-      .reduce((sum, bd) => {
-        const weight = bd.weight ? parseFloat(bd.weight) : 0;
-        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-        const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        return sum + (netWeight * price);
-      }, 0);
+    let totalPayable: number;
+    let totalBagsForMandi: number;
+
+    if (lot.bagBreakdowns.length > 0) {
+      totalPayable = lot.bagBreakdowns
+        .filter(bd => bd.size !== "Wastage")
+        .reduce((sum, bd) => {
+          const weight = bd.weight ? parseFloat(bd.weight) : 0;
+          const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+          const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+          return sum + (netWeight * price);
+        }, 0);
+      totalBagsForMandi = lot.bagBreakdowns
+        .filter(bd => bd.size !== "Wastage")
+        .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
+    } else {
+      const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+      const netWeight = weight > 0 ? weight - lot.originalBags : 0;
+      const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+      totalPayable = netWeight * price;
+      totalBagsForMandi = lot.originalBags;
+    }
     
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
     const charges = lot.charges || [];
@@ -154,9 +176,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     const mandiExtra = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
     const mandiCommission = totalPayable * mandiPct / 100;
     const aadhatCommission = totalPayable * aadhatPct / 100;
-    const totalBagsForMandi = lot.bagBreakdowns
-      .filter(bd => bd.size !== "Wastage")
-      .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
     const mandiHammali = totalBagsForMandi * hammaliRate;
     const totalMandiCharges = mandiCommission + aadhatCommission + mandiHammali + mandiExtra;
 
@@ -255,12 +274,32 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             </tbody>
           </table>
         `;
-      } else if (lot.cutType === "gate_cut" && lot.size) {
+      } else {
+        const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+        const lotNetWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
+        const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+        const lotAmount = lotNetWeight * lotPrice;
         breakdownHtml = `
-          <div style="background: #f5f5f5; padding: 6px 8px; border-radius: 4px; margin-top: 4px;">
-            <p style="margin: 0;"><span style="color: #666;">Size / आकार:</span> ${getSizeBilingual(lot.size)}</p>
-            ${lot.pricePerKg ? `<p style="margin: 4px 0 0 0;"><span style="color: #666;">Price/kg / मूल्य प्रति किलो:</span> ₹${parseFloat((Math.trunc(parseFloat(lot.pricePerKg) * 100) / 100).toFixed(2))}</p>` : ""}
-          </div>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Place / स्थान</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getPlaceBilingual(lot)}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lot.originalBags}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
+              </tr>
+            </tbody>
+          </table>
         `;
       }
 
@@ -497,11 +536,35 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                   })}
                 </tbody>
               </table>
-            ) : lot.cutType === "gate_cut" && lot.size && (
-              <div className="text-sm bg-gray-100 rounded p-2">
-                <p><span className="text-gray-600">Size / आकार:</span> {getSizeBilingual(lot.size)}</p>
-                {lot.pricePerKg && <p><span className="text-gray-600">Price/kg / मूल्य प्रति किलो:</span> ₹{parseFloat((Math.trunc(parseFloat(lot.pricePerKg) * 100) / 100).toFixed(2))}</p>}
-              </div>
+            ) : (
+              (() => {
+                const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+                const lotNetWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
+                const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+                const lotAmount = lotNetWeight * lotPrice;
+                return (
+                  <table className="w-full text-sm mt-1 border-collapse">
+                    <thead>
+                      <tr className="border-b bg-gray-100">
+                        <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Place / स्थान</th>
+                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
+                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
+                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-gray-200">
+                        <td className="py-1 px-2">{getPlaceBilingual(lot)}</td>
+                        <td className="py-1 px-2 text-right font-mono">{lot.originalBags}</td>
+                        <td className="py-1 px-2 text-right font-mono">{lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
+                        <td className="py-1 px-2 text-right font-mono">{lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
+                        <td className="py-1 px-2 text-right font-mono font-medium">{lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                );
+              })()
             )}
 
             {(() => {
