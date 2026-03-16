@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Printer, Share2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
 
@@ -84,6 +85,14 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const [sharing, setSharing] = useState(false);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const autoActionDone = React.useRef(false);
+
+  const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
+
+  const { data: aadhats } = useQuery<Array<{ id: number; name: string; address: string; contact: string | null }>>({
+    queryKey: ["/api/aadhats"],
+    enabled: isMandi && !!entry.aadhatDbId,
+  });
+  const aadhatRecord = aadhats?.find(a => a.id === entry.aadhatDbId);
 
   const handleShare = async () => {
     if (!billRef.current) return;
@@ -206,7 +215,66 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     };
   }, { totalPayable: 0, totalDeductions: 0, totalMandiCharges: 0, adjustedValue: 0, netPayable: 0 });
 
-  const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
+  const aggregatedMandiCharges = (() => {
+    let mandiCommission = 0, aadhatCommission = 0, mandiHammali = 0, mandiExtra = 0;
+    let totalHammali = 0, totalAdjustedValue = 0;
+    const mandiPcts = new Set<number>();
+    const aadhatPcts = new Set<number>();
+    const chargesByType: Record<string, number> = {};
+
+    entry.lots.forEach(lot => {
+      const lotTotals = calculateLotTotals(lot);
+      mandiCommission += lotTotals.mandiCommission;
+      aadhatCommission += lotTotals.aadhatCommission;
+      mandiHammali += lotTotals.mandiHammali;
+      mandiExtra += lotTotals.mandiExtra;
+      totalHammali += lotTotals.hammali;
+      totalAdjustedValue += lotTotals.adjustedValue;
+
+      const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
+      const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
+      if (mandiPct > 0) mandiPcts.add(mandiPct);
+      if (aadhatPct > 0) aadhatPcts.add(aadhatPct);
+
+      const charges = lot.charges || [];
+      const isFarmGate = lot.place === "farm_gate";
+      const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+      charges
+        .filter(c => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+        .forEach(c => {
+          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+          if (amt > 0) {
+            chargesByType[c.type || "Charge"] = (chargesByType[c.type || "Charge"] || 0) + amt;
+          }
+        });
+    });
+
+    const mandiPctLabel = mandiPcts.size === 1 ? ` (${[...mandiPcts][0]}%)` : "";
+    const aadhatPctLabel = aadhatPcts.size === 1 ? ` (${[...aadhatPcts][0]}%)` : "";
+
+    return { mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalHammali, totalAdjustedValue, chargesByType, mandiPctLabel, aadhatPctLabel };
+  })();
+
+  const allTableRows = (() => {
+    const rows: Array<{ crop: string; bags: number; weight: number; price: number; amount: number }> = [];
+    entry.lots.forEach(lot => {
+      if (lot.bagBreakdowns.length > 0) {
+        lot.bagBreakdowns.forEach(bd => {
+          if (bd.size === "Wastage") return;
+          const weight = bd.weight ? parseFloat(bd.weight) : 0;
+          const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+          const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+          rows.push({ crop: lot.crop || "potato", bags: bd.numberOfBags, weight, price, amount: netWeight * price });
+        });
+      } else {
+        const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+        const netWeight = weight > 0 ? weight - lot.originalBags : 0;
+        const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+        rows.push({ crop: lot.crop || "potato", bags: lot.originalBags, weight, price, amount: netWeight * price });
+      }
+    });
+    return rows;
+  })();
 
   const getSizeBilingual = (size: string) => {
     const sizeMap: Record<string, string> = {
@@ -358,12 +426,69 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       `;
     }).join("");
 
-    const address = [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ");
+    const farmerAddress = [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ");
+    const address = isMandi ? (aadhatRecord?.address || "") : farmerAddress;
     const detailsLabel = isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण";
     const detailsName = isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName;
-    const detailsContact = isMandi ? null : entry.farmerContact;
+    const detailsContact = isMandi ? (aadhatRecord?.contact || null) : entry.farmerContact;
     const summaryLabel = isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश";
     const netDueLabel = isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय";
+
+    let mandiUnifiedHtml = "";
+    if (isMandi) {
+      const tableRowsHtml = allTableRows.map(r => `
+        <tr>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(r.crop)}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.bags}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.weight > 0 ? r.weight.toFixed(2) : "—"}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.price > 0 ? "₹" + parseFloat((Math.trunc(r.price * 100) / 100).toFixed(2)) : "—"}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${r.amount > 0 ? "₹" + parseFloat(r.amount.toFixed(1)).toLocaleString('en-IN') : "—"}</td>
+        </tr>
+      `).join("");
+
+      let mandiChargesLines = "";
+      if (aggregatedMandiCharges.mandiCommission > 0) {
+        mandiChargesLines += '<div><span style="color: #666;">Mandi Commission' + aggregatedMandiCharges.mandiPctLabel + ' / मंडी कमीशन' + aggregatedMandiCharges.mandiPctLabel + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
+      if (aggregatedMandiCharges.aadhatCommission > 0) {
+        mandiChargesLines += '<div><span style="color: #666;">Aadhat Commission' + aggregatedMandiCharges.aadhatPctLabel + ' / आढ़त कमीशन' + aggregatedMandiCharges.aadhatPctLabel + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
+      if (aggregatedMandiCharges.mandiHammali > 0) {
+        mandiChargesLines += '<div><span style="color: #666;">Hammali / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
+      if (aggregatedMandiCharges.mandiExtra > 0) {
+        mandiChargesLines += '<div><span style="color: #666;">Extra Charges / अतिरिक्त शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
+
+      const mandiChargesBlockHtmlMandi = mandiChargesLines ? `
+        <div style="margin-top: 6px; padding: 8px; background: #eff6ff; border-radius: 4px; border-left: 3px solid #3b82f6;">
+          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Mandi Charges / मंडी शुल्क</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
+            ${mandiChargesLines}
+          </div>
+        </div>
+      ` : "";
+
+      mandiUnifiedHtml = `
+        <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRowsHtml}
+            </tbody>
+          </table>
+          ${mandiChargesBlockHtmlMandi}
+        </div>
+      `;
+    }
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -415,14 +540,14 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
             <!-- Lot Details -->
             <div>
-              <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">Lot Details / लॉट विवरण</h3>
-              ${lotsHtml}
+              <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">${isMandi ? "Details / विवरण" : "Lot Details / लॉट विवरण"}</h3>
+              ${isMandi ? mandiUnifiedHtml : lotsHtml}
             </div>
 
             <!-- Totals Summary -->
             <div style="margin-top: 12px; padding: 10px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border: 1px solid #0ea5e9;">
               <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 8px 0; font-weight: 700; letter-spacing: 0.05em;">${summaryLabel}</h3>
-              <div style="display: grid; grid-template-columns: repeat(${overallTotals.totalMandiCharges > 0 ? 5 : 4}, 1fr); gap: 8px; text-align: center;">
+              <div style="display: grid; grid-template-columns: repeat(${isMandi ? (overallTotals.totalMandiCharges > 0 ? 4 : 3) : (overallTotals.totalMandiCharges > 0 ? 5 : 4)}, 1fr); gap: 8px; text-align: center;">
                 <div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
                   <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0;">${totalBagsExcludingWastage}</p>
@@ -435,10 +560,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Mandi Charges / मंडी शुल्क</p>
                   <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #3b82f6;">₹${overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
                 </div>` : ""}
-                <div>
+                ${!isMandi ? `<div>
                   <p style="font-size: 10px; color: #666; margin: 0 0 4px 0;">Deductions / कटौती</p>
                   <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>
+                </div>` : ""}
                 <div style="background: #0d9488; padding: 8px; border-radius: 6px; margin: -8px;">
                   <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">${netDueLabel}</p>
                   <p style="font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
@@ -493,9 +618,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">{isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण"}</h3>
           <div className="space-y-1 text-sm">
             <p className="font-semibold">{isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName}</p>
+            {isMandi && aadhatRecord?.contact && <p className="text-gray-600">{aadhatRecord.contact}</p>}
             {!isMandi && entry.farmerContact && <p className="text-gray-600">{entry.farmerContact}</p>}
             <p className="text-gray-600">
-              {[entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ")}
+              {isMandi ? (aadhatRecord?.address || "") : [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ")}
             </p>
           </div>
         </div>
@@ -504,160 +630,218 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       <Separator className="my-3 bg-gray-300" />
 
       <div className="space-y-2">
-        <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">Lot Details / लॉट विवरण</h3>
-        {entry.lots.map((lot) => (
-          <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
-            {lot.bagBreakdowns.length > 0 ? (
-              <table className="w-full text-sm mt-1 border-collapse">
-                <thead>
-                  <tr className="border-b bg-gray-100">
-                    <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
-                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
-                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
-                    <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
+        <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">{isMandi ? "Details / विवरण" : "Lot Details / लॉट विवरण"}</h3>
+        {isMandi ? (
+          <div className="border border-gray-300 rounded-lg p-3">
+            <table className="w-full text-sm mt-1 border-collapse">
+              <thead>
+                <tr className="border-b bg-gray-100">
+                  <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
+                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
+                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
+                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allTableRows.map((r, idx) => (
+                  <tr key={idx} className="border-b border-gray-200">
+                    <td className="py-1 px-2">{getCropBilingual(r.crop)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{r.bags}</td>
+                    <td className="py-1 px-2 text-right font-mono">{r.weight > 0 ? r.weight.toFixed(2) : "—"}</td>
+                    <td className="py-1 px-2 text-right font-mono">{r.price > 0 ? `₹${parseFloat((Math.trunc(r.price * 100) / 100).toFixed(2))}` : "—"}</td>
+                    <td className="py-1 px-2 text-right font-mono font-medium">{r.amount > 0 ? `₹${parseFloat(r.amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lot.bagBreakdowns.map((bd, bdIndex) => {
-                    const weight = bd.weight ? parseFloat(bd.weight) : 0;
-                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
-                    const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                    const amount = netWeight * price;
-                    return (
-                      <tr key={bd.id || bdIndex} className="border-b border-gray-200">
-                        <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
-                        <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
-                        <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
-                        <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
-                        <td className="py-1 px-2 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              (() => {
-                const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
-                const lotNetWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
-                const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-                const lotAmount = lotNetWeight * lotPrice;
-                return (
-                  <table className="w-full text-sm mt-1 border-collapse">
-                    <thead>
-                      <tr className="border-b bg-gray-100">
-                        <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
-                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
-                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
-                        <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-200">
-                        <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
-                        <td className="py-1 px-2 text-right font-mono">{lot.originalBags}</td>
-                        <td className="py-1 px-2 text-right font-mono">{lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
-                        <td className="py-1 px-2 text-right font-mono">{lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
-                        <td className="py-1 px-2 text-right font-mono font-medium">{lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                );
-              })()
-            )}
-
-            {(() => {
-              const lotTotals = calculateLotTotals(lot);
-              const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
-              const hasMandiCharges = lotTotals.totalMandiCharges > 0;
-              return (
-                <>
-                  {hasMandiCharges && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                      <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Mandi Charges / मंडी शुल्क</p>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {lotTotals.mandiCommission > 0 && (
-                          <>
-                            <span className="text-gray-600">Mandi Commission / मंडी कमीशन:</span>
-                            <span className="text-right font-mono">₹{lotTotals.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                          </>
-                        )}
-                        {lotTotals.aadhatCommission > 0 && (
-                          <>
-                            <span className="text-gray-600">Aadhat Commission / आढ़त कमीशन:</span>
-                            <span className="text-right font-mono">₹{lotTotals.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                          </>
-                        )}
-                        {lotTotals.mandiHammali > 0 && (
-                          <>
-                            <span className="text-gray-600">Hammali / हम्माली:</span>
-                            <span className="text-right font-mono">₹{lotTotals.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                          </>
-                        )}
-                        {lotTotals.mandiExtra > 0 && (
-                          <>
-                            <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
-                            <span className="text-right font-mono">₹{lotTotals.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                ))}
+              </tbody>
+            </table>
+            {overallTotals.totalMandiCharges > 0 && (
+              <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Mandi Charges / मंडी शुल्क</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {aggregatedMandiCharges.mandiCommission > 0 && (
+                    <>
+                      <span className="text-gray-600">Mandi Commission{aggregatedMandiCharges.mandiPctLabel} / मंडी कमीशन{aggregatedMandiCharges.mandiPctLabel}:</span>
+                      <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
                   )}
-                  {hasDeductions && (
-                    <div className="mt-2 p-2 bg-orange-50 rounded border-l-4 border-orange-400">
-                      <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Deductions / कटौती</p>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {lotTotals.hammali > 0 && (
-                          <>
-                            <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
-                            <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                          </>
-                        )}
-                        {lotTotals.charges.filter((c: any) => {
-                          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                          return amt > 0;
-                        }).map((c: any, i: number) => {
-                          const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                          return (
-                            <React.Fragment key={i}>
-                              <span className="text-gray-600">{c.type || "Charge"}:</span>
-                              <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </React.Fragment>
-                          );
-                        })}
-                        {lotTotals.adjustedValue !== 0 && (
-                          <>
-                            <span className="text-gray-600">
-                              Adjustment / समायोजन
-                              {lotTotals.rate > 0 && lotTotals.interestDays > 0 
-                                ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
-                                : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
-                            </span>
-                            <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                              {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                  {aggregatedMandiCharges.aadhatCommission > 0 && (
+                    <>
+                      <span className="text-gray-600">Aadhat Commission{aggregatedMandiCharges.aadhatPctLabel} / आढ़त कमीशन{aggregatedMandiCharges.aadhatPctLabel}:</span>
+                      <span className="text-right font-mono">₹{aggregatedMandiCharges.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
                   )}
-                </>
-              );
-            })()}
-
-            {lot.remarks && (
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{lot.remarks}</span></p>
+                  {aggregatedMandiCharges.mandiHammali > 0 && (
+                    <>
+                      <span className="text-gray-600">Hammali / हम्माली:</span>
+                      <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
+                  )}
+                  {aggregatedMandiCharges.mandiExtra > 0 && (
+                    <>
+                      <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
+                      <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
-        ))}
+        ) : (
+          entry.lots.map((lot) => (
+            <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
+              {lot.bagBreakdowns.length > 0 ? (
+                <table className="w-full text-sm mt-1 border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-100">
+                      <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
+                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
+                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
+                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lot.bagBreakdowns.map((bd, bdIndex) => {
+                      const weight = bd.weight ? parseFloat(bd.weight) : 0;
+                      const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+                      const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+                      const amount = netWeight * price;
+                      return (
+                        <tr key={bd.id || bdIndex} className="border-b border-gray-200">
+                          <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
+                          <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
+                          <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                (() => {
+                  const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+                  const lotNetWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
+                  const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+                  const lotAmount = lotNetWeight * lotPrice;
+                  return (
+                    <table className="w-full text-sm mt-1 border-collapse">
+                      <thead>
+                        <tr className="border-b bg-gray-100">
+                          <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
+                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
+                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
+                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-gray-200">
+                          <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
+                          <td className="py-1 px-2 text-right font-mono">{lot.originalBags}</td>
+                          <td className="py-1 px-2 text-right font-mono">{lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono">{lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono font-medium">{lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  );
+                })()
+              )}
+
+              {(() => {
+                const lotTotals = calculateLotTotals(lot);
+                const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
+                const hasMandiCharges = lotTotals.totalMandiCharges > 0;
+                return (
+                  <>
+                    {hasMandiCharges && (
+                      <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                        <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Mandi Charges / मंडी शुल्क</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {lotTotals.mandiCommission > 0 && (
+                            <>
+                              <span className="text-gray-600">Mandi Commission / मंडी कमीशन:</span>
+                              <span className="text-right font-mono">₹{lotTotals.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </>
+                          )}
+                          {lotTotals.aadhatCommission > 0 && (
+                            <>
+                              <span className="text-gray-600">Aadhat Commission / आढ़त कमीशन:</span>
+                              <span className="text-right font-mono">₹{lotTotals.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </>
+                          )}
+                          {lotTotals.mandiHammali > 0 && (
+                            <>
+                              <span className="text-gray-600">Hammali / हम्माली:</span>
+                              <span className="text-right font-mono">₹{lotTotals.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </>
+                          )}
+                          {lotTotals.mandiExtra > 0 && (
+                            <>
+                              <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
+                              <span className="text-right font-mono">₹{lotTotals.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {hasDeductions && (
+                      <div className="mt-2 p-2 bg-orange-50 rounded border-l-4 border-orange-400">
+                        <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Deductions / कटौती</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {lotTotals.hammali > 0 && (
+                            <>
+                              <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
+                              <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </>
+                          )}
+                          {lotTotals.charges.filter((c: any) => {
+                            const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                            return amt > 0;
+                          }).map((c: any, i: number) => {
+                            const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                            return (
+                              <React.Fragment key={i}>
+                                <span className="text-gray-600">{c.type || "Charge"}:</span>
+                                <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                              </React.Fragment>
+                            );
+                          })}
+                          {lotTotals.adjustedValue !== 0 && (
+                            <>
+                              <span className="text-gray-600">
+                                Adjustment / समायोजन
+                                {lotTotals.rate > 0 && lotTotals.interestDays > 0 
+                                  ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
+                                  : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
+                              </span>
+                              <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {lot.remarks && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{lot.remarks}</span></p>
+                </div>
+              )}
+            </div>
+          ))
+        )}
       </div>
 
       <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
         <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">{isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश"}</h3>
-        <div className={`grid ${overallTotals.totalMandiCharges > 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-2 text-center`}>
+        <div className={`grid ${isMandi ? (overallTotals.totalMandiCharges > 0 ? 'grid-cols-4' : 'grid-cols-3') : (overallTotals.totalMandiCharges > 0 ? 'grid-cols-5' : 'grid-cols-4')} gap-2 text-center`}>
           <div>
             <p className="text-xs text-gray-600 mb-1">Total Bags / कुल बोरी</p>
             <p className="font-mono font-semibold text-xs">{totalBagsExcludingWastage}</p>
@@ -672,10 +856,12 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <p className="font-mono font-semibold text-xs text-blue-600">₹{overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
             </div>
           )}
-          <div>
-            <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
-            <p className="font-mono font-semibold text-xs text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-          </div>
+          {!isMandi && (
+            <div>
+              <p className="text-xs text-gray-600 mb-1">Deductions / कटौती</p>
+              <p className="font-mono font-semibold text-xs text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            </div>
+          )}
           <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
             <p className="text-xs opacity-90 mb-1">{isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय"}</p>
             <p className="font-mono font-bold text-sm">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
