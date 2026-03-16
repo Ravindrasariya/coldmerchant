@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog,
@@ -19,7 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, UserPlus, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, UserPlus, ChevronDown, ChevronUp, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -94,6 +97,9 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [dateOfLoading, setDateOfLoading] = useState(new Date().toISOString().split("T")[0]);
   const [showTransporterSuggestions, setShowTransporterSuggestions] = useState(false);
+  const [selectedTransporterIndex, setSelectedTransporterIndex] = useState(-1);
+  const transporterSuggestionsRef = useRef<HTMLDivElement>(null);
+  const [buyerPopoverOpen, setBuyerPopoverOpen] = useState<Record<string, boolean>>({});
 
   // Buyer sections
   const [buyerSections, setBuyerSections] = useState<BuyerSection[]>([createEmptyBuyerSection()]);
@@ -398,6 +404,40 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
     (name) => name.toLowerCase().includes(transporterName.toLowerCase())
   );
 
+  useEffect(() => {
+    setSelectedTransporterIndex(-1);
+  }, [filteredTransporterSuggestions.length, transporterName]);
+
+  useEffect(() => {
+    if (selectedTransporterIndex >= 0 && transporterSuggestionsRef.current) {
+      const items = transporterSuggestionsRef.current.querySelectorAll('[data-suggestion-item]');
+      items[selectedTransporterIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedTransporterIndex]);
+
+  const handleTransporterKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showTransporterSuggestions || filteredTransporterSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedTransporterIndex(prev => (prev + 1) % filteredTransporterSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedTransporterIndex(prev => (prev <= 0 ? filteredTransporterSuggestions.length - 1 : prev - 1));
+    } else if (e.key === 'Enter' && selectedTransporterIndex >= 0) {
+      e.preventDefault();
+      const name = filteredTransporterSuggestions[selectedTransporterIndex];
+      if (name) {
+        setTransporterName(name);
+        setShowTransporterSuggestions(false);
+        setSelectedTransporterIndex(-1);
+      }
+    } else if (e.key === 'Escape') {
+      setShowTransporterSuggestions(false);
+      setSelectedTransporterIndex(-1);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
       // Only close dialog, don't reset form data - data persists until Save/Cancel
@@ -433,18 +473,22 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                     onChange={(e) => setTransporterName(e.target.value)}
                     onFocus={() => setShowTransporterSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowTransporterSuggestions(false), 200)}
+                    onKeyDown={handleTransporterKeyDown}
                     placeholder={t("Enter transporter name", "ट्रांसपोर्टर का नाम दर्ज करें")}
                     data-testid="input-transporter-name"
+                    autoComplete="off"
                   />
                   {showTransporterSuggestions && filteredTransporterSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                      {filteredTransporterSuggestions.map((name) => (
+                    <div ref={transporterSuggestionsRef} className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {filteredTransporterSuggestions.map((name, idx) => (
                         <div
                           key={name}
-                          className="px-3 py-2 hover:bg-muted cursor-pointer text-sm"
+                          data-suggestion-item
+                          className={`px-3 py-2 hover:bg-muted cursor-pointer text-sm ${idx === selectedTransporterIndex ? 'bg-accent' : ''}`}
                           onClick={() => {
                             setTransporterName(name);
                             setShowTransporterSuggestions(false);
+                            setSelectedTransporterIndex(-1);
                           }}
                         >
                           {name}
@@ -528,30 +572,66 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <Label className="text-xs">{t("Select Buyer", "खरीदार चुनें")}</Label>
-                            <Select
-                              value={section.buyerId?.toString() || ""}
-                              onValueChange={(val) => handleBuyerSelect(section.id, val)}
+                            <Popover
+                              open={buyerPopoverOpen[section.id] || false}
+                              onOpenChange={(isOpen) => setBuyerPopoverOpen(prev => ({ ...prev, [section.id]: isOpen }))}
                             >
-                              <SelectTrigger data-testid={`select-buyer-${sectionIndex}`}>
-                                <SelectValue placeholder={t("Select a buyer...", "एक खरीदार चुनें...")} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {buyers
-                                  .filter((b) => b.isActive)
-                                  .map((buyer) => (
-                                    <SelectItem key={buyer.id} value={buyer.id.toString()}>
-                                      <span className="flex items-center gap-2">
-                                        {buyer.name} {buyer.address && `(${buyer.address})`}
-                                        {buyer.redFlag && (
-                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                            Red Flag
-                                          </span>
-                                        )}
-                                      </span>
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={buyerPopoverOpen[section.id] || false}
+                                  className="w-full justify-between font-normal"
+                                  data-testid={`select-buyer-${sectionIndex}`}
+                                >
+                                  {selectedBuyer ? (
+                                    <span className="flex items-center gap-2 truncate">
+                                      {selectedBuyer.name} {selectedBuyer.address && `(${selectedBuyer.address})`}
+                                      {selectedBuyer.redFlag && (
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                          Red Flag
+                                        </span>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">{t("Select a buyer...", "एक खरीदार चुनें...")}</span>
+                                  )}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
+                                  <CommandList>
+                                    <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
+                                    <CommandGroup>
+                                      {buyers
+                                        .filter((b) => b.isActive)
+                                        .map((buyer) => (
+                                          <CommandItem
+                                            key={buyer.id}
+                                            value={`${buyer.name} ${buyer.address || ''}`}
+                                            onSelect={() => {
+                                              handleBuyerSelect(section.id, buyer.id.toString());
+                                              setBuyerPopoverOpen(prev => ({ ...prev, [section.id]: false }));
+                                            }}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4", section.buyerId === buyer.id ? "opacity-100" : "opacity-0")} />
+                                            <span className="flex items-center gap-2">
+                                              {buyer.name} {buyer.address && `(${buyer.address})`}
+                                              {buyer.redFlag && (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                                  Red Flag
+                                                </span>
+                                              )}
+                                            </span>
+                                          </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                         </div>
                         {selectedBuyer?.redFlag && (
