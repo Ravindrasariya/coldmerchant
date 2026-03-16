@@ -775,7 +775,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               <div className="grid grid-cols-2 md:grid-cols-8 gap-2">
                                 <div className="hidden md:block col-span-3" />
                                 <div className="col-span-2 text-xs font-semibold text-orange-600" data-testid={`edit-breakdown-avgwt-${lotIndex}-${bdIndex}`}>
-                                  {t("Avg. Weight", "औसत वजन")} {parseFloat((netWeight / bd.numberOfBags).toFixed(1))} Kg
+                                  {t("Avg Net Weight", "औसत नेट वजन")} {parseFloat((netWeight / bd.numberOfBags).toFixed(1))} Kg
                                 </div>
                               </div>
                             )}
