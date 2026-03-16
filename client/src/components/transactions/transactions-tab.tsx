@@ -539,6 +539,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         merchantId={user?.merchantId || 0}
         open={printTransactionId !== null}
         onOpenChange={(open) => !open && setPrintTransactionId(null)}
+        cropType={selectedCrop}
       />
 
     </div>

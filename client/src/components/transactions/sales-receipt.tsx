@@ -44,9 +44,10 @@ interface SalesReceiptDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   autoAction?: "print" | "share";
+  cropType?: "potato" | "onion" | "garlic";
 }
 
-export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChange, autoAction }: SalesReceiptDialogProps) {
+export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChange, autoAction, cropType = "potato" }: SalesReceiptDialogProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
@@ -278,6 +279,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 {transaction.vehicleNumber && (
                   <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
                 )}
+                <p><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
               </div>
               <div className="text-right">
                 {transaction.partyName && (
@@ -290,9 +292,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               <thead>
                 <tr className="bg-gray-100">
                   <th className="border p-2 text-left">S.No / क्र.सं.</th>
-                  <th className="border p-2 text-left">Lot Details / लॉट विवरण</th>
-                  <th className="border p-2 text-left">Potato Type / आलू का प्रकार</th>
-                  <th className="border p-2 text-left">Size / आकार</th>
+                  <th className="border p-2 text-left">Variety / किस्म</th>
                   <th className="border p-2 text-right">Bags / बोरी</th>
                   <th className="border p-2 text-right">Weight (Kg) / वजन (किग्रा)</th>
                 </tr>
@@ -301,9 +301,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
                     <td className="border p-2">{idx + 1}</td>
-                    <td className="border p-2">S#{item.serialNumber} - {item.coldStoreName}</td>
                     <td className="border p-2">{item.potatoType || "-"}</td>
-                    <td className="border p-2">{item.size || "Mixed / मिश्रित"}</td>
                     <td className="border p-2 text-right">{item.bagsMoved}</td>
                     <td className="border p-2 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
                   </tr>
@@ -311,7 +309,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="border p-2" colSpan={4}>Total / कुल</td>
+                  <td className="border p-2" colSpan={2}>Total / कुल</td>
                   <td className="border p-2 text-right">{transaction.totalBags}</td>
                   <td className="border p-2 text-right">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
                 </tr>
