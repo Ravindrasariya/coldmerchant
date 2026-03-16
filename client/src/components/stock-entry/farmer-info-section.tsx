@@ -416,10 +416,11 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
                         }}
                         data-testid={`suggestion-contact-${index}`}
                       >
-                        <div className="text-sm font-medium">{farmer.farmerContact || farmer.farmerName}</div>
+                        <div className="text-sm font-medium">{farmer.farmerName}</div>
                         <div className="text-[11px] text-muted-foreground">
-                          {farmer.farmerName}
-                          {farmer.village && <span> • {farmer.village}</span>}
+                          {farmer.farmerContact && <span>{farmer.farmerContact}</span>}
+                          {farmer.farmerContact && farmer.village && <span> • </span>}
+                          {farmer.village && <span>{farmer.village}</span>}
                         </div>
                       </div>
                     ))}

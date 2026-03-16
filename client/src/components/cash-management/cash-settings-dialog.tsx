@@ -1155,10 +1155,11 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         }}
                         data-testid={`suggestion-farmer-contact-${index}`}
                       >
-                        <div className="font-medium text-sm">{farmer.contact}</div>
+                        <div className="font-medium text-sm">{farmer.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {farmer.name}
-                          {farmer.village && <span> | {farmer.village}</span>}
+                          {farmer.contact && <span>{farmer.contact}</span>}
+                          {farmer.contact && farmer.village && <span> | </span>}
+                          {farmer.village && <span>{farmer.village}</span>}
                         </div>
                       </div>
                     ))}
@@ -1202,10 +1203,11 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                         }}
                         data-testid={`suggestion-farmer-village-${index}`}
                       >
-                        <div className="font-medium text-sm">{farmer.village}</div>
+                        <div className="font-medium text-sm">{farmer.name}</div>
                         <div className="text-xs text-muted-foreground">
-                          {farmer.name}
-                          {farmer.contact && <span> | {farmer.contact}</span>}
+                          {farmer.contact && <span>{farmer.contact}</span>}
+                          {farmer.contact && farmer.village && <span> | </span>}
+                          {farmer.village && <span>{farmer.village}</span>}
                         </div>
                       </div>
                     ))}
