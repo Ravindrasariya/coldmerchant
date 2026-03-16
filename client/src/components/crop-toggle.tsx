@@ -5,10 +5,19 @@ import { CropType } from "@shared/schema";
 interface CropToggleProps {
   value: CropType;
   onChange: (value: CropType) => void;
+  allowedCrops?: CropType[];
 }
 
-export function CropToggle({ value, onChange }: CropToggleProps) {
+export function CropToggle({ value, onChange, allowedCrops }: CropToggleProps) {
   const { t } = useLanguage();
+
+  const allCrops: { value: CropType; label: [string, string]; testId: string }[] = [
+    { value: "potato", label: ["Potato", "आलू"], testId: "toggle-crop-potato" },
+    { value: "onion", label: ["Onion", "प्याज"], testId: "toggle-crop-onion" },
+    { value: "garlic", label: ["Garlic", "लहसुन"], testId: "toggle-crop-garlic" },
+  ];
+
+  const crops = allowedCrops ? allCrops.filter(c => allowedCrops.includes(c.value)) : allCrops;
   
   return (
     <Select value={value} onValueChange={(v) => onChange(v as CropType)}>
@@ -19,15 +28,11 @@ export function CropToggle({ value, onChange }: CropToggleProps) {
         <SelectValue placeholder={t("Potato", "आलू")} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="potato" data-testid="toggle-crop-potato">
-          {t("Potato", "आलू")}
-        </SelectItem>
-        <SelectItem value="onion" data-testid="toggle-crop-onion">
-          {t("Onion", "प्याज")}
-        </SelectItem>
-        <SelectItem value="garlic" data-testid="toggle-crop-garlic">
-          {t("Garlic", "लहसुन")}
-        </SelectItem>
+        {crops.map(c => (
+          <SelectItem key={c.value} value={c.value} data-testid={c.testId}>
+            {t(c.label[0], c.label[1])}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

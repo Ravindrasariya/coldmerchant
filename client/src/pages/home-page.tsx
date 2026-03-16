@@ -482,7 +482,7 @@ export default function HomePage() {
                       <SelectItem value="mandi">{t("Mandi", "मंडी")}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} />
+                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} allowedCrops={selectedPlace === "cold_store" ? ["potato"] : undefined} />
                 </div>
               </div>
               <StockEntryForm 
