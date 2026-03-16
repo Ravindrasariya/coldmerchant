@@ -282,7 +282,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 )}
                 <p><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
               </div>
-              <div className="text-right">
+              <div className="text-right right">
                 {transaction.partyName && (
                   <p><strong>Sent to / भेजा गया:</strong> {transaction.partyName}</p>
                 )}
