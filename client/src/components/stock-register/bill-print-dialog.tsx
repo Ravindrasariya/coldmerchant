@@ -88,7 +88,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
 
-  const { data: aadhats } = useQuery<Array<{ id: number; name: string; address: string; contact: string | null }>>({
+  const { data: aadhats, isLoading: aadhatLoading } = useQuery<Array<{ id: number; name: string; address: string; contact: string | null }>>({
     queryKey: ["/api/aadhats"],
     enabled: isMandi && !!entry.aadhatDbId,
   });
@@ -302,6 +302,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   };
 
   const handlePrint = () => {
+    if (isMandi && entry.aadhatDbId && aadhatLoading) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
