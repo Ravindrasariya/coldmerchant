@@ -356,7 +356,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                 name={`lots.${lotIndex}.potatoType`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("Variety", "किस्म")} *</FormLabel>
+                    <FormLabel>{t("Variety", "किस्म")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
                         <SelectTrigger data-testid={`select-variety-${lotIndex}`}>
@@ -381,7 +381,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                 name={`lots.${lotIndex}.harvestPotatoType`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("Potato Type", "आलू का प्रकार")} *</FormLabel>
+                    <FormLabel>{t("Potato Type", "आलू का प्रकार")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value || ""}>
                       <FormControl>
                         <SelectTrigger data-testid={`select-potato-type-${lotIndex}`}>
@@ -410,7 +410,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             name={`lots.${lotIndex}.quality`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("Quality", "गुणवत्ता")} *</FormLabel>
+                <FormLabel>{t("Quality", "गुणवत्ता")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger data-testid={`select-quality-${lotIndex}`}>

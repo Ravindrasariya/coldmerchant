@@ -91,7 +91,7 @@ export const lots = pgTable("lots", {
   potatoType: text("potato_type"), // Jyoti, Pukhraj, Lakar, LR, Torus, CS1, CS3, Others - variety (potato only, made nullable)
   harvestPotatoType: text("harvest_potato_type"), // Wafer, Ration, Seed - for potato crop only
   bagType: text("bag_type").notNull(), // editable text field now
-  quality: text("quality").notNull(), // Poor, Medium, Good
+  quality: text("quality"), // Poor, Medium, Good (made nullable)
   cutType: text("cut_type").notNull(), // gate_cut, bilty_cut (now called Delivery Type in UI)
   size: text("size"), // Large, Medium, Small - for gate cut only
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
@@ -1001,7 +1001,7 @@ export const lotFormSchema = z.object({
   potatoType: z.string().optional(),
   harvestPotatoType: z.string().optional(),
   bagType: z.string().optional().default(""),
-  quality: z.string().min(1, "Quality is required"),
+  quality: z.string().optional().default(""),
   cutType: z.enum(["gate_cut", "bilty_cut"]),
   size: z.string().optional(),
   pricePerKg: z.coerce.number().optional(),
