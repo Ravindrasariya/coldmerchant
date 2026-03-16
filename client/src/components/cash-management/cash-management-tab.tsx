@@ -2890,16 +2890,18 @@ export function CashManagementTab() {
                                   .filter(f => f.netDue > 0)
                                   .map((farmer) => (
                                       <SelectItem key={farmer.name} value={farmer.name}>
-                                        <div className="flex items-center justify-between gap-4">
-                                          <span>{farmer.name}</span>
+                                        <div className="flex flex-col flex-1">
+                                          <div className="flex items-center justify-between">
+                                            <span className="font-medium">{farmer.name}</span>
+                                            <Badge variant="secondary" className="ml-2">
+                                              {t("Due", "बकाया")}: ₹{parseFloat(farmer.netDue.toFixed(1)).toLocaleString('en-IN')}
+                                            </Badge>
+                                          </div>
                                           <span className="text-xs text-muted-foreground">
                                             {farmer.contact || ""}
                                             {farmer.contact && farmer.village && " • "}
                                             {farmer.village || ""}
                                           </span>
-                                          <Badge variant="secondary">
-                                            {t("Due", "बकाया")}: ₹{parseFloat(farmer.netDue.toFixed(1)).toLocaleString('en-IN')}
-                                          </Badge>
                                         </div>
                                       </SelectItem>
                                     ))}
@@ -2934,8 +2936,8 @@ export function CashManagementTab() {
                                 .filter(f => !f.isArchived)
                                 .map((farmer) => (
                                   <SelectItem key={farmer.name} value={farmer.name}>
-                                    <div className="flex items-center gap-4">
-                                      <span>{farmer.name}</span>
+                                    <div className="flex flex-col flex-1">
+                                      <span className="font-medium">{farmer.name}</span>
                                       <span className="text-xs text-muted-foreground">
                                         {farmer.contact || ""}
                                         {farmer.contact && farmer.village && " • "}
