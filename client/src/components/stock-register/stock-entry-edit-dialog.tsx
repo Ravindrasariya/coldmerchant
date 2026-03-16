@@ -140,7 +140,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           size: lot.size || "Large",
           numberOfBags: lot.originalBags,
           remainingBags: lot.remainingBags,
-          weight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : 0,
+          weight: lot.totalWeight !== null && lot.totalWeight !== "0" && lot.totalWeight !== "0.00" ? parseFloat(lot.totalWeight) : null,
           pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : 0,
           totalAmount: null,
         }];
@@ -148,7 +148,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       return lot.bagBreakdowns.map(bd => ({
         ...bd,
         remainingBags: bd.remainingBags ?? bd.numberOfBags,
-        weight: bd.weight ? parseFloat(bd.weight) : 0,
+        weight: bd.weight && parseFloat(bd.weight) !== 0 ? parseFloat(bd.weight) : null,
         pricePerKg: bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0,
         totalAmount: bd.totalAmount ?? null,
       }));
@@ -275,8 +275,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       size: "",
       numberOfBags: 0,
       remainingBags: 0,
-      weight: 0,
-      pricePerKg: 0,
+      weight: null,
+      pricePerKg: null,
       totalAmount: null,
     });
     setLots(newLots);
@@ -736,6 +736,11 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                 <div className="font-mono text-sm text-muted-foreground">
                                   {bd.weight && bd.numberOfBags ? parseFloat(netWeight.toFixed(1)) : "—"}
                                 </div>
+                                {bd.weight && bd.numberOfBags && bd.numberOfBags > 0 && netWeight > 0 && (
+                                  <div className="text-xs font-semibold text-orange-600 mt-0.5" data-testid={`edit-breakdown-avgwt-${lotIndex}-${bdIndex}`}>
+                                    {t("Avg. Weight", "औसत वजन")} {parseFloat((netWeight / bd.numberOfBags).toFixed(1))} Kg
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Price/kg", "मूल्य/किलो")}</label>
