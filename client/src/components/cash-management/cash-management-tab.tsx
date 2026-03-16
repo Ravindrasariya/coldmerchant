@@ -975,6 +975,15 @@ export function CashManagementTab() {
         return;
       }
       const selectedBuyer = ledgerBuyers.find(b => b.name.toLowerCase() === values.partyName?.toLowerCase());
+      const selectedMergedParty = mergedPartiesForRawPotato.find(p => p.name.toLowerCase() === values.partyName?.toLowerCase());
+      const partyDue = selectedMergedParty?.overallDue || 0;
+      if (values.amount > partyDue) {
+        inwardForm.setError("amount", {
+          type: "manual",
+          message: t(`Amount cannot exceed due amount (₹${partyDue.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${partyDue.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
+        });
+        return;
+      }
       createEntryMutation.mutate({
         direction: "inward",
         receiptType: values.receiptType,
@@ -996,6 +1005,16 @@ export function CashManagementTab() {
         inwardForm.setError("amount", { 
           type: "manual", 
           message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
+        });
+        return;
+      }
+
+      const selectedMergedFarmer = mergedFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
+      const farmerDue = selectedMergedFarmer?.pendingDues || 0;
+      if (farmerDue > 0 && values.amount > farmerDue) {
+        inwardForm.setError("amount", {
+          type: "manual",
+          message: t(`Amount cannot exceed due amount (₹${farmerDue.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${farmerDue.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
         });
         return;
       }
