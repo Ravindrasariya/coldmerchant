@@ -115,7 +115,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const totalBagsExcludingWastage = entry.lots.reduce((sum, lot) => {
     if (lot.bagBreakdowns.length > 0) {
       return sum + lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage")
+        .filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0)
         .reduce((bdSum, bd) => bdSum + (bd.numberOfBags || 0), 0);
     }
     return sum + lot.originalBags;
@@ -126,7 +126,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     entry.lots.forEach(lot => {
       if (lot.bagBreakdowns.length > 0) {
         lot.bagBreakdowns.forEach(bd => {
-          if (bd.size === "Wastage") return;
+          if (bd.size === "Wastage" || bd.numberOfBags === 0) return;
           if (bd.weight && bd.pricePerKg) {
             const weight = parseFloat(bd.weight);
             const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
@@ -150,7 +150,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
     if (lot.bagBreakdowns.length > 0) {
       totalPayable = lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage")
+        .filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0)
         .reduce((sum, bd) => {
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
@@ -158,7 +158,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           return sum + (netWeight * price);
         }, 0);
       totalBagsForMandi = lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage")
+        .filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0)
         .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
     } else {
       const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
@@ -260,7 +260,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     entry.lots.forEach(lot => {
       if (lot.bagBreakdowns.length > 0) {
         lot.bagBreakdowns.forEach(bd => {
-          if (bd.size === "Wastage") return;
+          if (bd.size === "Wastage" || bd.numberOfBags === 0) return;
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
