@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, type ComponentType, type DragEvent } from "react";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import vyaparVriddhiLogo from "@assets/Screenshot_2026-01-17_at_10.27.58_AM_1768625967467.png";
@@ -42,8 +42,66 @@ import {
   LayoutDashboard,
   PlayCircle,
   BookOpen,
-  Building2
+  Building2,
+  GripVertical,
+  RotateCcw
 } from "lucide-react";
+
+interface TabConfig {
+  value: string;
+  icon: ComponentType<{ className?: string }>;
+  labelEn: string;
+  labelHi: string;
+  badge?: string;
+}
+
+const DEFAULT_TAB_ORDER: TabConfig[] = [
+  { value: "dashboard", icon: LayoutDashboard, labelEn: "Dashboard", labelHi: "डैशबोर्ड" },
+  { value: "stock-entry", icon: PackagePlus, labelEn: "Stock Entry", labelHi: "स्टॉक एंट्री" },
+  { value: "stock-register", icon: ClipboardList, labelEn: "Stock Register", labelHi: "स्टॉक रजिस्टर" },
+  { value: "transactions", icon: Truck, labelEn: "Transactions", labelHi: "लेनदेन" },
+  { value: "cash-management", icon: Wallet, labelEn: "Cash", labelHi: "नकद" },
+  { value: "seed", icon: Leaf, labelEn: "Seed", labelHi: "बीज" },
+  { value: "farmer-ledger", icon: Wheat, labelEn: "Farmer", labelHi: "किसान" },
+  { value: "buyers", icon: Users, labelEn: "Buyers", labelHi: "खरीदार" },
+  { value: "aadhat", icon: Users, labelEn: "Aadhat", labelHi: "आढ़त" },
+  { value: "cold-store", icon: Building2, labelEn: "Cold Store", labelHi: "कोल्ड स्टोर" },
+  { value: "books", icon: BookOpen, labelEn: "Books", labelHi: "बुक्स", badge: "Beta" },
+  { value: "demo-videos", icon: PlayCircle, labelEn: "Demo Videos", labelHi: "डेमो वीडियो" },
+];
+
+const TAB_ORDER_KEY = "vyapar_tab_order";
+
+function getSavedTabOrder(): TabConfig[] {
+  try {
+    const saved = localStorage.getItem(TAB_ORDER_KEY);
+    if (!saved) return DEFAULT_TAB_ORDER;
+    const savedValues: string[] = JSON.parse(saved);
+    if (!Array.isArray(savedValues)) return DEFAULT_TAB_ORDER;
+    const tabMap = new Map(DEFAULT_TAB_ORDER.map(t => [t.value, t]));
+    const seen = new Set<string>();
+    const ordered: TabConfig[] = [];
+    for (const v of savedValues) {
+      const tab = tabMap.get(v);
+      if (tab && !seen.has(v)) {
+        ordered.push(tab);
+        seen.add(v);
+      }
+    }
+    for (const tab of DEFAULT_TAB_ORDER) {
+      if (!seen.has(tab.value)) {
+        ordered.push(tab);
+      }
+    }
+    return ordered;
+  } catch {
+    return DEFAULT_TAB_ORDER;
+  }
+}
+
+function saveTabOrder(tabs: TabConfig[]) {
+  localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(tabs.map(t => t.value)));
+}
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
 import { CashManagementTab } from "@/components/cash-management/cash-management-tab";
@@ -96,6 +154,48 @@ export default function HomePage() {
     newPassword: "",
     confirmPassword: "",
   });
+
+  const [tabOrder, setTabOrder] = useState<TabConfig[]>(getSavedTabOrder);
+  const isCustomOrder = tabOrder.some((tab, i) => tab.value !== DEFAULT_TAB_ORDER[i].value);
+  const dragItemRef = useRef<number | null>(null);
+  const dragOverItemRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = useCallback((index: number) => {
+    dragItemRef.current = index;
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLElement>, index: number) => {
+    e.preventDefault();
+    dragOverItemRef.current = index;
+    setDragOverIndex(index);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (dragItemRef.current === null || dragOverItemRef.current === null) {
+      setDragOverIndex(null);
+      return;
+    }
+    const from = dragItemRef.current;
+    const to = dragOverItemRef.current;
+    if (from !== to) {
+      setTabOrder(prev => {
+        const updated = [...prev];
+        const [moved] = updated.splice(from, 1);
+        updated.splice(to, 0, moved);
+        saveTabOrder(updated);
+        return updated;
+      });
+    }
+    dragItemRef.current = null;
+    dragOverItemRef.current = null;
+    setDragOverIndex(null);
+  }, []);
+
+  const resetTabOrder = useCallback(() => {
+    setTabOrder(DEFAULT_TAB_ORDER);
+    localStorage.removeItem(TAB_ORDER_KEY);
+  }, []);
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -164,106 +264,40 @@ export default function HomePage() {
             </div>
 
             {/* Navigation Tabs - Desktop (hidden on mobile) */}
-            <nav className="hidden md:flex flex-1 overflow-x-auto scrollbar-hide">
+            <nav className="hidden md:flex flex-1 overflow-x-auto scrollbar-hide items-center">
               <TabsList className="inline-flex h-9 items-center gap-1 bg-transparent p-0">
-                <TabsTrigger 
-                  value="dashboard" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-dashboard"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  {t("Dashboard", "डैशबोर्ड")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="stock-entry" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-stock-entry"
-                >
-                  <PackagePlus className="h-4 w-4" />
-                  {t("Stock Entry", "स्टॉक एंट्री")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="stock-register" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-stock-register"
-                >
-                  <ClipboardList className="h-4 w-4" />
-                  {t("Stock Register", "स्टॉक रजिस्टर")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="transactions" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-transactions"
-                >
-                  <Truck className="h-4 w-4" />
-                  {t("Transactions", "लेनदेन")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="cash-management" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-cash-management"
-                >
-                  <Wallet className="h-4 w-4" />
-                  {t("Cash", "नकद")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="seed" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-seed"
-                >
-                  <Leaf className="h-4 w-4" />
-                  {t("Seed", "बीज")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="farmer-ledger" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-farmer-ledger"
-                >
-                  <Wheat className="h-4 w-4" />
-                  {t("Farmer", "किसान")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="buyers" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-buyers"
-                >
-                  <Users className="h-4 w-4" />
-                  {t("Buyers", "खरीदार")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="aadhat" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-aadhat"
-                >
-                  <Users className="h-4 w-4" />
-                  {t("Aadhat", "आढ़त")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="cold-store" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-cold-store"
-                >
-                  <Building2 className="h-4 w-4" />
-                  {t("Cold Store", "कोल्ड स्टोर")}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="books" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-books"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  {t("Books", "बुक्स")}
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Beta</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="demo-videos" 
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                  data-testid="tab-demo-videos"
-                >
-                  <PlayCircle className="h-4 w-4" />
-                  {t("Demo Videos", "डेमो वीडियो")}
-                </TabsTrigger>
+                {tabOrder.map((tab, index) => {
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors cursor-grab active:cursor-grabbing data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50 ${dragOverIndex === index ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+                      data-testid={`tab-${tab.value}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {t(tab.labelEn, tab.labelHi)}
+                      {tab.badge && (
+                        <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">{tab.badge}</span>
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
               </TabsList>
+              {isCustomOrder && (
+                <button
+                  onClick={resetTabOrder}
+                  className="ml-2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+                  title={t("Reset tab order", "टैब क्रम रीसेट करें")}
+                  data-testid="reset-tab-order"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              )}
             </nav>
 
             {/* Spacer for mobile */}
@@ -334,116 +368,44 @@ export default function HomePage() {
                     </div>
                     <nav className="flex-1 p-2">
                       <TabsList className="flex flex-col w-full h-auto gap-1 bg-transparent p-0">
-                        <TabsTrigger 
-                          value="dashboard" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-dashboard-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <LayoutDashboard className="h-4 w-4" />
-                          {t("Dashboard", "डैशबोर्ड")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="stock-entry" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-stock-entry-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <PackagePlus className="h-4 w-4" />
-                          {t("Stock Entry", "स्टॉक एंट्री")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="stock-register" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-stock-register-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <ClipboardList className="h-4 w-4" />
-                          {t("Stock Register", "स्टॉक रजिस्टर")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="transactions" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-transactions-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Truck className="h-4 w-4" />
-                          {t("Transactions", "लेनदेन")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="cash-management" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-cash-management-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Wallet className="h-4 w-4" />
-                          {t("Cash", "नकद")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="seed" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-seed-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Leaf className="h-4 w-4" />
-                          {t("Seed", "बीज")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="farmer-ledger" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-farmer-ledger-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Wheat className="h-4 w-4" />
-                          {t("Farmer", "किसान")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="buyers" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-buyers-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Users className="h-4 w-4" />
-                          {t("Buyers", "खरीदार")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="aadhat" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-aadhat-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Users className="h-4 w-4" />
-                          {t("Aadhat", "आढ़त")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="cold-store" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-cold-store-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <Building2 className="h-4 w-4" />
-                          {t("Cold Store", "कोल्ड स्टोर")}
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="books" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-books-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <BookOpen className="h-4 w-4" />
-                          {t("Books", "बुक्स")}
-                          <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">Beta</span>
-                        </TabsTrigger>
-                        <TabsTrigger 
-                          value="demo-videos" 
-                          className="w-full justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50" 
-                          data-testid="tab-demo-videos-mobile"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                        >
-                          <PlayCircle className="h-4 w-4" />
-                          {t("Demo Videos", "डेमो वीडियो")}
-                        </TabsTrigger>
+                        {tabOrder.map((tab, index) => {
+                          const Icon = tab.icon;
+                          return (
+                            <div
+                              key={tab.value}
+                              draggable
+                              onDragStart={() => handleDragStart(index)}
+                              onDragOver={(e) => handleDragOver(e, index)}
+                              onDragEnd={handleDragEnd}
+                              className={`flex items-center w-full ${dragOverIndex === index ? 'ring-2 ring-primary ring-offset-1 rounded-md' : ''}`}
+                            >
+                              <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0 cursor-grab active:cursor-grabbing mr-1" />
+                              <TabsTrigger
+                                value={tab.value}
+                                className="flex-1 justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50"
+                                data-testid={`tab-${tab.value}-mobile`}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                              >
+                                <Icon className="h-4 w-4" />
+                                {t(tab.labelEn, tab.labelHi)}
+                                {tab.badge && (
+                                  <span className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold leading-none rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">{tab.badge}</span>
+                                )}
+                              </TabsTrigger>
+                            </div>
+                          );
+                        })}
                       </TabsList>
+                      {isCustomOrder && (
+                        <button
+                          onClick={resetTabOrder}
+                          className="flex items-center gap-2 w-full mt-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-muted/50 transition-colors"
+                          data-testid="reset-tab-order-mobile"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          {t("Reset tab order", "टैब क्रम रीसेट करें")}
+                        </button>
+                      )}
                     </nav>
                   </div>
                 </SheetContent>
