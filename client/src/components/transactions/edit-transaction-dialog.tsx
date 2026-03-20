@@ -520,17 +520,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const confirmRemoveItem = () => {
     if (deleteConfirmIndex === null) return;
     const index = deleteConfirmIndex;
+    const removedItem = editableItems[index];
+    
+    if (removedItem && isLoadingType) {
+      adjustMandiCharges(computeItemMandiCharges(removedItem), -1);
+    }
     
     setEditableItems(items => {
       const item = items[index];
       if (!item) return items;
       
-      // If it's a newly added item (no id), just filter it out
       if (!item.id) {
         return items.filter((_, i) => i !== index);
       }
       
-      // If it's an existing item, mark for removal (will be hidden but sent to server)
       return items.map((it, i) => 
         i === index ? { ...it, action: 'remove' as const } : it
       );
