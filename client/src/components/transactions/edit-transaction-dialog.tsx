@@ -39,6 +39,8 @@ interface TransactionItem {
   revenue: string | null;
   pricePerKg: string | null;
   amount: string | null;
+  lotSourceWeight: number;
+  lotSourceBags: number;
 }
 
 interface UnsoldInventoryItem {
@@ -298,8 +300,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         originalRevenue: parseFloat(item.revenue || "0"),
         loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
         loadingAmount: parseFloat(item.amount || "0"),
-        lotSourceWeight: (item as any).lotSourceWeight || 0,
-        lotSourceBags: (item as any).lotSourceBags || 0,
+        lotSourceWeight: item.lotSourceWeight || 0,
+        lotSourceBags: item.lotSourceBags || 0,
         action: 'keep' as const
       })));
     }
