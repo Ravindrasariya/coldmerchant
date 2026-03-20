@@ -591,7 +591,115 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
             <Skeleton className="h-10 w-full" />
           </div>
         ) : transaction ? (
-          <div className="space-y-6">
+          <>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <FormField
+                control={form.control}
+                name="partyName"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
+                    <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={buyerPopoverOpen}
+                            className={cn(
+                              "justify-between font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            data-testid="select-buyer-name"
+                          >
+                            {field.value || t("Select buyer...", "खरीदार चुनें...")}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
+                          <CommandList>
+                            <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
+                            <CommandGroup>
+                              {buyers.filter(b => b.isActive !== false).map((buyer) => (
+                                <CommandItem
+                                  key={buyer.id}
+                                  value={buyer.name}
+                                  onSelect={() => {
+                                    field.onChange(buyer.name);
+                                    setSelectedBuyerId(buyer.id);
+                                    setBuyerPopoverOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === buyer.name ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {buyer.name}
+                                  {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
+                                  {buyer.redFlag && (
+                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                      Red Flag
+                                    </span>
+                                  )}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="vehicleNumber"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="driverContact"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="advancePayment"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <div className="bg-muted/50 p-4 rounded-md space-y-3">
               <div className="flex justify-between items-center">
                 <h4 className="font-medium text-sm">{t("Items in Transaction", "लेनदेन में आइटम")}</h4>
@@ -948,116 +1056,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
             </div>
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 {isLoadingType ? (
                   <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="partyName"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
-                            <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={buyerPopoverOpen}
-                                    className={cn(
-                                      "justify-between font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                    data-testid="select-buyer-name"
-                                  >
-                                    {field.value || t("Select buyer...", "खरीदार चुनें...")}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[300px] p-0" align="start">
-                                <Command>
-                                  <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
-                                  <CommandList>
-                                    <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
-                                    <CommandGroup>
-                                      {buyers.filter(b => b.isActive !== false).map((buyer) => (
-                                        <CommandItem
-                                          key={buyer.id}
-                                          value={buyer.name}
-                                          onSelect={() => {
-                                            field.onChange(buyer.name);
-                                            setSelectedBuyerId(buyer.id);
-                                            setBuyerPopoverOpen(false);
-                                          }}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              field.value === buyer.name ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          {buyer.name}
-                                          {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
-                                          {buyer.redFlag && (
-                                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                              Red Flag
-                                            </span>
-                                          )}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="vehicleNumber"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
-                            <FormControl>
-                              <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="driverContact"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
-                            <FormControl>
-                              <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="advancePayment"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <FormField
                         control={form.control}
@@ -1177,113 +1177,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   </>
                 ) : (
                   <>
-                    <div className="grid grid-cols-3 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="partyName"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
-                            <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={buyerPopoverOpen}
-                                    className={cn(
-                                      "justify-between font-normal",
-                                      !field.value && "text-muted-foreground"
-                                    )}
-                                    data-testid="select-buyer-name"
-                                  >
-                                    {field.value || t("Select buyer...", "खरीदार चुनें...")}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[300px] p-0" align="start">
-                                <Command>
-                                  <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
-                                  <CommandList>
-                                    <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
-                                    <CommandGroup>
-                                      {buyers.filter(b => b.isActive !== false).map((buyer) => (
-                                        <CommandItem
-                                          key={buyer.id}
-                                          value={buyer.name}
-                                          onSelect={() => {
-                                            field.onChange(buyer.name);
-                                            setSelectedBuyerId(buyer.id);
-                                            setBuyerPopoverOpen(false);
-                                          }}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              field.value === buyer.name ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          {buyer.name}
-                                          {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
-                                          {buyer.redFlag && (
-                                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                              Red Flag
-                                            </span>
-                                          )}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="vehicleNumber"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
-                            <FormControl>
-                              <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="driverContact"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
-                            <FormControl>
-                              <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
                     <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="advancePayment"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div>
+                        <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
+                        <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
+                          ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">({t("sum of lot revenues", "लॉट राजस्व का योग")})</p>
+                      </div>
                       <FormField
                         control={form.control}
                         name="amountReceived"
@@ -1298,14 +1199,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           </FormItem>
                         )}
                       />
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
-                      <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
-                        ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">({t("sum of lot revenues", "लॉट राजस्व का योग")})</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -1380,7 +1273,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </div>
               </form>
             </Form>
-
             {transaction.editHistory && transaction.editHistory.length > 0 && (
               <Collapsible open={historyOpen} onOpenChange={setHistoryOpen} className="border-t pt-4">
                 <CollapsibleTrigger asChild>
@@ -1425,7 +1317,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 </CollapsibleContent>
               </Collapsible>
             )}
-          </div>
+          </>
         ) : (
           <div className="text-center text-muted-foreground py-8">
             {t("Transaction not found", "लेनदेन नहीं मिला")}
