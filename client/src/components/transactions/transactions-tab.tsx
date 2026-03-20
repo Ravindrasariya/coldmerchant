@@ -15,8 +15,10 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { LoadTruckDialog } from "./load-truck-dialog";
+import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
 import { SalesReceiptDialog } from "./sales-receipt";
+import { LoadingReceiptDialog } from "./loading-receipt";
 
 interface TransactionItem {
   id: number;
@@ -39,6 +41,7 @@ interface Transaction {
   uniqueId: string | null;
   merchantId: number;
   transactionNumber: number;
+  transactionType: string | null;
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
@@ -66,8 +69,11 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const { toast } = useToast();
   const { user } = useAuth();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [showLoadingDialog, setShowLoadingDialog] = useState(false);
+  const [showChooser, setShowChooser] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
+  const [printLoadingTransactionId, setPrintLoadingTransactionId] = useState<number | null>(null);
   
   // Download dialog state (uses filtered transactions directly)
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
@@ -326,7 +332,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       {/* Filters Row */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         {/* Mobile: Button at top, full width */}
-        <Button onClick={() => setShowLoadDialog(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile">
+        <Button onClick={() => setShowChooser(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
@@ -398,7 +404,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         </Card>
 
         {/* Desktop: Button on right */}
-        <Button onClick={() => setShowLoadDialog(true)} className="hidden md:flex" data-testid="button-load-truck">
+        <Button onClick={() => setShowChooser(true)} className="hidden md:flex" data-testid="button-load-truck">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
@@ -516,15 +522,64 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               key={txn.id} 
               transaction={txn} 
               onEdit={() => setEditTransactionId(txn.id)}
-              onPrint={() => setPrintTransactionId(txn.id)}
+              onPrint={() => {
+                if (txn.transactionType === "loading") {
+                  setPrintLoadingTransactionId(txn.id);
+                } else {
+                  setPrintTransactionId(txn.id);
+                }
+              }}
             />
           ))}
         </div>
       )}
 
+      <Dialog open={showChooser} onOpenChange={setShowChooser}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              {t("Choose Transaction Type", "लेनदेन प्रकार चुनें")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col gap-2 text-base"
+              onClick={() => {
+                setShowChooser(false);
+                setShowLoadingDialog(true);
+              }}
+              data-testid="button-choose-loading"
+            >
+              <Truck className="h-6 w-6" />
+              {t("Loading", "लोडिंग")}
+            </Button>
+            <Button
+              variant="outline"
+              className="h-24 flex flex-col gap-2 text-base"
+              onClick={() => {
+                setShowChooser(false);
+                setShowLoadDialog(true);
+              }}
+              data-testid="button-choose-sale"
+            >
+              <IndianRupee className="h-6 w-6" />
+              {t("Sale / Bikri", "बिक्री")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <LoadTruckDialog 
         open={showLoadDialog} 
         onOpenChange={setShowLoadDialog}
+        selectedCrop={selectedCrop}
+      />
+
+      <LoadingTruckDialog
+        open={showLoadingDialog}
+        onOpenChange={setShowLoadingDialog}
         selectedCrop={selectedCrop}
       />
 
@@ -539,6 +594,14 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         merchantId={user?.merchantId || 0}
         open={printTransactionId !== null}
         onOpenChange={(open) => !open && setPrintTransactionId(null)}
+        cropType={selectedCrop}
+      />
+
+      <LoadingReceiptDialog
+        transactionId={printLoadingTransactionId}
+        merchantId={user?.merchantId || 0}
+        open={printLoadingTransactionId !== null}
+        onOpenChange={(open) => !open && setPrintLoadingTransactionId(null)}
         cropType={selectedCrop}
       />
 
@@ -588,6 +651,11 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                     year: "numeric",
                   })}
                 </span>
+                {transaction.transactionType === "loading" && (
+                  <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-600 h-5">
+                    {t("Loading", "लोडिंग")}
+                  </Badge>
+                )}
               </div>
               {transaction.partyName && (
                 <span className="font-semibold text-sm leading-tight">

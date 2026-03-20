@@ -892,6 +892,13 @@ export class DatabaseStorage implements IStorage {
       
       const { breakdownCosts } = this.computeBreakdownCosts(lot, breakdowns);
       
+      const mandiCharges = {
+        mandiCommissionPercent: lot.mandiCommissionPercent || null,
+        aadhatCommissionPercent: lot.aadhatCommissionPercent || null,
+        hammaliPerBag: lot.hammaliPerBag || null,
+        mandiExtraCharges: lot.mandiExtraCharges || null,
+      };
+
       if (breakdowns.length > 0) {
         for (const breakdown of breakdowns) {
           if (breakdown.size === "Wastage") continue;
@@ -919,6 +926,7 @@ export class DatabaseStorage implements IStorage {
             totalWeight: breakdown.weight || lot.totalWeight || null,
             breakdownWeight: breakdown.weight || null,
             costPerBag: breakdownCosts.get(breakdown.id) || 0,
+            ...mandiCharges,
           });
         }
       } else {
@@ -943,6 +951,7 @@ export class DatabaseStorage implements IStorage {
             totalWeight: lot.totalWeight || null,
             breakdownWeight: null,
             costPerBag: breakdownCosts.get(null) || 0,
+            ...mandiCharges,
           });
         }
       }

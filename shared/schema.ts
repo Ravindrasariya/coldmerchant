@@ -149,6 +149,7 @@ export const transactions = pgTable("transactions", {
   uniqueId: text("unique_id"), // HTE + YYYYMMDD + sequence (e.g., HTE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
+  transactionType: text("transaction_type").default("sale"), // "sale" or "loading"
   crop: text("crop").default("potato"), // potato, onion, or garlic - for separate transaction number sequences
   transporterName: text("transporter_name"), // transporter/driver name for autocomplete history
   driverContact: text("driver_contact"), // driver/transporter contact number
@@ -167,6 +168,11 @@ export const transactions = pgTable("transactions", {
   totalNetWeight: decimal("total_net_weight", { precision: 12, scale: 2 }),
   totalCostOfGoods: decimal("total_cost_of_goods", { precision: 12, scale: 2 }),
   profitLoss: decimal("profit_loss", { precision: 12, scale: 2 }),
+  salesCommission: decimal("sales_commission", { precision: 12, scale: 2 }),
+  totalMandiCommission: decimal("total_mandi_commission", { precision: 12, scale: 2 }),
+  totalAadhatCommission: decimal("total_aadhat_commission", { precision: 12, scale: 2 }),
+  totalHammali: decimal("total_hammali", { precision: 12, scale: 2 }),
+  totalMandiExtraCharges: decimal("total_mandi_extra_charges", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -186,6 +192,8 @@ export const transactionItems = pgTable("transaction_items", {
   pricePerKgSnapshot: decimal("price_per_kg_snapshot", { precision: 10, scale: 2 }),
   costOfGoods: decimal("cost_of_goods", { precision: 12, scale: 2 }),
   revenue: decimal("revenue", { precision: 12, scale: 2 }), // per-item revenue for P&L calculation
+  pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }), // user-entered price/kg for loading mode
+  amount: decimal("amount", { precision: 12, scale: 2 }), // pricePerKg * netWeight for loading mode
   createdAt: timestamp("created_at").defaultNow(),
 });
 

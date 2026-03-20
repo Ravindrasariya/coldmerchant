@@ -1572,14 +1572,14 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
       }
 
       // Parse inventoryKey and validate
-      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number }[] = [];
+      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number; pricePerKg?: number; amount?: number }[] = [];
       
       for (const item of items) {
         // Parse inventoryKey format: "lotId-breakdownId" or "lotId-lot"
@@ -1625,6 +1625,8 @@ export async function registerRoutes(
           breakdownId,
           bagsMoved: item.bagsMoved,
           netWeight: item.netWeight || 0,
+          pricePerKg: item.pricePerKg,
+          amount: item.amount,
         });
       }
 
@@ -1664,7 +1666,7 @@ export async function registerRoutes(
         totalNetWeight += netWeight;
         totalCostOfGoods += costOfGoods;
 
-        return {
+        const itemResult: any = {
           merchantId,
           lotId: item.lotId,
           breakdownId: item.breakdownId,
@@ -1677,18 +1679,35 @@ export async function registerRoutes(
           pricePerKgSnapshot: costPerBag.toString(),
           costOfGoods: costOfGoods.toString(),
         };
+
+        if (transactionType === "loading") {
+          itemResult.pricePerKg = item.pricePerKg ? item.pricePerKg.toString() : null;
+          itemResult.amount = item.amount ? item.amount.toString() : null;
+          itemResult.revenue = item.amount ? item.amount.toString() : "0";
+        }
+
+        return itemResult;
       }));
 
       // Calculate profit/loss
       const revenueNum = parseFloat(revenue) || 0;
       const transportNum = parseFloat(transportationCharges) || 0;
       const otherNum = parseFloat(otherCharges) || 0;
-      const profitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
+      let profitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
+      if (transactionType === "loading") {
+        const scNum = parseFloat(salesCommission) || 0;
+        const mcNum = parseFloat(totalMandiCommission) || 0;
+        const acNum = parseFloat(totalAadhatCommission) || 0;
+        const hNum = parseFloat(totalHammali) || 0;
+        const ecNum = parseFloat(totalMandiExtraCharges) || 0;
+        profitLoss = revenueNum - totalCostOfGoods - scNum - mcNum - acNum - hNum - ecNum;
+      }
 
       const transaction = await storage.createTransaction(
         {
           merchantId,
           transactionNumber,
+          transactionType: transactionType || "sale",
           crop: transactionCrop,
           transporterName: titleCase(transporterName) || null,
           driverContact: driverContact || null,
@@ -1705,6 +1724,11 @@ export async function registerRoutes(
           totalNetWeight: totalNetWeight.toString(),
           totalCostOfGoods: totalCostOfGoods.toString(),
           profitLoss: profitLoss.toString(),
+          salesCommission: salesCommission ? salesCommission.toString() : null,
+          totalMandiCommission: totalMandiCommission ? totalMandiCommission.toString() : null,
+          totalAadhatCommission: totalAadhatCommission ? totalAadhatCommission.toString() : null,
+          totalHammali: totalHammali ? totalHammali.toString() : null,
+          totalMandiExtraCharges: totalMandiExtraCharges ? totalMandiExtraCharges.toString() : null,
         },
         transactionItems
       );
@@ -1747,7 +1771,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -1801,12 +1825,39 @@ export async function registerRoutes(
       const transportNum = parseFloat(transportationCharges !== undefined ? transportationCharges : existingTxn.transportationCharges) || 0;
       const otherNum = parseFloat(otherCharges !== undefined ? otherCharges : existingTxn.otherCharges) || 0;
       const totalCostOfGoods = parseFloat(existingTxn.totalCostOfGoods || "0");
-      const newProfitLoss = existingRevenueNum - totalCostOfGoods - transportNum - otherNum;
+      let newProfitLoss: number;
+      if (existingTxn.transactionType === "loading") {
+        const scNum = parseFloat(salesCommission !== undefined ? salesCommission : existingTxn.salesCommission) || 0;
+        const mcNum = parseFloat(totalMandiCommission !== undefined ? totalMandiCommission : existingTxn.totalMandiCommission) || 0;
+        const acNum = parseFloat(totalAadhatCommission !== undefined ? totalAadhatCommission : existingTxn.totalAadhatCommission) || 0;
+        const hNum = parseFloat(totalHammali !== undefined ? totalHammali : existingTxn.totalHammali) || 0;
+        const ecNum = parseFloat(totalMandiExtraCharges !== undefined ? totalMandiExtraCharges : existingTxn.totalMandiExtraCharges) || 0;
+        newProfitLoss = existingRevenueNum - totalCostOfGoods - scNum - mcNum - acNum - hNum - ecNum;
+      } else {
+        newProfitLoss = existingRevenueNum - totalCostOfGoods - transportNum - otherNum;
+      }
       
       if (!decimalEqual(newProfitLoss, existingTxn.profitLoss)) {
         changes.push({ field: "profitLoss", oldValue: existingTxn.profitLoss, newValue: newProfitLoss.toString() });
       }
       
+      // Track loading-specific field changes
+      if (salesCommission !== undefined && !decimalEqual(salesCommission, existingTxn.salesCommission)) {
+        changes.push({ field: "salesCommission", oldValue: existingTxn.salesCommission, newValue: salesCommission?.toString() || null });
+      }
+      if (totalMandiCommission !== undefined && !decimalEqual(totalMandiCommission, existingTxn.totalMandiCommission)) {
+        changes.push({ field: "totalMandiCommission", oldValue: existingTxn.totalMandiCommission, newValue: totalMandiCommission?.toString() || null });
+      }
+      if (totalAadhatCommission !== undefined && !decimalEqual(totalAadhatCommission, existingTxn.totalAadhatCommission)) {
+        changes.push({ field: "totalAadhatCommission", oldValue: existingTxn.totalAadhatCommission, newValue: totalAadhatCommission?.toString() || null });
+      }
+      if (totalHammali !== undefined && !decimalEqual(totalHammali, existingTxn.totalHammali)) {
+        changes.push({ field: "totalHammali", oldValue: existingTxn.totalHammali, newValue: totalHammali?.toString() || null });
+      }
+      if (totalMandiExtraCharges !== undefined && !decimalEqual(totalMandiExtraCharges, existingTxn.totalMandiExtraCharges)) {
+        changes.push({ field: "totalMandiExtraCharges", oldValue: existingTxn.totalMandiExtraCharges, newValue: totalMandiExtraCharges?.toString() || null });
+      }
+
       // Update the transaction (do NOT update revenue - it's derived from items)
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: titleCase(partyName) || null,
@@ -1820,6 +1871,11 @@ export async function registerRoutes(
         remarks: remarks !== undefined ? (remarks || null) : existingTxn.remarks,
         profitLoss: newProfitLoss.toString(),
         ...(buyerId !== undefined ? { buyerId } : {}),
+        ...(salesCommission !== undefined ? { salesCommission: salesCommission ? salesCommission.toString() : null } : {}),
+        ...(totalMandiCommission !== undefined ? { totalMandiCommission: totalMandiCommission ? totalMandiCommission.toString() : null } : {}),
+        ...(totalAadhatCommission !== undefined ? { totalAadhatCommission: totalAadhatCommission ? totalAadhatCommission.toString() : null } : {}),
+        ...(totalHammali !== undefined ? { totalHammali: totalHammali ? totalHammali.toString() : null } : {}),
+        ...(totalMandiExtraCharges !== undefined ? { totalMandiExtraCharges: totalMandiExtraCharges ? totalMandiExtraCharges.toString() : null } : {}),
       });
       
       // Record edit history if there are changes

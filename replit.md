@@ -226,6 +226,15 @@ The Books feature provides simplified accounting views:
 - FY selector allows viewing any year (Indian FY: April–March).
 - Tables: `assets`, `asset_depreciation_log`, `liabilities`, `liability_payments`
 
+### Loading Mode (Transactions)
+- **Transaction Types**: Two types — "sale" (default, multi-buyer, legacy) and "loading" (single buyer, mandi charges, price/kg per lot)
+- **Chooser Popup**: "Load A Truck" button shows chooser between Loading and Sale/Bikri modes
+- **Loading Dialog** (`loading-truck-dialog.tsx`): Single buyer, lot picker with ₹/Kg (pre-filled from stock register), Net Weight (proportionate), Amount (₹/Kg × Net Weight), P&L per lot, auto-aggregated mandi charges (commission %, aadhat %, hammali/bag, extra charges), Sales Commission, Advance Amount, Driver Advance, Grand Total
+- **Loading Receipt** (`loading-receipt.tsx`): Displays lot details with ₹/Kg and Amount columns, mandi charge breakdown, grand total
+- **DB Fields**: `transactions.transactionType`, `salesCommission`, `totalMandiCommission`, `totalAadhatCommission`, `totalHammali`, `totalMandiExtraCharges`; `transactionItems.pricePerKg`, `amount`
+- **P&L Formula**: Loading P&L = Revenue - COGS - salesCommission - mandiCharges (vs Sale P&L = Revenue - COGS - transport - other)
+- **Edit**: Loading transactions show loading-specific fields (sales commission, advance, mandi charges) instead of transport/other charges
+
 ### Demo Videos
 - multer for video file uploads (disk storage in uploads/ directory)
 - Admin uploads/manages videos via /api/admin/demo-videos endpoints

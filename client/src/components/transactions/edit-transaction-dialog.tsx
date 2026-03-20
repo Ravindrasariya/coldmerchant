@@ -102,6 +102,7 @@ interface EditHistoryEntry {
 interface TransactionWithHistory {
   id: number;
   transactionNumber: number;
+  transactionType: string | null;
   buyerId: number | null;
   partyName: string | null;
   partyAddress: string | null;
@@ -117,6 +118,11 @@ interface TransactionWithHistory {
   totalNetWeight: string | null;
   totalCostOfGoods: string | null;
   profitLoss: string | null;
+  salesCommission: string | null;
+  totalMandiCommission: string | null;
+  totalAadhatCommission: string | null;
+  totalHammali: string | null;
+  totalMandiExtraCharges: string | null;
   createdAt: string;
   items: TransactionItem[];
   editHistory: EditHistoryEntry[];
@@ -131,6 +137,11 @@ const editTransactionSchema = z.object({
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
   remarks: z.string().optional(),
+  salesCommission: z.coerce.number().optional(),
+  totalMandiCommission: z.coerce.number().optional(),
+  totalAadhatCommission: z.coerce.number().optional(),
+  totalHammali: z.coerce.number().optional(),
+  totalMandiExtraCharges: z.coerce.number().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -214,6 +225,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       transportationCharges: undefined,
       otherCharges: undefined,
       remarks: "",
+      salesCommission: undefined,
+      totalMandiCommission: undefined,
+      totalAadhatCommission: undefined,
+      totalHammali: undefined,
+      totalMandiExtraCharges: undefined,
     },
   });
 
@@ -228,6 +244,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         transportationCharges: transaction.transportationCharges && parseFloat(transaction.transportationCharges) !== 0 ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? parseFloat(transaction.otherCharges) : undefined,
         remarks: transaction.remarks || "",
+        salesCommission: transaction.salesCommission ? parseFloat(transaction.salesCommission) : undefined,
+        totalMandiCommission: transaction.totalMandiCommission ? parseFloat(transaction.totalMandiCommission) : undefined,
+        totalAadhatCommission: transaction.totalAadhatCommission ? parseFloat(transaction.totalAadhatCommission) : undefined,
+        totalHammali: transaction.totalHammali ? parseFloat(transaction.totalHammali) : undefined,
+        totalMandiExtraCharges: transaction.totalMandiExtraCharges ? parseFloat(transaction.totalMandiExtraCharges) : undefined,
       });
       setSelectedBuyerId(transaction.buyerId || null);
       setEditableItems(transaction.items.map(item => ({
@@ -470,6 +491,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       otherCharges: t("Other Charges", "अन्य शुल्क"),
       revenue: t("Revenue", "राजस्व"),
       profitLoss: t("Profit/Loss", "लाभ/हानि"),
+      salesCommission: t("Sales Commission", "बिक्री कमीशन"),
+      totalMandiCommission: t("Mandi Commission", "मंडी कमीशन"),
+      totalAadhatCommission: t("Aadhat Commission", "आढ़त कमीशन"),
+      totalHammali: t("Hammali", "हम्माली"),
+      totalMandiExtraCharges: t("Extra Charges", "अतिरिक्त शुल्क"),
     };
     return labels[field] || field;
   };
@@ -935,35 +961,131 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   <p className="text-xs text-muted-foreground mt-1">({t("sum of lot revenues", "लॉट राजस्व का योग")})</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="transportationCharges"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Transportation", "परिवहन")} (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-transportation" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                {transaction.transactionType === "loading" ? (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="salesCommission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Sales Commission", "बिक्री कमीशन")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-sales-commission" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="otherCharges"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Advance Amount", "अग्रिम राशि")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-advance-amount" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="advancePayment"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-driver-advance" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="totalMandiCommission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">{t("Mandi Comm.", "मंडी कमीशन")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-mandi-commission" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalAadhatCommission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">{t("Aadhat Comm.", "आढ़त कमीशन")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-aadhat-commission" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalHammali"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">{t("Hammali", "हम्माली")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-hammali" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalMandiExtraCharges"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">{t("Extra Charges", "अतिरिक्त शुल्क")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-extra-charges" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="transportationCharges"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Transportation", "परिवहन")} (₹)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" placeholder="0" {...field} data-testid="input-transportation" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="otherCharges"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Other Charges", "अन्य शुल्क")} (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-other-charges" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                    <FormField
+                      control={form.control}
+                      name="otherCharges"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Other Charges", "अन्य शुल्क")} (₹)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="any" placeholder="0" {...field} data-testid="input-other-charges" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
 
                 <ProfitLossDisplay 
                   totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.pricePerKg * i.bagsMoved), 0)}
