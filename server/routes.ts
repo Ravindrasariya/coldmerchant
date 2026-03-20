@@ -1660,7 +1660,20 @@ export async function registerRoutes(
         const costPerBag = breakdownCosts.get(item.breakdownId || null) || 0;
         
         const netWeight = item.netWeight || 0;
-        const costOfGoods = costPerBag * item.bagsMoved;
+
+        let costOfGoods: number;
+        let snapshotPrice: number;
+        if (transactionType === "loading") {
+          const loadingBd = item.breakdownId
+            ? allBreakdowns.find(b => b.id === item.breakdownId)
+            : null;
+          const bdPricePerKg = loadingBd?.pricePerKg ? parseFloat(loadingBd.pricePerKg) : (lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0);
+          costOfGoods = bdPricePerKg * netWeight;
+          snapshotPrice = bdPricePerKg;
+        } else {
+          costOfGoods = costPerBag * item.bagsMoved;
+          snapshotPrice = costPerBag;
+        }
 
         totalBags += item.bagsMoved;
         totalNetWeight += netWeight;
@@ -1676,7 +1689,7 @@ export async function registerRoutes(
           size,
           bagsMoved: item.bagsMoved,
           netWeight: netWeight.toString(),
-          pricePerKgSnapshot: costPerBag.toString(),
+          pricePerKgSnapshot: snapshotPrice.toString(),
           costOfGoods: costOfGoods.toString(),
         };
 
@@ -1978,7 +1991,17 @@ export async function registerRoutes(
             const editBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
             const { breakdownCosts: editBdCosts } = editLot ? storage.computeBreakdownCosts(editLot, editBreakdowns) : { breakdownCosts: new Map() };
             const editCostPerBag = editBdCosts.get(existingItem.breakdownId || null) || parseFloat(existingItem.pricePerKgSnapshot || "0");
-            const newCostOfGoods = editCostPerBag * itemChange.bagsMoved;
+            let newCostOfGoods: number;
+            let editBdPpk = 0;
+            if (existingTxn.transactionType === "loading") {
+              const editBd = existingItem.breakdownId
+                ? editBreakdowns.find(b => b.id === existingItem.breakdownId)
+                : null;
+              editBdPpk = editBd?.pricePerKg ? parseFloat(editBd.pricePerKg) : (editLot?.pricePerKg ? parseFloat(editLot.pricePerKg) : 0);
+              newCostOfGoods = editBdPpk * newNetWeight;
+            } else {
+              newCostOfGoods = editCostPerBag * itemChange.bagsMoved;
+            }
             
             const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
@@ -1989,6 +2012,7 @@ export async function registerRoutes(
               revenue: itemRevenue.toString()
             };
             if (existingTxn.transactionType === "loading") {
+              updateFields.pricePerKgSnapshot = editBdPpk.toString();
               if (typeof itemChange.pricePerKg === 'number') updateFields.pricePerKg = itemChange.pricePerKg.toString();
               if (typeof itemChange.amount === 'number') {
                 updateFields.amount = itemChange.amount.toString();
@@ -2062,7 +2086,19 @@ export async function registerRoutes(
           const netWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
             ? itemChange.netWeight
             : itemChange.bagsMoved * 50;
-          const costOfGoods = addCostPerBag * itemChange.bagsMoved;
+          let costOfGoods: number;
+          let addSnapshotPrice: number;
+          if (existingTxn.transactionType === "loading") {
+            const addBd = breakdownId
+              ? addBreakdowns.find(b => b.id === breakdownId)
+              : null;
+            const addBdPpk = addBd?.pricePerKg ? parseFloat(addBd.pricePerKg) : (lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0);
+            costOfGoods = addBdPpk * netWeight;
+            addSnapshotPrice = addBdPpk;
+          } else {
+            costOfGoods = addCostPerBag * itemChange.bagsMoved;
+            addSnapshotPrice = addCostPerBag;
+          }
           
           // Use provided revenue if given, default to 0
           const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : 0;
@@ -2078,7 +2114,7 @@ export async function registerRoutes(
             size,
             bagsMoved: itemChange.bagsMoved,
             netWeight: netWeight.toString(),
-            pricePerKgSnapshot: addCostPerBag.toString(),
+            pricePerKgSnapshot: addSnapshotPrice.toString(),
             costOfGoods: costOfGoods.toString(),
             revenue: itemRevenue.toString()
           };

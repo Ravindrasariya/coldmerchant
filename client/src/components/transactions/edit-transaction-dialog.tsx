@@ -498,7 +498,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (!inv) return;
     
     const costPerBag = inv.costPerBag || 0;
-    const costOfGoods = costPerBag * newItemBags;
+    const breakdownPricePerKg = inv.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
+    const costOfGoods = isLoadingType
+      ? breakdownPricePerKg * newItemWeight
+      : costPerBag * newItemBags;
     
     const loadingPpk = inv.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
     const loadingAmt = isLoadingType ? parseFloat((loadingPpk * newItemWeight).toFixed(2)) : 0;
@@ -515,7 +518,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       originalBags: 0,
       netWeight: newItemWeight,
       originalNetWeight: 0,
-      pricePerKg: costPerBag,
+      pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag,
       costOfGoods: costOfGoods,
       revenue: isLoadingType ? loadingAmt : newItemRevenue,
       originalRevenue: 0,
@@ -700,7 +703,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
               {editableItems.map((item, index) => {
                 if (item.action === 'remove') return null;
-                const itemCost = item.pricePerKg * item.bagsMoved;
+                const itemCost = isLoadingType
+                  ? item.pricePerKg * item.netWeight
+                  : item.pricePerKg * item.bagsMoved;
                 const itemPL = isLoadingType 
                   ? item.loadingAmount - itemCost
                   : item.revenue - itemCost;
@@ -887,7 +892,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 const totalWeight = activeItems.reduce((sum, i) => sum + (i.netWeight || 0), 0);
                 const totalRevOrAmt = activeItems.reduce((sum, i) => sum + (isLoadingType ? i.loadingAmount : (i.revenue || 0)), 0);
                 const totalPL = activeItems.reduce((sum, i) => {
-                  const cost = i.pricePerKg * i.bagsMoved;
+                  const cost = isLoadingType
+                    ? i.pricePerKg * i.netWeight
+                    : i.pricePerKg * i.bagsMoved;
                   return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - cost);
                 }, 0);
                 return (

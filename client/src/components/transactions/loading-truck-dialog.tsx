@@ -224,7 +224,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalBags += bags;
       totalNetWeight += Number(item.netWeight) || 0;
       totalAmount += Number(item.amount) || 0;
-      totalCostOfGoods += (inv?.costPerBag || 0) * bags;
+      const breakdownPricePerKg = inv?.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
+      totalCostOfGoods += breakdownPricePerKg * (Number(item.netWeight) || 0);
     });
 
     const grandTotal = totalAmount + totalMandiCharges + salesCommission - advanceAmount;
@@ -575,8 +576,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
                 {items.map((item, itemIndex) => {
                   const selectedInv = findInventoryByKey(item.inventoryKey);
-                  const costPerBag = selectedInv?.costPerBag || 0;
-                  const itemCost = costPerBag * (Number(item.bagsMoved) || 0);
+                  const breakdownPpk = selectedInv?.pricePerKg ? parseFloat(selectedInv.pricePerKg) : 0;
+                  const itemCost = breakdownPpk * (Number(item.netWeight) || 0);
                   const itemPL = (Number(item.amount) || 0) - itemCost;
 
                   return (
