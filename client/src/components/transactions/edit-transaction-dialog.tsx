@@ -672,13 +672,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto border-t-4 ${isLoadingType ? "border-t-blue-500 dark:border-t-blue-400" : "border-t-emerald-500 dark:border-t-emerald-400"}`}>
-        <DialogHeader className={`-mx-6 -mt-6 px-6 pt-6 pb-4 rounded-t-lg ${isLoadingType ? "bg-blue-50/50 dark:bg-blue-950/30" : "bg-emerald-50/50 dark:bg-emerald-950/30"}`}>
+      <DialogContent className={`w-[95vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border-t-4 ${isLoadingType ? "border-t-blue-500 dark:border-t-blue-400" : "border-t-emerald-500 dark:border-t-emerald-400"}`}>
+        <DialogHeader className={`shrink-0 -mx-6 -mt-6 px-6 pt-6 pb-4 rounded-t-lg ${isLoadingType ? "bg-blue-50/50 dark:bg-blue-950/30" : "bg-emerald-50/50 dark:bg-emerald-950/30"}`}>
           <DialogTitle className={isLoadingType ? "text-blue-700 dark:text-blue-300" : "text-emerald-700 dark:text-emerald-300"}>
             {t("Edit Transaction", "लेनदेन संपादित करें")} #{transaction?.transactionNumber}
           </DialogTitle>
         </DialogHeader>
 
+        <div className="overflow-y-auto flex-1 min-h-0">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-10 w-full" />
@@ -1418,6 +1419,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
             {t("Transaction not found", "लेनदेन नहीं मिला")}
           </div>
         )}
+        </div>
       </DialogContent>
 
       <AlertDialog open={deleteConfirmIndex !== null} onOpenChange={(open) => !open && setDeleteConfirmIndex(null)}>

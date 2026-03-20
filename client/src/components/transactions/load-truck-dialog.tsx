@@ -434,8 +434,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
         onOpenChange(true);
       }
     }}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
-        <DialogHeader className="bg-emerald-50/50 dark:bg-emerald-950/30 -mx-6 -mt-6 px-6 pt-6 pb-4 rounded-t-lg">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
+        <DialogHeader className="shrink-0 bg-emerald-50/50 dark:bg-emerald-950/30 -mx-6 -mt-6 px-6 pt-6 pb-4 rounded-t-lg">
           <DialogTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
             <Truck className="h-5 w-5" />
             {t("Load A Truck", "ट्रक लोड करें")}
@@ -448,6 +448,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           </DialogDescription>
         </DialogHeader>
 
+        <div className="overflow-y-auto flex-1 min-h-0">
         <div className="space-y-6">
           {/* Header Section - Transport Details */}
           <Card className="bg-muted/30">
@@ -956,6 +957,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
               {t("Save Transaction", "लेनदेन सेव करें")}
             </Button>
           </div>
+        </div>
         </div>
       </DialogContent>
     </Dialog>
