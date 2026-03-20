@@ -362,33 +362,40 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   const isLoadingType = transaction?.transactionType === "loading";
 
-  useEffect(() => {
-    if (!isLoadingType) return;
-    const activeItems = editableItems.filter(i => i.action !== 'remove');
-    let mc = 0, ac = 0, hm = 0, ec = 0;
-    activeItems.forEach(item => {
-      const amount = item.loadingAmount || 0;
-      const bags = item.bagsMoved || 0;
-      if (item.mandiCommissionPercent) {
-        mc += (amount * parseFloat(item.mandiCommissionPercent)) / 100;
-      }
-      if (item.aadhatCommissionPercent) {
-        ac += (amount * parseFloat(item.aadhatCommissionPercent)) / 100;
-      }
-      if (item.hammaliPerBag) {
-        hm += bags * parseFloat(item.hammaliPerBag);
-      }
-      if (item.mandiExtraCharges) {
-        const lotExtra = parseFloat(item.mandiExtraCharges);
-        const proportion = item.lotOriginalBags > 0 ? bags / item.lotOriginalBags : 0;
-        ec += lotExtra * proportion;
-      }
-    });
-    form.setValue("totalMandiCommission", Math.round(mc * 100) / 100 || undefined);
-    form.setValue("totalAadhatCommission", Math.round(ac * 100) / 100 || undefined);
-    form.setValue("totalHammali", Math.round(hm * 100) / 100 || undefined);
-    form.setValue("totalMandiExtraCharges", Math.round(ec * 100) / 100 || undefined);
-  }, [editableItems, isLoadingType, form]);
+  const computeItemMandiCharges = (item: EditableItem) => {
+    const costBasis = item.costOfGoods || 0;
+    const bags = item.bagsMoved || 0;
+    const mc = item.mandiCommissionPercent ? (costBasis * parseFloat(item.mandiCommissionPercent)) / 100 : 0;
+    const ac = item.aadhatCommissionPercent ? (costBasis * parseFloat(item.aadhatCommissionPercent)) / 100 : 0;
+    const hm = item.hammaliPerBag ? bags * parseFloat(item.hammaliPerBag) : 0;
+    const ec = item.mandiExtraCharges && item.lotOriginalBags > 0
+      ? parseFloat(item.mandiExtraCharges) * (bags / item.lotOriginalBags) : 0;
+    return {
+      mc: Math.round(mc * 100) / 100,
+      ac: Math.round(ac * 100) / 100,
+      hm: Math.round(hm * 100) / 100,
+      ec: Math.round(ec * 100) / 100,
+    };
+  };
+
+  const adjustMandiCharges = (delta: { mc: number; ac: number; hm: number; ec: number }, sign: 1 | -1) => {
+    const cur = {
+      mc: Number(form.getValues("totalMandiCommission")) || 0,
+      ac: Number(form.getValues("totalAadhatCommission")) || 0,
+      hm: Number(form.getValues("totalHammali")) || 0,
+      ec: Number(form.getValues("totalMandiExtraCharges")) || 0,
+    };
+    const updated = {
+      mc: Math.round((cur.mc + sign * delta.mc) * 100) / 100,
+      ac: Math.round((cur.ac + sign * delta.ac) * 100) / 100,
+      hm: Math.round((cur.hm + sign * delta.hm) * 100) / 100,
+      ec: Math.round((cur.ec + sign * delta.ec) * 100) / 100,
+    };
+    form.setValue("totalMandiCommission", updated.mc || undefined);
+    form.setValue("totalAadhatCommission", updated.ac || undefined);
+    form.setValue("totalHammali", updated.hm || undefined);
+    form.setValue("totalMandiExtraCharges", updated.ec || undefined);
+  };
 
   const updateItemsMutation = useMutation({
     mutationFn: async () => {
@@ -596,6 +603,25 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       lotOriginalBags: inv.lotOriginalBags || 0,
       action: 'add' as const
     }]);
+    
+    if (isLoadingType) {
+      const newItem: EditableItem = {
+        lotId: inv.lotId, breakdownId: inv.breakdownId, serialNumber: inv.serialNumber,
+        place: inv.place, coldStoreName: inv.coldStoreName, potatoType: inv.potatoType, size: inv.size,
+        bagsMoved: newItemBags, originalBags: 0, netWeight: newItemWeight, originalNetWeight: 0,
+        pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag, costOfGoods,
+        revenue: isLoadingType ? loadingAmt : newItemRevenue, originalRevenue: 0,
+        loadingPricePerKg: loadingPpk, loadingAmount: loadingAmt,
+        lotSourceWeight: 0, lotSourceBags: 0,
+        mandiCommissionPercent: inv.mandiCommissionPercent || null,
+        aadhatCommissionPercent: inv.aadhatCommissionPercent || null,
+        hammaliPerBag: inv.hammaliPerBag || null,
+        mandiExtraCharges: inv.mandiExtraCharges || null,
+        lotOriginalBags: inv.lotOriginalBags || 0,
+        action: 'add',
+      };
+      adjustMandiCharges(computeItemMandiCharges(newItem), 1);
+    }
     
     setSelectedInventory("");
     setNewItemBags(0);
