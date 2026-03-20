@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ComponentType, type DragEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type ComponentType, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import vyaparVriddhiLogo from "@assets/Screenshot_2026-01-17_at_10.27.58_AM_1768625967467.png";
@@ -197,6 +197,46 @@ export default function HomePage() {
     setDragOverIndex(null);
   }, []);
 
+  const mobileListRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = useCallback((index: number) => {
+    dragItemRef.current = index;
+  }, []);
+
+  const handleTouchMove = useCallback((e: ReactTouchEvent) => {
+    if (dragItemRef.current === null || !mobileListRef.current) return;
+    const touch = e.touches[0];
+    const items = mobileListRef.current.querySelectorAll<HTMLElement>('[data-tab-index]');
+    for (const item of items) {
+      const rect = item.getBoundingClientRect();
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        const idx = parseInt(item.getAttribute('data-tab-index') || '-1', 10);
+        if (idx >= 0 && idx !== dragOverItemRef.current) {
+          dragOverItemRef.current = idx;
+          setDragOverIndex(idx);
+        }
+        break;
+      }
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const from = dragItemRef.current;
+    const to = dragOverItemRef.current;
+    if (from !== null && to !== null && from !== to) {
+      setTabOrder(prev => {
+        const updated = [...prev];
+        const [moved] = updated.splice(from, 1);
+        updated.splice(to, 0, moved);
+        saveTabOrder(userId, updated);
+        return updated;
+      });
+    }
+    dragItemRef.current = null;
+    dragOverItemRef.current = null;
+    setDragOverIndex(null);
+  }, [userId]);
+
   const resetTabOrder = useCallback(() => {
     setTabOrder(DEFAULT_TAB_ORDER);
     localStorage.removeItem(getTabOrderKey(userId));
@@ -373,12 +413,14 @@ export default function HomePage() {
                       </div>
                     </div>
                     <nav className="flex-1 p-2">
+                      <div ref={mobileListRef}>
                       <TabsList className="flex flex-col w-full h-auto gap-1 bg-transparent p-0">
                         {tabOrder.map((tab, index) => {
                           const Icon = tab.icon;
                           return (
                             <div
                               key={tab.value}
+                              data-tab-index={index}
                               draggable
                               onDragStart={() => handleDragStart(index)}
                               onDragOver={(e) => handleDragOver(e, index)}
@@ -386,7 +428,12 @@ export default function HomePage() {
                               onDragEnd={handleDragEnd}
                               className={`flex items-center w-full ${dragOverIndex === index ? 'ring-2 ring-primary ring-offset-1 rounded-md' : ''}`}
                             >
-                              <GripVertical className="h-4 w-4 text-muted-foreground/50 shrink-0 cursor-grab active:cursor-grabbing mr-1" />
+                              <GripVertical
+                                className="h-4 w-4 text-muted-foreground/50 shrink-0 cursor-grab active:cursor-grabbing mr-1 touch-none"
+                                onTouchStart={() => handleTouchStart(index)}
+                                onTouchMove={handleTouchMove}
+                                onTouchEnd={handleTouchEnd}
+                              />
                               <TabsTrigger
                                 value={tab.value}
                                 className="flex-1 justify-start gap-2 px-3 py-2.5 text-sm font-extrabold rounded-md transition-colors data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50"
@@ -403,6 +450,7 @@ export default function HomePage() {
                           );
                         })}
                       </TabsList>
+                      </div>
                       {isCustomOrder && (
                         <button
                           onClick={resetTabOrder}
