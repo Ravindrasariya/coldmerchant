@@ -89,6 +89,7 @@ interface EditableItem {
   originalNetWeight: number;
   pricePerKg: number;
   costOfGoods: number;
+  originalCostOfGoods: number;
   revenue: number;
   originalRevenue: number;
   loadingPricePerKg: number;
@@ -310,6 +311,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         originalNetWeight: parseFloat(item.netWeight || "0"),
         pricePerKg: parseFloat(item.pricePerKgSnapshot || "0"),
         costOfGoods: parseFloat(item.costOfGoods || "0"),
+        originalCostOfGoods: parseFloat(item.costOfGoods || "0"),
         revenue: parseFloat(item.revenue || "0"),
         originalRevenue: parseFloat(item.revenue || "0"),
         loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
@@ -459,7 +461,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       }
       const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
       const newCostOfGoods = item.originalBags > 0
-        ? parseFloat(((newBags / item.originalBags) * item.costOfGoods).toFixed(2))
+        ? parseFloat(((newBags / item.originalBags) * item.originalCostOfGoods).toFixed(2))
         : item.costOfGoods;
       const hasChanges = newBags !== item.originalBags || newWeight !== item.originalNetWeight || item.revenue !== item.originalRevenue;
       return {
@@ -479,7 +481,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       if (i !== index) return item;
       const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
       const newCostOfGoods = item.originalNetWeight > 0
-        ? parseFloat(((newWeight / item.originalNetWeight) * item.costOfGoods).toFixed(2))
+        ? parseFloat(((newWeight / item.originalNetWeight) * item.originalCostOfGoods).toFixed(2))
         : item.costOfGoods;
       const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
       return {
@@ -600,6 +602,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       originalNetWeight: 0,
       pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag,
       costOfGoods: costOfGoods,
+      originalCostOfGoods: costOfGoods,
       revenue: isLoadingType ? loadingAmt : newItemRevenue,
       originalRevenue: 0,
       loadingPricePerKg: loadingPpk,
@@ -620,7 +623,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         lotId: inv.lotId, breakdownId: inv.breakdownId, serialNumber: inv.serialNumber,
         place: inv.place, coldStoreName: inv.coldStoreName, potatoType: inv.potatoType, size: inv.size,
         bagsMoved: newItemBags, originalBags: 0, netWeight: newItemWeight, originalNetWeight: 0,
-        pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag, costOfGoods,
+        pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag, costOfGoods, originalCostOfGoods: costOfGoods,
         revenue: isLoadingType ? loadingAmt : newItemRevenue, originalRevenue: 0,
         loadingPricePerKg: loadingPpk, loadingAmount: loadingAmt,
         lotSourceWeight: 0, lotSourceBags: 0,
@@ -1108,10 +1111,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 const totalWeight = activeItems.reduce((sum, i) => sum + (i.netWeight || 0), 0);
                 const totalRevOrAmt = activeItems.reduce((sum, i) => sum + (isLoadingType ? i.loadingAmount : (i.revenue || 0)), 0);
                 const totalPL = activeItems.reduce((sum, i) => {
-                  const cost = isLoadingType
-                    ? i.pricePerKg * i.netWeight
-                    : i.pricePerKg * i.bagsMoved;
-                  return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - cost);
+                  return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - i.costOfGoods);
                 }, 0);
                 return (
                   <>
@@ -1255,8 +1255,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
                       const totalItemPL = activeItems.reduce((sum, i) => {
-                        const cost = i.pricePerKg * i.netWeight;
-                        return sum + (i.loadingAmount - cost);
+                        return sum + (i.loadingAmount - i.costOfGoods);
                       }, 0);
                       const sc = Number(form.watch("salesCommission")) || 0;
                       const totalPL = totalItemPL + sc;
