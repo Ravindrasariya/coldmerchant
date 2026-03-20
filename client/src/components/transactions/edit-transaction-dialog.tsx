@@ -487,7 +487,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const bags = inv.remainingBags;
       const wpb = getWeightPerBag(inv);
       const totalWeight = wpb * bags;
-      const weight = isLoadingType ? Math.max(0, totalWeight - bags) : totalWeight;
+      const weight = Math.max(0, totalWeight - bags);
       setNewItemBags(bags);
       setNewItemWeight(parseFloat(weight.toFixed(1)));
       setNewItemRevenue(0);
@@ -774,7 +774,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         if (inv) {
                           const wpb = getWeightPerBag(inv);
                           const totalWeight = wpb * bags;
-                          const weight = isLoadingType ? Math.max(0, totalWeight - bags) : totalWeight;
+                          const weight = Math.max(0, totalWeight - bags);
                           setNewItemWeight(parseFloat(weight.toFixed(1)));
                         }
                       }}
