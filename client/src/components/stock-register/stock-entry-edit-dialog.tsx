@@ -237,6 +237,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock-entries', entry.id, 'history'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
