@@ -294,11 +294,8 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 {transaction.partyAddress && (
                   <p className="text-sm text-gray-600">{transaction.partyAddress}</p>
                 )}
+                <p><strong>Driver Advance:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}</p>
               </div>
-            </div>
-
-            <div className="text-right mb-4">
-              <p><strong>Driver Advance:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}</p>
             </div>
 
             <table className="w-full border-collapse">
