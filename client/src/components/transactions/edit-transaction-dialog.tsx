@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -949,152 +950,81 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="partyName"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
-                        <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={buyerPopoverOpen}
-                                className={cn(
-                                  "justify-between font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                                data-testid="select-buyer-name"
-                              >
-                                {field.value || t("Select buyer...", "खरीदार चुनें...")}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0" align="start">
-                            <Command>
-                              <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
-                              <CommandList>
-                                <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
-                                <CommandGroup>
-                                  {buyers.filter(b => b.isActive !== false).map((buyer) => (
-                                    <CommandItem
-                                      key={buyer.id}
-                                      value={buyer.name}
-                                      onSelect={() => {
-                                        field.onChange(buyer.name);
-                                        setSelectedBuyerId(buyer.id);
-                                        setBuyerPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          field.value === buyer.name ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {buyer.name}
-                                      {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
-                                      {buyer.redFlag && (
-                                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                          Red Flag
-                                        </span>
-                                      )}
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="vehicleNumber"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
-                        <FormControl>
-                          <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="driverContact"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
-                        <FormControl>
-                          <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="advancePayment"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="amountReceived"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("Amount Received", "प्राप्त राशि")} (₹)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="any" placeholder="0" {...field} readOnly className="bg-muted cursor-not-allowed" data-testid="input-amount-received" />
-                        </FormControl>
-                        <p className="text-xs text-muted-foreground">{t("Managed via Cash tab", "कैश टैब से प्रबंधित")}</p>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
-                  <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
-                    ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">({t("sum of lot revenues", "लॉट राजस्व का योग")})</p>
-                </div>
-
-                {transaction.transactionType === "loading" ? (
+                {isLoadingType ? (
                   <>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
-                        name="salesCommission"
+                        name="partyName"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("Sales Commission", "बिक्री कमीशन")} (₹)</FormLabel>
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
+                            <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={buyerPopoverOpen}
+                                    className={cn(
+                                      "justify-between font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                    data-testid="select-buyer-name"
+                                  >
+                                    {field.value || t("Select buyer...", "खरीदार चुनें...")}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
+                                  <CommandList>
+                                    <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
+                                    <CommandGroup>
+                                      {buyers.filter(b => b.isActive !== false).map((buyer) => (
+                                        <CommandItem
+                                          key={buyer.id}
+                                          value={buyer.name}
+                                          onSelect={() => {
+                                            field.onChange(buyer.name);
+                                            setSelectedBuyerId(buyer.id);
+                                            setBuyerPopoverOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === buyer.name ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {buyer.name}
+                                          {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
+                                          {buyer.redFlag && (
+                                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                              Red Flag
+                                            </span>
+                                          )}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="vehicleNumber"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
                             <FormControl>
-                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-sales-commission" />
+                              <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1102,12 +1032,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       />
                       <FormField
                         control={form.control}
-                        name="otherCharges"
+                        name="driverContact"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("Advance Amount", "अग्रिम राशि")} (₹)</FormLabel>
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
                             <FormControl>
-                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-advance-amount" />
+                              <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1117,16 +1047,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         control={form.control}
                         name="advancePayment"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="flex flex-col">
                             <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-driver-advance" />
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <FormField
                         control={form.control}
@@ -1177,53 +1108,246 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         )}
                       />
                     </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="salesCommission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Sales Commission", "बिक्री कमीशन")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-edit-sales-commission" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div>
+                        <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
+                        <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
+                          ₹{(() => {
+                            const lotAmounts = editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.loadingAmount || 0), 0);
+                            const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
+                            const sc = Number(form.watch("salesCommission")) || 0;
+                            return parseFloat((lotAmounts + mandiTotal + sc).toFixed(1)).toLocaleString('en-IN');
+                          })()}
+                        </div>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="amountReceived"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Amount Received", "प्राप्त राशि")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} readOnly className="bg-muted cursor-not-allowed" data-testid="input-amount-received" />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground">{t("Managed via Cash tab", "कैश टैब से प्रबंधित")}</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {(() => {
+                      const activeItems = editableItems.filter(i => i.action !== 'remove');
+                      const totalItemPL = activeItems.reduce((sum, i) => {
+                        const cost = i.pricePerKg * i.netWeight;
+                        return sum + (i.loadingAmount - cost);
+                      }, 0);
+                      const sc = Number(form.watch("salesCommission")) || 0;
+                      const totalPL = totalItemPL + sc;
+                      return (
+                        <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
+                          <CardContent className="py-3 px-4 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium">{t("Total P&L", "कुल लाभ/हानि")}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {t("Sum of lot P&L", "लॉट P&L का योग")} + {t("Sales Commission", "बिक्री कमीशन")}
+                              </p>
+                            </div>
+                            <p className={`text-xl font-bold ${totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                              {totalPL >= 0 ? "+" : ""}₹{parseFloat(Math.abs(totalPL).toFixed(1)).toLocaleString('en-IN')}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
                   </>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="transportationCharges"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("Transportation", "परिवहन")} (₹)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="any" placeholder="0" {...field} data-testid="input-transportation" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <>
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="partyName"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
+                            <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={buyerPopoverOpen}
+                                    className={cn(
+                                      "justify-between font-normal",
+                                      !field.value && "text-muted-foreground"
+                                    )}
+                                    data-testid="select-buyer-name"
+                                  >
+                                    {field.value || t("Select buyer...", "खरीदार चुनें...")}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={t("Search buyer...", "खरीदार खोजें...")} />
+                                  <CommandList>
+                                    <CommandEmpty>{t("No buyer found.", "कोई खरीदार नहीं मिला।")}</CommandEmpty>
+                                    <CommandGroup>
+                                      {buyers.filter(b => b.isActive !== false).map((buyer) => (
+                                        <CommandItem
+                                          key={buyer.id}
+                                          value={buyer.name}
+                                          onSelect={() => {
+                                            field.onChange(buyer.name);
+                                            setSelectedBuyerId(buyer.id);
+                                            setBuyerPopoverOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              field.value === buyer.name ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          {buyer.name}
+                                          {buyer.address && <span className="ml-1 text-xs text-muted-foreground">({buyer.address})</span>}
+                                          {buyer.redFlag && (
+                                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                              Red Flag
+                                            </span>
+                                          )}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="vehicleNumber"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="driverContact"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
+                            <FormControl>
+                              <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                    <FormField
-                      control={form.control}
-                      name="otherCharges"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("Other Charges", "अन्य शुल्क")} (₹)</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="any" placeholder="0" {...field} data-testid="input-other-charges" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="advancePayment"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="amountReceived"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Amount Received", "प्राप्त राशि")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} readOnly className="bg-muted cursor-not-allowed" data-testid="input-amount-received" />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground">{t("Managed via Cash tab", "कैश टैब से प्रबंधित")}</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
+                      <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
+                        ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">({t("sum of lot revenues", "लॉट राजस्व का योग")})</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="transportationCharges"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Transportation", "परिवहन")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-transportation" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="otherCharges"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Other Charges", "अन्य शुल्क")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} data-testid="input-other-charges" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <ProfitLossDisplay 
+                      totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.pricePerKg * i.bagsMoved), 0)}
+                      revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0)}
+                      transportationCharges={form.watch("transportationCharges") || 0}
+                      otherCharges={form.watch("otherCharges") || 0}
+                      isLoadingType={false}
+                      salesCommission={0}
+                      mandiCharges={0}
                     />
-                  </div>
+                  </>
                 )}
-
-                <ProfitLossDisplay 
-                  totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.pricePerKg * i.bagsMoved), 0)}
-                  revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (isLoadingType ? i.loadingAmount : (i.revenue || 0)), 0)}
-                  transportationCharges={form.watch("transportationCharges") || 0}
-                  otherCharges={form.watch("otherCharges") || 0}
-                  isLoadingType={isLoadingType}
-                  salesCommission={form.watch("salesCommission") || 0}
-                  mandiCharges={
-                    (form.watch("totalMandiCommission") || 0) + 
-                    (form.watch("totalAadhatCommission") || 0) + 
-                    (form.watch("totalHammali") || 0) + 
-                    (form.watch("totalMandiExtraCharges") || 0)
-                  }
-                />
 
                 <FormField
                   control={form.control}
