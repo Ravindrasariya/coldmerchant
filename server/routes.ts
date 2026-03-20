@@ -1982,12 +1982,20 @@ export async function registerRoutes(
             
             const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
-            await storage.updateTransactionItem(itemChange.id, merchantId, {
+            const updateFields: any = {
               bagsMoved: itemChange.bagsMoved,
               netWeight: newNetWeight.toString(),
               costOfGoods: newCostOfGoods.toString(),
               revenue: itemRevenue.toString()
-            });
+            };
+            if (existingTxn.transactionType === "loading") {
+              if (typeof itemChange.pricePerKg === 'number') updateFields.pricePerKg = itemChange.pricePerKg.toString();
+              if (typeof itemChange.amount === 'number') {
+                updateFields.amount = itemChange.amount.toString();
+                updateFields.revenue = itemChange.amount.toString();
+              }
+            }
+            await storage.updateTransactionItem(itemChange.id, merchantId, updateFields);
             
             const changeDetails: string[] = [];
             if (itemChange.bagsMoved !== existingItem.bagsMoved) {
@@ -2059,8 +2067,7 @@ export async function registerRoutes(
           // Use provided revenue if given, default to 0
           const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : 0;
           
-          // Create the transaction item
-          const newItem = await storage.addTransactionItem({
+          const addItemData: any = {
             transactionId,
             merchantId,
             lotId,
@@ -2074,7 +2081,12 @@ export async function registerRoutes(
             pricePerKgSnapshot: addCostPerBag.toString(),
             costOfGoods: costOfGoods.toString(),
             revenue: itemRevenue.toString()
-          });
+          };
+          if (existingTxn.transactionType === "loading") {
+            addItemData.pricePerKg = typeof itemChange.pricePerKg === 'number' ? itemChange.pricePerKg.toString() : null;
+            addItemData.amount = typeof itemChange.amount === 'number' ? itemChange.amount.toString() : itemRevenue.toString();
+          }
+          const newItem = await storage.addTransactionItem(addItemData);
           
           changes.push({
             field: `item_S#${entry?.serialNumber || 0}_${size || 'Mixed'}`,
@@ -2087,17 +2099,40 @@ export async function registerRoutes(
           newTotalCostOfGoods += costOfGoods;
           newTotalRevenue += itemRevenue;
         } else if (itemChange.action === 'keep' && itemChange.id) {
-          // Keep existing item - but check if revenue was updated
           const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
           if (existingItem) {
             const existingRevenue = parseFloat(existingItem.revenue || "0");
-            const newItemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
+            let newItemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
-            // Update revenue if changed
+            const keepUpdateFields: any = {};
+            let hasKeepChanges = false;
+
             if (typeof itemChange.revenue === 'number' && itemChange.revenue !== existingRevenue) {
-              await storage.updateTransactionItem(itemChange.id, merchantId, {
-                revenue: newItemRevenue.toString()
-              });
+              keepUpdateFields.revenue = newItemRevenue.toString();
+              hasKeepChanges = true;
+            }
+
+            if (existingTxn.transactionType === "loading") {
+              if (typeof itemChange.pricePerKg === 'number') {
+                const existingPpk = parseFloat(existingItem.pricePerKg || "0");
+                if (itemChange.pricePerKg !== existingPpk) {
+                  keepUpdateFields.pricePerKg = itemChange.pricePerKg.toString();
+                  hasKeepChanges = true;
+                }
+              }
+              if (typeof itemChange.amount === 'number') {
+                const existingAmt = parseFloat(existingItem.amount || "0");
+                if (itemChange.amount !== existingAmt) {
+                  keepUpdateFields.amount = itemChange.amount.toString();
+                  keepUpdateFields.revenue = itemChange.amount.toString();
+                  newItemRevenue = itemChange.amount;
+                  hasKeepChanges = true;
+                }
+              }
+            }
+
+            if (hasKeepChanges) {
+              await storage.updateTransactionItem(itemChange.id, merchantId, keepUpdateFields);
               changes.push({
                 field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_revenue`,
                 oldValue: `₹${existingRevenue.toFixed(0)}`,
@@ -2114,9 +2149,20 @@ export async function registerRoutes(
       }
       
       // Recalculate profit/loss using aggregated item revenues
-      const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
-      const otherCharges = parseFloat(existingTxn.otherCharges || "0");
-      const newProfitLoss = newTotalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges;
+      let newProfitLoss: number;
+      if (existingTxn.transactionType === "loading") {
+        const salesCommission = parseFloat(existingTxn.salesCommission || "0");
+        const totalMandiCommission = parseFloat(existingTxn.totalMandiCommission || "0");
+        const totalAadhatCommission = parseFloat(existingTxn.totalAadhatCommission || "0");
+        const totalHammali = parseFloat(existingTxn.totalHammali || "0");
+        const totalMandiExtraCharges = parseFloat(existingTxn.totalMandiExtraCharges || "0");
+        const mandiCharges = totalMandiCommission + totalAadhatCommission + totalHammali + totalMandiExtraCharges;
+        newProfitLoss = newTotalRevenue - newTotalCostOfGoods - salesCommission - mandiCharges;
+      } else {
+        const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
+        const otherCharges = parseFloat(existingTxn.otherCharges || "0");
+        newProfitLoss = newTotalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges;
+      }
       
       // Update transaction totals with aggregated revenue
       await storage.updateTransaction(transactionId, merchantId, {

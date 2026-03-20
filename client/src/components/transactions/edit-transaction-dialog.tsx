@@ -36,6 +36,8 @@ interface TransactionItem {
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
   revenue: string | null;
+  pricePerKg: string | null;
+  amount: string | null;
 }
 
 interface UnsoldInventoryItem {
@@ -76,6 +78,8 @@ interface EditableItem {
   costOfGoods: number;
   revenue: number;
   originalRevenue: number;
+  loadingPricePerKg: number;
+  loadingAmount: number;
   inventoryKey?: string;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
@@ -156,19 +160,39 @@ function ProfitLossDisplay({
   totalCostOfGoods, 
   revenue, 
   transportationCharges, 
-  otherCharges 
+  otherCharges,
+  isLoadingType,
+  salesCommission,
+  mandiCharges
 }: { 
   totalCostOfGoods: number; 
   revenue: number | undefined; 
   transportationCharges: number | undefined; 
   otherCharges: number | undefined;
+  isLoadingType?: boolean;
+  salesCommission?: number;
+  mandiCharges?: number;
 }) {
   const { t } = useLanguage();
   const safeRevenue = Number(revenue) || 0;
-  const safeTrans = Number(transportationCharges) || 0;
-  const safeOther = Number(otherCharges) || 0;
   const safeCost = Number(totalCostOfGoods) || 0;
-  const profitLoss = safeRevenue - safeCost - safeTrans - safeOther;
+  let profitLoss: number;
+  let chargesLabel: string;
+  let chargesAmount: number;
+
+  if (isLoadingType) {
+    const safeSC = Number(salesCommission) || 0;
+    const safeMC = Number(mandiCharges) || 0;
+    chargesAmount = safeSC + safeMC;
+    profitLoss = safeRevenue - safeCost - chargesAmount;
+    chargesLabel = t("Mandi+Commission", "मंडी+कमीशन");
+  } else {
+    const safeTrans = Number(transportationCharges) || 0;
+    const safeOther = Number(otherCharges) || 0;
+    chargesAmount = safeTrans + safeOther;
+    profitLoss = safeRevenue - safeCost - chargesAmount;
+    chargesLabel = t("Charges", "शुल्क");
+  }
   
   return (
     <div className="bg-muted/50 p-4 rounded-md">
@@ -179,7 +203,7 @@ function ProfitLossDisplay({
         </span>
       </div>
       <p className="text-xs text-muted-foreground mt-1">
-        {t("Revenue", "राजस्व")} (₹{parseFloat(safeRevenue.toFixed(1)).toLocaleString('en-IN')}) - {t("Cost", "लागत")} (₹{parseFloat(safeCost.toFixed(1)).toLocaleString('en-IN')}) - {t("Charges", "शुल्क")} (₹{parseFloat((safeTrans + safeOther).toFixed(1)).toLocaleString('en-IN')})
+        {isLoadingType ? t("Amount", "राशि") : t("Revenue", "राजस्व")} (₹{parseFloat(safeRevenue.toFixed(1)).toLocaleString('en-IN')}) - {t("Cost", "लागत")} (₹{parseFloat(safeCost.toFixed(1)).toLocaleString('en-IN')}) - {chargesLabel} (₹{parseFloat(chargesAmount.toFixed(1)).toLocaleString('en-IN')})
       </p>
     </div>
   );
@@ -268,6 +292,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         costOfGoods: parseFloat(item.costOfGoods || "0"),
         revenue: parseFloat(item.revenue || "0"),
         originalRevenue: parseFloat(item.revenue || "0"),
+        loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
+        loadingAmount: parseFloat(item.amount || "0"),
         action: 'keep' as const
       })));
     }
@@ -306,16 +332,26 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     },
   });
 
+  const isLoadingType = transaction?.transactionType === "loading";
+
   const updateItemsMutation = useMutation({
     mutationFn: async () => {
-      const itemsToSend = editableItems.map(item => ({
-        id: item.id,
-        inventoryKey: item.inventoryKey,
-        bagsMoved: item.bagsMoved,
-        netWeight: item.netWeight,
-        revenue: item.revenue,
-        action: item.action
-      }));
+      const itemsToSend = editableItems.map(item => {
+        const base: any = {
+          id: item.id,
+          inventoryKey: item.inventoryKey,
+          bagsMoved: item.bagsMoved,
+          netWeight: item.netWeight,
+          revenue: item.revenue,
+          action: item.action
+        };
+        if (transaction?.transactionType === "loading") {
+          base.pricePerKg = item.loadingPricePerKg;
+          base.amount = item.loadingAmount;
+          base.revenue = item.loadingAmount;
+        }
+        return base;
+      });
       return apiRequest("PUT", `/api/transactions/${transactionId}/items`, { items: itemsToSend });
     },
     onSuccess: () => {
@@ -351,11 +387,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       if (i !== index) return item;
       const weightPerBag = item.originalBags > 0 ? item.originalNetWeight / item.originalBags : 0;
       const newWeight = parseFloat((weightPerBag * newBags).toFixed(1));
+      const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
       const hasChanges = newBags !== item.originalBags || newWeight !== item.originalNetWeight || item.revenue !== item.originalRevenue;
       return {
         ...item,
         bagsMoved: newBags,
         netWeight: newWeight,
+        loadingAmount: newLoadingAmount,
+        revenue: isLoadingType ? newLoadingAmount : item.revenue,
         action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
       };
     }));
@@ -364,11 +403,28 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const handleNetWeightChange = (index: number, newWeight: number) => {
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
+      const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
       const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
       return {
         ...item,
         netWeight: newWeight,
+        loadingAmount: newLoadingAmount,
+        revenue: isLoadingType ? newLoadingAmount : item.revenue,
         action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+      };
+    }));
+  };
+
+  const handleLoadingPricePerKgChange = (index: number, newPpk: number) => {
+    setEditableItems(items => items.map((item, i) => {
+      if (i !== index) return item;
+      const newAmount = parseFloat((newPpk * item.netWeight).toFixed(2));
+      return {
+        ...item,
+        loadingPricePerKg: newPpk,
+        loadingAmount: newAmount,
+        revenue: newAmount,
+        action: item.id ? 'update' : 'add'
       };
     }));
   };
@@ -444,6 +500,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     const costPerBag = inv.costPerBag || 0;
     const costOfGoods = costPerBag * newItemBags;
     
+    const loadingPpk = inv.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
+    const loadingAmt = isLoadingType ? parseFloat((loadingPpk * newItemWeight).toFixed(2)) : 0;
+    
     setEditableItems(items => [...items, {
       lotId: inv.lotId,
       breakdownId: inv.breakdownId,
@@ -458,8 +517,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       originalNetWeight: 0,
       pricePerKg: costPerBag,
       costOfGoods: costOfGoods,
-      revenue: newItemRevenue,
+      revenue: isLoadingType ? loadingAmt : newItemRevenue,
       originalRevenue: 0,
+      loadingPricePerKg: loadingPpk,
+      loadingAmount: loadingAmt,
       inventoryKey: selectedInventory,
       action: 'add' as const
     }]);
@@ -631,8 +692,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 <span>{t("Lot Details", "लॉट विवरण")}</span>
                 <span className="text-right">{t("Bags", "बोरी")}</span>
                 <span className="text-right">{t("Net Weight", "शुद्ध वजन")}</span>
-                <span className="text-right">{t("Cost/Bag", "लागत/बोरी")}</span>
-                <span className="text-right">{t("Revenue", "राजस्व")}</span>
+                <span className="text-right">{isLoadingType ? t("₹/Kg", "₹/किग्रा") : t("Cost/Bag", "लागत/बोरी")}</span>
+                <span className="text-right">{isLoadingType ? t("Amount", "राशि") : t("Revenue", "राजस्व")}</span>
                 <span className="text-right">{t("P&L", "लाभ/हानि")}</span>
                 <span></span>
               </div>
@@ -640,7 +701,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               {editableItems.map((item, index) => {
                 if (item.action === 'remove') return null;
                 const itemCost = item.pricePerKg * item.bagsMoved;
-                const itemPL = item.revenue - itemCost;
+                const itemPL = isLoadingType 
+                  ? item.loadingAmount - itemCost
+                  : item.revenue - itemCost;
                 return (
                   <div key={item.id || `new-${index}`}>
                     {/* Desktop row */}
@@ -666,22 +729,44 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         placeholder="0"
                         data-testid={`input-item-weight-${index}`}
                       />
-                      <div 
-                        className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
-                        data-testid={`text-item-price-${index}`}
-                      >
-                        {parseFloat((item.pricePerKg || 0).toFixed(1)).toLocaleString('en-IN')}
-                      </div>
-                      <Input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={item.revenue || ""}
-                        onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
-                        className="h-8 text-right no-spinner"
-                        placeholder="₹0"
-                        data-testid={`input-item-revenue-${index}`}
-                      />
+                      {isLoadingType ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={item.loadingPricePerKg || ""}
+                          onChange={(e) => handleLoadingPricePerKgChange(index, parseFloat(e.target.value) || 0)}
+                          className="h-8 text-right no-spinner"
+                          placeholder="₹/Kg"
+                          data-testid={`input-item-ppk-${index}`}
+                        />
+                      ) : (
+                        <div 
+                          className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                          data-testid={`text-item-price-${index}`}
+                        >
+                          {parseFloat((item.pricePerKg || 0).toFixed(1)).toLocaleString('en-IN')}
+                        </div>
+                      )}
+                      {isLoadingType ? (
+                        <div 
+                          className="h-8 flex items-center justify-end px-3 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                          data-testid={`text-item-amount-${index}`}
+                        >
+                          ₹{parseFloat((item.loadingAmount || 0).toFixed(1)).toLocaleString('en-IN')}
+                        </div>
+                      ) : (
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={item.revenue || ""}
+                          onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
+                          className="h-8 text-right no-spinner"
+                          placeholder="₹0"
+                          data-testid={`input-item-revenue-${index}`}
+                        />
+                      )}
                       <span className={`text-right text-xs font-medium ${itemPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                         {itemPL >= 0 ? "+" : ""}₹{parseFloat(itemPL.toFixed(1)).toLocaleString('en-IN')}
                       </span>
@@ -739,28 +824,50 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                         </div>
                         <div>
-                          <Label className="text-[10px] text-muted-foreground">{t("Price/kg", "मूल्य/किग्रा")}</Label>
-                          <div 
-                            className="h-8 flex items-center justify-center px-2 bg-muted/50 rounded-md text-sm text-muted-foreground"
-                            data-testid={`text-item-price-m-${index}`}
-                          >
-                            {parseFloat((item.pricePerKg || 0).toFixed(1)).toLocaleString('en-IN')}
-                          </div>
+                          <Label className="text-[10px] text-muted-foreground">{isLoadingType ? t("₹/Kg", "₹/किग्रा") : t("Cost/Bag", "लागत/बोरी")}</Label>
+                          {isLoadingType ? (
+                            <Input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={item.loadingPricePerKg || ""}
+                              onChange={(e) => handleLoadingPricePerKgChange(index, parseFloat(e.target.value) || 0)}
+                              className="h-8 text-center no-spinner"
+                              placeholder="₹/Kg"
+                              data-testid={`input-item-ppk-m-${index}`}
+                            />
+                          ) : (
+                            <div 
+                              className="h-8 flex items-center justify-center px-2 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                              data-testid={`text-item-price-m-${index}`}
+                            >
+                              {parseFloat((item.pricePerKg || 0).toFixed(1)).toLocaleString('en-IN')}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[10px] text-muted-foreground">{t("Revenue", "राजस्व")}</Label>
-                          <Input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={item.revenue || ""}
-                            onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
-                            className="h-8 text-center no-spinner"
-                            placeholder="₹0"
-                            data-testid={`input-item-revenue-m-${index}`}
-                          />
+                          <Label className="text-[10px] text-muted-foreground">{isLoadingType ? t("Amount", "राशि") : t("Revenue", "राजस्व")}</Label>
+                          {isLoadingType ? (
+                            <div 
+                              className="h-8 flex items-center justify-center px-2 bg-muted/50 rounded-md text-sm text-muted-foreground"
+                              data-testid={`text-item-amount-m-${index}`}
+                            >
+                              ₹{parseFloat((item.loadingAmount || 0).toFixed(1)).toLocaleString('en-IN')}
+                            </div>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={item.revenue || ""}
+                              onChange={(e) => handleRevenueChange(index, parseFloat(e.target.value) || 0)}
+                              className="h-8 text-center no-spinner"
+                              placeholder="₹0"
+                              data-testid={`input-item-revenue-m-${index}`}
+                            />
+                          )}
                         </div>
                         <div>
                           <Label className="text-[10px] text-muted-foreground">{t("P&L", "लाभ/हानि")}</Label>
@@ -774,53 +881,57 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 );
               })}
 
-              {/* Desktop totals row */}
-              <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
-                <span>{t("Total", "कुल")}</span>
-                <span className="text-right h-8 flex items-center justify-end">
-                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)}
-                </span>
-                <span className="text-right h-8 flex items-center justify-end">
-                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)}
-                </span>
-                <span></span>
-                <span className="text-right h-8 flex items-center justify-end">
-                  ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
-                </span>
-                <span className={`text-right h-8 flex items-center justify-end ${
-                  editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 
-                    ? "text-green-600 dark:text-green-400" 
-                    : "text-red-600 dark:text-red-400"
-                }`}>
-                  {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 ? "+" : ""}
-                  ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0).toFixed(1)).toLocaleString('en-IN')}
-                </span>
-                <span></span>
-              </div>
-              {/* Mobile totals */}
-              <div className="md:hidden border-t pt-2 mt-2">
-                <div className="grid grid-cols-4 gap-2 text-xs font-medium">
-                  <div className="text-center">
-                    <span className="text-muted-foreground block">{t("Bags", "बोरी")}</span>
-                    <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + i.bagsMoved, 0)}</span>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-muted-foreground block">{t("Weight", "वजन")}</span>
-                    <span>{editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.netWeight || 0), 0).toFixed(1)}</span>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-muted-foreground block">{t("Revenue", "राजस्व")}</span>
-                    <span>₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="text-center">
-                    <span className="text-muted-foreground block">{t("P&L", "लाभ/हानि")}</span>
-                    <span className={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                      {editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0) >= 0 ? "+" : ""}
-                      ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue - i.pricePerKg * i.bagsMoved), 0).toFixed(1)).toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              {(() => {
+                const activeItems = editableItems.filter(i => i.action !== 'remove');
+                const totalBags = activeItems.reduce((sum, i) => sum + i.bagsMoved, 0);
+                const totalWeight = activeItems.reduce((sum, i) => sum + (i.netWeight || 0), 0);
+                const totalRevOrAmt = activeItems.reduce((sum, i) => sum + (isLoadingType ? i.loadingAmount : (i.revenue || 0)), 0);
+                const totalPL = activeItems.reduce((sum, i) => {
+                  const cost = i.pricePerKg * i.bagsMoved;
+                  return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - cost);
+                }, 0);
+                return (
+                  <>
+                    {/* Desktop totals row */}
+                    <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
+                      <span>{t("Total", "कुल")}</span>
+                      <span className="text-right h-8 flex items-center justify-end">{totalBags}</span>
+                      <span className="text-right h-8 flex items-center justify-end">{totalWeight.toFixed(1)}</span>
+                      <span></span>
+                      <span className="text-right h-8 flex items-center justify-end">
+                        ₹{parseFloat(totalRevOrAmt.toFixed(1)).toLocaleString('en-IN')}
+                      </span>
+                      <span className={`text-right h-8 flex items-center justify-end ${totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        {totalPL >= 0 ? "+" : ""}₹{parseFloat(totalPL.toFixed(1)).toLocaleString('en-IN')}
+                      </span>
+                      <span></span>
+                    </div>
+                    {/* Mobile totals */}
+                    <div className="md:hidden border-t pt-2 mt-2">
+                      <div className="grid grid-cols-4 gap-2 text-xs font-medium">
+                        <div className="text-center">
+                          <span className="text-muted-foreground block">{t("Bags", "बोरी")}</span>
+                          <span>{totalBags}</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-muted-foreground block">{t("Weight", "वजन")}</span>
+                          <span>{totalWeight.toFixed(1)}</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-muted-foreground block">{isLoadingType ? t("Amount", "राशि") : t("Revenue", "राजस्व")}</span>
+                          <span>₹{parseFloat(totalRevOrAmt.toFixed(1)).toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-muted-foreground block">{t("P&L", "लाभ/हानि")}</span>
+                          <span className={totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                            {totalPL >= 0 ? "+" : ""}₹{parseFloat(totalPL.toFixed(1)).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
 
             </div>
 
@@ -1089,9 +1200,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
                 <ProfitLossDisplay 
                   totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.pricePerKg * i.bagsMoved), 0)}
-                  revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0)}
+                  revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (isLoadingType ? i.loadingAmount : (i.revenue || 0)), 0)}
                   transportationCharges={form.watch("transportationCharges") || 0}
                   otherCharges={form.watch("otherCharges") || 0}
+                  isLoadingType={isLoadingType}
+                  salesCommission={form.watch("salesCommission") || 0}
+                  mandiCharges={
+                    (form.watch("totalMandiCommission") || 0) + 
+                    (form.watch("totalAadhatCommission") || 0) + 
+                    (form.watch("totalHammali") || 0) + 
+                    (form.watch("totalMandiExtraCharges") || 0)
+                  }
                 />
 
                 <FormField
