@@ -70,11 +70,13 @@ const DEFAULT_TAB_ORDER: TabConfig[] = [
   { value: "demo-videos", icon: PlayCircle, labelEn: "Demo Videos", labelHi: "डेमो वीडियो" },
 ];
 
-const TAB_ORDER_KEY = "vyapar_tab_order";
+function getTabOrderKey(userId: number | string) {
+  return `vyapar_tab_order:${userId}`;
+}
 
-function getSavedTabOrder(): TabConfig[] {
+function getSavedTabOrder(userId: number | string): TabConfig[] {
   try {
-    const saved = localStorage.getItem(TAB_ORDER_KEY);
+    const saved = localStorage.getItem(getTabOrderKey(userId));
     if (!saved) return DEFAULT_TAB_ORDER;
     const savedValues: string[] = JSON.parse(saved);
     if (!Array.isArray(savedValues)) return DEFAULT_TAB_ORDER;
@@ -99,8 +101,8 @@ function getSavedTabOrder(): TabConfig[] {
   }
 }
 
-function saveTabOrder(tabs: TabConfig[]) {
-  localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(tabs.map(t => t.value)));
+function saveTabOrder(userId: number | string, tabs: TabConfig[]) {
+  localStorage.setItem(getTabOrderKey(userId), JSON.stringify(tabs.map(t => t.value)));
 }
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TransactionsTab } from "@/components/transactions/transactions-tab";
@@ -155,11 +157,16 @@ export default function HomePage() {
     confirmPassword: "",
   });
 
-  const [tabOrder, setTabOrder] = useState<TabConfig[]>(getSavedTabOrder);
+  const userId = user?.id ?? "anonymous";
+  const [tabOrder, setTabOrder] = useState<TabConfig[]>(() => getSavedTabOrder(userId));
   const isCustomOrder = tabOrder.some((tab, i) => tab.value !== DEFAULT_TAB_ORDER[i].value);
   const dragItemRef = useRef<number | null>(null);
   const dragOverItemRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setTabOrder(getSavedTabOrder(userId));
+  }, [userId]);
 
   const handleDragStart = useCallback((index: number) => {
     dragItemRef.current = index;
@@ -183,19 +190,19 @@ export default function HomePage() {
         const updated = [...prev];
         const [moved] = updated.splice(from, 1);
         updated.splice(to, 0, moved);
-        saveTabOrder(updated);
+        saveTabOrder(userId, updated);
         return updated;
       });
     }
     dragItemRef.current = null;
     dragOverItemRef.current = null;
     setDragOverIndex(null);
-  }, []);
+  }, [userId]);
 
   const resetTabOrder = useCallback(() => {
     setTabOrder(DEFAULT_TAB_ORDER);
-    localStorage.removeItem(TAB_ORDER_KEY);
-  }, []);
+    localStorage.removeItem(getTabOrderKey(userId));
+  }, [userId]);
 
   const handleLogout = () => {
     logoutMutation.mutate();
