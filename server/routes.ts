@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
@@ -1666,7 +1666,7 @@ export async function registerRoutes(
         totalNetWeight += netWeight;
         totalCostOfGoods += costOfGoods;
 
-        const itemResult: any = {
+        const itemBase: Omit<InsertTransactionItem, 'transactionId'> = {
           merchantId,
           lotId: item.lotId,
           breakdownId: item.breakdownId,
@@ -1681,12 +1681,12 @@ export async function registerRoutes(
         };
 
         if (transactionType === "loading") {
-          itemResult.pricePerKg = item.pricePerKg ? item.pricePerKg.toString() : null;
-          itemResult.amount = item.amount ? item.amount.toString() : null;
-          itemResult.revenue = item.amount ? item.amount.toString() : "0";
+          itemBase.pricePerKg = item.pricePerKg ? item.pricePerKg.toString() : null;
+          itemBase.amount = item.amount ? item.amount.toString() : null;
+          itemBase.revenue = item.amount ? item.amount.toString() : "0";
         }
 
-        return itemResult;
+        return itemBase;
       }));
 
       // Calculate profit/loss
@@ -1982,7 +1982,7 @@ export async function registerRoutes(
             
             const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
-            const updateFields: any = {
+            const updateFields: Partial<TransactionItem> = {
               bagsMoved: itemChange.bagsMoved,
               netWeight: newNetWeight.toString(),
               costOfGoods: newCostOfGoods.toString(),
@@ -2067,7 +2067,7 @@ export async function registerRoutes(
           // Use provided revenue if given, default to 0
           const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : 0;
           
-          const addItemData: any = {
+          const addItemData: InsertTransactionItem = {
             transactionId,
             merchantId,
             lotId,
@@ -2104,7 +2104,7 @@ export async function registerRoutes(
             const existingRevenue = parseFloat(existingItem.revenue || "0");
             let newItemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
-            const keepUpdateFields: any = {};
+            const keepUpdateFields: Partial<TransactionItem> = {};
             let hasKeepChanges = false;
 
             if (typeof itemChange.revenue === 'number' && itemChange.revenue !== existingRevenue) {

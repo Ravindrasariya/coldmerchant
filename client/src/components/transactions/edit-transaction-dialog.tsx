@@ -337,7 +337,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const updateItemsMutation = useMutation({
     mutationFn: async () => {
       const itemsToSend = editableItems.map(item => {
-        const base: any = {
+        const base: Record<string, unknown> = {
           id: item.id,
           inventoryKey: item.inventoryKey,
           bagsMoved: item.bagsMoved,
