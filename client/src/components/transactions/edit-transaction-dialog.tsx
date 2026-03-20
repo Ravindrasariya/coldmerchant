@@ -41,6 +41,11 @@ interface TransactionItem {
   amount: string | null;
   lotSourceWeight: number;
   lotSourceBags: number;
+  mandiCommissionPercent: string | null;
+  aadhatCommissionPercent: string | null;
+  hammaliPerBag: string | null;
+  mandiExtraCharges: string | null;
+  lotOriginalBags: number;
 }
 
 interface UnsoldInventoryItem {
@@ -63,6 +68,10 @@ interface UnsoldInventoryItem {
   netWeight: number;
   breakdownWeight: string | null;
   costPerBag: number;
+  mandiCommissionPercent: string | null;
+  aadhatCommissionPercent: string | null;
+  hammaliPerBag: string | null;
+  mandiExtraCharges: string | null;
 }
 
 interface EditableItem {
@@ -87,6 +96,11 @@ interface EditableItem {
   inventoryKey?: string;
   lotSourceWeight: number;
   lotSourceBags: number;
+  mandiCommissionPercent: string | null;
+  aadhatCommissionPercent: string | null;
+  hammaliPerBag: string | null;
+  mandiExtraCharges: string | null;
+  lotOriginalBags: number;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
 
@@ -302,6 +316,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         loadingAmount: parseFloat(item.amount || "0"),
         lotSourceWeight: item.lotSourceWeight || 0,
         lotSourceBags: item.lotSourceBags || 0,
+        mandiCommissionPercent: item.mandiCommissionPercent || null,
+        aadhatCommissionPercent: item.aadhatCommissionPercent || null,
+        hammaliPerBag: item.hammaliPerBag || null,
+        mandiExtraCharges: item.mandiExtraCharges || null,
+        lotOriginalBags: item.lotOriginalBags || 0,
         action: 'keep' as const
       })));
     }
@@ -342,6 +361,34 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   });
 
   const isLoadingType = transaction?.transactionType === "loading";
+
+  useEffect(() => {
+    if (!isLoadingType) return;
+    const activeItems = editableItems.filter(i => i.action !== 'remove');
+    let mc = 0, ac = 0, hm = 0, ec = 0;
+    activeItems.forEach(item => {
+      const amount = item.loadingAmount || 0;
+      const bags = item.bagsMoved || 0;
+      if (item.mandiCommissionPercent) {
+        mc += (amount * parseFloat(item.mandiCommissionPercent)) / 100;
+      }
+      if (item.aadhatCommissionPercent) {
+        ac += (amount * parseFloat(item.aadhatCommissionPercent)) / 100;
+      }
+      if (item.hammaliPerBag) {
+        hm += bags * parseFloat(item.hammaliPerBag);
+      }
+      if (item.mandiExtraCharges) {
+        const lotExtra = parseFloat(item.mandiExtraCharges);
+        const proportion = item.lotOriginalBags > 0 ? bags / item.lotOriginalBags : 0;
+        ec += lotExtra * proportion;
+      }
+    });
+    form.setValue("totalMandiCommission", Math.round(mc * 100) / 100 || undefined);
+    form.setValue("totalAadhatCommission", Math.round(ac * 100) / 100 || undefined);
+    form.setValue("totalHammali", Math.round(hm * 100) / 100 || undefined);
+    form.setValue("totalMandiExtraCharges", Math.round(ec * 100) / 100 || undefined);
+  }, [editableItems, isLoadingType, form]);
 
   const updateItemsMutation = useMutation({
     mutationFn: async () => {
@@ -542,6 +589,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       inventoryKey: selectedInventory,
       lotSourceWeight: parseFloat(inv.breakdownWeight || inv.totalWeight || "0"),
       lotSourceBags: inv.originalBags || inv.lotOriginalBags || 0,
+      mandiCommissionPercent: inv.mandiCommissionPercent || null,
+      aadhatCommissionPercent: inv.aadhatCommissionPercent || null,
+      hammaliPerBag: inv.hammaliPerBag || null,
+      mandiExtraCharges: inv.mandiExtraCharges || null,
+      lotOriginalBags: inv.lotOriginalBags || 0,
       action: 'add' as const
     }]);
     

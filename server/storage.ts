@@ -1028,6 +1028,11 @@ export class DatabaseStorage implements IStorage {
         place: lot.length > 0 ? lot[0].place : undefined,
         lotSourceWeight,
         lotSourceBags,
+        mandiCommissionPercent: lot.length > 0 ? (lot[0].mandiCommissionPercent || null) : null,
+        aadhatCommissionPercent: lot.length > 0 ? (lot[0].aadhatCommissionPercent || null) : null,
+        hammaliPerBag: lot.length > 0 ? (lot[0].hammaliPerBag || null) : null,
+        mandiExtraCharges: lot.length > 0 ? (lot[0].mandiExtraCharges || null) : null,
+        lotOriginalBags: lot.length > 0 ? (lot[0].originalBags || 0) : 0,
       };
     }));
     
