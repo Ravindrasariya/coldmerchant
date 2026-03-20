@@ -58,6 +58,7 @@ interface UnsoldInventoryItem {
   originalBags: number;
   lotOriginalBags: number;
   totalWeight: string | null;
+  netWeight: number;
   breakdownWeight: string | null;
   costPerBag: number;
 }
@@ -472,10 +473,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setDeleteConfirmIndex(null);
   };
 
-  const getWeightPerBag = (inv: UnsoldInventoryItem): number => {
-    const weight = inv.breakdownWeight ? parseFloat(inv.breakdownWeight) : (inv.totalWeight ? parseFloat(inv.totalWeight) : 0);
+  const getNetWeightPerBag = (inv: UnsoldInventoryItem): number => {
     const bags = inv.originalBags || inv.lotOriginalBags || 1;
-    return bags > 0 ? weight / bags : 0;
+    return bags > 0 ? inv.netWeight / bags : 0;
   };
 
   const handleInventorySelect = (value: string) => {
@@ -485,11 +485,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     );
     if (inv) {
       const bags = inv.remainingBags;
-      const wpb = getWeightPerBag(inv);
-      const totalWeight = wpb * bags;
-      const weight = Math.max(0, totalWeight - bags);
+      const nwpb = getNetWeightPerBag(inv);
       setNewItemBags(bags);
-      setNewItemWeight(parseFloat(weight.toFixed(1)));
+      setNewItemWeight(parseFloat((nwpb * bags).toFixed(1)));
       setNewItemRevenue(0);
     }
   };
@@ -772,10 +770,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         setNewItemBags(bags);
                         const inv = unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory);
                         if (inv) {
-                          const wpb = getWeightPerBag(inv);
-                          const totalWeight = wpb * bags;
-                          const weight = Math.max(0, totalWeight - bags);
-                          setNewItemWeight(parseFloat(weight.toFixed(1)));
+                          const nwpb = getNetWeightPerBag(inv);
+                          setNewItemWeight(parseFloat((nwpb * bags).toFixed(1)));
                         }
                       }}
                       className="w-20 no-spinner"

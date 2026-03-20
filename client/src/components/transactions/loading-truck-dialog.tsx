@@ -47,6 +47,7 @@ interface UnsoldInventoryItem {
   originalBags: number;
   lotOriginalBags: number;
   totalWeight: string | null;
+  netWeight: number;
   breakdownWeight: string | null;
   costPerBag: number;
   mandiCommissionPercent: string | null;
@@ -146,23 +147,11 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     [items, findInventoryByKey]
   );
 
-  const calculateProportionateTotalWeight = useCallback(
-    (inv: UnsoldInventoryItem, bagsMoved: number): number => {
-      if (inv.breakdownWeight && inv.originalBags > 0) {
-        const breakdownWeightNum = parseFloat(inv.breakdownWeight);
-        return (bagsMoved / inv.originalBags) * breakdownWeightNum;
-      } else if (inv.totalWeight && inv.lotOriginalBags > 0) {
-        const totalWeightNum = parseFloat(inv.totalWeight);
-        return (bagsMoved / inv.lotOriginalBags) * totalWeightNum;
-      }
-      return 0;
-    },
-    []
-  );
-
   const calculateNetWeight = useCallback(
-    (totalWeight: number, bags: number): number => {
-      return Math.max(0, totalWeight - bags);
+    (inv: UnsoldInventoryItem, bagsMoved: number): number => {
+      const totalBags = inv.originalBags || inv.lotOriginalBags || 1;
+      if (totalBags <= 0) return 0;
+      return (bagsMoved / totalBags) * inv.netWeight;
     },
     []
   );
@@ -595,14 +584,13 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                             if (inv) {
                               const availableBags = getAvailableBags(value, itemIndex);
                               const bags = availableBags || 0;
-                              const proportionateTotalWeight = calculateProportionateTotalWeight(inv, bags);
-                              const netWeight = calculateNetWeight(proportionateTotalWeight, bags);
+                              const netWeight = calculateNetWeight(inv, bags);
                               const pricePerKg = inv.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
                               const amount = Math.round(pricePerKg * netWeight * 100) / 100;
                               updateItem(itemIndex, {
                                 inventoryKey: value,
                                 bagsMoved: bags,
-                                totalWeight: Math.round(proportionateTotalWeight * 10) / 10,
+                                totalWeight: Math.round(netWeight * 10) / 10,
                                 netWeight: Math.round(netWeight * 10) / 10,
                                 pricePerKg,
                                 amount,
@@ -661,12 +649,11 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                           onChange={(e) => {
                             const bags = Number(e.target.value) || 0;
                             if (selectedInv) {
-                              const proportionateTotalWeight = calculateProportionateTotalWeight(selectedInv, bags);
-                              const netWeight = calculateNetWeight(proportionateTotalWeight, bags);
+                              const netWeight = calculateNetWeight(selectedInv, bags);
                               const amount = Math.round(item.pricePerKg * netWeight * 100) / 100;
                               updateItem(itemIndex, {
                                 bagsMoved: bags,
-                                totalWeight: Math.round(proportionateTotalWeight * 10) / 10,
+                                totalWeight: Math.round(netWeight * 10) / 10,
                                 netWeight: Math.round(netWeight * 10) / 10,
                                 amount,
                               });
