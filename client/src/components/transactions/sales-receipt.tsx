@@ -320,13 +320,11 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               </tfoot>
             </table>
 
-            {parseFloat(transaction.advancePayment || "0") > 0 && (
-              <div className="border-t pt-4">
-                <p className="text-right">
-                  <strong>Advance Paid to Driver / ड्राइवर को अग्रिम भुगतान:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}
-                </p>
-              </div>
-            )}
+            <div className="border-t pt-4">
+              <p className="text-right">
+                <strong>Advance Paid to Driver / ड्राइवर को अग्रिम भुगतान:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}
+              </p>
+            </div>
 
             <div className="border-t pt-4 text-center text-sm text-gray-500">
               <p>Thank you for your business! / आपके व्यापार के लिए धन्यवाद!</p>
