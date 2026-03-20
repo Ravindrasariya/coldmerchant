@@ -1123,6 +1123,11 @@ export function FarmerLedgerTab() {
                     <SelectValue placeholder={t("Select district", "जिला चुनें")} />
                   </SelectTrigger>
                   <SelectContent>
+                    {editForm.district && !DISTRICTS.includes(editForm.district as any) && (
+                      <SelectItem key={editForm.district} value={editForm.district}>
+                        {editForm.district}
+                      </SelectItem>
+                    )}
                     {DISTRICTS.map((district) => (
                       <SelectItem key={district} value={district}>
                         {district}
@@ -1141,6 +1146,11 @@ export function FarmerLedgerTab() {
                     <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
                   </SelectTrigger>
                   <SelectContent>
+                    {editForm.state && !STATES.includes(editForm.state as any) && (
+                      <SelectItem key={editForm.state} value={editForm.state}>
+                        {editForm.state}
+                      </SelectItem>
+                    )}
                     {STATES.map((state) => (
                       <SelectItem key={state} value={state}>
                         {state}
