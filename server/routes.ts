@@ -1572,7 +1572,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -1691,6 +1691,7 @@ export async function registerRoutes(
           transactionNumber,
           crop: transactionCrop,
           transporterName: titleCase(transporterName) || null,
+          driverContact: driverContact || null,
           dateOfLoading: dateOfLoading || null,
           partyName: titleCase(partyName) || null,
           partyAddress: partyAddress || null,
@@ -1746,7 +1747,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -1766,6 +1767,9 @@ export async function registerRoutes(
       }
       if (vehicleNumber !== undefined && (vehicleNumber || null) !== (existingTxn.vehicleNumber || null)) {
         changes.push({ field: "vehicleNumber", oldValue: existingTxn.vehicleNumber, newValue: vehicleNumber || null });
+      }
+      if (driverContact !== undefined && (driverContact || null) !== (existingTxn.driverContact || null)) {
+        changes.push({ field: "driverContact", oldValue: existingTxn.driverContact, newValue: driverContact || null });
       }
       if (advancePayment !== undefined && !decimalEqual(advancePayment, existingTxn.advancePayment)) {
         changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
@@ -1808,6 +1812,7 @@ export async function registerRoutes(
         partyName: titleCase(partyName) || null,
         partyAddress: partyAddress || null,
         vehicleNumber: vehicleNumber || null,
+        driverContact: driverContact !== undefined ? (driverContact || null) : existingTxn.driverContact,
         advancePayment: advancePayment ? advancePayment.toString() : null,
         amountReceived: amountReceived ? amountReceived.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,

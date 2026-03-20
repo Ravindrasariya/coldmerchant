@@ -106,6 +106,7 @@ interface TransactionWithHistory {
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
+  driverContact: string | null;
   advancePayment: string | null;
   amountReceived: string | null;
   transportationCharges: string | null;
@@ -124,6 +125,7 @@ interface TransactionWithHistory {
 const editTransactionSchema = z.object({
   partyName: z.string().optional(),
   vehicleNumber: z.string().optional(),
+  driverContact: z.string().optional(),
   advancePayment: z.coerce.number().optional(),
   amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
@@ -206,6 +208,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     defaultValues: {
       partyName: "",
       vehicleNumber: "",
+      driverContact: "",
       advancePayment: undefined,
       amountReceived: undefined,
       transportationCharges: undefined,
@@ -219,6 +222,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       form.reset({
         partyName: transaction.partyName || "",
         vehicleNumber: transaction.vehicleNumber || "",
+        driverContact: transaction.driverContact || "",
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges && parseFloat(transaction.transportationCharges) !== 0 ? parseFloat(transaction.transportationCharges) : undefined,
@@ -460,6 +464,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     const labels: Record<string, string> = {
       partyName: t("Buyer Name", "खरीदार का नाम"),
       vehicleNumber: t("Vehicle #", "वाहन नं"),
+      driverContact: t("Driver Contact", "ड्राइवर संपर्क"),
       advancePayment: t("Advance Payment", "अग्रिम भुगतान"),
       transportationCharges: t("Transportation", "परिवहन"),
       otherCharges: t("Other Charges", "अन्य शुल्क"),
@@ -795,7 +800,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="partyName"
@@ -869,6 +874,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
                         <FormControl>
                           <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="driverContact"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
+                        <FormControl>
+                          <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

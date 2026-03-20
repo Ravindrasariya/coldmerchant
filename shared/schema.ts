@@ -151,6 +151,7 @@ export const transactions = pgTable("transactions", {
   transactionNumber: integer("transaction_number").notNull(),
   crop: text("crop").default("potato"), // potato, onion, or garlic - for separate transaction number sequences
   transporterName: text("transporter_name"), // transporter/driver name for autocomplete history
+  driverContact: text("driver_contact"), // driver/transporter contact number
   dateOfLoading: text("date_of_loading"), // date when truck was loaded (YYYY-MM-DD format)
   partyName: text("party_name"),
   partyAddress: text("party_address"),

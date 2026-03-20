@@ -22,6 +22,8 @@ interface Transaction {
   id: number;
   transactionNumber: number;
   merchantId: number;
+  transporterName: string | null;
+  driverContact: string | null;
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
@@ -279,6 +281,9 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 })}</p>
                 {transaction.vehicleNumber && (
                   <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
+                )}
+                {transaction.transporterName && (
+                  <p><strong>Transporter / ट्रांसपोर्टर:</strong> {transaction.transporterName}{transaction.driverContact ? ` (${transaction.driverContact})` : ""}</p>
                 )}
                 <p><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
               </div>

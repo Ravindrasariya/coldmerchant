@@ -95,6 +95,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
   // Header state
   const [transporterName, setTransporterName] = useState("");
+  const [driverContact, setDriverContact] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [dateOfLoading, setDateOfLoading] = useState(getTodayIST());
   const [showTransporterSuggestions, setShowTransporterSuggestions] = useState(false);
@@ -316,6 +317,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
         return apiRequest("POST", "/api/transactions", {
           transporterName,
+          driverContact,
           dateOfLoading,
           vehicleNumber,
           buyerId: section.buyerId,
@@ -358,6 +360,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
   const resetForm = () => {
     setTransporterName("");
+    setDriverContact("");
     setVehicleNumber("");
     setDateOfLoading(getTodayIST());
     setBuyerSections([createEmptyBuyerSection()]);
@@ -466,7 +469,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           {/* Header Section - Transport Details */}
           <Card className="bg-muted/30">
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="relative">
                   <Label className="text-xs">{t("Transporter Name", "ट्रांसपोर्टर का नाम")}</Label>
                   <Input
@@ -497,6 +500,15 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                       ))}
                     </div>
                   )}
+                </div>
+                <div>
+                  <Label className="text-xs">{t("Driver Contact", "ड्राइवर संपर्क")}</Label>
+                  <Input
+                    value={driverContact}
+                    onChange={(e) => setDriverContact(e.target.value)}
+                    placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")}
+                    data-testid="input-driver-contact"
+                  />
                 </div>
                 <div>
                   <Label className="text-xs">{t("Vehicle #", "वाहन नं")}</Label>
