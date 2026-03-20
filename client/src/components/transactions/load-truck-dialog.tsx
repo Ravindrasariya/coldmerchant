@@ -434,9 +434,9 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
         onOpenChange(true);
       }
     }}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto border-t-4 border-t-emerald-500 dark:border-t-emerald-400">
+        <DialogHeader className="bg-emerald-50/50 dark:bg-emerald-950/30 -mx-6 -mt-6 px-6 pt-6 pb-4 rounded-t-lg">
+          <DialogTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
             <Truck className="h-5 w-5" />
             {t("Load A Truck", "ट्रक लोड करें")}
           </DialogTitle>

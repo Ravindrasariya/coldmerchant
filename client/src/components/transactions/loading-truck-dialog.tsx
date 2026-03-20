@@ -401,9 +401,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       if (!newOpen) onOpenChange(false);
       else onOpenChange(true);
     }}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto border-t-4 border-t-blue-500 dark:border-t-blue-400">
+        <DialogHeader className="bg-blue-50/50 dark:bg-blue-950/30 -mx-6 -mt-6 px-6 pt-6 pb-4 rounded-t-lg">
+          <DialogTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
             <Truck className="h-5 w-5" />
             {t("Loading", "लोडिंग")}
           </DialogTitle>
