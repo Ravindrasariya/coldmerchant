@@ -229,6 +229,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     });
 
     const grandTotal = totalAmount + totalMandiCharges + salesCommission - advanceAmount;
+    const totalPL = (totalAmount - totalCostOfGoods) + salesCommission;
 
     return {
       totalBags,
@@ -236,6 +237,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalAmount,
       totalCostOfGoods,
       grandTotal,
+      totalPL,
     };
   }, [items, findInventoryByKey, totalMandiCharges, salesCommission, advanceAmount]);
 
@@ -800,29 +802,35 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-4">
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
                     <div>
-                      <p className="text-xl font-bold">{totals.totalBags}</p>
-                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                      <p className="text-base font-bold">{totals.totalBags}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
                         <Package className="h-3 w-3" />
                         {t("Bags", "बोरी")}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold">{totals.totalNetWeight.toFixed(1)}</p>
-                      <p className="text-xs text-muted-foreground">{t("Net Wt (Kg)", "शुद्ध वजन (किग्रा)")}</p>
+                      <p className="text-base font-bold">{totals.totalNetWeight.toFixed(1)}</p>
+                      <p className="text-[10px] text-muted-foreground">{t("Net Wt (Kg)", "शुद्ध वजन (किग्रा)")}</p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold">₹{parseFloat(totals.totalAmount.toFixed(1)).toLocaleString('en-IN')}</p>
-                      <p className="text-xs text-muted-foreground">{t("Total Amount", "कुल राशि")}</p>
+                      <p className="text-base font-bold">₹{parseFloat(totals.totalAmount.toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] text-muted-foreground">{t("Total Amount", "कुल राशि")}</p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold">₹{parseFloat(totalMandiCharges.toFixed(1)).toLocaleString('en-IN')}</p>
-                      <p className="text-xs text-muted-foreground">{t("Mandi Charges", "मंडी शुल्क")}</p>
+                      <p className="text-base font-bold">₹{parseFloat(totalMandiCharges.toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] text-muted-foreground">{t("Mandi Charges", "मंडी शुल्क")}</p>
                     </div>
-                    <div className="col-span-2 md:col-span-1">
-                      <p className="text-2xl font-bold text-primary">₹{parseFloat(totals.grandTotal.toFixed(1)).toLocaleString('en-IN')}</p>
-                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                    <div>
+                      <p className={`text-base font-bold ${totals.totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        {totals.totalPL >= 0 ? "+" : ""}₹{parseFloat(Math.abs(totals.totalPL).toFixed(1)).toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">{t("Total P&L", "कुल लाभ/हानि")}</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-primary">₹{parseFloat(totals.grandTotal.toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center justify-center gap-1">
                         <IndianRupee className="h-3 w-3" />
                         {t("Grand Total", "कुल योग")}
                       </p>
