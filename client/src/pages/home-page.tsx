@@ -178,18 +178,24 @@ export default function HomePage() {
     setDragOverIndex(index);
   }, []);
 
-  const handleDrop = useCallback((e: DragEvent<HTMLElement>, dropIndex: number) => {
-    e.preventDefault();
-    const from = dragItemRef.current;
-    if (from === null || from === dropIndex) return;
+  const reorderTabs = useCallback((from: number, to: number) => {
+    if (from === to) return;
     setTabOrder(prev => {
       const updated = [...prev];
       const [moved] = updated.splice(from, 1);
-      updated.splice(dropIndex, 0, moved);
+      const insertAt = from < to ? to - 1 : to;
+      updated.splice(insertAt, 0, moved);
       saveTabOrder(userId, updated);
       return updated;
     });
   }, [userId]);
+
+  const handleDrop = useCallback((e: DragEvent<HTMLElement>, dropIndex: number) => {
+    e.preventDefault();
+    const from = dragItemRef.current;
+    if (from === null) return;
+    reorderTabs(from, dropIndex);
+  }, [reorderTabs]);
 
   const handleDragEnd = useCallback(() => {
     dragItemRef.current = null;
@@ -207,10 +213,10 @@ export default function HomePage() {
     if (dragItemRef.current === null || !mobileListRef.current) return;
     const touch = e.touches[0];
     const items = mobileListRef.current.querySelectorAll<HTMLElement>('[data-tab-index]');
-    for (const item of items) {
-      const rect = item.getBoundingClientRect();
+    for (let i = 0; i < items.length; i++) {
+      const rect = items[i].getBoundingClientRect();
       if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-        const idx = parseInt(item.getAttribute('data-tab-index') || '-1', 10);
+        const idx = parseInt(items[i].getAttribute('data-tab-index') || '-1', 10);
         if (idx >= 0 && idx !== dragOverItemRef.current) {
           dragOverItemRef.current = idx;
           setDragOverIndex(idx);
@@ -223,19 +229,13 @@ export default function HomePage() {
   const handleTouchEnd = useCallback(() => {
     const from = dragItemRef.current;
     const to = dragOverItemRef.current;
-    if (from !== null && to !== null && from !== to) {
-      setTabOrder(prev => {
-        const updated = [...prev];
-        const [moved] = updated.splice(from, 1);
-        updated.splice(to, 0, moved);
-        saveTabOrder(userId, updated);
-        return updated;
-      });
+    if (from !== null && to !== null) {
+      reorderTabs(from, to);
     }
     dragItemRef.current = null;
     dragOverItemRef.current = null;
     setDragOverIndex(null);
-  }, [userId]);
+  }, [reorderTabs]);
 
   const resetTabOrder = useCallback(() => {
     setTabOrder(DEFAULT_TAB_ORDER);
