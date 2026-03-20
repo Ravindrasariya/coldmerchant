@@ -1008,7 +1008,27 @@ export class DatabaseStorage implements IStorage {
     
     const enrichedItems = await Promise.all(items.map(async (item) => {
       const lot = await db.select().from(lots).where(and(eq(lots.id, item.lotId), eq(lots.merchantId, merchantId))).limit(1);
-      return { ...item, place: lot.length > 0 ? lot[0].place : undefined };
+      let lotSourceWeight = 0;
+      let lotSourceBags = 0;
+      if (lot.length > 0) {
+        if (item.breakdownId) {
+          const [bd] = await db.select().from(bagBreakdowns).where(and(eq(bagBreakdowns.id, item.breakdownId), eq(bagBreakdowns.merchantId, merchantId))).limit(1);
+          if (bd) {
+            lotSourceWeight = bd.weight ? parseFloat(bd.weight) : (lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0);
+            lotSourceBags = bd.numberOfBags || 0;
+          }
+        }
+        if (lotSourceBags === 0) {
+          lotSourceWeight = lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0;
+          lotSourceBags = lot[0].originalBags || 0;
+        }
+      }
+      return {
+        ...item,
+        place: lot.length > 0 ? lot[0].place : undefined,
+        lotSourceWeight,
+        lotSourceBags,
+      };
     }));
     
     return { ...txn, items: enrichedItems };

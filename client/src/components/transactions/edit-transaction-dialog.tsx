@@ -83,6 +83,8 @@ interface EditableItem {
   loadingPricePerKg: number;
   loadingAmount: number;
   inventoryKey?: string;
+  lotSourceWeight: number;
+  lotSourceBags: number;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
 
@@ -296,6 +298,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         originalRevenue: parseFloat(item.revenue || "0"),
         loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
         loadingAmount: parseFloat(item.amount || "0"),
+        lotSourceWeight: (item as any).lotSourceWeight || 0,
+        lotSourceBags: (item as any).lotSourceBags || 0,
         action: 'keep' as const
       })));
     }
@@ -389,8 +393,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const handleBagCountChange = (index: number, newBags: number) => {
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
-      const weightPerBag = item.originalBags > 0 ? item.originalNetWeight / item.originalBags : 0;
-      const newWeight = parseFloat((weightPerBag * newBags).toFixed(1));
+      let newWeight: number;
+      if (item.lotSourceBags > 0) {
+        const lotNetWeight = Math.max(0, item.lotSourceWeight - item.lotSourceBags);
+        newWeight = parseFloat(((newBags / item.lotSourceBags) * lotNetWeight).toFixed(1));
+      } else {
+        const weightPerBag = item.originalBags > 0 ? item.originalNetWeight / item.originalBags : 0;
+        newWeight = parseFloat((weightPerBag * newBags).toFixed(1));
+      }
       const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
       const hasChanges = newBags !== item.originalBags || newWeight !== item.originalNetWeight || item.revenue !== item.originalRevenue;
       return {
@@ -528,6 +538,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       loadingPricePerKg: loadingPpk,
       loadingAmount: loadingAmt,
       inventoryKey: selectedInventory,
+      lotSourceWeight: parseFloat(inv.breakdownWeight || inv.totalWeight || "0"),
+      lotSourceBags: inv.originalBags || inv.lotOriginalBags || 0,
       action: 'add' as const
     }]);
     
