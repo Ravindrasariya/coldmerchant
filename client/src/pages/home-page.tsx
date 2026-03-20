@@ -178,26 +178,24 @@ export default function HomePage() {
     setDragOverIndex(index);
   }, []);
 
-  const handleDragEnd = useCallback(() => {
-    if (dragItemRef.current === null || dragOverItemRef.current === null) {
-      setDragOverIndex(null);
-      return;
-    }
+  const handleDrop = useCallback((e: DragEvent<HTMLElement>, dropIndex: number) => {
+    e.preventDefault();
     const from = dragItemRef.current;
-    const to = dragOverItemRef.current;
-    if (from !== to) {
-      setTabOrder(prev => {
-        const updated = [...prev];
-        const [moved] = updated.splice(from, 1);
-        updated.splice(to, 0, moved);
-        saveTabOrder(userId, updated);
-        return updated;
-      });
-    }
+    if (from === null || from === dropIndex) return;
+    setTabOrder(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(from, 1);
+      updated.splice(dropIndex, 0, moved);
+      saveTabOrder(userId, updated);
+      return updated;
+    });
+  }, [userId]);
+
+  const handleDragEnd = useCallback(() => {
     dragItemRef.current = null;
     dragOverItemRef.current = null;
     setDragOverIndex(null);
-  }, [userId]);
+  }, []);
 
   const resetTabOrder = useCallback(() => {
     setTabOrder(DEFAULT_TAB_ORDER);
@@ -282,6 +280,7 @@ export default function HomePage() {
                       draggable
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={(e) => handleDragOver(e, index)}
+                      onDrop={(e) => handleDrop(e, index)}
                       onDragEnd={handleDragEnd}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-extrabold rounded-md transition-colors cursor-grab active:cursor-grabbing data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-muted/50 ${dragOverIndex === index ? 'ring-2 ring-primary ring-offset-1' : ''}`}
                       data-testid={`tab-${tab.value}`}
@@ -383,6 +382,7 @@ export default function HomePage() {
                               draggable
                               onDragStart={() => handleDragStart(index)}
                               onDragOver={(e) => handleDragOver(e, index)}
+                              onDrop={(e) => handleDrop(e, index)}
                               onDragEnd={handleDragEnd}
                               className={`flex items-center w-full ${dragOverIndex === index ? 'ring-2 ring-primary ring-offset-1 rounded-md' : ''}`}
                             >
