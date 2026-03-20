@@ -258,7 +258,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
                     <td className="border p-2">{idx + 1}</td>
-                    <td className="border p-2">{item.potatoType || "-"}{item.size ? ` (${item.size})` : ""}</td>
+                    <td className="border p-2">{item.potatoType || "-"}</td>
                     <td className="border p-2 text-right">{item.bagsMoved}</td>
                     <td className="border p-2 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
                     <td className="border p-2 text-right">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
@@ -278,35 +278,33 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             </table>
 
             <div className="charges-section text-sm">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                {mandiCommission > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Mandi Commission / मंडी कमीशन</span>
-                    <span>₹{parseFloat(mandiCommission.toFixed(1)).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-                {aadhatCommission > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Aadhat Commission / आढ़त कमीशन</span>
-                    <span>₹{parseFloat(aadhatCommission.toFixed(1)).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-                {hammali > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Hammali / हम्माली</span>
-                    <span>₹{parseFloat(hammali.toFixed(1)).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-                {extraCharges > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Extra Charges / अतिरिक्त शुल्क</span>
-                    <span>₹{parseFloat(extraCharges.toFixed(1)).toLocaleString('en-IN')}</span>
-                  </div>
-                )}
-              </div>
+              {mandiCommission > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                  <span>Mandi Commission / मंडी कमीशन</span>
+                  <span>₹{parseFloat(mandiCommission.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {aadhatCommission > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                  <span>Aadhat Commission / आढ़त कमीशन</span>
+                  <span>₹{parseFloat(aadhatCommission.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {hammali > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                  <span>Hammali / हम्माली</span>
+                  <span>₹{parseFloat(hammali.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {extraCharges > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                  <span>Extra Charges / अतिरिक्त शुल्क</span>
+                  <span>₹{parseFloat(extraCharges.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
 
               {totalMandiCharges > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "600", borderTop: "1px solid #ccc", paddingTop: "8px", marginTop: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "600", borderTop: "1px solid #ccc", paddingTop: "8px", marginTop: "4px" }}>
                   <span>Total Mandi Charges / कुल मंडी शुल्क</span>
                   <span>₹{parseFloat(totalMandiCharges.toFixed(1)).toLocaleString('en-IN')}</span>
                 </div>
