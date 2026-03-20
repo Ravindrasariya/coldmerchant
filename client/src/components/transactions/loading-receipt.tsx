@@ -224,6 +224,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.partyAddress && (
                   <p className="text-sm text-gray-600">{transaction.partyAddress}</p>
                 )}
+                <p><strong>Driver Contact:</strong> {transaction.driverContact || "-"}</p>
+                <p><strong>Driver Advance:</strong> {driverAdvance > 0 ? `₹${driverAdvance.toLocaleString("en-IN")}` : "-"}</p>
               </div>
             </div>
 
