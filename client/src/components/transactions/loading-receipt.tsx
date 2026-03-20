@@ -29,6 +29,7 @@ interface LoadingTransaction {
   transactionType: string | null;
   transporterName: string | null;
   driverContact: string | null;
+  buyerId: number | null;
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
@@ -45,6 +46,13 @@ interface LoadingTransaction {
   totalMandiExtraCharges: string | null;
   createdAt: string;
   items: TransactionItem[];
+}
+
+interface Buyer {
+  id: number;
+  name: string;
+  address: string;
+  contact: string | null;
 }
 
 interface Merchant {
@@ -91,6 +99,12 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     queryKey: ["/api/merchants", merchantId],
     enabled: !!merchantId && open,
   });
+
+  const { data: buyers } = useQuery<Buyer[]>({
+    queryKey: ["/api/buyers"],
+    enabled: !!transaction?.buyerId && open,
+  });
+  const buyer = buyers?.find(b => b.id === transaction?.buyerId);
 
   const isLoading = txnLoading || merchantLoading;
 
@@ -221,11 +235,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.partyName && (
                   <p><strong>Buyer / खरीदार:</strong> {transaction.partyName}</p>
                 )}
-                {transaction.partyAddress && (
-                  <p className="text-sm text-gray-600">{transaction.partyAddress}</p>
+                {(buyer?.address || transaction.partyAddress) && (
+                  <p className="text-sm text-gray-600">{buyer?.address || transaction.partyAddress}</p>
                 )}
-                <p><strong>Driver Contact:</strong> {transaction.driverContact || ""}</p>
-                <p><strong>Driver Advance:</strong> {driverAdvance > 0 ? `₹${driverAdvance.toLocaleString("en-IN")}` : ""}</p>
+                <p><strong>Driver Contact:</strong> {transaction.driverContact ? ` ${transaction.driverContact}` : " ___________"}</p>
+                <p><strong>Driver Advance:</strong> {driverAdvance > 0 ? ` ₹${driverAdvance.toLocaleString("en-IN")}` : " ___________"}</p>
               </div>
             </div>
 
