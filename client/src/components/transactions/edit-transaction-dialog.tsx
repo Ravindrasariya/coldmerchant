@@ -642,7 +642,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   </Select>
                   {selectedInventory && (
                     <div className="text-xs text-muted-foreground">
-                      {t("Cost/Bag", "लागत/बोरी")}: ₹{parseFloat((unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory)?.costPerBag || 0).toFixed(1)).toLocaleString('en-IN')}
+                      {isLoadingType
+                        ? `${t("₹/Kg", "₹/किग्रा")}: ₹${parseFloat((unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory)?.pricePerKg || "0")).toLocaleString('en-IN')}`
+                        : `${t("Cost/Bag", "लागत/बोरी")}: ₹${parseFloat((unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory)?.costPerBag || 0).toFixed(1)).toLocaleString('en-IN')}`
+                      }
                     </div>
                   )}
                   <div className="flex gap-2 flex-wrap items-center">
