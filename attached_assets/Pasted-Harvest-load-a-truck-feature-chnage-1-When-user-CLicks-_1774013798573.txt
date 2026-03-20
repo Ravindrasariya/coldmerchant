@@ -1,0 +1,24 @@
+Harvest load a truck feature chnage:
+1) When user CLicks on the load truck, it shall give two options in the intermediate pop-up before going to actual dialog
+  a) Loading (keep same name in Devnagiri for hindi conversion)
+  b) Sale (Bikri in Devnagairi) 
+
+2) If user clicks on Bikri (sales) then the existing route shall be followed no change at all
+3) If loading is selected then Load a truck dilaog shall have following
+  a) Same row for transport as existing with 4 input cell - no change
+  b) Same Buyer selection from serachable drop down - no change
+  c) Similar lot picking functions (with add new lot), below are some changes
+    i) replace Total weight with Price/kg editable field - the cell will be pre-filled with the price coming from stock regsiter for the lot
+    ii)Cost of Goods column shall be replaced with Amount as : Price per kg x Net weight for each row. AFter amount add P&L - non editable as (Price per kg x Net weight - actual price per kg from stock register x Net Weight)
+    iii) other features like editable cell for # of bags default as coming from the lot but user can decrease it 
+    iv) Proportionate calculation of the net weight as # of bags changes based on the net weight coming from the stock register
+    v) USer can add more lots from the add lot button similar to existing
+    vi) At the end it shall aggregate all Mandi related charges for all the lots in their different bkts like Mandi Commission, Aadhat Commission, Hammali/Bag and Extra Charges
+    v) After this section add below items - 
+        - Sales Commission - Amount input field
+        - Advance AMount 
+        - Driver Advance
+    vi) Grand Total as = Sum total of inidividual lot amount + all Mandi Charges + Sales Commossion - Advance Amount
+    vii) Finally submit button
+    viii) Once submitted, transaction dialog, shall have edit transaction button laying out all these fields, to edit and modify and save
+ix) Print receipt showing all the details as listed above and (attaching pic 2 for reference)
