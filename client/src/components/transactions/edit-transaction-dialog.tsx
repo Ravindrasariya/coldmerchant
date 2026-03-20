@@ -486,8 +486,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (inv) {
       const bags = inv.remainingBags;
       const wpb = getWeightPerBag(inv);
+      const totalWeight = wpb * bags;
+      const weight = isLoadingType ? Math.max(0, totalWeight - bags) : totalWeight;
       setNewItemBags(bags);
-      setNewItemWeight(parseFloat((wpb * bags).toFixed(1)));
+      setNewItemWeight(parseFloat(weight.toFixed(1)));
       setNewItemRevenue(0);
     }
   };
@@ -771,7 +773,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         const inv = unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory);
                         if (inv) {
                           const wpb = getWeightPerBag(inv);
-                          setNewItemWeight(parseFloat((wpb * bags).toFixed(1)));
+                          const totalWeight = wpb * bags;
+                          const weight = isLoadingType ? Math.max(0, totalWeight - bags) : totalWeight;
+                          setNewItemWeight(parseFloat(weight.toFixed(1)));
                         }
                       }}
                       className="w-20 no-spinner"
