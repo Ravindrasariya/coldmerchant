@@ -304,6 +304,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       toast({
         title: t("Loading Created", "लोडिंग बनाई गई"),
         description: t("Loading transaction saved successfully", "लोडिंग लेनदेन सफलतापूर्वक सहेजा गया"),

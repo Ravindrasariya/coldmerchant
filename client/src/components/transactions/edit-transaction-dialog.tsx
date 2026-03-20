@@ -309,6 +309,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
@@ -360,6 +361,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
