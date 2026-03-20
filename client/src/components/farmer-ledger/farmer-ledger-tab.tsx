@@ -98,6 +98,16 @@ export function FarmerLedgerTab() {
     enabled: !!user,
   });
 
+  const { data: apiVillages = [] } = useQuery<string[]>({
+    queryKey: ["/api/farmers/villages"],
+    enabled: !!user,
+  });
+
+  const { data: apiTehsils = [] } = useQuery<string[]>({
+    queryKey: ["/api/farmers/tehsils"],
+    enabled: !!user,
+  });
+
   const syncMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/farmers/sync", {});
@@ -157,6 +167,8 @@ export function FarmerLedgerTab() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/villages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/tehsils"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
@@ -378,14 +390,6 @@ export function FarmerLedgerTab() {
       if (f.village) villages.add(f.village);
     });
     return Array.from(villages).sort();
-  }, [farmers]);
-
-  const uniqueTehsils = useMemo(() => {
-    const tehsils = new Set<string>();
-    farmers.forEach(f => {
-      if (f.tehsil) tehsils.add(f.tehsil);
-    });
-    return Array.from(tehsils).sort();
   }, [farmers]);
 
   const availableYears = useMemo(() => {
@@ -1037,8 +1041,8 @@ export function FarmerLedgerTab() {
                   {showEditVillageSuggestions && (() => {
                     const term = editForm.village.toLowerCase().trim();
                     const filtered = term
-                      ? uniqueVillages.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
-                      : uniqueVillages.slice(0, 10);
+                      ? apiVillages.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
+                      : apiVillages.slice(0, 10);
                     return filtered.length > 0 ? (
                       <div
                         ref={editVillageSuggestionsRef}
@@ -1081,8 +1085,8 @@ export function FarmerLedgerTab() {
                   {showEditTehsilSuggestions && (() => {
                     const term = editForm.tehsil.toLowerCase().trim();
                     const filtered = term
-                      ? uniqueTehsils.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
-                      : uniqueTehsils.slice(0, 10);
+                      ? apiTehsils.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
+                      : apiTehsils.slice(0, 10);
                     return filtered.length > 0 ? (
                       <div
                         ref={editTehsilSuggestionsRef}
