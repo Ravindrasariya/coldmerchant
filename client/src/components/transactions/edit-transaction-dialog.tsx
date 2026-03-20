@@ -460,8 +460,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         newWeight = parseFloat((weightPerBag * newBags).toFixed(1));
       }
       const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
-      const newCostOfGoods = item.originalBags > 0
-        ? parseFloat(((newBags / item.originalBags) * item.originalCostOfGoods).toFixed(2))
+      const cogsDenom = item.originalBags > 0 ? item.originalBags : item.bagsMoved;
+      const newCostOfGoods = cogsDenom > 0
+        ? parseFloat(((newBags / cogsDenom) * (item.originalBags > 0 ? item.originalCostOfGoods : item.costOfGoods)).toFixed(2))
         : item.costOfGoods;
       const hasChanges = newBags !== item.originalBags || newWeight !== item.originalNetWeight || item.revenue !== item.originalRevenue;
       return {
@@ -480,8 +481,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setEditableItems(items => items.map((item, i) => {
       if (i !== index) return item;
       const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
-      const newCostOfGoods = item.originalNetWeight > 0
-        ? parseFloat(((newWeight / item.originalNetWeight) * item.originalCostOfGoods).toFixed(2))
+      const cogsDenom = item.originalNetWeight > 0 ? item.originalNetWeight : item.netWeight;
+      const newCostOfGoods = cogsDenom > 0
+        ? parseFloat(((newWeight / cogsDenom) * (item.originalNetWeight > 0 ? item.originalCostOfGoods : item.costOfGoods)).toFixed(2))
         : item.costOfGoods;
       const hasChanges = item.bagsMoved !== item.originalBags || newWeight !== item.originalNetWeight;
       return {
