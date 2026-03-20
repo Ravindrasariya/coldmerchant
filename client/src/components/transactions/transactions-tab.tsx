@@ -554,30 +554,32 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
             </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
-            <Button
-              variant="outline"
-              className="h-24 flex flex-col gap-2 text-base"
+            <button
+              className="group h-28 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 shadow-sm transition-all hover:border-blue-400 hover:shadow-md hover:scale-[1.03] active:scale-[0.98] dark:border-blue-800 dark:from-blue-950 dark:to-blue-900 dark:text-blue-300 dark:hover:border-blue-600"
               onClick={() => {
                 setShowChooser(false);
                 setShowLoadingDialog(true);
               }}
               data-testid="button-choose-loading"
             >
-              <Truck className="h-6 w-6" />
-              {t("Loading", "लोडिंग")}
-            </Button>
-            <Button
-              variant="outline"
-              className="h-24 flex flex-col gap-2 text-base"
+              <div className="rounded-full bg-blue-200/60 p-2.5 group-hover:bg-blue-200 transition-colors dark:bg-blue-800/60 dark:group-hover:bg-blue-800">
+                <Truck className="h-6 w-6" />
+              </div>
+              <span className="text-base font-semibold">{t("Loading", "लोडिंग")}</span>
+            </button>
+            <button
+              className="group h-28 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 text-emerald-700 shadow-sm transition-all hover:border-emerald-400 hover:shadow-md hover:scale-[1.03] active:scale-[0.98] dark:border-emerald-800 dark:from-emerald-950 dark:to-emerald-900 dark:text-emerald-300 dark:hover:border-emerald-600"
               onClick={() => {
                 setShowChooser(false);
                 setShowLoadDialog(true);
               }}
               data-testid="button-choose-sale"
             >
-              <IndianRupee className="h-6 w-6" />
-              {t("Sale / Bikri", "बिक्री")}
-            </Button>
+              <div className="rounded-full bg-emerald-200/60 p-2.5 group-hover:bg-emerald-200 transition-colors dark:bg-emerald-800/60 dark:group-hover:bg-emerald-800">
+                <IndianRupee className="h-6 w-6" />
+              </div>
+              <span className="text-base font-semibold">{t("Sale / Bikri", "बिक्री")}</span>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
