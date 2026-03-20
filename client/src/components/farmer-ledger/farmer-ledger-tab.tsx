@@ -25,9 +25,16 @@ import {
   X
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { type Farmer, type FarmerEditHistory } from "@shared/schema";
+import { type Farmer, type FarmerEditHistory, DISTRICTS, STATES } from "@shared/schema";
 
 interface FarmerWithDues extends Farmer {
   harvestDue: number;
@@ -71,6 +78,11 @@ export function FarmerLedgerTab() {
     district: "",
     state: "",
   });
+  
+  const [showEditVillageSuggestions, setShowEditVillageSuggestions] = useState(false);
+  const [showEditTehsilSuggestions, setShowEditTehsilSuggestions] = useState(false);
+  const editVillageSuggestionsRef = useRef<HTMLDivElement>(null);
+  const editTehsilSuggestionsRef = useRef<HTMLDivElement>(null);
   
   // Edit history in dialog state
   const [showDialogEditHistory, setShowDialogEditHistory] = useState(false);
@@ -232,6 +244,8 @@ export function FarmerLedgerTab() {
       state: farmer.state || "",
     });
     setShowDialogEditHistory(false);
+    setShowEditVillageSuggestions(false);
+    setShowEditTehsilSuggestions(false);
     setEditDialogOpen(true);
   };
 
@@ -268,6 +282,12 @@ export function FarmerLedgerTab() {
       if (villageSuggestionsRef.current && !villageSuggestionsRef.current.contains(event.target as Node) &&
           villageInputRef.current && !villageInputRef.current.contains(event.target as Node)) {
         setShowVillageSuggestions(false);
+      }
+      if (editVillageSuggestionsRef.current && !editVillageSuggestionsRef.current.contains(event.target as Node)) {
+        setShowEditVillageSuggestions(false);
+      }
+      if (editTehsilSuggestionsRef.current && !editTehsilSuggestionsRef.current.contains(event.target as Node)) {
+        setShowEditTehsilSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -358,6 +378,14 @@ export function FarmerLedgerTab() {
       if (f.village) villages.add(f.village);
     });
     return Array.from(villages).sort();
+  }, [farmers]);
+
+  const uniqueTehsils = useMemo(() => {
+    const tehsils = new Set<string>();
+    farmers.forEach(f => {
+      if (f.tehsil) tehsils.add(f.tehsil);
+    });
+    return Array.from(tehsils).sort();
   }, [farmers]);
 
   const availableYears = useMemo(() => {
@@ -993,45 +1021,129 @@ export function FarmerLedgerTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-village">{t("Village", "गांव")} <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-village"
-                  value={editForm.village}
-                  onChange={(e) => setEditForm(f => ({ ...f, village: e.target.value }))}
-                  placeholder={t("Village name", "गांव का नाम")}
-                  data-testid="input-edit-farmer-village"
-                />
+                <div className="relative">
+                  <Input
+                    id="edit-village"
+                    value={editForm.village}
+                    onChange={(e) => {
+                      setEditForm(f => ({ ...f, village: e.target.value }));
+                      setShowEditVillageSuggestions(true);
+                    }}
+                    onFocus={() => setShowEditVillageSuggestions(true)}
+                    placeholder={t("Village name", "गांव का नाम")}
+                    autoComplete="off"
+                    data-testid="input-edit-farmer-village"
+                  />
+                  {showEditVillageSuggestions && (() => {
+                    const term = editForm.village.toLowerCase().trim();
+                    const filtered = term
+                      ? uniqueVillages.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
+                      : uniqueVillages.slice(0, 10);
+                    return filtered.length > 0 ? (
+                      <div
+                        ref={editVillageSuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                      >
+                        {filtered.map((village, idx) => (
+                          <button
+                            key={village}
+                            type="button"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setEditForm(f => ({ ...f, village }));
+                              setShowEditVillageSuggestions(false);
+                            }}
+                            data-testid={`suggestion-edit-village-${idx}`}
+                          >
+                            {village}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-tehsil">{t("Tehsil", "तहसील")} <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-tehsil"
-                  value={editForm.tehsil}
-                  onChange={(e) => setEditForm(f => ({ ...f, tehsil: e.target.value }))}
-                  placeholder={t("Tehsil name", "तहसील का नाम")}
-                  data-testid="input-edit-farmer-tehsil"
-                />
+                <div className="relative">
+                  <Input
+                    id="edit-tehsil"
+                    value={editForm.tehsil}
+                    onChange={(e) => {
+                      setEditForm(f => ({ ...f, tehsil: e.target.value }));
+                      setShowEditTehsilSuggestions(true);
+                    }}
+                    onFocus={() => setShowEditTehsilSuggestions(true)}
+                    placeholder={t("Tehsil name", "तहसील का नाम")}
+                    autoComplete="off"
+                    data-testid="input-edit-farmer-tehsil"
+                  />
+                  {showEditTehsilSuggestions && (() => {
+                    const term = editForm.tehsil.toLowerCase().trim();
+                    const filtered = term
+                      ? uniqueTehsils.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
+                      : uniqueTehsils.slice(0, 10);
+                    return filtered.length > 0 ? (
+                      <div
+                        ref={editTehsilSuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                      >
+                        {filtered.map((tehsil, idx) => (
+                          <button
+                            key={tehsil}
+                            type="button"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setEditForm(f => ({ ...f, tehsil }));
+                              setShowEditTehsilSuggestions(false);
+                            }}
+                            data-testid={`suggestion-edit-tehsil-${idx}`}
+                          >
+                            {tehsil}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-district">{t("District", "जिला")} <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-district"
+                <Label>{t("District", "जिला")} <span className="text-destructive">*</span></Label>
+                <Select
                   value={editForm.district}
-                  onChange={(e) => setEditForm(f => ({ ...f, district: e.target.value }))}
-                  placeholder={t("District name", "जिले का नाम")}
-                  data-testid="input-edit-farmer-district"
-                />
+                  onValueChange={(value) => setEditForm(f => ({ ...f, district: value }))}
+                >
+                  <SelectTrigger data-testid="select-edit-farmer-district">
+                    <SelectValue placeholder={t("Select district", "जिला चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DISTRICTS.map((district) => (
+                      <SelectItem key={district} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-state">{t("State", "राज्य")} <span className="text-destructive">*</span></Label>
-                <Input
-                  id="edit-state"
+                <Label>{t("State", "राज्य")} <span className="text-destructive">*</span></Label>
+                <Select
                   value={editForm.state}
-                  onChange={(e) => setEditForm(f => ({ ...f, state: e.target.value }))}
-                  placeholder={t("State name", "राज्य का नाम")}
-                  data-testid="input-edit-farmer-state"
-                />
+                  onValueChange={(value) => setEditForm(f => ({ ...f, state: value }))}
+                >
+                  <SelectTrigger data-testid="select-edit-farmer-state">
+                    <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
