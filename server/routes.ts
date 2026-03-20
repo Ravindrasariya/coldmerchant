@@ -1659,7 +1659,8 @@ export async function registerRoutes(
         const { breakdownCosts } = storage.computeBreakdownCosts(lot!, allBreakdowns);
         const costPerBag = breakdownCosts.get(item.breakdownId || null) || 0;
         
-        const netWeight = item.netWeight || 0;
+        const computedNetWeight = storage.computeProportionateNetWeight(lot!, allBreakdowns, item.breakdownId, item.bagsMoved);
+        const netWeight = (item.netWeight && item.netWeight > 0) ? item.netWeight : computedNetWeight;
 
         let costOfGoods: number;
         let snapshotPrice: number;
@@ -1989,13 +1990,14 @@ export async function registerRoutes(
               await storage.adjustInventory(existingItem.lotId, existingItem.breakdownId, merchantId, bagsDelta);
             }
             
-            const newNetWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
-              ? itemChange.netWeight
-              : (existingItem.bagsMoved > 0 
-                  ? parseFloat(existingItem.netWeight || "0") / existingItem.bagsMoved * itemChange.bagsMoved
-                  : itemChange.bagsMoved * 50);
             const editLot = await storage.getLotById(existingItem.lotId, merchantId);
             const editBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
+            const computedNetWeight = editLot
+              ? storage.computeProportionateNetWeight(editLot, editBreakdowns, existingItem.breakdownId, itemChange.bagsMoved)
+              : itemChange.bagsMoved * 50;
+            const newNetWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
+              ? itemChange.netWeight
+              : computedNetWeight;
             const { breakdownCosts: editBdCosts } = editLot ? storage.computeBreakdownCosts(editLot, editBreakdowns) : { breakdownCosts: new Map() };
             const editCostPerBag = editBdCosts.get(existingItem.breakdownId || null) || parseFloat(existingItem.pricePerKgSnapshot || "0");
             let newCostOfGoods: number;
@@ -2090,9 +2092,10 @@ export async function registerRoutes(
           const { breakdownCosts: addBdCosts } = storage.computeBreakdownCosts(lot, addBreakdowns);
           const addCostPerBag = addBdCosts.get(breakdownId || null) || 0;
           
+          const computedNetWeight = storage.computeProportionateNetWeight(lot, addBreakdowns, breakdownId, itemChange.bagsMoved);
           const netWeight = typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0
             ? itemChange.netWeight
-            : itemChange.bagsMoved * 50;
+            : computedNetWeight;
           let costOfGoods: number;
           let addSnapshotPrice: number;
           if (existingTxn.transactionType === "loading" && lot.place !== "farm_gate") {

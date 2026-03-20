@@ -801,6 +801,22 @@ export class DatabaseStorage implements IStorage {
     return result ? result.transactionNumber + 1 : 1;
   }
 
+  computeProportionateNetWeight(lot: any, breakdowns: any[], breakdownId: number | null, bagsMoved: number): number {
+    if (breakdownId) {
+      const bd = breakdowns.find((b: any) => b.id === breakdownId);
+      if (bd) {
+        const weight = bd.weight ? parseFloat(bd.weight) : (lot.totalWeight ? parseFloat(lot.totalWeight) : 0);
+        const bags = bd.numberOfBags || 0;
+        const netWeight = bags > 0 ? Math.max(0, weight - bags) : 0;
+        return bags > 0 ? (bagsMoved / bags) * netWeight : 0;
+      }
+    }
+    const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+    const bags = lot.originalBags || 0;
+    const netWeight = bags > 0 ? Math.max(0, weight - bags) : 0;
+    return bags > 0 ? (bagsMoved / bags) * netWeight : 0;
+  }
+
   computeBreakdownCosts(lot: any, breakdowns: any[]): { breakdownCosts: Map<number | null, number>, totalCogs: number } {
     const result = new Map<number | null, number>();
     if (lot.originalBags <= 0) return { breakdownCosts: result, totalCogs: 0 };
