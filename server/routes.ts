@@ -1663,7 +1663,7 @@ export async function registerRoutes(
 
         let costOfGoods: number;
         let snapshotPrice: number;
-        if (transactionType === "loading") {
+        if (transactionType === "loading" && lot?.place !== "farm_gate") {
           const loadingBd = item.breakdownId
             ? allBreakdowns.find(b => b.id === item.breakdownId)
             : null;
@@ -2000,7 +2000,7 @@ export async function registerRoutes(
             const editCostPerBag = editBdCosts.get(existingItem.breakdownId || null) || parseFloat(existingItem.pricePerKgSnapshot || "0");
             let newCostOfGoods: number;
             let editBdPpk = 0;
-            if (existingTxn.transactionType === "loading") {
+            if (existingTxn.transactionType === "loading" && editLot?.place !== "farm_gate") {
               const editBd = existingItem.breakdownId
                 ? editBreakdowns.find(b => b.id === existingItem.breakdownId)
                 : null;
@@ -2019,7 +2019,7 @@ export async function registerRoutes(
               revenue: itemRevenue.toString()
             };
             if (existingTxn.transactionType === "loading") {
-              updateFields.pricePerKgSnapshot = editBdPpk.toString();
+              updateFields.pricePerKgSnapshot = (editLot?.place === "farm_gate" ? editCostPerBag : editBdPpk).toString();
               if (typeof itemChange.pricePerKg === 'number') updateFields.pricePerKg = itemChange.pricePerKg.toString();
               if (typeof itemChange.amount === 'number') {
                 updateFields.amount = itemChange.amount.toString();
@@ -2095,7 +2095,7 @@ export async function registerRoutes(
             : itemChange.bagsMoved * 50;
           let costOfGoods: number;
           let addSnapshotPrice: number;
-          if (existingTxn.transactionType === "loading") {
+          if (existingTxn.transactionType === "loading" && lot.place !== "farm_gate") {
             const addBd = breakdownId
               ? addBreakdowns.find(b => b.id === breakdownId)
               : null;

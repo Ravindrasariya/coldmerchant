@@ -49,6 +49,10 @@ interface Transaction {
   amountReceived: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
+  totalMandiCommission: string | null;
+  totalAadhatCommission: string | null;
+  totalHammali: string | null;
+  totalMandiExtraCharges: string | null;
   revenue: string | null;
   totalBags: number;
   totalNetWeight: string | null;
@@ -206,7 +210,9 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})${item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}`
       ).join(", ");
       
-      const totalCost = parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+      const totalCost = txn.transactionType === "loading"
+        ? parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalAadhatCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.totalMandiExtraCharges || "0")
+        : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
       return [
         txn.transactionNumber.toString(),
         format(new Date(txn.createdAt), "dd/MM/yyyy"),
@@ -436,7 +442,12 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 {t("Total Cost", "कुल लागत")}
               </div>
               <p className="text-sm sm:text-lg font-bold">
-                ₹{filteredTransactions.reduce((sum, t) => sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.transportationCharges || "0") + parseFloat(t.otherCharges || "0"), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                ₹{filteredTransactions.reduce((sum, t) => {
+                  if (t.transactionType === "loading") {
+                    return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.totalMandiCommission || "0") + parseFloat(t.totalAadhatCommission || "0") + parseFloat(t.totalHammali || "0") + parseFloat(t.totalMandiExtraCharges || "0");
+                  }
+                  return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.transportationCharges || "0") + parseFloat(t.otherCharges || "0");
+                }, 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -618,7 +629,9 @@ interface TransactionCardProps {
 function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps) {
   const { t } = useLanguage();
 
-  const totalCost = parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.transportationCharges || "0") + parseFloat(transaction.otherCharges || "0");
+  const totalCost = transaction.transactionType === "loading"
+    ? parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.totalMandiCommission || "0") + parseFloat(transaction.totalAadhatCommission || "0") + parseFloat(transaction.totalHammali || "0") + parseFloat(transaction.totalMandiExtraCharges || "0")
+    : parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.transportationCharges || "0") + parseFloat(transaction.otherCharges || "0");
   const revenue = transaction.revenue 
     ? parseFloat(transaction.revenue) 
     : transaction.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
