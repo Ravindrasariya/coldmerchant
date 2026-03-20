@@ -297,6 +297,12 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               </div>
             </div>
 
+            <div className="mb-4">
+              <p className="text-right">
+                <strong>Advance Paid to Driver / ड्राइवर को अग्रिम भुगतान:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}
+              </p>
+            </div>
+
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
@@ -324,12 +330,6 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 </tr>
               </tfoot>
             </table>
-
-            <div className="border-t pt-4">
-              <p className="text-right">
-                <strong>Advance Paid to Driver / ड्राइवर को अग्रिम भुगतान:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}
-              </p>
-            </div>
 
             <div className="border-t pt-4 text-center text-sm text-gray-500">
               <p>Thank you for your business! / आपके व्यापार के लिए धन्यवाद!</p>
