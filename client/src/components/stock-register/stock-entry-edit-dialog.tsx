@@ -447,6 +447,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           return c.type && c.type.length > 0 && amt > 0;
         })
       };
+
+      const syncedRemainingBags = lot.bagBreakdowns.length > 0
+        ? lot.bagBreakdowns
+            .filter(bd => bd.size !== "Wastage")
+            .reduce((sum, bd) => sum + (bd.remainingBags ?? bd.numberOfBags ?? 0), 0)
+        : lot.remainingBags;
       
       // For gate_cut with breakdowns, derive lot-level fields from breakdowns
       if (lot.cutType === "gate_cut" && lot.bagBreakdowns.length > 0) {
@@ -461,7 +467,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         // Guard: Only sync if we have meaningful weight data AND at least one valid price
         // This prevents incomplete rows from overwriting lot-level data
         if (totalWeight <= 0 || !hasValidPrices) {
-          return baseCleanedLot;
+          return { ...baseCleanedLot, remainingBags: syncedRemainingBags };
         }
         
         // Use weighted average for pricePerKg based on weight
@@ -472,13 +478,14 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         
         return {
           ...baseCleanedLot,
+          remainingBags: syncedRemainingBags,
           totalWeight: totalWeight,
           pricePerKg: avgPrice,
           size: firstSize || lot.size,
         };
       }
       
-      return baseCleanedLot;
+      return { ...baseCleanedLot, remainingBags: syncedRemainingBags };
     });
     updateMutation.mutate({ paymentStatus: entry.paymentStatus, remarks, lots: cleanedLots });
   };
