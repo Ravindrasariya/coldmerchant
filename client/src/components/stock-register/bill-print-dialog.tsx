@@ -89,7 +89,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const [headerImageDataUri, setHeaderImageDataUri] = useState<string | null>(null);
   const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
 
-  const { data: merchantData } = useQuery<{ receiptHeaderImage: string | null }>({
+  const { data: merchantData, isLoading: merchantLoading } = useQuery<{ receiptHeaderImage: string | null }>({
     queryKey: ["/api/merchants", user?.merchantId],
     enabled: !!user?.merchantId && open,
   });
@@ -329,7 +329,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   const handlePrint = () => {
     if (isMandi && entry.aadhatDbId && aadhatLoading) return;
-    if (merchantData?.receiptHeaderImage && !headerImageDataUri) return;
+    if (merchantLoading || (merchantData?.receiptHeaderImage && !headerImageDataUri)) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
@@ -956,7 +956,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     </div>
   );
 
-  const imageReady = !merchantData?.receiptHeaderImage || !!headerImageDataUri;
+  const imageReady = !merchantLoading && (!merchantData?.receiptHeaderImage || !!headerImageDataUri);
 
   React.useEffect(() => {
     if (!open || !autoAction || autoActionDone.current) return;

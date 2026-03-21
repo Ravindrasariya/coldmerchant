@@ -31,7 +31,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
 
   const [headerImageDataUri, setHeaderImageDataUri] = useState<string | null>(null);
 
-  const { data: merchantData } = useQuery<{ receiptHeaderImage: string | null }>({
+  const { data: merchantData, isLoading: merchantLoading } = useQuery<{ receiptHeaderImage: string | null }>({
     queryKey: ["/api/merchants", user?.merchantId],
     enabled: !!user?.merchantId && open,
   });
@@ -95,7 +95,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
   };
 
   const handlePrint = () => {
-    if (merchantData?.receiptHeaderImage && !headerImageDataUri) return;
+    if (merchantLoading || (merchantData?.receiptHeaderImage && !headerImageDataUri)) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
@@ -288,7 +288,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     </>
   );
 
-  const imageReady = !merchantData?.receiptHeaderImage || !!headerImageDataUri;
+  const imageReady = !merchantLoading && (!merchantData?.receiptHeaderImage || !!headerImageDataUri);
 
   React.useEffect(() => {
     if (!open || !autoAction || autoActionDone.current) return;
