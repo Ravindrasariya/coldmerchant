@@ -708,7 +708,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 control={form.control}
                 name="partyName"
                 render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem className="flex flex-col min-w-0">
                     <FormLabel>{t("Buyer Name", "खरीदार का नाम")}</FormLabel>
                     <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
                       <PopoverTrigger asChild>
@@ -723,7 +723,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             )}
                             data-testid="select-buyer-name"
                           >
-                            {field.value || t("Select buyer...", "खरीदार चुनें...")}
+                            <span className="truncate">{field.value || t("Select buyer...", "खरीदार चुनें...")}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
