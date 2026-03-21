@@ -146,7 +146,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
           <div style="max-width: 800px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px;">
               ${headerImageDataUri
-                ? `<img src="${headerImageDataUri}" alt="${user?.merchantName || 'Merchant'}" style="width: 100%; max-height: 120px; object-fit: contain; margin: 0 auto 4px; display: block;" />`
+                ? `<img src="${headerImageDataUri}" alt="${user?.merchantName || 'Merchant'}" style="width: 100%; margin: 0 auto 4px; display: block;" />`
                 : `<h1 style="font-size: 18px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
               ${user?.merchantAddress ? `<p style="font-size: 11px; color: #444; margin-bottom: 2px;">${user.merchantAddress}</p>` : ""}
               ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}`}
@@ -216,7 +216,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     <>
       <div className="text-center mb-3 pb-2 border-b-2 border-black">
         {merchantData?.receiptHeaderImage ? (
-          <img src={`/api/merchants/${user?.merchantId}/receipt-header`} alt={user?.merchantName || "Merchant"} className="w-full max-h-28 mx-auto object-contain mb-1" />
+          <img src={`/api/merchants/${user?.merchantId}/receipt-header`} alt={user?.merchantName || "Merchant"} className="w-full mx-auto mb-1" />
         ) : (
           <>
             {user?.merchantName && <h1 className="text-xl font-bold mb-0.5">{user.merchantName}</h1>}
