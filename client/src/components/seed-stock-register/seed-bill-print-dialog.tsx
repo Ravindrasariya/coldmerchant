@@ -95,6 +95,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
   };
 
   const handlePrint = () => {
+    if (merchantData?.receiptHeaderImage && !headerImageDataUri) return;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
@@ -287,13 +288,17 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     </>
   );
 
+  const imageReady = !merchantData?.receiptHeaderImage || !!headerImageDataUri;
+
   React.useEffect(() => {
     if (!open || !autoAction || autoActionDone.current) return;
-    autoActionDone.current = true;
     if (autoAction === "print") {
+      if (!imageReady) return;
+      autoActionDone.current = true;
       handlePrint();
       onOpenChange(false);
     } else if (autoAction === "share") {
+      autoActionDone.current = true;
       const timer = setTimeout(async () => {
         if (!billRef.current) {
           onOpenChange(false);
@@ -304,7 +309,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [open, autoAction]);
+  }, [open, autoAction, imageReady]);
 
   React.useEffect(() => {
     if (!open) {

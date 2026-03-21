@@ -1078,6 +1078,24 @@ export default function AdminPage() {
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
+                    <label className="cursor-pointer inline-block">
+                      <Button variant="outline" size="sm" disabled={headerImageUploading} asChild data-testid="button-replace-header-image">
+                        <span>
+                          {headerImageUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Replace Image
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleHeaderImageUpload(editingMerchant.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
                   </div>
                 ) : (
                   <div className="border-2 border-dashed rounded-lg p-4 text-center">
