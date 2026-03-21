@@ -338,12 +338,6 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 </div>
               )}
 
-              {driverAdvance > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px" }}>
-                  <span>Driver Advance / ड्राइवर अग्रिम</span>
-                  <span>₹{parseFloat(driverAdvance.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
             </div>
 
             <div className="grand-total text-right border-t-2 border-black pt-3 mt-4">
