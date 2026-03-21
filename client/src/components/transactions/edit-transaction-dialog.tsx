@@ -718,7 +718,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             role="combobox"
                             aria-expanded={buyerPopoverOpen}
                             className={cn(
-                              "justify-between font-normal",
+                              "justify-between font-normal truncate overflow-hidden",
                               !field.value && "text-muted-foreground"
                             )}
                             data-testid="select-buyer-name"
