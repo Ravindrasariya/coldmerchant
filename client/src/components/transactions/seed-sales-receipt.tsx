@@ -317,7 +317,7 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
           <div ref={printRef} className="space-y-2 p-3 bg-white text-black text-xs min-w-[600px]">
             <div className="header text-center border-b border-black pb-2">
               {merchant.receiptHeaderImage ? (
-                <img src={`/api/uploads/${merchant.receiptHeaderImage}`} alt={merchant.name} className="max-h-20 mx-auto object-contain" />
+                <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-20 mx-auto object-contain" />
               ) : (
                 <>
                   <h1 className="text-base font-bold">{merchant.name}</h1>

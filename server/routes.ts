@@ -1348,16 +1348,29 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/uploads/:filename", requireAuth, (req, res) => {
-    const filename = req.params.filename;
-    if (filename.includes("..") || filename.includes("/")) {
-      return res.status(400).json({ message: "Invalid filename" });
+  app.get("/api/merchants/:id/receipt-header", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.user!.isSystemAdmin && id !== req.user!.merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant || !merchant.receiptHeaderImage) {
+        return res.status(404).json({ message: "No header image" });
+      }
+      const filename = merchant.receiptHeaderImage;
+      if (filename.includes("..") || filename.includes("/")) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+      const filePath = path.join(uploadsDir, filename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      res.sendFile(filePath);
+    } catch (error) {
+      console.error("Error serving receipt header:", error);
+      res.status(500).json({ message: "Failed to serve receipt header" });
     }
-    const filePath = path.join(uploadsDir, filename);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found" });
-    }
-    res.sendFile(filePath);
   });
 
   // DELETE /api/admin/merchants/:id - Delete a merchant (admin only)

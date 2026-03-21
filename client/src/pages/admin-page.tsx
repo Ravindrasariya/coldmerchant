@@ -1062,7 +1062,7 @@ export default function AdminPage() {
                   <div className="space-y-2">
                     <div className="relative border rounded-lg overflow-hidden">
                       <img
-                        src={`/api/uploads/${editingMerchant.receiptHeaderImage}`}
+                        src={`/api/merchants/${editingMerchant.id}/receipt-header`}
                         alt="Receipt header"
                         className="w-full max-h-32 object-contain bg-white"
                         data-testid="img-receipt-header-preview"

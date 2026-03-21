@@ -29,10 +29,32 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const autoActionDone = React.useRef(false);
 
+  const [headerImageDataUri, setHeaderImageDataUri] = useState<string | null>(null);
+
   const { data: merchantData } = useQuery<{ receiptHeaderImage: string | null }>({
     queryKey: ["/api/merchants", user?.merchantId],
     enabled: !!user?.merchantId && open,
   });
+
+  React.useEffect(() => {
+    if (!merchantData?.receiptHeaderImage || !user?.merchantId) {
+      setHeaderImageDataUri(null);
+      return;
+    }
+    const fetchImage = async () => {
+      try {
+        const res = await fetch(`/api/merchants/${user.merchantId}/receipt-header`, { credentials: "include" });
+        if (!res.ok) { setHeaderImageDataUri(null); return; }
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setHeaderImageDataUri(reader.result as string);
+        reader.readAsDataURL(blob);
+      } catch {
+        setHeaderImageDataUri(null);
+      }
+    };
+    fetchImage();
+  }, [merchantData?.receiptHeaderImage, user?.merchantId]);
 
   const handleShare = async () => {
     if (!billRef.current) return;
@@ -122,8 +144,8 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
         <body>
           <div style="max-width: 800px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px;">
-              ${merchantData?.receiptHeaderImage
-                ? `<img src="/api/uploads/${merchantData.receiptHeaderImage}" alt="${user?.merchantName || 'Merchant'}" style="max-height: 80px; margin: 0 auto 4px; display: block;" />`
+              ${headerImageDataUri
+                ? `<img src="${headerImageDataUri}" alt="${user?.merchantName || 'Merchant'}" style="max-height: 80px; margin: 0 auto 4px; display: block;" />`
                 : `<h1 style="font-size: 18px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
               ${user?.merchantAddress ? `<p style="font-size: 11px; color: #444; margin-bottom: 2px;">${user.merchantAddress}</p>` : ""}
               ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}`}
@@ -186,24 +208,14 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
 
     printWindow.document.close();
     printWindow.focus();
-    if (merchantData?.receiptHeaderImage) {
-      const img = printWindow.document.querySelector('img');
-      if (img && !img.complete) {
-        img.onload = () => printWindow.print();
-        img.onerror = () => printWindow.print();
-      } else {
-        setTimeout(() => printWindow.print(), 250);
-      }
-    } else {
-      setTimeout(() => printWindow.print(), 250);
-    }
+    setTimeout(() => printWindow.print(), 250);
   };
 
   const renderBillContent = () => (
     <>
       <div className="text-center mb-3 pb-2 border-b-2 border-black">
         {merchantData?.receiptHeaderImage ? (
-          <img src={`/api/uploads/${merchantData.receiptHeaderImage}`} alt={user?.merchantName || "Merchant"} className="max-h-24 mx-auto object-contain mb-1" />
+          <img src={`/api/merchants/${user?.merchantId}/receipt-header`} alt={user?.merchantName || "Merchant"} className="max-h-24 mx-auto object-contain mb-1" />
         ) : (
           <>
             {user?.merchantName && <h1 className="text-xl font-bold mb-0.5">{user.merchantName}</h1>}

@@ -212,7 +212,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
           <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
               {merchant.receiptHeaderImage ? (
-                <img src={`/api/uploads/${merchant.receiptHeaderImage}`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
+                <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
               ) : (
                 <>
                   <h1 className="text-2xl font-bold">{merchant.name}</h1>
