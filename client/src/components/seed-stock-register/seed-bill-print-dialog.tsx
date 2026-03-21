@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,11 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
   const [sharing, setSharing] = useState(false);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const autoActionDone = React.useRef(false);
+
+  const { data: merchantData } = useQuery<{ receiptHeaderImage: string | null }>({
+    queryKey: ["/api/merchants", user?.merchantId],
+    enabled: !!user?.merchantId && open,
+  });
 
   const handleShare = async () => {
     if (!billRef.current) return;
@@ -116,9 +122,11 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
         <body>
           <div style="max-width: 800px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 16px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px;">
-              <h1 style="font-size: 18px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
+              ${merchantData?.receiptHeaderImage
+                ? `<img src="/api/uploads/${merchantData.receiptHeaderImage}" alt="${user?.merchantName || 'Merchant'}" style="max-height: 80px; margin: 0 auto 4px; display: block;" />`
+                : `<h1 style="font-size: 18px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
               ${user?.merchantAddress ? `<p style="font-size: 11px; color: #444; margin-bottom: 2px;">${user.merchantAddress}</p>` : ""}
-              ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}
+              ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}`}
               <p style="font-size: 12px; color: #666;">Seed Purchase Receipt / बीज खरीद रसीद</p>
             </div>
 
@@ -178,13 +186,33 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
 
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+    if (merchantData?.receiptHeaderImage) {
+      const img = printWindow.document.querySelector('img');
+      if (img && !img.complete) {
+        img.onload = () => printWindow.print();
+        img.onerror = () => printWindow.print();
+      } else {
+        setTimeout(() => printWindow.print(), 250);
+      }
+    } else {
+      setTimeout(() => printWindow.print(), 250);
+    }
   };
 
   const renderBillContent = () => (
     <>
+      <div className="text-center mb-3 pb-2 border-b-2 border-black">
+        {merchantData?.receiptHeaderImage ? (
+          <img src={`/api/uploads/${merchantData.receiptHeaderImage}`} alt={user?.merchantName || "Merchant"} className="max-h-24 mx-auto object-contain mb-1" />
+        ) : (
+          <>
+            {user?.merchantName && <h1 className="text-xl font-bold mb-0.5">{user.merchantName}</h1>}
+            {user?.merchantAddress && <p className="text-xs text-gray-500">{user.merchantAddress}</p>}
+            {user?.merchantContact && <p className="text-xs text-gray-500">Ph: {user.merchantContact}</p>}
+          </>
+        )}
+        <p className="text-sm font-semibold mt-1">Seed Purchase Receipt / बीज खरीद रसीद</p>
+      </div>
       <div className="bg-muted/30 p-3 rounded-lg">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">

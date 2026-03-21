@@ -17,7 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Loader2, Plus, Edit, Trash2, KeyRound, Building2, Users, 
   LogOut, Phone, MapPin, Archive, Power, RotateCcw, AlertTriangle, Search,
-  Wrench, Play, CheckCircle2, XCircle, PlayCircle, Upload
+  Wrench, Play, CheckCircle2, XCircle, PlayCircle, Upload, ImageIcon, X
 } from "lucide-react";
 import type { Merchant, User, DemoVideo } from "@shared/schema";
 
@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [videoUploading, setVideoUploading] = useState(false);
   const [editingVideoId, setEditingVideoId] = useState<number | null>(null);
   const [editingVideoCaption, setEditingVideoCaption] = useState("");
+  const [headerImageUploading, setHeaderImageUploading] = useState(false);
 
   useEffect(() => {
     if (!user?.isSystemAdmin) {
@@ -310,6 +311,48 @@ export default function AdminPage() {
       updateMerchantMutation.mutate({ id: editingMerchant.id, data: merchantForm });
     } else {
       createMerchantMutation.mutate(merchantForm);
+    }
+  };
+
+  const handleHeaderImageUpload = async (merchantId: number, file: File) => {
+    setHeaderImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch(`/api/admin/merchants/${merchantId}/receipt-header`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      const updated = await res.json();
+      if (editingMerchant && editingMerchant.id === merchantId) {
+        setEditingMerchant({ ...editingMerchant, receiptHeaderImage: updated.receiptHeaderImage });
+      }
+      toast({ title: "Header image uploaded" });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setHeaderImageUploading(false);
+    }
+  };
+
+  const handleHeaderImageDelete = async (merchantId: number) => {
+    setHeaderImageUploading(true);
+    try {
+      await apiRequest("DELETE", `/api/admin/merchants/${merchantId}/receipt-header`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      if (editingMerchant && editingMerchant.id === merchantId) {
+        setEditingMerchant({ ...editingMerchant, receiptHeaderImage: null });
+      }
+      toast({ title: "Header image removed" });
+    } catch {
+      toast({ title: "Failed to remove", variant: "destructive" });
+    } finally {
+      setHeaderImageUploading(false);
     }
   };
 
@@ -1012,6 +1055,67 @@ export default function AdminPage() {
                 data-testid="input-merchant-address"
               />
             </div>
+            {editingMerchant && (
+              <div className="space-y-2">
+                <Label>Receipt Header Image</Label>
+                {editingMerchant.receiptHeaderImage ? (
+                  <div className="space-y-2">
+                    <div className="relative border rounded-lg overflow-hidden">
+                      <img
+                        src={`/api/uploads/${editingMerchant.receiptHeaderImage}`}
+                        alt="Receipt header"
+                        className="w-full max-h-32 object-contain bg-white"
+                        data-testid="img-receipt-header-preview"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => handleHeaderImageDelete(editingMerchant.id)}
+                        disabled={headerImageUploading}
+                        data-testid="button-remove-header-image"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">Upload an image to replace the text header on receipts</p>
+                    <label className="cursor-pointer">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={headerImageUploading}
+                        asChild
+                        data-testid="button-upload-header-image"
+                      >
+                        <span>
+                          {headerImageUploading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4 mr-2" />
+                          )}
+                          Choose Image
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleHeaderImageUpload(editingMerchant.id, file);
+                          e.target.value = "";
+                        }}
+                        data-testid="input-header-image-file"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMerchantDialogOpen(false)}>

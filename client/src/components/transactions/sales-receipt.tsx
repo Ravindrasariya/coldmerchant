@@ -39,6 +39,7 @@ interface Merchant {
   name: string;
   contactNumber: string | null;
   address: string | null;
+  receiptHeaderImage: string | null;
 }
 
 interface SalesReceiptDialogProps {
@@ -180,7 +181,17 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    const imgs = printWindow.document.querySelectorAll('img');
+    if (imgs.length > 0) {
+      let loaded = 0;
+      const tryPrint = () => { loaded++; if (loaded >= imgs.length) printWindow.print(); };
+      imgs.forEach(img => {
+        if (img.complete) tryPrint();
+        else { img.onload = tryPrint; img.onerror = tryPrint; }
+      });
+    } else {
+      printWindow.print();
+    }
   };
 
   useEffect(() => {
@@ -256,12 +267,18 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
           <div className="overflow-x-auto -mx-4 px-4">
           <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
-              <h1 className="text-2xl font-bold">{merchant.name}</h1>
-              {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
-              {merchant.contactNumber && (
-                <p className="text-sm text-gray-600">
-                  Phone / फोन: {merchant.contactNumber}
-                </p>
+              {merchant.receiptHeaderImage ? (
+                <img src={`/api/uploads/${merchant.receiptHeaderImage}`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
+              ) : (
+                <>
+                  <h1 className="text-2xl font-bold">{merchant.name}</h1>
+                  {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
+                  {merchant.contactNumber && (
+                    <p className="text-sm text-gray-600">
+                      Phone / फोन: {merchant.contactNumber}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 

@@ -49,6 +49,7 @@ interface Merchant {
   name: string;
   contactNumber: string | null;
   address: string | null;
+  receiptHeaderImage: string | null;
 }
 
 interface SeedSalesReceiptDialogProps {
@@ -226,7 +227,17 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    const imgs = printWindow.document.querySelectorAll('img');
+    if (imgs.length > 0) {
+      let loaded = 0;
+      const tryPrint = () => { loaded++; if (loaded >= imgs.length) printWindow.print(); };
+      imgs.forEach(img => {
+        if (img.complete) tryPrint();
+        else { img.onload = tryPrint; img.onerror = tryPrint; }
+      });
+    } else {
+      printWindow.print();
+    }
   };
 
   useEffect(() => {
@@ -305,10 +316,16 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
           <div className="overflow-x-auto -mx-4 px-4">
           <div ref={printRef} className="space-y-2 p-3 bg-white text-black text-xs min-w-[600px]">
             <div className="header text-center border-b border-black pb-2">
-              <h1 className="text-base font-bold">{merchant.name}</h1>
-              {merchant.address && <p className="text-[10px] text-gray-600">{merchant.address}</p>}
-              {merchant.contactNumber && (
-                <p className="text-[10px] text-gray-600">Phone / फोन: {merchant.contactNumber}</p>
+              {merchant.receiptHeaderImage ? (
+                <img src={`/api/uploads/${merchant.receiptHeaderImage}`} alt={merchant.name} className="max-h-20 mx-auto object-contain" />
+              ) : (
+                <>
+                  <h1 className="text-base font-bold">{merchant.name}</h1>
+                  {merchant.address && <p className="text-[10px] text-gray-600">{merchant.address}</p>}
+                  {merchant.contactNumber && (
+                    <p className="text-[10px] text-gray-600">Phone / फोन: {merchant.contactNumber}</p>
+                  )}
+                </>
               )}
             </div>
 

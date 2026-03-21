@@ -88,6 +88,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   const isMandi = !!(entry.aadhatDbId || entry.lots.some(l => l.place === "mandi"));
 
+  const { data: merchantData } = useQuery<{ receiptHeaderImage: string | null }>({
+    queryKey: ["/api/merchants", user?.merchantId],
+    enabled: !!user?.merchantId && open,
+  });
+
   const { data: aadhats, isLoading: aadhatLoading } = useQuery<Array<{ id: number; name: string; address: string; contact: string | null }>>({
     queryKey: ["/api/aadhats"],
     enabled: isMandi && !!entry.aadhatDbId,
@@ -528,9 +533,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <div style="max-width: 800px; margin: 0 auto;">
             <!-- Header -->
             <div style="text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #1a1a1a;">
-              <h1 style="font-size: 22px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
+              ${merchantData?.receiptHeaderImage
+                ? `<img src="/api/uploads/${merchantData.receiptHeaderImage}" alt="${user?.merchantName || 'Merchant'}" style="max-height: 80px; margin: 0 auto 4px; display: block;" />`
+                : `<h1 style="font-size: 22px; font-weight: 700; margin-bottom: 2px;">${user?.merchantName || "Merchant"}</h1>
               ${user?.merchantAddress ? `<p style="font-size: 11px; color: #444; margin-bottom: 2px;">${user.merchantAddress}</p>` : ""}
-              ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}
+              ${user?.merchantContact ? `<p style="font-size: 11px; color: #666; margin-bottom: 4px;">Ph: ${user.merchantContact}</p>` : ""}`}
               <p style="font-size: 13px; font-weight: 600; color: #333;">Purchase Receipt / खरीद रसीद</p>
             </div>
 
@@ -602,20 +609,36 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    if (merchantData?.receiptHeaderImage) {
+      const img = printWindow.document.querySelector('img');
+      if (img && !img.complete) {
+        img.onload = () => printWindow.print();
+        img.onerror = () => printWindow.print();
+      } else {
+        printWindow.print();
+      }
+    } else {
+      printWindow.print();
+    }
   };
 
   const renderBillContent = () => (
     <div className="bill-container">
       <div className="text-center mb-3 pb-2 border-b-2 border-black">
-        {user?.merchantName && (
-          <h1 className="text-2xl font-bold mb-1">{user.merchantName}</h1>
-        )}
-        {user?.merchantAddress && (
-          <p className="text-xs text-gray-500 mb-0.5">{user.merchantAddress}</p>
-        )}
-        {user?.merchantContact && (
-          <p className="text-xs text-gray-500 mb-1">Ph: {user.merchantContact}</p>
+        {merchantData?.receiptHeaderImage ? (
+          <img src={`/api/uploads/${merchantData.receiptHeaderImage}`} alt={user?.merchantName || "Merchant"} className="max-h-24 mx-auto object-contain mb-1" />
+        ) : (
+          <>
+            {user?.merchantName && (
+              <h1 className="text-2xl font-bold mb-1">{user.merchantName}</h1>
+            )}
+            {user?.merchantAddress && (
+              <p className="text-xs text-gray-500 mb-0.5">{user.merchantAddress}</p>
+            )}
+            {user?.merchantContact && (
+              <p className="text-xs text-gray-500 mb-1">Ph: {user.merchantContact}</p>
+            )}
+          </>
         )}
         <p className="text-lg font-semibold">Purchase Receipt / खरीद रसीद</p>
       </div>

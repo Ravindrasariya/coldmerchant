@@ -12,6 +12,7 @@ export const merchants = pgTable("merchants", {
   name: text("name").notNull(),
   contactNumber: text("contact_number"),
   address: text("address"),
+  receiptHeaderImage: text("receipt_header_image"),
   status: text("status").default("active").notNull(), // active, inactive, archived
   createdAt: timestamp("created_at").defaultNow(),
 });

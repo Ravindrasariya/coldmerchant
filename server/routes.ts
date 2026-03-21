@@ -35,6 +35,26 @@ const videoUpload = multer({
   limits: { fileSize: 200 * 1024 * 1024 },
 });
 
+const imageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `header-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
   return str.trim().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -1281,6 +1301,63 @@ export async function registerRoutes(
       console.error("Error updating merchant:", error);
       res.status(500).json({ message: "Failed to update merchant" });
     }
+  });
+
+  app.post("/api/admin/merchants/:id/receipt-header", requireSystemAdmin, imageUpload.single("image"), async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file uploaded" });
+      }
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      if (merchant.receiptHeaderImage) {
+        const oldPath = path.join(uploadsDir, merchant.receiptHeaderImage);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
+      const updated = await storage.updateMerchant(id, { receiptHeaderImage: req.file.filename });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error uploading receipt header:", error);
+      res.status(500).json({ message: "Failed to upload receipt header image" });
+    }
+  });
+
+  app.delete("/api/admin/merchants/:id/receipt-header", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      if (merchant.receiptHeaderImage) {
+        const filePath = path.join(uploadsDir, merchant.receiptHeaderImage);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+      const updated = await storage.updateMerchant(id, { receiptHeaderImage: null });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error deleting receipt header:", error);
+      res.status(500).json({ message: "Failed to delete receipt header image" });
+    }
+  });
+
+  app.get("/api/uploads/:filename", requireAuth, (req, res) => {
+    const filename = req.params.filename;
+    if (filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ message: "Invalid filename" });
+    }
+    const filePath = path.join(uploadsDir, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "File not found" });
+    }
+    res.sendFile(filePath);
   });
 
   // DELETE /api/admin/merchants/:id - Delete a merchant (admin only)

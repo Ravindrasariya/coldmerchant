@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Multi-Tenant Data Model
 The system isolates data by merchant:
-- **Merchants**: Top-level tenant entity with name, contact, address
+- **Merchants**: Top-level tenant entity with name, contact, address, receiptHeaderImage (optional custom header for receipts)
 - **Users**: Linked to merchants with role-based access (isSystemAdmin, canEdit, mustChangePassword flags)
 - **Stock Entries**: Per-merchant with auto-incrementing serial numbers and globally unique IDs (HSE+YYYYMMDD+sequence)
 - **Lots**: Child of stock entries, tracks inventory with flexible field structure:
