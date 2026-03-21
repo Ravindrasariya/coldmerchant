@@ -226,9 +226,6 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.vehicleNumber && (
                   <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
                 )}
-                {transaction.transporterName && (
-                  <p><strong>Transporter / ट्रांसपोर्टर:</strong> {transaction.transporterName}{transaction.driverContact ? ` (${transaction.driverContact})` : ""}</p>
-                )}
                 <p><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
               </div>
               <div className="text-right right">
