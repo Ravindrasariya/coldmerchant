@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer, FileText } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer, FileText, HandCoins } from "lucide-react";
 import { numberToIndianWords, escapeHtml } from "@/lib/number-to-words";
 import {
   AlertDialog,
@@ -63,6 +63,8 @@ interface CashEntry {
   supplierName: string | null;
   aadhatName: string | null;
   aadhatDbId: number | null;
+  sundryPayName: string | null;
+  sundryPayDbId: number | null;
   chequeNumber: string | null;
   expenseCategory: string | null;
   capitalAssetName: string | null;
@@ -247,6 +249,8 @@ const inwardFormSchema = z.object({
   revenueType: z.string().min(1, "Revenue type is required"),
   partyName: z.string().optional(),
   seedFarmerName: z.string().optional(),
+  sundryPayName: z.string().optional(),
+  sundryPayDbId: z.coerce.number().optional(),
   bankAccountId: z.coerce.number().optional(),
   chequeNumber: z.string().optional(),
   amount: z.coerce.number().min(0, "Amount cannot be negative"),
@@ -265,6 +269,13 @@ const inwardFormSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Farmer name is required",
       path: ["seedFarmerName"],
+    });
+  }
+  if (data.revenueType === "sundry_pay" && (!data.sundryPayName || data.sundryPayName.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Stakeholder name is required",
+      path: ["sundryPayName"],
     });
   }
   if ((data.receiptType === "account_received" || data.receiptType === "cheque_received") && !data.bankAccountId) {
@@ -294,6 +305,8 @@ const outflowFormSchema = z.object({
   supplierName: z.string().optional(),
   aadhatName: z.string().optional(),
   aadhatDbId: z.coerce.number().optional(),
+  sundryPayName: z.string().optional(),
+  sundryPayDbId: z.coerce.number().optional(),
   capitalAssetName: z.string().optional(),
   capitalAssetCategory: z.string().optional(),
   capitalDepreciationRate: z.coerce.number().optional(),
@@ -351,6 +364,13 @@ const outflowFormSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: "Aadhtiya name is required",
         path: ["aadhatName"],
+      });
+    }
+    if (data.expenseType === "sundry_pay" && (!data.sundryPayName || data.sundryPayName.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Stakeholder name is required",
+        path: ["sundryPayName"],
       });
     }
   }
@@ -446,6 +466,10 @@ export function CashManagementTab() {
   // Fetch aadhats with outstanding dues
   const { data: aadhatsWithDues = [] } = useQuery<AadhatWithDue[]>({
     queryKey: ["/api/cash/aadhats-with-dues"],
+  });
+
+  const { data: sundryPayStakeholders = [] } = useQuery<{ id: number; name: string; address: string; contact: string | null; totalDue: number; isActive: boolean }[]>({
+    queryKey: ["/api/sundry-pay"],
   });
 
   // Fetch Farmer Ledger data (comprehensive dues from all sources)
@@ -629,6 +653,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sundry-pay"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       toast({
@@ -642,6 +667,8 @@ export function CashManagementTab() {
           revenueType: "raw_potato",
           partyName: "",
           seedFarmerName: "",
+          sundryPayName: "",
+          sundryPayDbId: undefined,
           chequeNumber: "",
           amount: "" as unknown as number,
           entryDate: format(new Date(), "yyyy-MM-dd"),
@@ -658,6 +685,8 @@ export function CashManagementTab() {
           supplierName: "",
           aadhatName: "",
           aadhatDbId: undefined,
+          sundryPayName: "",
+          sundryPayDbId: undefined,
           capitalAssetName: "",
           capitalAssetCategory: "",
           capitalDepreciationRate: "" as unknown as number,
@@ -693,6 +722,7 @@ export function CashManagementTab() {
   const [expenseTypePopoverOpen, setExpenseTypePopoverOpen] = useState(false);
   // State for searchable aadhtiya name popover
   const [aadhatPopoverOpen, setAadhatPopoverOpen] = useState(false);
+  const [sundryPayPopoverOpen, setSundryPayPopoverOpen] = useState(false);
 
   // Aadhat allocation state
   const [aadhatAllocations, setAadhatAllocations] = useState<AadhatAllocationRow[]>([]);
@@ -1037,8 +1067,7 @@ export function CashManagementTab() {
         entryDate: values.entryDate,
         remarks: values.remarks || null,
       });
-    } else {
-      // Seed sale - use farmer ledger (farmers with negative Net Due - they owe us)
+    } else if (values.revenueType === "seed_sale") {
       const selectedLedgerFarmer = ledgerFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
       
       if (!values.amount || values.amount <= 0) {
@@ -1075,6 +1104,26 @@ export function CashManagementTab() {
       };
 
       createEntryMutation.mutate(inwardData);
+    } else if (values.revenueType === "sundry_pay") {
+      if (!values.amount || values.amount <= 0) {
+        inwardForm.setError("amount", { 
+          type: "manual", 
+          message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
+        });
+        return;
+      }
+      createEntryMutation.mutate({
+        direction: "inward",
+        receiptType: values.receiptType,
+        revenueType: values.revenueType,
+        sundryPayName: values.sundryPayName,
+        sundryPayDbId: values.sundryPayDbId || null,
+        bankAccountId: (values.receiptType === "account_received" || values.receiptType === "cheque_received") ? values.bankAccountId : null,
+        chequeNumber: values.receiptType === "cheque_received" ? (values.chequeNumber || null) : null,
+        amount: values.amount,
+        entryDate: values.entryDate,
+        remarks: values.remarks || null,
+      });
     }
   };
 
@@ -1178,6 +1227,8 @@ export function CashManagementTab() {
       supplierName: effectiveExpenseType === "supplier" ? values.supplierName : null,
       aadhatName: isAadhtiya ? values.aadhatName : null,
       aadhatDbId: selectedAadhat?.id || values.aadhatDbId || null,
+      sundryPayName: effectiveExpenseType === "sundry_pay" ? values.sundryPayName : null,
+      sundryPayDbId: effectiveExpenseType === "sundry_pay" ? (values.sundryPayDbId || null) : null,
       capitalAssetName: isCapital ? values.capitalAssetName : null,
       capitalAssetCategory: isCapital ? values.capitalAssetCategory : null,
       amount: isAadhtiya ? aadhatGrandTotalCash : values.amount,
@@ -1389,6 +1440,7 @@ export function CashManagementTab() {
       case "kata_charges": return t("Kata Charges", "काटा शुल्क");
       case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
+      case "sundry_pay": return t("Sundry Pay", "सन्ड्री पे");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       case "transport_freight": return t("Transport/Freight", "परिवहन/भाड़ा");
       case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
@@ -1424,6 +1476,7 @@ export function CashManagementTab() {
     switch (type) {
       case "raw_potato": return t("Harvest", "हार्वेस्ट");
       case "seed_sale": return t("Seed Sale", "बीज बिक्री");
+      case "sundry_pay": return t("Sundry Pay Recovery", "सन्ड्री पे वसूली");
       default: return type;
     }
   };
@@ -2291,6 +2344,8 @@ export function CashManagementTab() {
                           field.onChange(value);
                           inwardForm.setValue("partyName", "");
                           inwardForm.setValue("seedFarmerName", "");
+                          inwardForm.setValue("sundryPayName", "");
+                          inwardForm.setValue("sundryPayDbId", undefined);
                         }} value={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-revenue-type">
@@ -2308,6 +2363,12 @@ export function CashManagementTab() {
                               <div className="flex items-center gap-2">
                                 <Leaf className="h-4 w-4" />
                                 {t("Seed Sale", "बीज बिक्री")}
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="sundry_pay">
+                              <div className="flex items-center gap-2">
+                                <HandCoins className="h-4 w-4" />
+                                {t("Sundry Pay Recovery", "सन्ड्री पे वसूली")}
                               </div>
                             </SelectItem>
                           </SelectContent>
@@ -2443,11 +2504,93 @@ export function CashManagementTab() {
                     </>
                   )}
 
+                  {revenueType === "sundry_pay" && (
+                    <FormField
+                      control={inwardForm.control}
+                      name="sundryPayName"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>{t("Sundry Pay Name", "सन्ड्री पे नाम")} *</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "w-full justify-between",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                  data-testid="select-sundry-pay-name-inward"
+                                >
+                                  {field.value
+                                    ? (() => {
+                                        const s = sundryPayStakeholders.find(s => s.name === field.value);
+                                        return s && s.totalDue > 0
+                                          ? `${s.name} — ${t("Due", "बकाया")}: ₹${s.totalDue.toLocaleString('en-IN')}`
+                                          : field.value;
+                                      })()
+                                    : t("Select or type name", "नाम चुनें या टाइप करें")}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[350px] p-0" align="start">
+                              <Command>
+                                <CommandInput
+                                  placeholder={t("Search or type new name...", "खोजें या नया नाम टाइप करें...")}
+                                  onValueChange={(search) => {
+                                    if (search && !sundryPayStakeholders.some(s => s.name.toLowerCase() === search.toLowerCase())) {
+                                      field.onChange(search);
+                                      inwardForm.setValue("sundryPayDbId", undefined);
+                                    }
+                                  }}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>{t("Type to add new name", "नया नाम जोड़ने के लिए टाइप करें")}</CommandEmpty>
+                                  <CommandGroup>
+                                    {sundryPayStakeholders.filter(s => s.isActive && s.totalDue > 0).map((stakeholder) => (
+                                      <CommandItem
+                                        key={stakeholder.id}
+                                        value={`${stakeholder.name} ${stakeholder.address || ""}`}
+                                        onSelect={() => {
+                                          field.onChange(stakeholder.name);
+                                          inwardForm.setValue("sundryPayDbId", stakeholder.id);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            field.value === stakeholder.name ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <div className="flex flex-col flex-1">
+                                          <span className="font-medium">{stakeholder.name}</span>
+                                          {stakeholder.address && (
+                                            <span className="text-xs text-muted-foreground">{stakeholder.address}</span>
+                                          )}
+                                        </div>
+                                        <Badge variant="secondary" className="ml-2">
+                                          {t("Due", "बकाया")}: ₹{stakeholder.totalDue.toLocaleString('en-IN')}
+                                        </Badge>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   <FormField
                     control={inwardForm.control}
                     name="amount"
                     render={({ field }) => {
-                      const currentDue = revenueType === "raw_potato" ? inwardPartyDue : inwardSeedFarmerDue;
+                      const currentDue = revenueType === "raw_potato" ? inwardPartyDue : revenueType === "seed_sale" ? inwardSeedFarmerDue : 0;
                       return (
                         <FormItem>
                           <FormLabel>
@@ -2722,6 +2865,77 @@ export function CashManagementTab() {
                               </Command>
                             </PopoverContent>
                           </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {expenseType === "sundry_pay" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="sundryPayName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Stakeholder Name", "हितधारक का नाम")} *</FormLabel>
+                          <Popover open={sundryPayPopoverOpen} onOpenChange={setSundryPayPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                  data-testid="select-sundry-pay-name"
+                                >
+                                  {field.value || t("Select Stakeholder", "हितधारक चुनें")}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder={t("Search or type new name...", "खोजें या नया नाम लिखें...")} />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    <div className="p-2 text-sm text-muted-foreground">
+                                      {t("No match found. The name you type will create a new stakeholder.", "कोई मिलान नहीं मिला। आप जो नाम लिखेंगे वह एक नया हितधारक बनाएगा।")}
+                                    </div>
+                                  </CommandEmpty>
+                                  <CommandGroup>
+                                    {sundryPayStakeholders.filter(s => s.isActive).map((stakeholder) => (
+                                      <CommandItem
+                                        key={stakeholder.id}
+                                        value={stakeholder.name}
+                                        onSelect={() => {
+                                          field.onChange(stakeholder.name);
+                                          outflowForm.setValue("sundryPayDbId", stakeholder.id);
+                                          setSundryPayPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", field.value === stakeholder.name ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex items-center justify-between gap-2 w-full">
+                                          <span>{stakeholder.name}</span>
+                                          <Badge variant="secondary" className="shrink-0">
+                                            {t("Due", "बकाया")}: ₹{stakeholder.totalDue.toLocaleString('en-IN')}
+                                          </Badge>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <Input
+                            placeholder={t("Or type a new name", "या नया नाम टाइप करें")}
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              field.onChange(e.target.value);
+                              outflowForm.setValue("sundryPayDbId", undefined);
+                            }}
+                            className="mt-2"
+                            data-testid="input-sundry-pay-name"
+                          />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -3435,6 +3649,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sundry-pay"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
     },
@@ -3474,6 +3689,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
       case "transport_freight": return t("Transport/Freight", "परिवहन/भाड़ा");
       case "warehouse_charges": return t("Warehouse Charges", "गोदाम शुल्क");
+      case "sundry_pay": return t("Sundry Pay", "सन्ड्री पे");
       default: return type || "";
     }
   };
@@ -3515,8 +3731,8 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
               {isTransfer 
                 ? getTransferLabel()
                 : isInward 
-                  ? (entry.partyName || entry.farmerName || t("Unknown", "अज्ञात"))
-                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || entry.aadhatName || entry.capitalAssetName || getExpenseTypeLabel(entry.expenseType))}
+                  ? (entry.partyName || entry.farmerName || entry.sundryPayName || t("Unknown", "अज्ञात"))
+                  : (entry.farmerName || entry.coldStoreName || entry.supplierName || entry.aadhatName || entry.sundryPayName || entry.capitalAssetName || getExpenseTypeLabel(entry.expenseType))}
             </span>
             <Badge 
               variant="outline" 

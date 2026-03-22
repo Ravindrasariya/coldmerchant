@@ -2,7 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders } from "@shared/schema";
+import { db } from "./db";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
@@ -2738,7 +2740,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2758,7 +2760,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Valid receipt type is required for inward entries" });
         }
         // Validate revenue type for inward entries
-        if (revenueType && !["raw_potato", "seed_sale"].includes(revenueType)) {
+        if (revenueType && !["raw_potato", "seed_sale", "sundry_pay"].includes(revenueType)) {
           return res.status(400).json({ message: "Valid revenue type is required" });
         }
         // For raw_potato, partyName is required; for seed_sale, farmerName is required
@@ -2768,12 +2770,15 @@ export async function registerRoutes(
         if (revenueType === "seed_sale" && !farmerName) {
           return res.status(400).json({ message: "Farmer name is required for seed sale entries" });
         }
+        if (revenueType === "sundry_pay" && !sundryPayName) {
+          return res.status(400).json({ message: "Stakeholder name is required for sundry pay entries" });
+        }
         // Fallback for legacy entries without revenueType
         if (!revenueType && !partyName) {
           return res.status(400).json({ message: "Party name is required for inward entries" });
         }
       } else if (direction === "outflow") {
-        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya", "capital_expense", "transport_freight"].includes(expenseType)) {
+        if (!expenseType || !["salary", "general_expense", "grading", "hammali", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "cold_store_charge", "supplier", "aadhtiya", "capital_expense", "transport_freight", "sundry_pay", "bag_charges", "kata_charges", "pesticide_charges", "warehouse_charges"].includes(expenseType)) {
           return res.status(400).json({ message: "Valid expense type is required for outflow entries" });
         }
         if (expenseType === "capital_expense") {
@@ -2796,6 +2801,9 @@ export async function registerRoutes(
         }
         if (expenseType === "aadhtiya" && !aadhatName) {
           return res.status(400).json({ message: "Aadhtiya name is required when expense type is aadhtiya" });
+        }
+        if (expenseType === "sundry_pay" && !sundryPayName) {
+          return res.status(400).json({ message: "Stakeholder name is required when expense type is sundry pay" });
         }
         if (expenseType === "aadhtiya" && Array.isArray(aadhatAllocations)) {
           if (aadhatAllocations.length === 0) {
@@ -2878,6 +2886,37 @@ export async function registerRoutes(
       // Resolve aadhatDbId
       let resolvedAadhatDbId: number | null = requestAadhatDbId ? parseInt(requestAadhatDbId) : null;
 
+      // Resolve sundryPayDbId - lookup or create stakeholder
+      let resolvedSundryPayDbId: number | null = requestSundryPayDbId ? parseInt(requestSundryPayDbId) : null;
+      if (!resolvedSundryPayDbId && sundryPayName && ((direction === "outflow" && expenseType === "sundry_pay") || (direction === "inward" && revenueType === "sundry_pay"))) {
+        try {
+          const existing = await storage.getSundryPayByCompositeKey(merchantId, sundryPayName, null);
+          if (existing) {
+            resolvedSundryPayDbId = existing.id;
+          } else {
+            const today = getISTDateString();
+            const dateStr = parseDateToCodeFormat(today);
+            const codePrefix = `SU${dateStr}`;
+            const maxSeq = await storage.getMaxSundryPayCodeSequence(merchantId, codePrefix);
+            const sundryPayCode = `SU${dateStr}${maxSeq + 1}`;
+            const created = await storage.createSundryPay({
+              merchantId,
+              sundryPayId: sundryPayCode,
+              dateAdded: today,
+              name: titleCaseKeep(sundryPayName.trim()),
+              address: "-",
+              contact: null,
+              pyReceivable: "0",
+              redFlag: false,
+              isActive: true,
+            });
+            resolvedSundryPayDbId = created.id;
+          }
+        } catch (e) {
+          console.error("Failed to resolve sundryPayDbId for cash entry:", e);
+        }
+      }
+
       // Resolve bank account names for history preservation
       let resolvedBankAccountName: string | null = null;
       let resolvedFromBankAccountName: string | null = null;
@@ -2942,6 +2981,8 @@ export async function registerRoutes(
             supplierName: titleCase(supplierName) || null,
             aadhatName: expenseType === "aadhtiya" ? (aadhatName || null) : null,
             aadhatDbId: expenseType === "aadhtiya" ? resolvedAadhatDbId : null,
+            sundryPayName: (expenseType === "sundry_pay" || revenueType === "sundry_pay") ? (titleCaseKeep(sundryPayName) || null) : null,
+            sundryPayDbId: (expenseType === "sundry_pay" || revenueType === "sundry_pay") ? resolvedSundryPayDbId : null,
             expenseCategory: expenseCategory || null,
             capitalAssetName: capitalAssetName || null,
             capitalAssetCategory: capitalAssetCategory || null,
@@ -5261,6 +5302,222 @@ export async function registerRoutes(
       res.json(history);
     } catch (error) {
       console.error("Error fetching aadhat edit history:", error);
+      res.status(500).json({ message: "Failed to fetch edit history" });
+    }
+  });
+
+  // ==================== Sundry Pay Ledger ====================
+
+  app.get("/api/sundry-pay", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const stakeholders = await storage.getSundryPayByMerchant(merchantId);
+
+      const cashEntryList = await db.select().from(cashEntries).where(
+        and(
+          eq(cashEntries.merchantId, merchantId),
+          eq(cashEntries.isReversed, false),
+          isNotNull(cashEntries.sundryPayDbId)
+        )
+      );
+
+      const duesMap = new Map<number, { totalGiven: number; totalReceived: number }>();
+      for (const entry of cashEntryList) {
+        if (!entry.sundryPayDbId) continue;
+        const existing = duesMap.get(entry.sundryPayDbId) || { totalGiven: 0, totalReceived: 0 };
+        const amount = parseFloat(entry.amount || "0");
+        if (entry.direction === "outflow") {
+          existing.totalGiven += amount;
+        } else if (entry.direction === "inward") {
+          existing.totalReceived += amount;
+        }
+        duesMap.set(entry.sundryPayDbId, existing);
+      }
+
+      const stakeholdersWithDues = stakeholders.map(s => {
+        const pyReceivable = parseFloat(s.pyReceivable || "0");
+        const dues = duesMap.get(s.id) || { totalGiven: 0, totalReceived: 0 };
+        const totalDue = pyReceivable + dues.totalGiven - dues.totalReceived;
+        return {
+          ...s,
+          pyReceivableAmount: pyReceivable,
+          totalGiven: dues.totalGiven,
+          totalReceived: dues.totalReceived,
+          totalDue: Math.max(0, totalDue),
+        };
+      });
+
+      res.json(stakeholdersWithDues);
+    } catch (error) {
+      console.error("Error fetching sundry pay stakeholders:", error);
+      res.status(500).json({ message: "Failed to fetch sundry pay stakeholders" });
+    }
+  });
+
+  app.post("/api/sundry-pay", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, address, contact, pyReceivable, redFlag, isActive } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Stakeholder name is required" });
+      }
+      if (!address || address.trim() === '') {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      const today = getISTDateString();
+      const dateStr = parseDateToCodeFormat(today);
+      const codePrefix = `SU${dateStr}`;
+
+      const maxRetries = 3;
+      let stakeholder: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxSundryPayCodeSequence(merchantId, codePrefix);
+        const sundryPayCode = `SU${dateStr}${maxSeq + 1 + attempt}`;
+        try {
+          stakeholder = await storage.createSundryPay({
+            merchantId,
+            sundryPayId: sundryPayCode,
+            dateAdded: today,
+            name: titleCaseKeep(name.trim()),
+            address: titleCase(address.trim()) || address.trim(),
+            contact: contact?.trim() || null,
+            pyReceivable: pyReceivable || "0",
+            redFlag: redFlag ?? false,
+            isActive: isActive ?? true,
+          });
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('sundry_pay') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!stakeholder) throw new Error("Failed to generate unique sundry pay code after multiple attempts");
+      res.status(201).json(stakeholder);
+    } catch (error) {
+      console.error("Error creating sundry pay stakeholder:", error);
+      res.status(500).json({ message: "Failed to create sundry pay stakeholder" });
+    }
+  });
+
+  app.patch("/api/sundry-pay/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateSundryPay(id, merchantId, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Stakeholder not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating sundry pay stakeholder:", error);
+      res.status(500).json({ message: "Failed to update sundry pay stakeholder" });
+    }
+  });
+
+  app.patch("/api/sundry-pay/:id/details", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      const { name, address, contact, pyReceivable, redFlag } = req.body;
+
+      if (!name || name.trim() === '') {
+        return res.status(400).json({ message: "Stakeholder name is required" });
+      }
+
+      const existing = await storage.getSundryPayById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Stakeholder not found" });
+      }
+
+      const newName = name.trim();
+      const newAddress = address?.trim() || null;
+      const newContact = contact?.trim() || null;
+
+      const matching = await storage.getSundryPayByCompositeKey(merchantId, newName, newContact);
+      if (matching && matching.id !== id) {
+        return res.status(409).json({
+          message: "A stakeholder with this name and contact already exists",
+          existingStakeholder: matching,
+        });
+      }
+
+      const changes: Array<{ fieldName: string; oldValue: string | null; newValue: string | null }> = [];
+      const newPyReceivable = pyReceivable ?? "0";
+      const newRedFlag = redFlag ?? existing.redFlag;
+
+      if (existing.name !== newName) {
+        changes.push({ fieldName: "name", oldValue: existing.name, newValue: newName });
+      }
+      if (existing.address !== newAddress) {
+        changes.push({ fieldName: "address", oldValue: existing.address, newValue: newAddress });
+      }
+      if (existing.contact !== newContact) {
+        changes.push({ fieldName: "contact", oldValue: existing.contact, newValue: newContact });
+      }
+      if (existing.pyReceivable !== newPyReceivable) {
+        changes.push({ fieldName: "pyReceivable", oldValue: existing.pyReceivable, newValue: newPyReceivable });
+      }
+      if (existing.redFlag !== newRedFlag) {
+        changes.push({ fieldName: "redFlag", oldValue: String(existing.redFlag), newValue: String(newRedFlag) });
+      }
+
+      if (changes.length > 0) {
+        const nextSerial = await storage.getNextSundryPayEditHistorySerialNumber(merchantId);
+        for (const change of changes) {
+          await storage.createSundryPayEditHistory({
+            serialNumber: nextSerial,
+            merchantId,
+            sundryPayStakeholderId: id,
+            changedBy: userId,
+            fieldName: change.fieldName,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          });
+        }
+      }
+
+      const result = await storage.updateSundryPayWithPropagation(id, merchantId, {
+        name: newName,
+        address: newAddress,
+        contact: newContact,
+      });
+
+      if (existing.pyReceivable !== newPyReceivable || existing.redFlag !== newRedFlag) {
+        await storage.updateSundryPay(id, merchantId, {
+          pyReceivable: newPyReceivable,
+          redFlag: newRedFlag,
+        });
+      }
+
+      if (!result.stakeholder) {
+        return res.status(404).json({ message: "Stakeholder not found" });
+      }
+
+      res.json({
+        stakeholder: result.stakeholder,
+        cashEntriesUpdated: result.cashEntriesUpdated,
+        changesRecorded: changes.length,
+        message: `Stakeholder updated. ${result.cashEntriesUpdated} linked record(s) updated.`
+      });
+    } catch (error) {
+      console.error("Error updating sundry pay details:", error);
+      res.status(500).json({ message: "Failed to update sundry pay stakeholder" });
+    }
+  });
+
+  app.get("/api/sundry-pay/:id/history", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const stakeholderId = parseInt(req.params.id);
+      const history = await storage.getSundryPayEditHistory(stakeholderId, merchantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching sundry pay edit history:", error);
       res.status(500).json({ message: "Failed to fetch edit history" });
     }
   });

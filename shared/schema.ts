@@ -243,6 +243,8 @@ export const cashEntries = pgTable("cash_entries", {
   supplierName: text("supplier_name"), // For supplier outflow (seed stock suppliers)
   aadhatName: text("aadhat_name"), // For aadhtiya outflow
   aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // resolved aadhat ledger ID
+  sundryPayName: text("sundry_pay_name"), // For sundry pay outflow/inward
+  sundryPayDbId: integer("sundry_pay_db_id"), // resolved sundry pay stakeholder ledger ID
   expenseCategory: text("expense_category"), // "revenue" or "capital" for outflow
   capitalAssetName: text("capital_asset_name"), // Asset name for capital expenses
   capitalAssetCategory: text("capital_asset_category"), // Asset category for capital expenses
@@ -879,6 +881,45 @@ export const aadhatsRelations = relations(aadhats, ({ one }) => ({
 export const insertAadhatSchema = createInsertSchema(aadhats).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertAadhatEditHistorySchema = createInsertSchema(aadhatEditHistory).omit({ id: true, changedAt: true });
 
+export const sundryPayStakeholders = pgTable("sundry_pay_stakeholders", {
+  id: serial("id").primaryKey(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  sundryPayId: text("sundry_pay_id"),
+  dateAdded: date("date_added").notNull(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  contact: text("contact"),
+  pyReceivable: decimal("py_receivable", { precision: 12, scale: 2 }).default("0"),
+  redFlag: boolean("red_flag").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  merchantSundryPayIdUnique: uniqueIndex("sundry_pay_merchant_sundry_pay_id_unique").on(table.merchantId, table.sundryPayId),
+}));
+
+export const sundryPayEditHistory = pgTable("sundry_pay_edit_history", {
+  id: serial("id").primaryKey(),
+  serialNumber: integer("serial_number").notNull(),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  sundryPayStakeholderId: integer("sundry_pay_stakeholder_id").notNull().references(() => sundryPayStakeholders.id),
+  changedAt: timestamp("changed_at").defaultNow(),
+  changedBy: integer("changed_by").references(() => users.id),
+  fieldName: text("field_name").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+});
+
+export const sundryPayStakeholdersRelations = relations(sundryPayStakeholders, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [sundryPayStakeholders.merchantId],
+    references: [merchants.id],
+  }),
+}));
+
+export const insertSundryPayStakeholderSchema = createInsertSchema(sundryPayStakeholders).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSundryPayEditHistorySchema = createInsertSchema(sundryPayEditHistory).omit({ id: true, changedAt: true });
+
 // Seed schemas
 export const insertSeedStockEntrySchema = createInsertSchema(seedStockEntries).omit({ id: true, createdAt: true, updatedAt: true, serialNumber: true });
 export const insertSeedLotSchema = createInsertSchema(seedLots).omit({ id: true, createdAt: true });
@@ -953,6 +994,12 @@ export type InsertAadhat = z.infer<typeof insertAadhatSchema>;
 
 export type AadhatEditHistory = typeof aadhatEditHistory.$inferSelect;
 export type InsertAadhatEditHistory = z.infer<typeof insertAadhatEditHistorySchema>;
+
+export type SundryPayStakeholder = typeof sundryPayStakeholders.$inferSelect;
+export type InsertSundryPayStakeholder = z.infer<typeof insertSundryPayStakeholderSchema>;
+
+export type SundryPayEditHistory = typeof sundryPayEditHistory.$inferSelect;
+export type InsertSundryPayEditHistory = z.infer<typeof insertSundryPayEditHistorySchema>;
 
 export type SeedStockEntry = typeof seedStockEntries.$inferSelect;
 export type InsertSeedStockEntry = z.infer<typeof insertSeedStockEntrySchema>;
@@ -1133,7 +1180,7 @@ export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
 export const RECEIPT_TYPES = ["cash_received", "account_received", "cheque_received"] as const;
-export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "capital_expense", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "pesticide_charges", "salary", "supplier", "transport_freight", "warehouse_charges"] as const;
+export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "capital_expense", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "pesticide_charges", "salary", "sundry_pay", "supplier", "transport_freight", "warehouse_charges"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer", "cheque"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 

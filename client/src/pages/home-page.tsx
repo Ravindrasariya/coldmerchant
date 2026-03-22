@@ -44,7 +44,8 @@ import {
   BookOpen,
   Building2,
   GripVertical,
-  RotateCcw
+  RotateCcw,
+  HandCoins
 } from "lucide-react";
 
 interface TabConfig {
@@ -66,6 +67,7 @@ const DEFAULT_TAB_ORDER: TabConfig[] = [
   { value: "buyers", icon: Users, labelEn: "Buyers", labelHi: "खरीदार" },
   { value: "aadhat", icon: Users, labelEn: "Aadhat", labelHi: "आढ़त" },
   { value: "cold-store", icon: Building2, labelEn: "Cold Store", labelHi: "कोल्ड स्टोर" },
+  { value: "sundry-pay", icon: HandCoins, labelEn: "Sundry Pay", labelHi: "सन्ड्री पे" },
   { value: "books", icon: BookOpen, labelEn: "Books", labelHi: "बुक्स", badge: "Beta" },
   { value: "demo-videos", icon: PlayCircle, labelEn: "Demo Videos", labelHi: "डेमो वीडियो" },
 ];
@@ -111,6 +113,7 @@ import { FarmerLedgerTab } from "@/components/farmer-ledger/farmer-ledger-tab";
 import BuyersTab from "@/components/buyers/buyers-tab";
 import AadhatLedgerTab from "@/components/aadhat/aadhat-ledger-tab";
 import ColdStoreLedgerTab from "@/components/cold-store/cold-store-ledger-tab";
+import SundryPayLedgerTab from "@/components/sundry-pay/sundry-pay-ledger-tab";
 import { DashboardTab } from "@/components/dashboard/dashboard-tab";
 import { DemoVideosTab } from "@/components/demo-videos/demo-videos-tab";
 import { BooksTab } from "@/components/books/books-tab";
@@ -576,6 +579,10 @@ export default function HomePage() {
 
           <div className={activeTab === "cold-store" ? "block" : "hidden"}>
             <ColdStoreLedgerTab />
+          </div>
+
+          <div className={activeTab === "sundry-pay" ? "block" : "hidden"}>
+            <SundryPayLedgerTab />
           </div>
 
           <div className={activeTab === "books" ? "block" : "hidden"}>

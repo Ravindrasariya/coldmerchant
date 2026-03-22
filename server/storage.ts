@@ -25,6 +25,9 @@ import {
   type Farmer, type InsertFarmer, type FarmerEditHistory, type InsertFarmerEditHistory,
   type Aadhat, type InsertAadhat, type AadhatEditHistory, type InsertAadhatEditHistory,
   aadhats, aadhatEditHistory,
+  sundryPayStakeholders, sundryPayEditHistory,
+  type SundryPayStakeholder, type InsertSundryPayStakeholder,
+  type SundryPayEditHistory, type InsertSundryPayEditHistory,
   type SeedStockEntry, type InsertSeedStockEntry,
   type SeedLot, type InsertSeedLot,
   type SeedStockEntryWithLots,
@@ -221,6 +224,18 @@ export interface IStorage {
   getAadhatEditHistory(aadhatId: number, merchantId: number): Promise<AadhatEditHistory[]>;
   getNextAadhatEditHistorySerialNumber(merchantId: number): Promise<number>;
   createAadhatEditHistory(data: InsertAadhatEditHistory): Promise<AadhatEditHistory>;
+
+  // Sundry Pay Ledger operations
+  getSundryPayByMerchant(merchantId: number): Promise<SundryPayStakeholder[]>;
+  getSundryPayById(id: number, merchantId: number): Promise<SundryPayStakeholder | undefined>;
+  getMaxSundryPayCodeSequence(merchantId: number, prefix: string): Promise<number>;
+  createSundryPay(data: InsertSundryPayStakeholder): Promise<SundryPayStakeholder>;
+  updateSundryPay(id: number, merchantId: number, data: Partial<SundryPayStakeholder>): Promise<SundryPayStakeholder | undefined>;
+  getSundryPayByCompositeKey(merchantId: number, name: string, contact: string | null): Promise<SundryPayStakeholder | undefined>;
+  updateSundryPayWithPropagation(id: number, merchantId: number, data: { name: string; address: string | null; contact: string | null }): Promise<{ stakeholder: SundryPayStakeholder | undefined; cashEntriesUpdated: number }>;
+  getSundryPayEditHistory(stakeholderId: number, merchantId: number): Promise<SundryPayEditHistory[]>;
+  getNextSundryPayEditHistorySerialNumber(merchantId: number): Promise<number>;
+  createSundryPayEditHistory(data: InsertSundryPayEditHistory): Promise<SundryPayEditHistory>;
 
   // Cold Store Ledger operations
   getColdStoresByMerchant(merchantId: number): Promise<ColdStore[]>;
@@ -4879,6 +4894,111 @@ export class DatabaseStorage implements IStorage {
 
   async createAadhatEditHistory(data: InsertAadhatEditHistory): Promise<AadhatEditHistory> {
     const [created] = await db.insert(aadhatEditHistory).values(data).returning();
+    return created;
+  }
+
+  async getSundryPayByMerchant(merchantId: number): Promise<SundryPayStakeholder[]> {
+    return await db.select().from(sundryPayStakeholders).where(eq(sundryPayStakeholders.merchantId, merchantId)).orderBy(desc(sundryPayStakeholders.createdAt));
+  }
+
+  async getSundryPayById(id: number, merchantId: number): Promise<SundryPayStakeholder | undefined> {
+    const [stakeholder] = await db.select().from(sundryPayStakeholders).where(and(eq(sundryPayStakeholders.id, id), eq(sundryPayStakeholders.merchantId, merchantId)));
+    return stakeholder;
+  }
+
+  async getMaxSundryPayCodeSequence(merchantId: number, prefix: string): Promise<number> {
+    const result = await db.select({ sundryPayId: sundryPayStakeholders.sundryPayId })
+      .from(sundryPayStakeholders)
+      .where(and(
+        eq(sundryPayStakeholders.merchantId, merchantId),
+        sql`${sundryPayStakeholders.sundryPayId} LIKE ${prefix + '%'}`
+      ));
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.sundryPayId) {
+        const seq = parseInt(row.sundryPayId.substring(prefix.length), 10);
+        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+      }
+    }
+    return maxSeq;
+  }
+
+  async createSundryPay(data: InsertSundryPayStakeholder): Promise<SundryPayStakeholder> {
+    const [created] = await db.insert(sundryPayStakeholders).values(data).returning();
+    return created;
+  }
+
+  async updateSundryPay(id: number, merchantId: number, data: Partial<SundryPayStakeholder>): Promise<SundryPayStakeholder | undefined> {
+    const [updated] = await db.update(sundryPayStakeholders)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(sundryPayStakeholders.id, id), eq(sundryPayStakeholders.merchantId, merchantId)))
+      .returning();
+    return updated;
+  }
+
+  async getSundryPayByCompositeKey(merchantId: number, name: string, contact: string | null): Promise<SundryPayStakeholder | undefined> {
+    const normalizedName = normalizeName(name);
+    const normalizedContact = contact ? normalizeName(contact) : null;
+    const all = await db.select().from(sundryPayStakeholders)
+      .where(eq(sundryPayStakeholders.merchantId, merchantId));
+    return all.find(s => {
+      const sName = normalizeName(s.name);
+      const sContact = s.contact ? normalizeName(s.contact) : null;
+      if (sName !== normalizedName) return false;
+      if (normalizedContact && sContact) return sContact === normalizedContact;
+      return true;
+    });
+  }
+
+  async updateSundryPayWithPropagation(
+    id: number,
+    merchantId: number,
+    data: { name: string; address: string | null; contact: string | null }
+  ): Promise<{ stakeholder: SundryPayStakeholder | undefined; cashEntriesUpdated: number }> {
+    const [updated] = await db.update(sundryPayStakeholders)
+      .set({
+        name: data.name,
+        address: data.address ?? undefined,
+        contact: data.contact ?? undefined,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(sundryPayStakeholders.id, id), eq(sundryPayStakeholders.merchantId, merchantId)))
+      .returning();
+
+    if (!updated) {
+      return { stakeholder: undefined, cashEntriesUpdated: 0 };
+    }
+
+    const cashResult = await db.update(cashEntries)
+      .set({ sundryPayName: data.name })
+      .where(and(
+        eq(cashEntries.merchantId, merchantId),
+        eq(cashEntries.sundryPayDbId, id)
+      ))
+      .returning({ id: cashEntries.id });
+
+    return { stakeholder: updated, cashEntriesUpdated: cashResult.length };
+  }
+
+  async getSundryPayEditHistory(stakeholderId: number, merchantId: number): Promise<SundryPayEditHistory[]> {
+    return await db.select()
+      .from(sundryPayEditHistory)
+      .where(and(
+        eq(sundryPayEditHistory.sundryPayStakeholderId, stakeholderId),
+        eq(sundryPayEditHistory.merchantId, merchantId)
+      ))
+      .orderBy(desc(sundryPayEditHistory.changedAt));
+  }
+
+  async getNextSundryPayEditHistorySerialNumber(merchantId: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: sql<number>`COALESCE(MAX(${sundryPayEditHistory.serialNumber}), 0)` })
+      .from(sundryPayEditHistory)
+      .where(eq(sundryPayEditHistory.merchantId, merchantId));
+    return (result?.maxSerial || 0) + 1;
+  }
+
+  async createSundryPayEditHistory(data: InsertSundryPayEditHistory): Promise<SundryPayEditHistory> {
+    const [created] = await db.insert(sundryPayEditHistory).values(data).returning();
     return created;
   }
 
