@@ -17,13 +17,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { User, AlertTriangle } from "lucide-react";
+import { User, AlertTriangle, Paperclip, X } from "lucide-react";
 import { StockEntryForm, DISTRICTS, STATES } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
 import { cn } from "@/lib/utils";
 
 interface FarmerInfoSectionProps {
   form: UseFormReturn<StockEntryForm>;
+  attachmentFile?: File | null;
+  onAttachmentChange?: (file: File | null) => void;
 }
 
 interface FarmerSuggestion {
@@ -37,7 +39,7 @@ interface FarmerSuggestion {
   source: 'stock_entry' | 'seed_transaction';
 }
 
-export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
+export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: FarmerInfoSectionProps) {
   const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<FarmerSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -612,6 +614,44 @@ export function FarmerInfoSection({ form }: FarmerInfoSectionProps) {
           <div className="mt-2 flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm text-orange-700 dark:text-orange-400">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span>{redFlagWarning} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
+          </div>
+        )}
+        {onAttachmentChange && (
+          <div className="mt-3">
+            <label className="text-sm font-medium">{t("Attachment", "अटैचमेंट")}</label>
+            <div className="flex items-center gap-2 mt-1">
+              {attachmentFile ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-md px-3 py-1.5">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  <span className="truncate max-w-[200px]">{attachmentFile.name}</span>
+                  <button type="button" onClick={() => onAttachmentChange(null)} className="text-muted-foreground hover:text-foreground" data-testid="button-remove-attachment">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="button-add-attachment">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">{t("Add Image (max 500KB)", "फोटो जोड़ें (अधिकतम 500KB)")}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 500 * 1024) {
+                          alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
+                          return;
+                        }
+                        onAttachmentChange(file);
+                      }
+                      e.target.value = "";
+                    }}
+                    data-testid="input-attachment-file"
+                  />
+                </label>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

@@ -2,7 +2,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { getTodayIST } from "@/lib/date-utils";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Plus, Save, X, Loader2 } from "lucide-react";
@@ -102,6 +102,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   const { t } = useLanguage();
   const formContainerRef = useRef<HTMLFormElement>(null);
   const isPausingAutoSaveRef = useRef(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   
   const form = useForm<StockEntryFormType>({
     resolver: zodResolver(stockEntryFormSchema),
@@ -176,11 +177,26 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       const res = await apiRequest("POST", "/api/stock-entries", data);
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (result: any) => {
+      let imageError = false;
+      if (attachmentFile && result?.id) {
+        try {
+          const formData = new FormData();
+          formData.append("image", attachmentFile);
+          const imgRes = await fetch(`/api/stock-entries/${result.id}/image`, { method: "POST", body: formData, credentials: "include" });
+          if (!imgRes.ok) imageError = true;
+        } catch (e) {
+          console.error("Image upload failed:", e);
+          imageError = true;
+        }
+        setAttachmentFile(null);
+      }
       toast({
         title: t("Stock Entry Created", "स्टॉक एंट्री बनाई गई"),
-        description: t("The stock entry has been saved successfully.", "स्टॉक एंट्री सफलतापूर्वक सहेजी गई।"),
-        variant: "success",
+        description: imageError
+          ? t("Entry saved but image upload failed.", "एंट्री सहेजी गई लेकिन फोटो अपलोड विफल।")
+          : t("The stock entry has been saved successfully.", "स्टॉक एंट्री सफलतापूर्वक सहेजी गई।"),
+        variant: imageError ? "destructive" : "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
@@ -317,9 +333,9 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     <Form {...form}>
       <form ref={formContainerRef} onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         {selectedPlace === "mandi" ? (
-          <AadhtiyaInfoSection form={form} />
+          <AadhtiyaInfoSection form={form} attachmentFile={attachmentFile} onAttachmentChange={setAttachmentFile} />
         ) : (
-          <FarmerInfoSection form={form} />
+          <FarmerInfoSection form={form} attachmentFile={attachmentFile} onAttachmentChange={setAttachmentFile} />
         )}
 
         <div className="space-y-4">

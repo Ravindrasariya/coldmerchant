@@ -47,6 +47,7 @@ The system isolates data by merchant:
   - **Delivery Type**: Gate Cut or Full Truck
   - **Expected Cold Charges**: Total amount that feeds into cold store dues
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
+- **Attachment Image**: Optional image attachment per stock entry (stored as filename in `attachment_image` column, files in `uploads/` directory, 500KB max, merchant-scoped API routes)
 - **Edit History**: Audit trail of all modifications to stock entries after initial creation
 
 ### Globally Unique ID System (Backend Only)

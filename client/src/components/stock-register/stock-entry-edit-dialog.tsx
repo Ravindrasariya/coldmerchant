@@ -32,7 +32,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Save, Loader2, Plus, Trash2, Package, History, ChevronDown, ChevronRight } from "lucide-react";
+import { Save, Loader2, Plus, Trash2, Package, History, ChevronDown, ChevronRight, Paperclip, Eye, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SIZE_OPTIONS, CHARGE_TYPES } from "@shared/schema";
@@ -53,6 +53,7 @@ interface StockEntryWithLots {
   aadhatName: string | null;
   paymentStatus: string;
   remarks: string | null;
+  attachmentImage: string | null;
   lots: Array<{
     id: number;
     place: string | null;
@@ -168,6 +169,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   })));
   const [deleteConfirm, setDeleteConfirm] = useState<{ lotIndex: number; bdIndex: number } | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [currentImage, setCurrentImage] = useState<string | null>(entry.attachmentImage);
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
   const [allColdStores, setAllColdStores] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreDropdown, setShowColdStoreDropdown] = useState<number | null>(null);
   const [coldStoreSearch, setColdStoreSearch] = useState("");
@@ -240,11 +245,33 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       const res = await apiRequest("PATCH", `/api/stock-entries/${entry.id}`, data);
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      let imageError = false;
+      if (newImageFile) {
+        try {
+          const formData = new FormData();
+          formData.append("image", newImageFile);
+          const imgRes = await fetch(`/api/stock-entries/${entry.id}/image`, { method: "POST", body: formData, credentials: "include" });
+          if (!imgRes.ok) imageError = true;
+        } catch (e) {
+          console.error("Image upload failed:", e);
+          imageError = true;
+        }
+      } else if (imageRemoved && !newImageFile) {
+        try {
+          const delRes = await fetch(`/api/stock-entries/${entry.id}/image`, { method: "DELETE", credentials: "include" });
+          if (!delRes.ok) imageError = true;
+        } catch (e) {
+          console.error("Image delete failed:", e);
+          imageError = true;
+        }
+      }
       toast({
         title: t("Entry Updated", "एंट्री अपडेट हो गई"),
-        description: t("The stock entry has been updated successfully.", "स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
-        variant: "success",
+        description: imageError
+          ? t("Entry updated but image operation failed.", "एंट्री अपडेट हो गई लेकिन फोटो ऑपरेशन विफल।")
+          : t("The stock entry has been updated successfully.", "स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
+        variant: imageError ? "destructive" : "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock-entries', entry.id, 'history'] });
@@ -1462,6 +1489,95 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         )}
 
         <div className="space-y-4 pt-4 border-t">
+          <div className="space-y-2">
+            <Label>{t("Attachment", "अटैचमेंट")}</Label>
+            <div className="flex items-center gap-2">
+              {(currentImage && !imageRemoved) || newImageFile ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowImagePreview(true)}
+                    className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 border rounded-md px-3 py-1.5"
+                    data-testid="edit-view-image"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    {newImageFile ? newImageFile.name : t("View Image", "फोटो देखें")}
+                  </button>
+                  <label className="flex items-center gap-1.5 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="edit-replace-image">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                    {t("Replace", "बदलें")}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 500 * 1024) {
+                            alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
+                            return;
+                          }
+                          setNewImageFile(file);
+                          setImageRemoved(false);
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => { setImageRemoved(true); setNewImageFile(null); }}
+                    className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 border border-red-200 rounded-md px-3 py-1.5"
+                    data-testid="edit-remove-image"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    {t("Remove", "हटाएं")}
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="edit-add-image">
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">{t("Add Image (max 500KB)", "फोटो जोड़ें (अधिकतम 500KB)")}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 500 * 1024) {
+                          alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
+                          return;
+                        }
+                        setNewImageFile(file);
+                        setImageRemoved(false);
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {showImagePreview && (
+            <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>{t("Attachment", "अटैचमेंट")}</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center justify-center">
+                  <img
+                    src={newImageFile ? URL.createObjectURL(newImageFile) : `/api/stock-entries/${entry.id}/image`}
+                    alt="Stock entry attachment"
+                    className="max-w-full max-h-[60vh] rounded-md object-contain"
+                    data-testid="edit-img-preview"
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
           <div className="space-y-2">
             <Label>{t("Remarks", "टिप्पणी")}</Label>
             <Textarea

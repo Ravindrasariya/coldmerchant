@@ -60,6 +60,7 @@ export const stockEntries = pgTable("stock_entries", {
   paymentStatus: text("payment_status").default("due"), // due, partial, paid
   amountPaid: decimal("amount_paid", { precision: 12, scale: 2 }).default("0"), // amount paid to farmer
   remarks: text("remarks"),
+  attachmentImage: text("attachment_image"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

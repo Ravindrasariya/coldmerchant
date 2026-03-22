@@ -112,6 +112,7 @@ export interface IStorage {
   getStockEntryById(id: number, merchantId: number): Promise<any | undefined>;
   createStockEntry(entry: InsertStockEntry & { merchantId: number; crop?: string }): Promise<StockEntry>;
   updateStockEntry(id: number, merchantId: number, data: Partial<StockEntry>): Promise<StockEntry | undefined>;
+  updateStockEntryImage(id: number, merchantId: number, filename: string | null): Promise<void>;
   getNextSerialNumber(merchantId: number, crop?: string): Promise<number>;
   
   // Lot operations
@@ -586,6 +587,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)))
       .returning();
     return updated || undefined;
+  }
+
+  async updateStockEntryImage(id: number, merchantId: number, filename: string | null): Promise<void> {
+    await db.update(stockEntries)
+      .set({ attachmentImage: filename, updatedAt: new Date() })
+      .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
   }
 
   async getNextSerialNumber(merchantId: number, crop: string = "potato"): Promise<number> {

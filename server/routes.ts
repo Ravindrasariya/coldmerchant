@@ -56,6 +56,26 @@ const imageUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+const attachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `attach-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  },
+});
+
+const attachmentUpload = multer({
+  storage: attachmentStorage,
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+  limits: { fileSize: 500 * 1024 },
+});
+
 function titleCase(str: string | null | undefined): string | null {
   if (!str) return null;
   return str.trim().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -817,6 +837,58 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating stock entry:", error);
       res.status(500).json({ message: "Failed to create stock entry" });
+    }
+  });
+
+  app.post("/api/stock-entries/:id/image", requireMerchant, attachmentUpload.single("image"), async (req: Request, res: Response) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const entry = await storage.getStockEntryById(id, merchantId);
+      if (!entry) return res.status(404).json({ message: "Stock entry not found" });
+      if (!req.file) return res.status(400).json({ message: "No image file provided" });
+      if (entry.attachmentImage) {
+        const oldPath = path.join(uploadsDir, entry.attachmentImage);
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      await storage.updateStockEntryImage(id, merchantId, req.file.filename);
+      res.json({ filename: req.file.filename });
+    } catch (error) {
+      console.error("Error uploading stock entry image:", error);
+      res.status(500).json({ message: "Failed to upload image" });
+    }
+  });
+
+  app.get("/api/stock-entries/:id/image", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const entry = await storage.getStockEntryById(id, merchantId);
+      if (!entry || !entry.attachmentImage) return res.status(404).json({ message: "No image found" });
+      const filePath = path.join(uploadsDir, entry.attachmentImage);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Image file not found" });
+      res.sendFile(filePath);
+    } catch (error) {
+      console.error("Error serving stock entry image:", error);
+      res.status(500).json({ message: "Failed to serve image" });
+    }
+  });
+
+  app.delete("/api/stock-entries/:id/image", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      const entry = await storage.getStockEntryById(id, merchantId);
+      if (!entry) return res.status(404).json({ message: "Stock entry not found" });
+      if (entry.attachmentImage) {
+        const filePath = path.join(uploadsDir, entry.attachmentImage);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      await storage.updateStockEntryImage(id, merchantId, null);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting stock entry image:", error);
+      res.status(500).json({ message: "Failed to delete image" });
     }
   });
 

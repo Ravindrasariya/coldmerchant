@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, Check, ChevronsUpDown, Share2, ChevronDown } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, Check, ChevronsUpDown, Share2, ChevronDown, Paperclip } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +50,7 @@ interface StockEntryWithLots {
   paymentStatus: string;
   amountPaid: string | null;
   remarks: string | null;
+  attachmentImage: string | null;
   crop?: string;
   lots: Array<{
     id: number;
@@ -224,6 +225,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [editEntry, setEditEntry] = useState<StockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
   const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
+  const [imageViewEntryId, setImageViewEntryId] = useState<number | null>(null);
   
   // Download dialog state (simplified - now uses filtered entries directly)
   const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
@@ -1098,6 +1100,16 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             {t("Due", "बाकी")}
                           </Badge>
                         )}
+                        {entry.attachmentImage && (
+                          <button
+                            type="button"
+                            onClick={() => setImageViewEntryId(entry.id)}
+                            className="inline-flex items-center"
+                            data-testid={`button-view-image-${entry.id}`}
+                          >
+                            <Paperclip className="h-4 w-4 text-blue-500" />
+                          </button>
+                        )}
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
@@ -1301,6 +1313,24 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           autoAction={billAction}
         />
       )}
+
+      <Dialog open={imageViewEntryId !== null} onOpenChange={(open) => { if (!open) setImageViewEntryId(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("Attachment", "अटैचमेंट")}</DialogTitle>
+          </DialogHeader>
+          {imageViewEntryId && (
+            <div className="flex items-center justify-center">
+              <img
+                src={`/api/stock-entries/${imageViewEntryId}/image`}
+                alt="Stock entry attachment"
+                className="max-w-full max-h-[70vh] rounded-md object-contain"
+                data-testid="img-attachment-view"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
