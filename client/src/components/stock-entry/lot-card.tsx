@@ -711,7 +711,8 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                     const cstTypes = ["Cold Charges", "Ware House Charges"];
                     const chgs = form.watch(`lots.${lotIndex}.charges`) || [];
                     const dynChg = chgs.filter((c: any) => !(isFG && cstTypes.includes(c.type))).reduce((s: number, c: any) => s + (parseFloat(String(c.amount)) || 0), 0);
-                    const otherDed = dynChg;
+                    const hammali = parseFloat(String(form.watch(`lots.${lotIndex}.hammaliGradingCharges`) || "0"));
+                    const otherDed = hammali + dynChg;
                     const base = cogs - otherDed;
                     const amt = base > 0 ? base * pct / 100 : 0;
                     return `₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
