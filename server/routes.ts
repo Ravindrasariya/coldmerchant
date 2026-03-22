@@ -5,7 +5,7 @@ import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem } from "@shared/schema";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
-import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
+import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
 import { computeNetWeight } from "@shared/utils";
 import multer from "multer";
 import path from "path";
@@ -994,9 +994,17 @@ export async function registerRoutes(
               adjustedAmount: lotData.adjustedAmount !== undefined
                 ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
                 : undefined,
-              adjustedAmountFinal: lotData.adjustedAmount !== undefined
-                ? (lotData.adjustedAmount ? lotData.adjustedAmount.toString() : null)
-                : undefined,
+              adjustedAmountFinal: (() => {
+                const effectivePrincipal = lotData.adjustedAmount !== undefined ? lotData.adjustedAmount : existingLot?.adjustedAmount;
+                if (!effectivePrincipal) return lotData.adjustedAmount !== undefined ? null : undefined;
+                const effectiveRate = lotData.adjustedAmountRate !== undefined ? lotData.adjustedAmountRate : existingLot?.adjustedAmountRate;
+                const effectiveDate = lotData.adjustedAmountEffectiveDate !== undefined ? lotData.adjustedAmountEffectiveDate : existingLot?.adjustedAmountEffectiveDate;
+                return calculateSimpleInterest(
+                  parseFloat(String(effectivePrincipal)),
+                  parseFloat(String(effectiveRate || "0")),
+                  effectiveDate || null
+                ).toFixed(2);
+              })(),
               adjustedAmountType: lotData.adjustedAmountType !== undefined
                 ? (lotData.adjustedAmountType || null)
                 : undefined,
@@ -3653,6 +3661,14 @@ export async function registerRoutes(
           
           if (matchesByFarmerId || matchesByCompositeKey) {
             seedDue += parseFloat(txn.totalDueToFarmer || "0");
+            const adjPrincipal = parseFloat(txn.adjustmentAmount || "0");
+            const adjFinal = parseFloat(txn.adjustmentAmountFinal || String(adjPrincipal));
+            const interestOnly = adjFinal - adjPrincipal;
+            if (interestOnly > 0 && txn.adjustmentType === "credit") {
+              seedDue += interestOnly;
+            } else if (interestOnly > 0 && txn.adjustmentType === "debit") {
+              seedDue -= interestOnly;
+            }
           }
         }
         
@@ -4567,7 +4583,17 @@ export async function registerRoutes(
           totalDueToFarmer: totalDueToFarmer.toString(),
           adjustmentType: adjustmentType || null,
           adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
-          adjustmentAmountFinal: adjustmentAmount ? adjustmentAmount.toString() : null,
+          adjustmentAmountFinal: (() => {
+            const effectivePrincipal = adjustmentAmount !== undefined ? adjustmentAmount : existingTxn.adjustmentAmount;
+            if (!effectivePrincipal) return adjustmentAmount !== undefined ? null : undefined;
+            const effectiveRate = adjustmentRate !== undefined ? adjustmentRate : existingTxn.adjustmentRate;
+            const effectiveDate = adjustmentEffectiveDate !== undefined ? adjustmentEffectiveDate : existingTxn.adjustmentEffectiveDate;
+            return calculateSimpleInterest(
+              parseFloat(String(effectivePrincipal)),
+              parseFloat(String(effectiveRate || "0")),
+              effectiveDate || null
+            ).toFixed(2);
+          })(),
           adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
           adjustmentEffectiveDate: adjustmentEffectiveDate || null,
           adjustmentReason: adjustmentReason || null,
@@ -5911,6 +5937,14 @@ export async function registerRoutes(
           const matchByKey = !txn.farmerId && tName === normalizedName && tContact === normalizedContact && tVillage === normalizedVillage;
           if (matchById || matchByKey) {
             seedDue += parseFloat(txn.totalDueToFarmer || "0");
+            const adjPrincipal = parseFloat(txn.adjustmentAmount || "0");
+            const adjFinal = parseFloat(txn.adjustmentAmountFinal || String(adjPrincipal));
+            const interestOnly = adjFinal - adjPrincipal;
+            if (interestOnly > 0 && txn.adjustmentType === "credit") {
+              seedDue += interestOnly;
+            } else if (interestOnly > 0 && txn.adjustmentType === "debit") {
+              seedDue -= interestOnly;
+            }
           }
         }
 

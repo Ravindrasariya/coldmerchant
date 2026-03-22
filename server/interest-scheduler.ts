@@ -50,9 +50,19 @@ export async function accrueInterestForAll(): Promise<void> {
     const rate = parseFloat(lot.adjustedAmountRate || "0");
     if (principal <= 0 || rate <= 0 || !lot.adjustedAmountEffectiveDate) continue;
 
-    const finalAmount = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate);
+    const oldFinal = parseFloat(lot.adjustedAmountFinal || String(principal));
+    const newFinal = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate);
+    const interestDelta = newFinal - oldFinal;
+    const oldNetPayable = parseFloat(lot.netPayable || "0");
+    const adjType = lot.adjustedAmountType;
+    const signedDelta = adjType === "credit" ? interestDelta : adjType === "debit" ? -interestDelta : 0;
+    const newNetPayable = oldNetPayable + signedDelta;
+
     await db.update(lots)
-      .set({ adjustedAmountFinal: finalAmount.toFixed(2) })
+      .set({
+        adjustedAmountFinal: newFinal.toFixed(2),
+        netPayable: newNetPayable.toFixed(2),
+      })
       .where(sql`${lots.id} = ${lot.id}`);
     lotCount++;
   }
