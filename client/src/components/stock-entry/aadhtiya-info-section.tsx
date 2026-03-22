@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,6 +31,13 @@ interface AadhatOption {
 
 export function AadhtiyaInfoSection({ form, attachmentFile, onAttachmentChange }: AadhtiyaInfoSectionProps) {
   const { t } = useLanguage();
+  const attachmentPreviewUrl = useMemo(() => {
+    if (attachmentFile) return URL.createObjectURL(attachmentFile);
+    return null;
+  }, [attachmentFile]);
+  useEffect(() => {
+    return () => { if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl); };
+  }, [attachmentPreviewUrl]);
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -226,7 +233,7 @@ export function AadhtiyaInfoSection({ form, attachmentFile, onAttachmentChange }
               {attachmentFile ? (
                 <div className="flex items-center gap-3">
                   <img
-                    src={URL.createObjectURL(attachmentFile)}
+                    src={attachmentPreviewUrl || ""}
                     alt="Preview"
                     className="h-16 w-16 rounded-md object-cover border"
                     data-testid="img-attachment-preview-mandi"

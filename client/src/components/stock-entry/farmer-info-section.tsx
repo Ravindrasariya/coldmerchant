@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,13 @@ interface FarmerSuggestion {
 
 export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: FarmerInfoSectionProps) {
   const { t } = useLanguage();
+  const attachmentPreviewUrl = useMemo(() => {
+    if (attachmentFile) return URL.createObjectURL(attachmentFile);
+    return null;
+  }, [attachmentFile]);
+  useEffect(() => {
+    return () => { if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl); };
+  }, [attachmentPreviewUrl]);
   const [suggestions, setSuggestions] = useState<FarmerSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeField, setActiveField] = useState<'name' | 'contact' | 'village' | 'tehsil' | null>(null);
@@ -623,7 +630,7 @@ export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: 
               {attachmentFile ? (
                 <div className="flex items-center gap-3">
                   <img
-                    src={URL.createObjectURL(attachmentFile)}
+                    src={attachmentPreviewUrl || ""}
                     alt="Preview"
                     className="h-16 w-16 rounded-md object-cover border"
                     data-testid="img-attachment-preview"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { getTodayIST } from "@/lib/date-utils";
 import { calculateInterestOnly, calculateSimpleInterest } from "@/lib/interest-utils";
 import { computeNetWeight } from "@shared/utils";
@@ -173,6 +173,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [imageRemoved, setImageRemoved] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const newImagePreviewUrl = useMemo(() => {
+    if (newImageFile) return URL.createObjectURL(newImageFile);
+    return null;
+  }, [newImageFile]);
+  useEffect(() => {
+    return () => { if (newImagePreviewUrl) URL.revokeObjectURL(newImagePreviewUrl); };
+  }, [newImagePreviewUrl]);
   const [allColdStores, setAllColdStores] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreDropdown, setShowColdStoreDropdown] = useState<number | null>(null);
   const [coldStoreSearch, setColdStoreSearch] = useState("");
@@ -1569,7 +1576,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 </DialogHeader>
                 <div className="flex items-center justify-center">
                   <img
-                    src={newImageFile ? URL.createObjectURL(newImageFile) : `/api/stock-entries/${entry.id}/image`}
+                    src={newImageFile ? (newImagePreviewUrl || "") : `/api/stock-entries/${entry.id}/image`}
                     alt="Stock entry attachment"
                     className="max-w-full max-h-[60vh] rounded-md object-contain"
                     data-testid="edit-img-preview"
