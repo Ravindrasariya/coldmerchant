@@ -111,7 +111,7 @@ function computeHarvestLotCharges(lot: any) {
     const hammaliTotal = actualBags * hammaliRate;
     const totalCharges = mandiCommission + aadhatCommission + hammaliTotal + extraCharges;
     const netPayable = costOfGoods + totalCharges;
-    return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2) };
+    return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: "0.00" };
   }
   
   // Farm Gate and Cold Store
