@@ -177,7 +177,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       const res = await apiRequest("POST", "/api/stock-entries", data);
       return await res.json();
     },
-    onSuccess: async (result: any) => {
+    onSuccess: async (result: { id: number }) => {
       let imageError = false;
       if (attachmentFile && result?.id) {
         try {
