@@ -3268,11 +3268,7 @@ export async function registerRoutes(
       
       const transactionList = await storage.getTransactionsByMerchant(merchantId);
       
-      const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
-      const todayMs = new Date(todayStr).getTime();
-      const ms15 = 15 * 24 * 60 * 60 * 1000;
-      const ms30 = 30 * 24 * 60 * 60 * 1000;
+      const todayStr = getISTDateString();
 
       const buyersWithDues = buyerList.map(buyer => {
         let totalDue = 0;
@@ -3290,17 +3286,15 @@ export async function registerRoutes(
 
             if (due > 0 && txn.purchaseDate) {
               const txnDate = typeof txn.purchaseDate === 'string' ? txn.purchaseDate : String(txn.purchaseDate);
-              const txnMs = new Date(txnDate).getTime();
-              const ageMs = todayMs - txnMs;
+              const ageDays = dateDiffInDaysIST(txnDate, todayStr);
 
               if (txnDate === todayStr) {
                 dueTodayAmount += due;
               }
-              if (ageMs > ms15) {
-                dueOver15Days += due;
-              }
-              if (ageMs > ms30) {
+              if (ageDays > 30) {
                 dueOver30Days += due;
+              } else if (ageDays > 15) {
+                dueOver15Days += due;
               }
             }
           }
