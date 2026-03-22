@@ -3266,20 +3266,43 @@ export async function registerRoutes(
       const merchantId = req.user!.merchantId!;
       const buyerList = await storage.getBuyersByMerchant(merchantId);
       
-      // Get all transactions for this merchant to calculate buyer dues
       const transactionList = await storage.getTransactionsByMerchant(merchantId);
       
-      // Calculate dues for each buyer: revenue - amountReceived for all transactions with that buyerId
-      // Plus receivableBalance from buyer record (synced from Cash Settings)
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const todayMs = new Date(todayStr).getTime();
+      const ms15 = 15 * 24 * 60 * 60 * 1000;
+      const ms30 = 30 * 24 * 60 * 60 * 1000;
+
       const buyersWithDues = buyerList.map(buyer => {
         let totalDue = 0;
+        let dueTodayAmount = 0;
+        let dueOver15Days = 0;
+        let dueOver30Days = 0;
         const receivables = parseFloat(buyer.receivableBalance || "0");
         
         for (const txn of transactionList) {
           if (txn.buyerId === buyer.id) {
             const revenue = parseFloat(txn.revenue || "0");
             const amountReceived = parseFloat(txn.amountReceived || "0");
-            totalDue += Math.max(0, revenue - amountReceived);
+            const due = Math.max(0, revenue - amountReceived);
+            totalDue += due;
+
+            if (due > 0 && txn.purchaseDate) {
+              const txnDate = typeof txn.purchaseDate === 'string' ? txn.purchaseDate : String(txn.purchaseDate);
+              const txnMs = new Date(txnDate).getTime();
+              const ageMs = todayMs - txnMs;
+
+              if (txnDate === todayStr) {
+                dueTodayAmount += due;
+              }
+              if (ageMs > ms15) {
+                dueOver15Days += due;
+              }
+              if (ageMs > ms30) {
+                dueOver30Days += due;
+              }
+            }
           }
         }
         
@@ -3287,6 +3310,10 @@ export async function registerRoutes(
           ...buyer,
           overallDue: totalDue + receivables,
           receivables: receivables,
+          transactionDue: totalDue,
+          dueTodayAmount,
+          dueOver15Days,
+          dueOver30Days,
         };
       });
       
