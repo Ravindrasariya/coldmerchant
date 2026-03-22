@@ -1571,7 +1571,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
             <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
               <DialogContent className="max-w-lg">
                 <DialogHeader>
-                  <DialogTitle>{t("Attachment", "अटैचमेंट")} - {t("Sr No:", "क्र.:")} {entry.serialNumber}</DialogTitle>
+                  <DialogTitle>{t("Attachment", "अटैचमेंट")} - {entry.uniqueId || `#${entry.serialNumber}`}</DialogTitle>
 
                 </DialogHeader>
                 <div className="flex items-center justify-center">
