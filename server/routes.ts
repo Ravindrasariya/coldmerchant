@@ -780,7 +780,7 @@ export async function registerRoutes(
           aadhatCommissionPercent: lotData.aadhatCommissionPercent ? lotData.aadhatCommissionPercent.toString() : null,
           hammaliPerBag: lotData.hammaliPerBag ? lotData.hammaliPerBag.toString() : null,
           mandiExtraCharges: lotData.mandiExtraCharges ? lotData.mandiExtraCharges.toString() : null,
-          earlyPayPercent: lotData.earlyPayPercent ? lotData.earlyPayPercent.toString() : null,
+          earlyPayPercent: lotData.earlyPayPercent != null ? lotData.earlyPayPercent.toString() : null,
           remainingBags: lotData.originalBags,
         });
 
@@ -911,6 +911,9 @@ export async function registerRoutes(
             if (existingLot && lotData.hammaliGradingCharges !== undefined) {
               compareField('hammaliGradingCharges', existingLot.hammaliGradingCharges, lotData.hammaliGradingCharges, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.earlyPayPercent !== undefined) {
+              compareField('earlyPayPercent', existingLot.earlyPayPercent, lotData.earlyPayPercent, lotLabel, 'lot', lotData.id);
+            }
             if (existingLot && lotData.adjustedAmount !== undefined) {
               compareField('adjustedAmount', existingLot.adjustedAmount, lotData.adjustedAmount, lotLabel, 'lot', lotData.id);
             }
@@ -1039,7 +1042,7 @@ export async function registerRoutes(
                 ? (lotData.mandiExtraCharges ? lotData.mandiExtraCharges.toString() : null)
                 : undefined,
               earlyPayPercent: lotData.earlyPayPercent !== undefined
-                ? (lotData.earlyPayPercent ? lotData.earlyPayPercent.toString() : null)
+                ? (lotData.earlyPayPercent != null ? lotData.earlyPayPercent.toString() : null)
                 : undefined,
             });
 
