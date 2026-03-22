@@ -665,6 +665,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                 {chargeFields.map((chargeField, chargeIndex) => {
                   const chargeType = form.watch(`lots.${lotIndex}.charges.${chargeIndex}.type`);
                   const isEarlyPay = chargeType === "Early Pay/Bataw";
+                  const hasOtherEarlyPay = chargeFields.some((_, ci) => ci !== chargeIndex && form.watch(`lots.${lotIndex}.charges.${ci}.type`) === "Early Pay/Bataw");
                   const showCSDropdown = place === "farm_gate" && coldStoreChargeTypes.includes(chargeType);
                   const chargeFilteredCS = allColdStores.filter(cs =>
                     !chargeCSSearch || cs.name.toLowerCase().includes(chargeCSSearch.toLowerCase())
@@ -704,7 +705,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {CHARGE_TYPES.map((type) => (
+                                {CHARGE_TYPES.filter(type => type !== "Early Pay/Bataw" || !hasOtherEarlyPay).map((type) => (
                                   <SelectItem key={type} value={type}>
                                     {type}
                                   </SelectItem>

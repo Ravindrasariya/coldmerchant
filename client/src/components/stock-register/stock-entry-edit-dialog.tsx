@@ -1049,6 +1049,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     {(lot.charges || []).map((charge, chargeIndex) => {
                       const isFarmGateLot = lot.place === "farm_gate";
                       const isEarlyPayCharge = charge.type === "Early Pay/Bataw";
+                      const hasOtherEarlyPay = (lot.charges || []).some((c, ci) => ci !== chargeIndex && c.type === "Early Pay/Bataw");
                       const showChargeCS = isFarmGateLot && coldStoreChargeTypes.includes(charge.type);
                       const chargeDropdownKey = `${lotIndex}-${chargeIndex}`;
                       const chargeFilteredCS = allColdStores.filter(cs =>
@@ -1075,7 +1076,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
                             </SelectTrigger>
                             <SelectContent>
-                              {CHARGE_TYPES.map((type) => (
+                              {CHARGE_TYPES.filter(type => type !== "Early Pay/Bataw" || !hasOtherEarlyPay).map((type) => (
                                 <SelectItem key={type} value={type}>
                                   {type}
                                 </SelectItem>
