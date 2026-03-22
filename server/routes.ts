@@ -6437,23 +6437,52 @@ export async function registerRoutes(
 
       const inventoryValue = harvestStockValue + seedStockValue;
 
+      const sundryPayStakeholdersList = await storage.getSundryPayByMerchant(merchantId);
+      const sundryPayCashEntries = fyEntries.filter(e => e.sundryPayDbId != null);
+      const sundryPayDuesMap = new Map<number, { totalGiven: number; totalReceived: number }>();
+      for (const entry of sundryPayCashEntries) {
+        if (!entry.sundryPayDbId) continue;
+        const existing = sundryPayDuesMap.get(entry.sundryPayDbId) || { totalGiven: 0, totalReceived: 0 };
+        const amount = parseFloat(entry.amount || "0");
+        if (entry.direction === "outflow") {
+          existing.totalGiven += amount;
+        } else if (entry.direction === "inward") {
+          existing.totalReceived += amount;
+        }
+        sundryPayDuesMap.set(entry.sundryPayDbId, existing);
+      }
+
+      let sundryPayReceivables = 0;
+      let sundryPayPayables = 0;
+      for (const s of sundryPayStakeholdersList) {
+        if (!s.isActive) continue;
+        const pyReceivable = parseFloat(s.pyReceivable || "0");
+        const dues = sundryPayDuesMap.get(s.id) || { totalGiven: 0, totalReceived: 0 };
+        const totalDue = pyReceivable + dues.totalGiven - dues.totalReceived;
+        if (totalDue > 0) {
+          sundryPayReceivables += totalDue;
+        } else if (totalDue < 0) {
+          sundryPayPayables += Math.abs(totalDue);
+        }
+      }
+
       const fixedAssetsNet = fixedAssetsGross - accumulatedDepreciation;
-      const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables + inventoryValue;
+      const currentAssets = cashInHand + totalBankBalance + buyerReceivables + farmerReceivables + inventoryValue + sundryPayReceivables;
       const totalAssets = fixedAssetsNet + currentAssets;
-      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + supplierPayables + aadhtiyaPayables + coldStorePayables + limitAccountLiabilities;
+      const totalLiabilities = longTermLiabilities + shortTermLiabilities + farmerPayables + supplierPayables + aadhtiyaPayables + coldStorePayables + limitAccountLiabilities + sundryPayPayables;
       const ownersEquity = totalAssets - totalLiabilities;
 
       res.json({
         financialYear: fy,
         assets: {
           fixedAssets: { gross: fixedAssetsGross, depreciation: accumulatedDepreciation, net: fixedAssetsNet, details: fixedAssetDetails },
-          currentAssets: { cashInHand, bankBalances: bankAccounts.length > 0 ? bankAccountBalances : [{ name: "Bank Account", balance: bankBalance }], totalBankBalance, buyerReceivables, farmerReceivables, harvestStockValue, seedStockValue, total: currentAssets },
+          currentAssets: { cashInHand, bankBalances: bankAccounts.length > 0 ? bankAccountBalances : [{ name: "Bank Account", balance: bankBalance }], totalBankBalance, buyerReceivables, farmerReceivables, sundryPayReceivables, harvestStockValue, seedStockValue, total: currentAssets },
           totalAssets,
         },
         liabilities: {
           longTerm: { total: longTermLiabilities, details: liabilityDetails.filter(l => l.type === "long_term") },
           shortTerm: { total: shortTermLiabilities, details: liabilityDetails.filter(l => l.type === "short_term") },
-          currentLiabilities: { farmerPayables, supplierPayables, aadhtiyaPayables, coldStorePayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
+          currentLiabilities: { farmerPayables, supplierPayables, aadhtiyaPayables, coldStorePayables, sundryPayPayables, limitAccountLiabilities, limitAccountDetails: limitAccountLiabilityDetails },
           totalLiabilities,
         },
         ownersEquity,

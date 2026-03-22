@@ -118,6 +118,9 @@ export function BalanceSheet({ financialYear }: BalanceSheetProps) {
               ))}
               <LineItem label={t("Receivables from Buyers", "खरीदारों से प्राप्य")} value={a.currentAssets.buyerReceivables} indent />
               <LineItem label={t("Receivables from Farmers", "किसानों से प्राप्य")} value={a.currentAssets.farmerReceivables} indent />
+              {a.currentAssets.sundryPayReceivables > 0 && (
+                <LineItem label={t("Sundry Pay Receivables", "सन्ड्री पे प्राप्य")} value={a.currentAssets.sundryPayReceivables} indent />
+              )}
               {(a.currentAssets.harvestStockValue > 0 || a.currentAssets.seedStockValue > 0) && (
                 <>
                   {a.currentAssets.harvestStockValue > 0 && (
@@ -175,6 +178,9 @@ export function BalanceSheet({ financialYear }: BalanceSheetProps) {
               <LineItem label={t("Payables to Suppliers", "आपूर्तिकर्ताओं को देय")} value={l.currentLiabilities.supplierPayables || 0} indent />
               <LineItem label={t("Payables to Aadhtiyas", "आढ़तियाओं को देय")} value={l.currentLiabilities.aadhtiyaPayables || 0} indent />
               <LineItem label={t("Payables to Cold Stores", "कोल्ड स्टोर को देय")} value={l.currentLiabilities.coldStorePayables || 0} indent />
+              {(l.currentLiabilities.sundryPayPayables || 0) > 0 && (
+                <LineItem label={t("Sundry Pay Over-recovery", "सन्ड्री पे अधिक वसूली")} value={l.currentLiabilities.sundryPayPayables} indent />
+              )}
               {l.currentLiabilities.limitAccountLiabilities > 0 && (
                 <>
                   {(l.currentLiabilities.limitAccountDetails || []).map((d: any, i: number) => (
