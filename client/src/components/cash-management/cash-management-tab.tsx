@@ -2872,7 +2872,7 @@ export function CashManagementTab() {
                       control={outflowForm.control}
                       name="sundryPayName"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                           <FormLabel>{t("Stakeholder Name", "हितधारक का नाम")} *</FormLabel>
                           <Popover open={sundryPayPopoverOpen} onOpenChange={setSundryPayPopoverOpen}>
                             <PopoverTrigger asChild>
@@ -2883,18 +2883,45 @@ export function CashManagementTab() {
                                   className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
                                   data-testid="select-sundry-pay-name"
                                 >
-                                  {field.value || t("Select Stakeholder", "हितधारक चुनें")}
+                                  {field.value
+                                    ? (() => {
+                                        const s = sundryPayStakeholders.find(s => s.name === field.value);
+                                        return s && s.totalDue > 0
+                                          ? `${s.name} — ${t("Due", "बकाया")}: ₹${s.totalDue.toLocaleString('en-IN')}`
+                                          : field.value;
+                                      })()
+                                    : t("Search or type name", "खोजें या नाम लिखें")}
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-full p-0" align="start">
+                            <PopoverContent className="w-[350px] p-0" align="start">
                               <Command>
-                                <CommandInput placeholder={t("Search or type new name...", "खोजें या नया नाम लिखें...")} />
+                                <CommandInput
+                                  placeholder={t("Search or type new name...", "खोजें या नया नाम लिखें...")}
+                                  onValueChange={(search) => {
+                                    if (search) {
+                                      const match = sundryPayStakeholders.find(s => s.name.toLowerCase() === search.toLowerCase());
+                                      if (match) {
+                                        field.onChange(match.name);
+                                        outflowForm.setValue("sundryPayDbId", match.id);
+                                      } else {
+                                        field.onChange(search);
+                                        outflowForm.setValue("sundryPayDbId", undefined);
+                                      }
+                                    }
+                                  }}
+                                  data-testid="input-sundry-pay-name"
+                                />
                                 <CommandList>
                                   <CommandEmpty>
-                                    <div className="p-2 text-sm text-muted-foreground">
-                                      {t("No match found. The name you type will create a new stakeholder.", "कोई मिलान नहीं मिला। आप जो नाम लिखेंगे वह एक नया हितधारक बनाएगा।")}
+                                    <div
+                                      className="p-2 text-sm cursor-pointer hover:bg-accent rounded"
+                                      onClick={() => setSundryPayPopoverOpen(false)}
+                                    >
+                                      {field.value
+                                        ? t(`Use "${field.value}" (new stakeholder)`, `"${field.value}" का उपयोग करें (नया हितधारक)`)
+                                        : t("Type a name to add new stakeholder", "नया हितधारक जोड़ने के लिए नाम लिखें")}
                                     </div>
                                   </CommandEmpty>
                                   <CommandGroup>
@@ -2911,9 +2938,11 @@ export function CashManagementTab() {
                                         <Check className={cn("mr-2 h-4 w-4", field.value === stakeholder.name ? "opacity-100" : "opacity-0")} />
                                         <div className="flex items-center justify-between gap-2 w-full">
                                           <span>{stakeholder.name}</span>
-                                          <Badge variant="secondary" className="shrink-0">
-                                            {t("Due", "बकाया")}: ₹{stakeholder.totalDue.toLocaleString('en-IN')}
-                                          </Badge>
+                                          {stakeholder.totalDue > 0 && (
+                                            <Badge variant="secondary" className="shrink-0">
+                                              {t("Due", "बकाया")}: ₹{stakeholder.totalDue.toLocaleString('en-IN')}
+                                            </Badge>
+                                          )}
                                         </div>
                                       </CommandItem>
                                     ))}
@@ -2922,16 +2951,6 @@ export function CashManagementTab() {
                               </Command>
                             </PopoverContent>
                           </Popover>
-                          <Input
-                            placeholder={t("Or type a new name", "या नया नाम टाइप करें")}
-                            value={field.value || ""}
-                            onChange={(e) => {
-                              field.onChange(e.target.value);
-                              outflowForm.setValue("sundryPayDbId", undefined);
-                            }}
-                            className="mt-2"
-                            data-testid="input-sundry-pay-name"
-                          />
                           <FormMessage />
                         </FormItem>
                       )}
