@@ -1166,14 +1166,22 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           {(() => {
                             const pct = lot.earlyPayPercent || 0;
                             if (!pct) return "₹0";
-                            const cogs = lot.bagBreakdowns
-                              .filter(bd => bd.size && bd.size !== "Wastage")
-                              .reduce((sum, bd) => {
+                            const sellable = lot.bagBreakdowns.filter(bd => bd.size && bd.size !== "Wastage");
+                            const hasBd = sellable.some(bd => (bd.weight || 0) > 0 && (bd.pricePerKg || 0) > 0);
+                            let cogs = 0;
+                            if (hasBd) {
+                              cogs = sellable.reduce((sum, bd) => {
                                 const weight = bd.weight || 0;
                                 const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
                                 const price = bd.pricePerKg || 0;
                                 return sum + (netWeight * price);
                               }, 0);
+                            } else {
+                              const w = lot.totalWeight || 0;
+                              const nw = w > 0 ? w - (lot.originalBags || 0) : 0;
+                              const p = lot.pricePerKg || 0;
+                              if (nw > 0 && p > 0) cogs = nw * p;
+                            }
                             const isFG = lot.place === "farm_gate";
                             const cstTypes = ["Cold Charges", "Ware House Charges"];
                             const dynChg = (lot.charges || [])

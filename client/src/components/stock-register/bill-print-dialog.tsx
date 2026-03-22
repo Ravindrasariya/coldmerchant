@@ -53,6 +53,8 @@ interface StockEntryWithLots {
     hammaliPerBag: string | null;
     mandiExtraCharges: string | null;
     coldStorageChargesPaid: string | null;
+    earlyPayPercent: string | null;
+    earlyPayAmount: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
     adjustedAmountRate: string | null;
