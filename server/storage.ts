@@ -521,7 +521,8 @@ export class DatabaseStorage implements IStorage {
       
       const lotsWithBreakdowns = await Promise.all(entryLots.map(async (lot) => {
         const breakdowns = await db.select().from(bagBreakdowns)
-          .where(and(eq(bagBreakdowns.lotId, lot.id), eq(bagBreakdowns.merchantId, merchantId)));
+          .where(and(eq(bagBreakdowns.lotId, lot.id), eq(bagBreakdowns.merchantId, merchantId)))
+          .orderBy(asc(bagBreakdowns.sortOrder), asc(bagBreakdowns.id));
         return { ...lot, bagBreakdowns: breakdowns };
       }));
 
@@ -542,7 +543,8 @@ export class DatabaseStorage implements IStorage {
     
     const lotsWithBreakdowns = await Promise.all(entryLots.map(async (lot) => {
       const breakdowns = await db.select().from(bagBreakdowns)
-        .where(and(eq(bagBreakdowns.lotId, lot.id), eq(bagBreakdowns.merchantId, merchantId)));
+        .where(and(eq(bagBreakdowns.lotId, lot.id), eq(bagBreakdowns.merchantId, merchantId)))
+        .orderBy(asc(bagBreakdowns.sortOrder), asc(bagBreakdowns.id));
       return { ...lot, bagBreakdowns: breakdowns };
     }));
 
@@ -651,7 +653,8 @@ export class DatabaseStorage implements IStorage {
 
   async getBagBreakdownsByLot(lotId: number, merchantId: number): Promise<BagBreakdown[]> {
     return await db.select().from(bagBreakdowns)
-      .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+      .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)))
+      .orderBy(asc(bagBreakdowns.sortOrder), asc(bagBreakdowns.id));
   }
 
   async getBagBreakdownById(id: number, merchantId: number): Promise<BagBreakdown | undefined> {

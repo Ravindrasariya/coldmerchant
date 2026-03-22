@@ -787,7 +787,8 @@ export async function registerRoutes(
 
         // Create bag breakdowns for both cut types
         if (lotData.bagBreakdowns) {
-          for (const bdData of lotData.bagBreakdowns) {
+          for (let bdIdx = 0; bdIdx < lotData.bagBreakdowns.length; bdIdx++) {
+            const bdData = lotData.bagBreakdowns[bdIdx];
             const weight = bdData.weight || 0;
             const pricePerKg = bdData.pricePerKg || 0;
             const totalAmount = weight * pricePerKg;
@@ -801,6 +802,7 @@ export async function registerRoutes(
               weight: weight > 0 ? weight.toString() : null,
               pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
               totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
+              sortOrder: bdIdx,
             });
           }
         }
@@ -1060,7 +1062,8 @@ export async function registerRoutes(
               const existingBreakdowns = existingLot?.bagBreakdowns || [];
               const existingIds = new Set<number>(existingBreakdowns.map((b: any) => b.id));
 
-              for (const bdData of lotData.bagBreakdowns) {
+              for (let bdIdx = 0; bdIdx < lotData.bagBreakdowns.length; bdIdx++) {
+                const bdData = lotData.bagBreakdowns[bdIdx];
                 const weight = bdData.weight || 0;
                 const pricePerKg = bdData.pricePerKg || 0;
                 const totalAmount = weight * pricePerKg;
@@ -1094,6 +1097,7 @@ export async function registerRoutes(
                     weight: weight > 0 ? weight.toString() : null,
                     pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
                     totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
+                    sortOrder: bdIdx,
                   });
                   existingIds.delete(bdData.id);
                 } else {
@@ -1113,6 +1117,7 @@ export async function registerRoutes(
                     weight: weight > 0 ? weight.toString() : null,
                     pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
                     totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
+                    sortOrder: bdIdx,
                   });
                 }
               }

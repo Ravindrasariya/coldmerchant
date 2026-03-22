@@ -134,6 +134,7 @@ export const bagBreakdowns = pgTable("bag_breakdowns", {
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
   costPerBag: decimal("cost_per_bag", { precision: 12, scale: 2 }).default("0"),
+  sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
