@@ -4920,7 +4920,9 @@ export async function registerRoutes(
         lotsByEntryId.set(lot.stockEntryId, arr);
       }
       
-      const aadhatDuesMap = new Map<number, number>();
+      const todayStr = getISTDateString();
+
+      const aadhatDuesMap = new Map<number, { stockDue: number; dueTodayAmount: number; dueOver15Days: number; dueOver30Days: number }>();
       for (const entry of stockEntryList) {
         if (!entry.aadhatDbId) continue;
         const entryLots = lotsByEntryId.get(entry.id) || [];
@@ -4930,16 +4932,37 @@ export async function registerRoutes(
         }
         const amountPaid = parseFloat(entry.amountPaid || "0");
         const entryDue = Math.max(0, entryNetPayable - amountPaid);
-        aadhatDuesMap.set(entry.aadhatDbId, (aadhatDuesMap.get(entry.aadhatDbId) || 0) + entryDue);
+
+        const existing = aadhatDuesMap.get(entry.aadhatDbId) || { stockDue: 0, dueTodayAmount: 0, dueOver15Days: 0, dueOver30Days: 0 };
+        existing.stockDue += entryDue;
+
+        if (entryDue > 0 && entry.purchaseDate) {
+          const entryDate = typeof entry.purchaseDate === 'string' ? entry.purchaseDate : String(entry.purchaseDate);
+          const ageDays = dateDiffInDaysIST(entryDate, todayStr);
+          if (entryDate === todayStr) {
+            existing.dueTodayAmount += entryDue;
+          }
+          if (ageDays > 30) {
+            existing.dueOver30Days += entryDue;
+          } else if (ageDays > 15) {
+            existing.dueOver15Days += entryDue;
+          }
+        }
+
+        aadhatDuesMap.set(entry.aadhatDbId, existing);
       }
       
       const aadhatsWithDues = aadhatList.map(aadhat => {
         const pyPayable = parseFloat(aadhat.pyPayable || "0");
-        const stockDue = aadhatDuesMap.get(aadhat.id) || 0;
+        const buckets = aadhatDuesMap.get(aadhat.id) || { stockDue: 0, dueTodayAmount: 0, dueOver15Days: 0, dueOver30Days: 0 };
         return {
           ...aadhat,
-          stockDue,
-          totalDue: pyPayable + stockDue,
+          stockDue: buckets.stockDue,
+          totalDue: pyPayable + buckets.stockDue,
+          pyPayableAmount: pyPayable,
+          dueTodayAmount: buckets.dueTodayAmount,
+          dueOver15Days: buckets.dueOver15Days,
+          dueOver30Days: buckets.dueOver30Days,
         };
       });
       

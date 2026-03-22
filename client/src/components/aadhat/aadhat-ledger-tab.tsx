@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,10 @@ import { type Aadhat, type AadhatEditHistory } from "@shared/schema";
 interface AadhatWithDues extends Aadhat {
   stockDue: number;
   totalDue: number;
+  pyPayableAmount: number;
+  dueTodayAmount: number;
+  dueOver15Days: number;
+  dueOver30Days: number;
 }
 
 export default function AadhatLedgerTab() {
@@ -283,8 +287,50 @@ export default function AadhatLedgerTab() {
       return 0;
     });
 
+  const summary = useMemo(() => {
+    return {
+      totalDue: filteredAadhats.reduce((sum, a) => sum + a.totalDue, 0),
+      receivableDue: filteredAadhats.reduce((sum, a) => sum + a.pyPayableAmount, 0),
+      dueOver30Days: filteredAadhats.reduce((sum, a) => sum + a.dueOver30Days, 0),
+      dueOver15Days: filteredAadhats.reduce((sum, a) => sum + a.dueOver15Days, 0),
+      dueToday: filteredAadhats.reduce((sum, a) => sum + a.dueTodayAmount, 0),
+    };
+  }, [filteredAadhats]);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 1,
+    }).format(value);
+  };
+
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <Card className="border-blue-300 dark:border-blue-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Total Due", "कुल बकाया")}</div>
+          <div className="text-sm font-bold mt-1" data-testid="summary-total-due">{formatCurrency(summary.totalDue)}</div>
+        </Card>
+        <Card className="border-purple-300 dark:border-purple-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Receivable Due", "प्राप्य बकाया")}</div>
+          <div className="text-sm font-bold mt-1 text-purple-600 dark:text-purple-400" data-testid="summary-receivable-due">{formatCurrency(summary.receivableDue)}</div>
+        </Card>
+        <Card className="border-red-300 dark:border-red-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Due (>30 Days)", "बकाया (>30 दिन)")}</div>
+          <div className="text-sm font-bold mt-1 text-red-600 dark:text-red-400" data-testid="summary-due-over-30">{formatCurrency(summary.dueOver30Days)}</div>
+        </Card>
+        <Card className="border-orange-300 dark:border-orange-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Due (>15 Days)", "बकाया (>15 दिन)")}</div>
+          <div className="text-sm font-bold mt-1 text-orange-600 dark:text-orange-400" data-testid="summary-due-over-15">{formatCurrency(summary.dueOver15Days)}</div>
+        </Card>
+        <Card className="border-green-300 dark:border-green-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Due (Today)", "बकाया (आज)")}</div>
+          <div className="text-sm font-bold mt-1 text-green-600 dark:text-green-400" data-testid="summary-due-today">{formatCurrency(summary.dueToday)}</div>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
