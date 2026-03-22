@@ -4717,7 +4717,7 @@ export async function registerRoutes(
   app.post("/api/seed-transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, items } = req.body;
+      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items } = req.body;
 
       if (!farmerName || !district || !state || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -4785,7 +4785,20 @@ export async function registerRoutes(
       const totalProfitLoss = totalRevenue - totalCost;
       const transportTotal = parseFloat(transportCharges) || 0;
       const otherTotal = parseFloat(otherCharges) || 0;
-      const totalDueToFarmer = totalRevenue + transportTotal + otherTotal;
+      const baseDueToFarmer = totalRevenue + transportTotal + otherTotal;
+
+      let computedAdjFinal: string | null = null;
+      let interestAdj = 0;
+      if (adjustmentAmount) {
+        const principal = parseFloat(String(adjustmentAmount));
+        const finalVal = calculateSimpleInterest(principal, parseFloat(String(adjustmentRate || "0")), adjustmentEffectiveDate || null);
+        computedAdjFinal = finalVal.toFixed(2);
+        const interestOnly = finalVal - principal;
+        if (interestOnly > 0) {
+          interestAdj = adjustmentType === "credit" ? interestOnly : adjustmentType === "debit" ? -interestOnly : 0;
+        }
+      }
+      const totalDueToFarmer = baseDueToFarmer + interestAdj;
 
       const transactionNumber = await storage.getNextSeedTransactionNumber(merchantId);
 
@@ -4808,7 +4821,13 @@ export async function registerRoutes(
           totalCost: totalCost.toString(),
           totalRevenue: totalRevenue.toString(),
           totalProfitLoss: totalProfitLoss.toString(),
-          totalDueToFarmer: totalDueToFarmer.toString(),
+          totalDueToFarmer: totalDueToFarmer.toFixed(2),
+          adjustmentType: adjustmentType || null,
+          adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
+          adjustmentAmountFinal: computedAdjFinal,
+          adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
+          adjustmentEffectiveDate: adjustmentEffectiveDate || null,
+          adjustmentReason: adjustmentReason || null,
         },
         processedItems
       );
