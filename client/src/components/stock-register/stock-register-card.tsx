@@ -226,6 +226,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
   const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
   const [imageViewEntryId, setImageViewEntryId] = useState<number | null>(null);
+  const [imageViewEntryLabel, setImageViewEntryLabel] = useState<string>("");
   
   // Download dialog state (simplified - now uses filtered entries directly)
   const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
@@ -1203,7 +1204,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             {lotIndex === 0 && entry.attachmentImage && (
                               <button
                                 type="button"
-                                onClick={() => setImageViewEntryId(entry.id)}
+                                onClick={() => { setImageViewEntryId(entry.id); setImageViewEntryLabel(entry.uniqueId || `#${entry.serialNumber}`); }}
                                 className="ml-auto inline-flex items-center"
                                 data-testid={`button-view-image-${entry.id}`}
                               >
@@ -1317,7 +1318,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       <Dialog open={imageViewEntryId !== null} onOpenChange={(open) => { if (!open) setImageViewEntryId(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("Attachment", "अटैचमेंट")} - {filteredEntries?.find(e => e.id === imageViewEntryId)?.uniqueId || `#${filteredEntries?.find(e => e.id === imageViewEntryId)?.serialNumber}`}</DialogTitle>
+            <DialogTitle>{t("Attachment", "अटैचमेंट")} - {imageViewEntryLabel}</DialogTitle>
           </DialogHeader>
           {imageViewEntryId && (
             <div className="flex items-center justify-center">

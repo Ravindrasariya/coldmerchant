@@ -161,6 +161,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     isPausingAutoSaveRef.current = true;
     clearSavedFormData(selectedCrop);
     form.reset(getDefaultFormValues(selectedCrop, selectedPlace));
+    setAttachmentFile(null);
     scrollToTop();
     setTimeout(() => {
       isPausingAutoSaveRef.current = false;
