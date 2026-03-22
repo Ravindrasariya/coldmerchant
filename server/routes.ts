@@ -3284,8 +3284,8 @@ export async function registerRoutes(
             const due = Math.max(0, revenue - amountReceived);
             totalDue += due;
 
-            if (due > 0 && txn.purchaseDate) {
-              const txnDate = typeof txn.purchaseDate === 'string' ? txn.purchaseDate : String(txn.purchaseDate);
+            if (due > 0 && txn.dateOfLoading) {
+              const txnDate = typeof txn.dateOfLoading === 'string' ? txn.dateOfLoading : String(txn.dateOfLoading);
               const ageDays = dateDiffInDaysIST(txnDate, todayStr);
 
               if (txnDate === todayStr) {
