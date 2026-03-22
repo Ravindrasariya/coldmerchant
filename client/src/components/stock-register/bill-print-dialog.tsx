@@ -201,7 +201,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     const isFarmGate = lot.place === "farm_gate";
     const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
     const dynamicCharges = charges
-      .filter(c => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+      .filter(c => c.type !== "Early Pay/Bataw" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
       .reduce((sum, c) => {
         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
         return sum + amt;
@@ -272,7 +272,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       const isFarmGate = lot.place === "farm_gate";
       const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
       charges
-        .filter(c => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+        .filter(c => c.type !== "Early Pay/Bataw" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
         .forEach(c => {
           const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
           if (amt > 0) {

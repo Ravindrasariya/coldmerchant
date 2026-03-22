@@ -69,6 +69,7 @@ export const CHARGE_TYPES = [
   "Advance",
   "Bag Charges",
   "Cold Charges",
+  "Early Pay/Bataw",
   "Freight Charges",
   "Grading Charges",
   "Hammali Charges",
@@ -1021,7 +1022,7 @@ export const lotFormSchema = z.object({
   charges: z.preprocess(
     (val) => {
       if (!Array.isArray(val)) return val;
-      return val.filter((c: any) => c && ((c.type && String(c.type).trim() !== "") || (c.amount && Number(c.amount) > 0)));
+      return val.filter((c: any) => c && c.type !== "Early Pay/Bataw" && ((c.type && String(c.type).trim() !== "") || (c.amount && Number(c.amount) > 0)));
     },
     z.array(chargeEntrySchema).optional()
   ),

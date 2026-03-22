@@ -123,7 +123,14 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     size: lot.size || "",
     pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : null,
     totalWeight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : null,
-    charges: lot.charges || [],
+    charges: (() => {
+      const base = lot.charges || [];
+      const ep = lot.earlyPayPercent !== null ? parseFloat(lot.earlyPayPercent) : 0;
+      if (ep > 0 && !base.some(c => c.type === "Early Pay/Bataw")) {
+        return [...base, { type: "Early Pay/Bataw", amount: ep, coldStoreName: "", coldStoreDbId: null }];
+      }
+      return base;
+    })(),
     mandiCommissionPercent: lot.mandiCommissionPercent !== null ? parseFloat(lot.mandiCommissionPercent) : null,
     aadhatCommissionPercent: lot.aadhatCommissionPercent !== null ? parseFloat(lot.aadhatCommissionPercent) : null,
     hammaliPerBag: lot.hammaliPerBag !== null ? parseFloat(lot.hammaliPerBag) : null,
@@ -415,7 +422,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       const charges = lot.charges || [];
       for (let j = 0; j < charges.length; j++) {
         const charge = charges[j];
-        // Check if charge has type but no valid amount
+        if (charge.type === "Early Pay/Bataw") continue;
         const chargeAmount = typeof charge.amount === 'string' ? parseFloat(charge.amount) : (charge.amount || 0);
         if (charge.type && charge.type.length > 0 && (!chargeAmount || chargeAmount <= 0)) {
           toast({
@@ -428,7 +435,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           });
           return;
         }
-        // Check if amount is provided but type is missing
         if (chargeAmount && chargeAmount > 0 && (!charge.type || charge.type.length === 0)) {
           toast({
             title: t("Validation Error", "सत्यापन त्रुटि"),
@@ -443,12 +449,19 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       }
     }
     
-    // Clean up charges before saving - remove empty entries
+    // Clean up charges before saving - remove empty entries and Early Pay/Bataw (handled via earlyPayPercent)
     // For gate_cut, sync lot-level fields from breakdowns (sum of weights, weighted avg price, first size)
     const cleanedLots = lots.map(lot => {
+      const earlyPayCharge = (lot.charges || []).find(c => c.type === "Early Pay/Bataw");
+      const earlyPayPctFromCharge = earlyPayCharge
+        ? (typeof earlyPayCharge.amount === 'string' ? parseFloat(earlyPayCharge.amount) : (earlyPayCharge.amount || 0))
+        : null;
+
       const baseCleanedLot = {
         ...lot,
+        earlyPayPercent: earlyPayPctFromCharge && earlyPayPctFromCharge > 0 ? earlyPayPctFromCharge : lot.earlyPayPercent,
         charges: (lot.charges || []).filter(c => {
+          if (c.type === "Early Pay/Bataw") return false;
           const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
           return c.type && c.type.length > 0 && amt > 0;
         })
@@ -1035,6 +1048,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     
                     {(lot.charges || []).map((charge, chargeIndex) => {
                       const isFarmGateLot = lot.place === "farm_gate";
+                      const isEarlyPayCharge = charge.type === "Early Pay/Bataw";
                       const showChargeCS = isFarmGateLot && coldStoreChargeTypes.includes(charge.type);
                       const chargeDropdownKey = `${lotIndex}-${chargeIndex}`;
                       const chargeFilteredCS = allColdStores.filter(cs =>
@@ -1045,7 +1059,17 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
                           <Select
                             value={charge.type || ""}
-                            onValueChange={(v) => handleChargeChange(lotIndex, chargeIndex, "type", v)}
+                            onValueChange={(v) => {
+                              const oldType = charge.type;
+                              handleChargeChange(lotIndex, chargeIndex, "type", v);
+                              if (oldType === "Early Pay/Bataw" && v !== "Early Pay/Bataw") {
+                                handleLotFieldChange(lotIndex, "earlyPayPercent", null);
+                              }
+                              if (v === "Early Pay/Bataw") {
+                                const amt = typeof charge.amount === 'string' ? parseFloat(charge.amount) : (charge.amount || 0);
+                                handleLotFieldChange(lotIndex, "earlyPayPercent", amt || null);
+                              }
+                            }}
                           >
                             <SelectTrigger className="h-8 flex-1" data-testid={`edit-charge-type-${lotIndex}-${chargeIndex}`}>
                               <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
@@ -1058,23 +1082,81 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               ))}
                             </SelectContent>
                           </Select>
-                          <Input
-                            type="number"
-                            step="any"
-                            className="h-8 w-28 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="₹0"
-                            value={charge.amount || ""}
-                            onChange={(e) => {
-                              handleChargeChange(lotIndex, chargeIndex, "amount", e.target.value === "" ? "" : parseFloat(e.target.value));
-                            }}
-                            data-testid={`edit-charge-amount-${lotIndex}-${chargeIndex}`}
-                          />
+                          {isEarlyPayCharge ? (
+                            <>
+                              <Input
+                                type="number"
+                                step="any"
+                                className="h-8 w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="%"
+                                value={charge.amount || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? "" : parseFloat(e.target.value);
+                                  handleChargeChange(lotIndex, chargeIndex, "amount", val);
+                                  handleLotFieldChange(lotIndex, "earlyPayPercent", val === "" ? null : val);
+                                }}
+                                data-testid={`edit-early-pay-percent-${lotIndex}`}
+                              />
+                              <p className="text-xs font-mono font-semibold whitespace-nowrap" data-testid={`edit-early-pay-amount-${lotIndex}`}>
+                                {(() => {
+                                  const pct = typeof charge.amount === 'string' ? parseFloat(charge.amount) : (charge.amount || 0);
+                                  if (!pct) return "₹0";
+                                  const sellable = lot.bagBreakdowns.filter(bd => bd.size && bd.size !== "Wastage");
+                                  const hasBd = sellable.some(bd => (bd.weight || 0) > 0 && (bd.pricePerKg || 0) > 0);
+                                  let cogs = 0;
+                                  if (hasBd) {
+                                    cogs = sellable.reduce((sum, bd) => {
+                                      const weight = bd.weight || 0;
+                                      const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
+                                      const price = bd.pricePerKg || 0;
+                                      return sum + (netWeight * price);
+                                    }, 0);
+                                  } else {
+                                    const w = lot.totalWeight || 0;
+                                    const nw = w > 0 ? w - (lot.originalBags || 0) : 0;
+                                    const p = lot.pricePerKg || 0;
+                                    if (nw > 0 && p > 0) cogs = nw * p;
+                                  }
+                                  const isFG = lot.place === "farm_gate";
+                                  const cstTypes = ["Cold Charges", "Ware House Charges"];
+                                  const dynChg = (lot.charges || [])
+                                    .filter(c => c.type !== "Early Pay/Bataw" && !(isFG && cstTypes.includes(c.type)))
+                                    .reduce((sum, c) => {
+                                      const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                                      return sum + amt;
+                                    }, 0);
+                                  const hammali = lot.hammaliGradingCharges || 0;
+                                  const otherDed = hammali + dynChg;
+                                  const base = cogs - otherDed;
+                                  const amt = base > 0 ? base * pct / 100 : 0;
+                                  return `₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+                                })()}
+                              </p>
+                            </>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="any"
+                              className="h-8 w-28 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="₹0"
+                              value={charge.amount || ""}
+                              onChange={(e) => {
+                                handleChargeChange(lotIndex, chargeIndex, "amount", e.target.value === "" ? "" : parseFloat(e.target.value));
+                              }}
+                              data-testid={`edit-charge-amount-${lotIndex}-${chargeIndex}`}
+                            />
+                          )}
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleChargeRemove(lotIndex, chargeIndex)}
+                            onClick={() => {
+                              if (charge.type === "Early Pay/Bataw") {
+                                handleLotFieldChange(lotIndex, "earlyPayPercent", null);
+                              }
+                              handleChargeRemove(lotIndex, chargeIndex);
+                            }}
                             data-testid={`edit-charge-remove-${lotIndex}-${chargeIndex}`}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1142,63 +1224,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         {t("No additional charges added", "कोई अतिरिक्त शुल्क नहीं जोड़ा गया")}
                       </p>
                     )}
-
-                    <div className="flex items-end gap-2 pt-2 border-t">
-                      <div className="flex-1">
-                        <Label className="text-xs">{t("Early Pay/Bataw", "जल्दी भुगतान/बटाव")} (%)</Label>
-                        <Input
-                          type="number"
-                          step="any"
-                          className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          placeholder="0"
-                          value={lot.earlyPayPercent ?? ""}
-                          onChange={(e) => {
-                            const newLots = [...lots];
-                            newLots[lotIndex] = { ...newLots[lotIndex], earlyPayPercent: e.target.value === "" ? null : parseFloat(e.target.value) };
-                            setLots(newLots);
-                          }}
-                          data-testid={`edit-early-pay-percent-${lotIndex}`}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label className="text-xs">{t("Amount", "राशि")}</Label>
-                        <p className="text-sm font-mono font-semibold h-8 flex items-center" data-testid={`edit-early-pay-amount-${lotIndex}`}>
-                          {(() => {
-                            const pct = lot.earlyPayPercent || 0;
-                            if (!pct) return "₹0";
-                            const sellable = lot.bagBreakdowns.filter(bd => bd.size && bd.size !== "Wastage");
-                            const hasBd = sellable.some(bd => (bd.weight || 0) > 0 && (bd.pricePerKg || 0) > 0);
-                            let cogs = 0;
-                            if (hasBd) {
-                              cogs = sellable.reduce((sum, bd) => {
-                                const weight = bd.weight || 0;
-                                const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
-                                const price = bd.pricePerKg || 0;
-                                return sum + (netWeight * price);
-                              }, 0);
-                            } else {
-                              const w = lot.totalWeight || 0;
-                              const nw = w > 0 ? w - (lot.originalBags || 0) : 0;
-                              const p = lot.pricePerKg || 0;
-                              if (nw > 0 && p > 0) cogs = nw * p;
-                            }
-                            const isFG = lot.place === "farm_gate";
-                            const cstTypes = ["Cold Charges", "Ware House Charges"];
-                            const dynChg = (lot.charges || [])
-                              .filter(c => !(isFG && cstTypes.includes(c.type)))
-                              .reduce((sum, c) => {
-                                const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                                return sum + amt;
-                              }, 0);
-                            const hammali = lot.hammaliGradingCharges || 0;
-                            const otherDed = hammali + dynChg;
-                            const base = cogs - otherDed;
-                            const amt = base > 0 ? base * pct / 100 : 0;
-                            return `₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
-                          })()}
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 </CardContent>
                 )}
@@ -1277,7 +1302,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     const isFarmGate = lot.place === "farm_gate";
                     const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
                     const dynamicCharges = (lot.charges || [])
-                      .filter(c => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+                      .filter(c => c.type !== "Early Pay/Bataw" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
                       .reduce((sum, c) => {
                         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
                         return sum + amt;
