@@ -46,6 +46,7 @@ import {
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, isNotNull, inArray } from "drizzle-orm";
+import { computeNetWeight } from "@shared/utils";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -807,13 +808,13 @@ export class DatabaseStorage implements IStorage {
       if (bd) {
         const weight = bd.weight ? parseFloat(bd.weight) : (lot.totalWeight ? parseFloat(lot.totalWeight) : 0);
         const bags = bd.numberOfBags || 0;
-        const netWeight = bags > 0 ? Math.max(0, weight - bags) : 0;
+        const netWeight = computeNetWeight(weight, bags, lot.place);
         return bags > 0 ? (bagsMoved / bags) * netWeight : 0;
       }
     }
     const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
     const bags = lot.originalBags || 0;
-    const netWeight = bags > 0 ? Math.max(0, weight - bags) : 0;
+    const netWeight = computeNetWeight(weight, bags, lot.place);
     return bags > 0 ? (bagsMoved / bags) * netWeight : 0;
   }
 
@@ -851,7 +852,7 @@ export class DatabaseStorage implements IStorage {
 
         const weight = bd.weight ? parseFloat(bd.weight) : 0;
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        const netWeight = weight > 0 ? weight - bags : 0;
+        const netWeight = computeNetWeight(weight, bags, place);
         const rowTotal = (netWeight > 0 && price > 0) ? netWeight * price : 0;
         const isWastage = bd.size === "Wastage";
 
@@ -874,7 +875,7 @@ export class DatabaseStorage implements IStorage {
     } else {
       const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
       const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-      const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+      const netWeight = computeNetWeight(lotTotalWeight, lot.originalBags, place);
       const totalPayable = (netWeight > 0 && price > 0) ? netWeight * price : 0;
 
       let cpb: number;

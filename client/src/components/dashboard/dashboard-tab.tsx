@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
+import { computeNetWeight } from "@shared/utils";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useLanguage } from "@/hooks/use-language";
@@ -158,7 +159,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
       if (bd.size !== "Wastage") {
         const weight = bd.weight ? parseFloat(bd.weight) : 0;
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+        const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
         if (netWeight > 0 && price > 0) {
           totalAmount = (totalAmount ?? 0) + (netWeight * price);
         }
@@ -167,7 +168,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   } else {
     const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
     const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-    const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+    const netWeight = computeNetWeight(lotTotalWeight, lot.originalBags, lot.place);
     if (netWeight > 0 && price > 0) {
       totalAmount = netWeight * price;
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getTodayIST } from "@/lib/date-utils";
 import { calculateInterestOnly, calculateSimpleInterest } from "@/lib/interest-utils";
+import { computeNetWeight } from "@shared/utils";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -702,7 +703,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         </div>
                         {lot.bagBreakdowns.map((bd, bdIndex) => {
                           const remaining = bd.remainingBags ?? bd.numberOfBags;
-                          const netWeight = (bd.weight || 0) - (bd.numberOfBags || 0);
+                          const netWeight = computeNetWeight(bd.weight || 0, bd.numberOfBags || 0, lot.place);
                           const total = netWeight > 0 ? netWeight * (bd.pricePerKg || 0) : 0;
                           return (
                             <div key={bd.id || bdIndex} className="p-2 bg-muted/30 rounded-md space-y-1">
@@ -939,7 +940,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         .filter(bd => bd.size && bd.size !== "Wastage")
                         .reduce((sum, bd) => {
                           const weight = bd.weight || 0;
-                          const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
+                          const netWeight = computeNetWeight(weight, bd.numberOfBags || 0, lot.place);
                           return sum + (netWeight * (bd.pricePerKg || 0));
                         }, 0);
                       const totalBags = lot.bagBreakdowns
@@ -1108,13 +1109,13 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   if (hasBd) {
                                     cogs = sellable.reduce((sum, bd) => {
                                       const weight = bd.weight || 0;
-                                      const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
+                                      const netWeight = computeNetWeight(weight, bd.numberOfBags || 0, lot.place);
                                       const price = bd.pricePerKg || 0;
                                       return sum + (netWeight * price);
                                     }, 0);
                                   } else {
                                     const w = lot.totalWeight || 0;
-                                    const nw = w > 0 ? w - (lot.originalBags || 0) : 0;
+                                    const nw = computeNetWeight(w, lot.originalBags || 0, lot.place);
                                     const p = lot.pricePerKg || 0;
                                     if (nw > 0 && p > 0) cogs = nw * p;
                                   }
@@ -1240,7 +1241,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       .filter(bd => bd.size && bd.size !== "Wastage")
                       .reduce((sum, bd) => {
                         const weight = bd.weight || 0;
-                        const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
+                        const netWeight = computeNetWeight(weight, bd.numberOfBags || 0, lot.place);
                         const price = bd.pricePerKg || 0;
                         return sum + (netWeight * price);
                       }, 0);

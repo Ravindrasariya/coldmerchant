@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFieldArray, UseFormReturn } from "react-hook-form";
+import { computeNetWeight } from "@shared/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -763,13 +764,13 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                                   for (const bd of sellable) {
                                     const w = parseFloat(String(bd.weight || 0));
                                     const p = parseFloat(String(bd.pricePerKg || 0));
-                                    const nw = w > 0 ? w - (bd.numberOfBags || 0) : 0;
+                                    const nw = computeNetWeight(w, bd.numberOfBags || 0, place);
                                     if (nw > 0 && p > 0) cogs += nw * p;
                                   }
                                 } else {
                                   const w = parseFloat(String(form.watch(`lots.${lotIndex}.totalWeight`) || 0));
                                   const p = parseFloat(String(form.watch(`lots.${lotIndex}.pricePerKg`) || 0));
-                                  const nw = w > 0 ? w - bags : 0;
+                                  const nw = computeNetWeight(w, bags, place);
                                   if (nw > 0 && p > 0) cogs = nw * p;
                                 }
                                 const isFG = place === "farm_gate";

@@ -6,6 +6,7 @@ import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStoc
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString } from './ist-utils';
+import { computeNetWeight } from "@shared/utils";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -82,7 +83,7 @@ function computeHarvestLotCharges(lot: any) {
     for (const bd of sellable) {
       const weight = bd.weight ? parseFloat(bd.weight) : 0;
       const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-      const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+      const netWeight = computeNetWeight(weight, bd.numberOfBags, place);
       if (netWeight > 0 && price > 0) {
         costOfGoods += netWeight * price;
       }
@@ -90,7 +91,7 @@ function computeHarvestLotCharges(lot: any) {
   } else {
     const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
     const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-    const netWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
+    const netWeight = computeNetWeight(lotWeight, lot.originalBags, place);
     if (netWeight > 0 && lotPrice > 0) {
       costOfGoods = netWeight * lotPrice;
     }

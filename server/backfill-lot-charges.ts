@@ -2,6 +2,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { lots, seedLots, stockEntries, seedStockEntries, merchants } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { computeNetWeight } from "@shared/utils";
 
 async function backfillHarvestLots() {
   console.log("Backfilling harvest lot charges...");
@@ -26,7 +27,7 @@ async function backfillHarvestLots() {
           for (const bd of sellable) {
             const weight = bd.weight ? parseFloat(bd.weight) : 0;
             const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-            const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+            const netWeight = computeNetWeight(weight, bd.numberOfBags, place);
             if (netWeight > 0 && price > 0) {
               costOfGoods += netWeight * price;
             }
@@ -34,7 +35,7 @@ async function backfillHarvestLots() {
         } else {
           const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
           const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-          const netWeight = lotWeight > 0 ? lotWeight - lot.originalBags : 0;
+          const netWeight = computeNetWeight(lotWeight, lot.originalBags, place);
           if (netWeight > 0 && lotPrice > 0) {
             costOfGoods = netWeight * lotPrice;
           }

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
+import { computeNetWeight } from "@shared/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,7 +124,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
         totalWeight += weight;
 
         const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-        const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+        const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
         if (netWeight > 0 && price > 0) {
           totalAmount = (totalAmount ?? 0) + (netWeight * price);
         }
@@ -133,7 +134,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     // Fallback to lot-level data when no breakdown weight/price data exists
     const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
     const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-    const netWeight = lotTotalWeight > 0 ? lotTotalWeight - lot.originalBags : 0;
+    const netWeight = computeNetWeight(lotTotalWeight, lot.originalBags, lot.place);
     totalWeight = lotTotalWeight;
     if (netWeight > 0 && price > 0) {
       totalAmount = netWeight * price;
@@ -1234,7 +1235,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                                 if (sellableBreakdowns.length > 0) {
                                   return sellableBreakdowns.map((bd: any, idx: number) => {
                                     const weight = bd.weight ? parseFloat(bd.weight) : 0;
-                                    const netWeight = weight > 0 ? weight - bd.numberOfBags : 0;
+                                    const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
                                     const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
                                     return (
                                       <span key={idx}>

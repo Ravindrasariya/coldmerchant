@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getTodayIST } from "@/lib/date-utils";
+import { computeNetWeight } from "@shared/utils";
 import {
   Dialog,
   DialogContent,
@@ -773,7 +774,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                     onChange={(e) => {
                                       const totalWt = Number(e.target.value) || 0;
                                       const bags = Number(item.bagsMoved) || 0;
-                                      const netWeight = Math.max(0, totalWt - bags);
+                                      const inv = findInventoryByKey(item.inventoryKey);
+                                      const netWeight = computeNetWeight(totalWt, bags, inv?.place);
                                       updateLotItem(section.id, itemIndex, {
                                         totalWeight: totalWt,
                                         netWeight: Math.round(netWeight * 10) / 10,
