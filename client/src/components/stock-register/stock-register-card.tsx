@@ -1100,16 +1100,6 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             {t("Due", "बाकी")}
                           </Badge>
                         )}
-                        {entry.attachmentImage && (
-                          <button
-                            type="button"
-                            onClick={() => setImageViewEntryId(entry.id)}
-                            className="inline-flex items-center"
-                            data-testid={`button-view-image-${entry.id}`}
-                          >
-                            <Paperclip className="h-4 w-4 text-blue-500" />
-                          </button>
-                        )}
                       </div>
                       
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
@@ -1210,6 +1200,16 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                               <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
                               <span className="font-medium">{lot.place === "farm_gate" ? t("Farm Gate", "फार्म गेट") : lot.coldStoreName}</span>
                             </div>
+                            {lotIndex === 0 && entry.attachmentImage && (
+                              <button
+                                type="button"
+                                onClick={() => setImageViewEntryId(entry.id)}
+                                className="ml-auto inline-flex items-center"
+                                data-testid={`button-view-image-${entry.id}`}
+                              >
+                                <Paperclip className="h-4 w-4 text-blue-500" />
+                              </button>
+                            )}
                             <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
                               {lot.potatoType}
                             </Badge>
@@ -1317,7 +1317,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       <Dialog open={imageViewEntryId !== null} onOpenChange={(open) => { if (!open) setImageViewEntryId(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("Attachment", "अटैचमेंट")}</DialogTitle>
+            <DialogTitle>{t("Attachment", "अटैचमेंट")} - {t("Sr No:", "क्र.:")} {filteredEntries?.find(e => e.id === imageViewEntryId)?.serialNumber}</DialogTitle>
           </DialogHeader>
           {imageViewEntryId && (
             <div className="flex items-center justify-center">

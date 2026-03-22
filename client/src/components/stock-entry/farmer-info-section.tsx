@@ -619,14 +619,22 @@ export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: 
         {onAttachmentChange && (
           <div className="mt-3">
             <label className="text-sm font-medium">{t("Attachment", "अटैचमेंट")}</label>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-3 mt-1">
               {attachmentFile ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground border rounded-md px-3 py-1.5">
-                  <Paperclip className="h-3.5 w-3.5" />
-                  <span className="truncate max-w-[200px]">{attachmentFile.name}</span>
-                  <button type="button" onClick={() => onAttachmentChange(null)} className="text-muted-foreground hover:text-foreground" data-testid="button-remove-attachment">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                <div className="flex items-center gap-3">
+                  <img
+                    src={URL.createObjectURL(attachmentFile)}
+                    alt="Preview"
+                    className="h-16 w-16 rounded-md object-cover border"
+                    data-testid="img-attachment-preview"
+                  />
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm text-muted-foreground truncate max-w-[200px]">{attachmentFile.name}</span>
+                    <button type="button" onClick={() => onAttachmentChange(null)} className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1" data-testid="button-remove-attachment">
+                      <X className="h-3 w-3" />
+                      {t("Remove", "हटाएं")}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <label className="flex items-center gap-2 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="button-add-attachment">

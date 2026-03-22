@@ -58,9 +58,10 @@ const imageUpload = multer({
 
 const attachmentStorage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
+  filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    cb(null, `attach-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    const entryId = req.params.id || Date.now();
+    cb(null, `attach-${entryId}-${Date.now()}${ext}`);
   },
 });
 
@@ -851,8 +852,13 @@ export async function registerRoutes(
         const oldPath = path.join(uploadsDir, entry.attachmentImage);
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
-      await storage.updateStockEntryImage(id, merchantId, req.file.filename);
-      res.json({ filename: req.file.filename });
+      const ext = path.extname(req.file.originalname);
+      const finalName = `${entry.uniqueId || `SE${id}`}${ext}`;
+      const oldFilePath = path.join(uploadsDir, req.file.filename);
+      const newFilePath = path.join(uploadsDir, finalName);
+      fs.renameSync(oldFilePath, newFilePath);
+      await storage.updateStockEntryImage(id, merchantId, finalName);
+      res.json({ filename: finalName });
     } catch (error) {
       console.error("Error uploading stock entry image:", error);
       res.status(500).json({ message: "Failed to upload image" });
