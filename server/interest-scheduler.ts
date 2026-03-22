@@ -80,9 +80,19 @@ export async function accrueInterestForAll(): Promise<void> {
     const rate = parseFloat(txn.adjustmentRate || "0");
     if (principal <= 0 || rate <= 0 || !txn.adjustmentEffectiveDate) continue;
 
-    const finalAmount = calculateSimpleInterest(principal, rate, txn.adjustmentEffectiveDate);
+    const oldFinal = parseFloat(txn.adjustmentAmountFinal || String(principal));
+    const newFinal = calculateSimpleInterest(principal, rate, txn.adjustmentEffectiveDate);
+    const interestDelta = newFinal - oldFinal;
+    const oldDue = parseFloat(txn.totalDueToFarmer || "0");
+    const adjType = txn.adjustmentType;
+    const signedDelta = adjType === "credit" ? interestDelta : adjType === "debit" ? -interestDelta : 0;
+    const newDue = oldDue + signedDelta;
+
     await db.update(seedTransactions)
-      .set({ adjustmentAmountFinal: finalAmount.toFixed(2) })
+      .set({
+        adjustmentAmountFinal: newFinal.toFixed(2),
+        totalDueToFarmer: newDue.toFixed(2),
+      })
       .where(sql`${seedTransactions.id} = ${txn.id}`);
     seedTxnCount++;
   }

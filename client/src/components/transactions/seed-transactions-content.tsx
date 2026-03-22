@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -169,28 +168,25 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
     setFilterPaymentDue("all");
   };
 
-  const calculateDynamicAdjustment = (txn: SeedTransaction): number => {
+  const getStoredAdjustmentInterest = (txn: SeedTransaction): number => {
     const principal = parseFloat(txn.adjustmentAmount || "0");
-    const rate = parseFloat(txn.adjustmentRate || "0");
-    const { interest } = calculateInterestOnly(principal, rate, txn.adjustmentEffectiveDate || null);
-    if (interest <= 0) return 0;
-    return txn.adjustmentType === "credit" ? interest : -interest;
+    const adjFinal = parseFloat(txn.adjustmentAmountFinal || String(principal));
+    const interestOnly = adjFinal - principal;
+    if (interestOnly <= 0) return 0;
+    return txn.adjustmentType === "credit" ? interestOnly : -interestOnly;
   };
 
-  // Helper function to get total due with dynamic adjustment
   const getTotalDueWithAdjustment = (txn: SeedTransaction): number => {
-    const baseDue = parseFloat(txn.totalDueToFarmer || "0");
-    const dynamicAdjustment = calculateDynamicAdjustment(txn);
-    return baseDue + dynamicAdjustment;
+    return parseFloat(txn.totalDueToFarmer || "0");
   };
 
   const txnDueMap = useMemo(() => {
     const map = new Map<number, { dueAmount: number; dynamicAdjustment: number }>();
     if (!transactions) return map;
     transactions.forEach(txn => {
-      const dynamicAdjustment = calculateDynamicAdjustment(txn);
-      const baseDue = parseFloat(txn.totalDueToFarmer || "0");
-      map.set(txn.id, { dueAmount: baseDue + dynamicAdjustment, dynamicAdjustment });
+      const dynamicAdjustment = getStoredAdjustmentInterest(txn);
+      const dueAmount = parseFloat(txn.totalDueToFarmer || "0");
+      map.set(txn.id, { dueAmount, dynamicAdjustment });
     });
     return map;
   }, [transactions]);
@@ -586,7 +582,7 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
             const cost = parseFloat(txn.totalCost || "0");
             const txnDue = txnDueMap.get(txn.id);
             const dueAmount = txnDue?.dueAmount ?? getTotalDueWithAdjustment(txn);
-            const dynamicAdjustment = txnDue?.dynamicAdjustment ?? calculateDynamicAdjustment(txn);
+            const dynamicAdjustment = txnDue?.dynamicAdjustment ?? getStoredAdjustmentInterest(txn);
             const transportCharges = parseFloat(txn.transportCharges || "0");
             const otherCharges = parseFloat(txn.otherCharges || "0");
             const extraCharges = transportCharges + otherCharges;

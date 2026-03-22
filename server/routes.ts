@@ -3661,14 +3661,6 @@ export async function registerRoutes(
           
           if (matchesByFarmerId || matchesByCompositeKey) {
             seedDue += parseFloat(txn.totalDueToFarmer || "0");
-            const adjPrincipal = parseFloat(txn.adjustmentAmount || "0");
-            const adjFinal = parseFloat(txn.adjustmentAmountFinal || String(adjPrincipal));
-            const interestOnly = adjFinal - adjPrincipal;
-            if (interestOnly > 0 && txn.adjustmentType === "credit") {
-              seedDue += interestOnly;
-            } else if (interestOnly > 0 && txn.adjustmentType === "debit") {
-              seedDue -= interestOnly;
-            }
           }
         }
         
@@ -4565,7 +4557,24 @@ export async function registerRoutes(
       const totalProfitLoss = totalRevenue - totalCost;
       const transportTotal = parseFloat(transportCharges) || 0;
       const otherTotal = parseFloat(otherCharges) || 0;
-      const totalDueToFarmer = totalRevenue + transportTotal + otherTotal;
+      const baseDueToFarmer = totalRevenue + transportTotal + otherTotal;
+
+      const effectivePrincipal = adjustmentAmount !== undefined ? adjustmentAmount : existingTxn.adjustmentAmount;
+      const effectiveRate = adjustmentRate !== undefined ? adjustmentRate : existingTxn.adjustmentRate;
+      const effectiveDate = adjustmentEffectiveDate !== undefined ? adjustmentEffectiveDate : existingTxn.adjustmentEffectiveDate;
+      const effectiveType = adjustmentType !== undefined ? adjustmentType : existingTxn.adjustmentType;
+      let computedAdjFinal: string | null = null;
+      let interestAdj = 0;
+      if (effectivePrincipal) {
+        const principal = parseFloat(String(effectivePrincipal));
+        const finalVal = calculateSimpleInterest(principal, parseFloat(String(effectiveRate || "0")), effectiveDate || null);
+        computedAdjFinal = finalVal.toFixed(2);
+        const interestOnly = finalVal - principal;
+        if (interestOnly > 0) {
+          interestAdj = effectiveType === "credit" ? interestOnly : effectiveType === "debit" ? -interestOnly : 0;
+        }
+      }
+      const totalDueToFarmer = baseDueToFarmer + interestAdj;
 
       // Farmer fields are read-only and managed via Farmer Ledger - not updated here
       const transaction = await storage.updateSeedTransaction(
@@ -4580,20 +4589,10 @@ export async function registerRoutes(
           totalCost: totalCost.toString(),
           totalRevenue: totalRevenue.toString(),
           totalProfitLoss: totalProfitLoss.toString(),
-          totalDueToFarmer: totalDueToFarmer.toString(),
+          totalDueToFarmer: totalDueToFarmer.toFixed(2),
           adjustmentType: adjustmentType || null,
           adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
-          adjustmentAmountFinal: (() => {
-            const effectivePrincipal = adjustmentAmount !== undefined ? adjustmentAmount : existingTxn.adjustmentAmount;
-            if (!effectivePrincipal) return adjustmentAmount !== undefined ? null : undefined;
-            const effectiveRate = adjustmentRate !== undefined ? adjustmentRate : existingTxn.adjustmentRate;
-            const effectiveDate = adjustmentEffectiveDate !== undefined ? adjustmentEffectiveDate : existingTxn.adjustmentEffectiveDate;
-            return calculateSimpleInterest(
-              parseFloat(String(effectivePrincipal)),
-              parseFloat(String(effectiveRate || "0")),
-              effectiveDate || null
-            ).toFixed(2);
-          })(),
+          adjustmentAmountFinal: computedAdjFinal,
           adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
           adjustmentEffectiveDate: adjustmentEffectiveDate || null,
           adjustmentReason: adjustmentReason || null,
@@ -5937,14 +5936,6 @@ export async function registerRoutes(
           const matchByKey = !txn.farmerId && tName === normalizedName && tContact === normalizedContact && tVillage === normalizedVillage;
           if (matchById || matchByKey) {
             seedDue += parseFloat(txn.totalDueToFarmer || "0");
-            const adjPrincipal = parseFloat(txn.adjustmentAmount || "0");
-            const adjFinal = parseFloat(txn.adjustmentAmountFinal || String(adjPrincipal));
-            const interestOnly = adjFinal - adjPrincipal;
-            if (interestOnly > 0 && txn.adjustmentType === "credit") {
-              seedDue += interestOnly;
-            } else if (interestOnly > 0 && txn.adjustmentType === "debit") {
-              seedDue -= interestOnly;
-            }
           }
         }
 
