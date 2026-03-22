@@ -215,7 +215,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     const totalMandiCharges = mandiCommission + aadhatCommission + mandiHammali + mandiExtra;
 
     const earlyPayPct = lot.earlyPayPercent ? parseFloat(lot.earlyPayPercent) : 0;
-    const earlyPayBase = costOfGoods - (hammali + dynamicCharges);
+    const earlyPayBase = totalPayable - (hammali + dynamicCharges);
     const earlyPayAmt = earlyPayPct > 0 && earlyPayBase > 0 ? earlyPayBase * earlyPayPct / 100 : 0;
     const totalDeductions = hammali + dynamicCharges + earlyPayAmt;
     
@@ -500,6 +500,9 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           mandiChargesLines += '<div><span style="color: #666;">' + type + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
         }
       });
+      if (aggregatedMandiCharges.totalEarlyPayAmt > 0) {
+        mandiChargesLines += '<div><span style="color: #666;">Early Pay/Bataw / जल्दी भुगतान:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.totalEarlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
+      }
       if (aggregatedMandiCharges.totalAdjustedValue !== 0) {
         const adjColor = aggregatedMandiCharges.totalAdjustedValue > 0 ? '#15803d' : '#dc2626';
         const adjSign = aggregatedMandiCharges.totalAdjustedValue > 0 ? '+' : '';
@@ -754,6 +757,12 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                       </React.Fragment>
                     ) : null
                   ))}
+                  {aggregatedMandiCharges.totalEarlyPayAmt > 0 && (
+                    <>
+                      <span className="text-gray-600">Early Pay/Bataw / जल्दी भुगतान:</span>
+                      <span className="text-right font-mono">₹{aggregatedMandiCharges.totalEarlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                    </>
+                  )}
                   {aggregatedMandiCharges.totalAdjustedValue !== 0 && (
                     <>
                       <span className="text-gray-600">Adjustment / समायोजन:</span>
@@ -888,6 +897,12 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                               </React.Fragment>
                             );
                           })}
+                          {lotTotals.earlyPayAmt > 0 && (
+                            <>
+                              <span className="text-gray-600">Early Pay/Bataw / जल्दी भुगतान ({lotTotals.earlyPayPct}%):</span>
+                              <span className="text-right font-mono">₹{lotTotals.earlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                            </>
+                          )}
                           {lotTotals.adjustedValue !== 0 && (
                             <>
                               <span className="text-gray-600">
