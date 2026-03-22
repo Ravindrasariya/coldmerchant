@@ -925,7 +925,7 @@ export class DatabaseStorage implements IStorage {
           
           const bdWeight = breakdown.weight ? parseFloat(breakdown.weight) : (lot.totalWeight ? parseFloat(lot.totalWeight) : 0);
           const bdBags = breakdown.numberOfBags || 0;
-          const bdNetWeight = bdBags > 0 ? Math.max(0, bdWeight - bdBags) : 0;
+          const bdNetWeight = computeNetWeight(bdWeight, bdBags, lot.place);
           results.push({
             breakdownId: breakdown.id,
             lotId: lot.id,
@@ -954,7 +954,7 @@ export class DatabaseStorage implements IStorage {
         if (lot.remainingBags > 0) {
           const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
           const lotBags = lot.originalBags || 0;
-          const lotNetWeight = lotBags > 0 ? Math.max(0, lotWeight - lotBags) : 0;
+          const lotNetWeight = computeNetWeight(lotWeight, lotBags, lot.place);
           results.push({
             breakdownId: null,
             lotId: lot.id,
