@@ -314,7 +314,7 @@ export default function AadhatLedgerTab() {
           <div className="text-sm font-bold mt-1" data-testid="summary-total-due">{formatCurrency(summary.totalDue)}</div>
         </Card>
         <Card className="border-purple-300 dark:border-purple-700 p-4">
-          <div className="text-xs text-muted-foreground">{t("Receivable Due", "प्राप्य बकाया")}</div>
+          <div className="text-xs text-muted-foreground">{t("PY Payable Due", "पीवाय देय बकाया")}</div>
           <div className="text-sm font-bold mt-1 text-purple-600 dark:text-purple-400" data-testid="summary-receivable-due">{formatCurrency(summary.receivableDue)}</div>
         </Card>
         <Card className="border-red-300 dark:border-red-700 p-4">
