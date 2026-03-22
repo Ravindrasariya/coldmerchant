@@ -10,6 +10,7 @@ import { computeNetWeight } from "@shared/utils";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { promises as fsPromises } from "fs";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -841,25 +842,34 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/stock-entries/:id/image", requireMerchant, attachmentUpload.single("image"), async (req: Request, res: Response) => {
+  app.post("/api/stock-entries/:id/image", requireMerchant, (req: Request, res: Response, next) => {
+    attachmentUpload.single("image")(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ message: "File too large. Maximum size is 500KB." });
+        return res.status(400).json({ message: `Upload error: ${err.message}` });
+      }
+      if (err) return res.status(400).json({ message: err.message || "Invalid file type. Only images are allowed." });
+      next();
+    });
+  }, async (req: Request, res: Response) => {
     try {
       const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
       const entry = await storage.getStockEntryById(id, merchantId);
       if (!entry) {
-        if (req.file) fs.unlinkSync(path.join(uploadsDir, req.file.filename));
+        if (req.file) await fsPromises.unlink(path.join(uploadsDir, req.file.filename)).catch(() => {});
         return res.status(404).json({ message: "Stock entry not found" });
       }
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
       if (entry.attachmentImage) {
         const oldPath = path.join(uploadsDir, entry.attachmentImage);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        await fsPromises.unlink(oldPath).catch(() => {});
       }
       const ext = path.extname(req.file.originalname);
       const finalName = `${entry.uniqueId || `SE${id}`}${ext}`;
       const oldFilePath = path.join(uploadsDir, req.file.filename);
       const newFilePath = path.join(uploadsDir, finalName);
-      fs.renameSync(oldFilePath, newFilePath);
+      await fsPromises.rename(oldFilePath, newFilePath);
       await storage.updateStockEntryImage(id, merchantId, finalName);
       res.json({ filename: finalName });
     } catch (error) {
@@ -891,7 +901,7 @@ export async function registerRoutes(
       if (!entry) return res.status(404).json({ message: "Stock entry not found" });
       if (entry.attachmentImage) {
         const filePath = path.join(uploadsDir, entry.attachmentImage);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        await fsPromises.unlink(filePath).catch(() => {});
       }
       await storage.updateStockEntryImage(id, merchantId, null);
       res.json({ success: true });
