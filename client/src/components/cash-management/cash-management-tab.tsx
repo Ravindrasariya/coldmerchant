@@ -2543,7 +2543,7 @@ export function CashManagementTab() {
                                 <CommandList>
                                   <CommandEmpty>{t("No stakeholder found.", "कोई हितधारक नहीं मिला।")}</CommandEmpty>
                                   <CommandGroup>
-                                    {sundryPayStakeholders.filter(s => s.isActive && s.totalDue > 0).map((stakeholder) => (
+                                    {sundryPayStakeholders.filter(s => s.isActive).map((stakeholder) => (
                                       <CommandItem
                                         key={stakeholder.id}
                                         value={`${stakeholder.name} ${stakeholder.address || ""}`}
@@ -2564,9 +2564,11 @@ export function CashManagementTab() {
                                             <span className="text-xs text-muted-foreground">{stakeholder.address}</span>
                                           )}
                                         </div>
-                                        <Badge variant="secondary" className="ml-2">
-                                          {t("Due", "बकाया")}: ₹{stakeholder.totalDue.toLocaleString('en-IN')}
-                                        </Badge>
+                                        {stakeholder.totalDue > 0 && (
+                                          <Badge variant="secondary" className="ml-2">
+                                            {t("Due", "बकाया")}: ₹{stakeholder.totalDue.toLocaleString('en-IN')}
+                                          </Badge>
+                                        )}
                                       </CommandItem>
                                     ))}
                                   </CommandGroup>
