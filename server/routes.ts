@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
@@ -5311,14 +5311,21 @@ export async function registerRoutes(
   app.get("/api/sundry-pay", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
+      const year = req.query.year as string | undefined;
       const stakeholders = await storage.getSundryPayByMerchant(merchantId);
 
+      const conditions = [
+        eq(cashEntries.merchantId, merchantId),
+        eq(cashEntries.isReversed, false),
+        isNotNull(cashEntries.sundryPayDbId),
+      ];
+
+      if (year && year !== "all") {
+        conditions.push(sql`EXTRACT(YEAR FROM ${cashEntries.entryDate}::date) = ${parseInt(year)}`);
+      }
+
       const cashEntryList = await db.select().from(cashEntries).where(
-        and(
-          eq(cashEntries.merchantId, merchantId),
-          eq(cashEntries.isReversed, false),
-          isNotNull(cashEntries.sundryPayDbId)
-        )
+        and(...conditions)
       );
 
       const duesMap = new Map<number, { totalGiven: number; totalReceived: number }>();

@@ -49,12 +49,20 @@ export default function SundryPayLedgerTab() {
   const [addForm, setAddForm] = useState({ name: "", address: "", contact: "", pyReceivable: "", redFlag: false });
 
   const [nameFilter, setNameFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState<string>("all");
   
   const [sortColumn, setSortColumn] = useState<'sundryPayId' | 'totalDue' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const { data: stakeholderList = [], isLoading } = useQuery<SundryPayWithDues[]>({
-    queryKey: ["/api/sundry-pay"],
+    queryKey: ["/api/sundry-pay", yearFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (yearFilter !== "all") params.set("year", yearFilter);
+      const res = await fetch(`/api/sundry-pay?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
     enabled: !!user,
   });
 
@@ -190,6 +198,12 @@ export default function SundryPayLedgerTab() {
     }
   };
 
+  const yearOptions = Array.from(new Set(
+    stakeholderList
+      .map(s => s.sundryPayId?.substring(2, 6))
+      .filter(Boolean)
+  )).sort().reverse();
+
   const filteredStakeholders = stakeholderList
     .filter(s => {
       if (nameFilter.trim()) {
@@ -267,6 +281,17 @@ export default function SundryPayLedgerTab() {
               {t("Sundry Pay Ledger", "सन्ड्री पे खाता")}
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
+              <Select value={yearFilter} onValueChange={setYearFilter}>
+                <SelectTrigger className="w-[90px]" data-testid="select-sundry-year-filter">
+                  <SelectValue placeholder={t("Year", "वर्ष")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All Years", "सभी वर्ष")}</SelectItem>
+                  {yearOptions.map(year => (
+                    <SelectItem key={year} value={year!}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
