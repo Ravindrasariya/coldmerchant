@@ -140,7 +140,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
     earlyPayPercent: lot.earlyPayPercent !== null ? parseFloat(lot.earlyPayPercent) : null,
     adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
-    adjustedAmountType: lot.adjustedAmountType || null,
+    adjustedAmountType: lot.adjustedAmountType || "credit",
     adjustedAmountRate: lot.adjustedAmountRate !== null ? parseFloat(lot.adjustedAmountRate) : null,
     adjustedAmountEffectiveDate: lot.adjustedAmountEffectiveDate || null,
     adjustedAmountRemark: lot.adjustedAmountRemark || "",
@@ -829,18 +829,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
                       <div className="space-y-1">
                         <Label className="text-xs">{t("Type", "प्रकार")}</Label>
-                        <Select
-                          value={lot.adjustedAmountType || ""}
-                          onValueChange={(v) => handleLotFieldChange(lotIndex, "adjustedAmountType", v)}
-                        >
-                          <SelectTrigger className="h-8" data-testid={`edit-adjustment-type-${lotIndex}`}>
-                            <SelectValue placeholder={t("Select", "चुनें")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="debit">{t("Debit (−)", "डेबिट")}</SelectItem>
-                            <SelectItem value="credit">{t("Credit (+)", "क्रेडिट")}</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          className="h-8"
+                          value={t("Credit (+)", "क्रेडिट (+)")}
+                          disabled
+                          data-testid={`edit-adjustment-type-${lotIndex}`}
+                        />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">{t("Amount (₹)", "राशि")}</Label>

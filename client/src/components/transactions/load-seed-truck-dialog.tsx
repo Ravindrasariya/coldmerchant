@@ -68,7 +68,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [otherChargesRemarks, setOtherChargesRemarks] = useState("");
   
   // Farmer adjustment fields
-  const [adjustmentType, setAdjustmentType] = useState("");
+  const [adjustmentType, setAdjustmentType] = useState("credit");
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [adjustmentRate, setAdjustmentRate] = useState("");
   const [adjustmentEffectiveDate, setAdjustmentEffectiveDate] = useState("");
@@ -805,15 +805,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">{t("Type", "प्रकार")}</Label>
-                <Select value={adjustmentType} onValueChange={setAdjustmentType}>
-                  <SelectTrigger data-testid="select-seed-adjustment-type">
-                    <SelectValue placeholder={t("Select", "चुनें")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="debit" data-testid="option-seed-adjustment-debit">{t("Debit (−)", "डेबिट (−)")}</SelectItem>
-                    <SelectItem value="credit" data-testid="option-seed-adjustment-credit">{t("Credit (+)", "क्रेडिट (+)")}</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={t("Credit (+)", "क्रेडिट (+)")}
+                  disabled
+                  data-testid="select-seed-adjustment-type"
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("Amount (₹)", "राशि (₹)")}</Label>
