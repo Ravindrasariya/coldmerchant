@@ -122,7 +122,12 @@ function computeHarvestLotCharges(lot: any) {
   const dynamicCharges = charges
     .filter((c: any) => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
     .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-  const totalDeductions = hammaliGrading + dynamicCharges;
+  let totalDeductions = hammaliGrading + dynamicCharges;
+
+  const earlyPayPct = lot.earlyPayPercent ? parseFloat(lot.earlyPayPercent) : 0;
+  const earlyPayBase = costOfGoods - totalDeductions;
+  const earlyPayAmount = earlyPayPct > 0 && earlyPayBase > 0 ? earlyPayBase * earlyPayPct / 100 : 0;
+  totalDeductions += earlyPayAmount;
   
   // Adjustment: use only the interest portion (adjustedAmountFinal - adjustedAmount)
   // Principal is already part of charges/deductions, so only interest affects net payable
@@ -134,7 +139,7 @@ function computeHarvestLotCharges(lot: any) {
   
   const totalCharges = totalDeductions;
   const netPayable = costOfGoods - totalDeductions + signedAdj;
-  return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2) };
+  return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: earlyPayAmount.toFixed(2) };
 }
 
 // After creating/updating lots and breakdowns, recompute and store totalCharges and netPayable
@@ -142,7 +147,7 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
   const entry = await storage.getStockEntryById(entryId, merchantId);
   if (!entry) return;
   for (const lot of entry.lots) {
-    const { totalCharges, netPayable } = computeHarvestLotCharges(lot);
+    const { totalCharges, netPayable, earlyPayAmount } = computeHarvestLotCharges(lot);
     const breakdowns = lot.bagBreakdowns || [];
     const { breakdownCosts, totalCogs } = storage.computeBreakdownCosts(lot, breakdowns);
     for (const bd of breakdowns) {
@@ -153,6 +158,7 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
       totalCharges,
       netPayable,
       totalCogs: totalCogs.toFixed(2),
+      earlyPayAmount,
     });
   }
 }
@@ -774,6 +780,7 @@ export async function registerRoutes(
           aadhatCommissionPercent: lotData.aadhatCommissionPercent ? lotData.aadhatCommissionPercent.toString() : null,
           hammaliPerBag: lotData.hammaliPerBag ? lotData.hammaliPerBag.toString() : null,
           mandiExtraCharges: lotData.mandiExtraCharges ? lotData.mandiExtraCharges.toString() : null,
+          earlyPayPercent: lotData.earlyPayPercent ? lotData.earlyPayPercent.toString() : null,
           remainingBags: lotData.originalBags,
         });
 
@@ -1030,6 +1037,9 @@ export async function registerRoutes(
                 : undefined,
               mandiExtraCharges: lotData.mandiExtraCharges !== undefined
                 ? (lotData.mandiExtraCharges ? lotData.mandiExtraCharges.toString() : null)
+                : undefined,
+              earlyPayPercent: lotData.earlyPayPercent !== undefined
+                ? (lotData.earlyPayPercent ? lotData.earlyPayPercent.toString() : null)
                 : undefined,
             });
 

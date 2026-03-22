@@ -214,7 +214,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     const mandiHammali = totalBagsForMandi * hammaliRate;
     const totalMandiCharges = mandiCommission + aadhatCommission + mandiHammali + mandiExtra;
 
-    const totalDeductions = hammali + dynamicCharges;
+    const earlyPayPct = lot.earlyPayPercent ? parseFloat(lot.earlyPayPercent) : 0;
+    const earlyPayBase = costOfGoods - (hammali + dynamicCharges);
+    const earlyPayAmt = earlyPayPct > 0 && earlyPayBase > 0 ? earlyPayBase * earlyPayPct / 100 : 0;
+    const totalDeductions = hammali + dynamicCharges + earlyPayAmt;
     
     const principal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
     const rate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
@@ -227,7 +230,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     
     const netPayable = totalPayable - totalDeductions + totalMandiCharges + adjustedValue;
     
-    return { totalPayable, hammali, charges, dynamicCharges, mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalMandiCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
+    return { totalPayable, hammali, charges, dynamicCharges, earlyPayPct, earlyPayAmt, mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalMandiCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
   };
 
   const overallTotals = entry.lots.reduce((acc, lot) => {
@@ -243,7 +246,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   const aggregatedMandiCharges = (() => {
     let mandiCommission = 0, aadhatCommission = 0, mandiHammali = 0, mandiExtra = 0;
-    let totalHammali = 0, totalAdjustedValue = 0;
+    let totalHammali = 0, totalAdjustedValue = 0, totalEarlyPayAmt = 0;
     const mandiPcts = new Set<number>();
     const aadhatPcts = new Set<number>();
     const chargesByType: Record<string, number> = {};
@@ -256,6 +259,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       mandiExtra += lotTotals.mandiExtra;
       totalHammali += lotTotals.hammali;
       totalAdjustedValue += lotTotals.adjustedValue;
+      totalEarlyPayAmt += lotTotals.earlyPayAmt;
 
       const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
       const aadhatPct = lot.aadhatCommissionPercent ? parseFloat(lot.aadhatCommissionPercent) : 0;
@@ -278,7 +282,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     const mandiPctLabel = mandiPcts.size === 1 ? ` (${[...mandiPcts][0]}%)` : "";
     const aadhatPctLabel = aadhatPcts.size === 1 ? ` (${[...aadhatPcts][0]}%)` : "";
 
-    return { mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalHammali, totalAdjustedValue, chargesByType, mandiPctLabel, aadhatPctLabel };
+    return { mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalHammali, totalAdjustedValue, totalEarlyPayAmt, chargesByType, mandiPctLabel, aadhatPctLabel };
   })();
 
   const allTableRows = (() => {
@@ -438,6 +442,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
             ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
             ${chargesHtml}
+            ${lotTotals.earlyPayAmt > 0 ? `<div><span style="color: #666;">Early Pay/Bataw / जल्दी भुगतान (${lotTotals.earlyPayPct}%):</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.earlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
             ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">${adjustmentLabel}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
           </div>
         </div>

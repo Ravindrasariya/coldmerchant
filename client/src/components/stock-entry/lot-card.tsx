@@ -660,6 +660,66 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
               </Button>
             </div>
 
+            <div className="flex items-end gap-3">
+              <FormField
+                control={form.control}
+                name={`lots.${lotIndex}.earlyPayPercent`}
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <FormLabel>{t("Early Pay/Bataw", "जल्दी भुगतान/बटाव")} (%)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                        data-testid={`input-early-pay-percent-${lotIndex}`}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground mb-1">{t("Amount", "राशि")}</p>
+                <p className="text-sm font-mono font-semibold h-9 flex items-center" data-testid={`text-early-pay-amount-${lotIndex}`}>
+                  {(() => {
+                    const pct = parseFloat(String(form.watch(`lots.${lotIndex}.earlyPayPercent`) || "0"));
+                    if (!pct) return "₹0";
+                    const bds = form.watch(`lots.${lotIndex}.bagBreakdowns`) || [];
+                    const bags = form.watch(`lots.${lotIndex}.originalBags`) || 0;
+                    const sellable = bds.filter((bd: any) => bd.size !== "Wastage");
+                    const hasBd = sellable.some((bd: any) => (parseFloat(String(bd.weight || 0)) > 0 && parseFloat(String(bd.pricePerKg || 0)) > 0));
+                    let cogs = 0;
+                    if (hasBd) {
+                      for (const bd of sellable) {
+                        const w = parseFloat(String(bd.weight || 0));
+                        const p = parseFloat(String(bd.pricePerKg || 0));
+                        const nw = w > 0 ? w - (bd.numberOfBags || 0) : 0;
+                        if (nw > 0 && p > 0) cogs += nw * p;
+                      }
+                    } else {
+                      const w = parseFloat(String(form.watch(`lots.${lotIndex}.totalWeight`) || 0));
+                      const p = parseFloat(String(form.watch(`lots.${lotIndex}.pricePerKg`) || 0));
+                      const nw = w > 0 ? w - bags : 0;
+                      if (nw > 0 && p > 0) cogs = nw * p;
+                    }
+                    const isFG = place === "farm_gate";
+                    const cstTypes = ["Cold Charges", "Ware House Charges"];
+                    const chgs = form.watch(`lots.${lotIndex}.charges`) || [];
+                    const dynChg = chgs.filter((c: any) => !(isFG && cstTypes.includes(c.type))).reduce((s: number, c: any) => s + (parseFloat(String(c.amount)) || 0), 0);
+                    const otherDed = dynChg;
+                    const base = cogs - otherDed;
+                    const amt = base > 0 ? base * pct / 100 : 0;
+                    return `₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+                  })()}
+                </p>
+              </div>
+            </div>
+
             {chargeFields.length > 0 && (
               <div className="space-y-3">
                 {chargeFields.map((chargeField, chargeIndex) => {

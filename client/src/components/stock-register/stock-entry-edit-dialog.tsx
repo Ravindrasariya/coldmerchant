@@ -76,6 +76,8 @@ interface StockEntryWithLots {
     mandiExtraCharges: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
+    earlyPayPercent: string | null;
+    earlyPayAmount: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
     adjustedAmountRate: string | null;
@@ -128,6 +130,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     mandiExtraCharges: lot.mandiExtraCharges !== null ? parseFloat(lot.mandiExtraCharges) : null,
     coldStoreChargesPerBag: lot.coldStoreChargesPerBag !== null ? parseFloat(lot.coldStoreChargesPerBag) : null,
     hammaliGradingCharges: lot.hammaliGradingCharges !== null ? parseFloat(lot.hammaliGradingCharges) : null,
+    earlyPayPercent: lot.earlyPayPercent !== null ? parseFloat(lot.earlyPayPercent) : null,
     adjustedAmount: lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : null,
     adjustedAmountType: lot.adjustedAmountType || null,
     adjustedAmountRate: lot.adjustedAmountRate !== null ? parseFloat(lot.adjustedAmountRate) : null,
@@ -1139,6 +1142,55 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         {t("No additional charges added", "कोई अतिरिक्त शुल्क नहीं जोड़ा गया")}
                       </p>
                     )}
+
+                    <div className="flex items-end gap-2 pt-2 border-t">
+                      <div className="flex-1">
+                        <Label className="text-xs">{t("Early Pay/Bataw", "जल्दी भुगतान/बटाव")} (%)</Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0"
+                          value={lot.earlyPayPercent ?? ""}
+                          onChange={(e) => {
+                            const newLots = [...lots];
+                            newLots[lotIndex] = { ...newLots[lotIndex], earlyPayPercent: e.target.value === "" ? null : parseFloat(e.target.value) };
+                            setLots(newLots);
+                          }}
+                          data-testid={`edit-early-pay-percent-${lotIndex}`}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs">{t("Amount", "राशि")}</Label>
+                        <p className="text-sm font-mono font-semibold h-8 flex items-center" data-testid={`edit-early-pay-amount-${lotIndex}`}>
+                          {(() => {
+                            const pct = lot.earlyPayPercent || 0;
+                            if (!pct) return "₹0";
+                            const cogs = lot.bagBreakdowns
+                              .filter(bd => bd.size && bd.size !== "Wastage")
+                              .reduce((sum, bd) => {
+                                const weight = bd.weight || 0;
+                                const netWeight = weight > 0 ? weight - (bd.numberOfBags || 0) : 0;
+                                const price = bd.pricePerKg || 0;
+                                return sum + (netWeight * price);
+                              }, 0);
+                            const isFG = lot.place === "farm_gate";
+                            const cstTypes = ["Cold Charges", "Ware House Charges"];
+                            const dynChg = (lot.charges || [])
+                              .filter(c => !(isFG && cstTypes.includes(c.type)))
+                              .reduce((sum, c) => {
+                                const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
+                                return sum + amt;
+                              }, 0);
+                            const hammali = lot.hammaliGradingCharges || 0;
+                            const otherDed = hammali + dynChg;
+                            const base = cogs - otherDed;
+                            const amt = base > 0 ? base * pct / 100 : 0;
+                            return `₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
                 )}
@@ -1222,7 +1274,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
                         return sum + amt;
                       }, 0);
-                    const totalDeductions = hammali + dynamicCharges;
+                    const earlyPayPct = lot.earlyPayPercent || 0;
+                    const earlyPayBase = costOfGoods - (hammali + dynamicCharges);
+                    const earlyPayAmt = earlyPayPct > 0 && earlyPayBase > 0 ? earlyPayBase * earlyPayPct / 100 : 0;
+                    const totalDeductions = hammali + dynamicCharges + earlyPayAmt;
                     
                     const principal = lot.adjustedAmount || 0;
                     const { interest: interestOnly } = calculateInterestOnly(
