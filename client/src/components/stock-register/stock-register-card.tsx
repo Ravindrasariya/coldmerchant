@@ -1317,7 +1317,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       <Dialog open={imageViewEntryId !== null} onOpenChange={(open) => { if (!open) setImageViewEntryId(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("Attachment", "अटैचमेंट")} - {t("Sr No:", "क्र.:")} {filteredEntries?.find(e => e.id === imageViewEntryId)?.serialNumber}</DialogTitle>
+            <DialogTitle>{t("Attachment", "अटैचमेंट")} - {filteredEntries?.find(e => e.id === imageViewEntryId)?.uniqueId || `#${filteredEntries?.find(e => e.id === imageViewEntryId)?.serialNumber}`}</DialogTitle>
           </DialogHeader>
           {imageViewEntryId && (
             <div className="flex items-center justify-center">

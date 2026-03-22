@@ -846,7 +846,10 @@ export async function registerRoutes(
       const merchantId = req.user!.merchantId!;
       const id = parseInt(req.params.id);
       const entry = await storage.getStockEntryById(id, merchantId);
-      if (!entry) return res.status(404).json({ message: "Stock entry not found" });
+      if (!entry) {
+        if (req.file) fs.unlinkSync(path.join(uploadsDir, req.file.filename));
+        return res.status(404).json({ message: "Stock entry not found" });
+      }
       if (!req.file) return res.status(400).json({ message: "No image file provided" });
       if (entry.attachmentImage) {
         const oldPath = path.join(uploadsDir, entry.attachmentImage);
