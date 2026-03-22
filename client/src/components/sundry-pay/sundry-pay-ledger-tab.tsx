@@ -206,6 +206,11 @@ export default function SundryPayLedgerTab() {
 
   const filteredStakeholders = stakeholderList
     .filter(s => {
+      if (yearFilter !== "all") {
+        if (!s.sundryPayId) return false;
+        const stakeholderYear = s.sundryPayId.substring(2, 6);
+        if (stakeholderYear !== yearFilter) return false;
+      }
       if (nameFilter.trim()) {
         const searchLower = nameFilter.toLowerCase().trim();
         if (!s.name.toLowerCase().includes(searchLower)) return false;

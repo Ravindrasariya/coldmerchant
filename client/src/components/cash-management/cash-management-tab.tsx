@@ -2530,7 +2530,7 @@ export function CashManagementTab() {
                                           ? `${s.name} — ${t("Due", "बकाया")}: ₹${s.totalDue.toLocaleString('en-IN')}`
                                           : field.value;
                                       })()
-                                    : t("Select or type name", "नाम चुनें या टाइप करें")}
+                                    : t("Select stakeholder", "हितधारक चुनें")}
                                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </FormControl>
@@ -2538,16 +2538,10 @@ export function CashManagementTab() {
                             <PopoverContent className="w-[350px] p-0" align="start">
                               <Command>
                                 <CommandInput
-                                  placeholder={t("Search or type new name...", "खोजें या नया नाम टाइप करें...")}
-                                  onValueChange={(search) => {
-                                    if (search && !sundryPayStakeholders.some(s => s.name.toLowerCase() === search.toLowerCase())) {
-                                      field.onChange(search);
-                                      inwardForm.setValue("sundryPayDbId", undefined);
-                                    }
-                                  }}
+                                  placeholder={t("Search stakeholder...", "हितधारक खोजें...")}
                                 />
                                 <CommandList>
-                                  <CommandEmpty>{t("Type to add new name", "नया नाम जोड़ने के लिए टाइप करें")}</CommandEmpty>
+                                  <CommandEmpty>{t("No stakeholder found.", "कोई हितधारक नहीं मिला।")}</CommandEmpty>
                                   <CommandGroup>
                                     {sundryPayStakeholders.filter(s => s.isActive && s.totalDue > 0).map((stakeholder) => (
                                       <CommandItem
