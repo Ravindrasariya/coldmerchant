@@ -270,22 +270,22 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border px-2 py-1 text-left">S.No / क्र.सं.</th>
-                  <th className="border px-2 py-1 text-left">Variety / किस्म</th>
-                  <th className="border px-2 py-1 text-right">Bags / बोरी</th>
-                  <th className="border px-2 py-1 text-right">Weight (Kg) / वजन</th>
-                  <th className="border px-2 py-1 text-right">₹/Kg</th>
+                  <th className="border px-2 py-1 text-center">S.No / क्र.सं.</th>
+                  <th className="border px-2 py-1 text-center">Variety / किस्म</th>
+                  <th className="border px-2 py-1 text-center">Bags / बोरी</th>
+                  <th className="border px-2 py-1 text-center">Weight (Kg) / वजन</th>
+                  <th className="border px-2 py-1 text-center">₹/Kg</th>
                   <th className="border px-2 py-1 text-right">Amount / राशि</th>
                 </tr>
               </thead>
               <tbody>
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
-                    <td className="border px-2 py-1">{idx + 1}</td>
-                    <td className="border px-2 py-1">{item.potatoType || "-"}</td>
-                    <td className="border px-2 py-1 text-right">{item.bagsMoved}</td>
-                    <td className="border px-2 py-1 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
-                    <td className="border px-2 py-1 text-right">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
+                    <td className="border px-2 py-1 text-center">{idx + 1}</td>
+                    <td className="border px-2 py-1 text-center">{item.potatoType || "-"}</td>
+                    <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
+                    <td className="border px-2 py-1 text-center">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
+                    <td className="border px-2 py-1 text-center">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
                     <td className="border px-2 py-1 text-right">₹{parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
