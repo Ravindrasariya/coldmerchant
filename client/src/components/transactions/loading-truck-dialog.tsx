@@ -777,6 +777,69 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
               <Separator />
 
+              {visibleCharges.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {visibleCharges.map((key) => {
+                    const opt = ADDITIONAL_CHARGE_OPTIONS.find((o) => o.key === key)!;
+                    return (
+                      <div key={key}>
+                        <Label className="text-[10px]">{t(opt.label, opt.labelHi)}</Label>
+                        <div className="flex gap-0.5">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={additionalCharges[key] || ""}
+                            onChange={(e) => setAdditionalCharges((prev) => ({ ...prev, [key]: Number(e.target.value) || 0 }))}
+                            placeholder="0"
+                            className="h-8 text-sm px-2"
+                            data-testid={`input-loading-${key}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500"
+                            onClick={() => {
+                              setVisibleCharges((prev) => prev.filter((k) => k !== key));
+                              setAdditionalCharges((prev) => ({ ...prev, [key]: 0 }));
+                            }}
+                            data-testid={`button-remove-charge-${key}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {visibleCharges.length < ADDITIONAL_CHARGE_OPTIONS.length && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" data-testid="button-add-charges">
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("Add Charges", "शुल्क जोड़ें")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-1" align="start">
+                    {ADDITIONAL_CHARGE_OPTIONS.filter((o) => !visibleCharges.includes(o.key)).map((opt) => (
+                      <Button
+                        key={opt.key}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        onClick={() => setVisibleCharges((prev) => [...prev, opt.key])}
+                        data-testid={`button-charge-option-${opt.key}`}
+                      >
+                        {t(opt.label, opt.labelHi)}
+                      </Button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              )}
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label className="text-xs">{t("Sales Commission", "बिक्री कमीशन")}</Label>
@@ -812,68 +875,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                   />
                 </div>
               </div>
-
-              {visibleCharges.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {visibleCharges.map((key) => {
-                    const opt = ADDITIONAL_CHARGE_OPTIONS.find((o) => o.key === key)!;
-                    return (
-                      <div key={key} className="relative">
-                        <Label className="text-xs">{t(opt.label, opt.labelHi)}</Label>
-                        <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            step="any"
-                            value={additionalCharges[key] || ""}
-                            onChange={(e) => setAdditionalCharges((prev) => ({ ...prev, [key]: Number(e.target.value) || 0 }))}
-                            placeholder="0"
-                            data-testid={`input-loading-${key}`}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 shrink-0 text-muted-foreground hover:text-red-500"
-                            onClick={() => {
-                              setVisibleCharges((prev) => prev.filter((k) => k !== key));
-                              setAdditionalCharges((prev) => ({ ...prev, [key]: 0 }));
-                            }}
-                            data-testid={`button-remove-charge-${key}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {visibleCharges.length < ADDITIONAL_CHARGE_OPTIONS.length && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" data-testid="button-add-charges">
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("Add Charges", "शुल्क जोड़ें")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-1" align="start">
-                    {ADDITIONAL_CHARGE_OPTIONS.filter((o) => !visibleCharges.includes(o.key)).map((opt) => (
-                      <Button
-                        key={opt.key}
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start text-xs"
-                        onClick={() => setVisibleCharges((prev) => [...prev, opt.key])}
-                        data-testid={`button-charge-option-${opt.key}`}
-                      >
-                        {t(opt.label, opt.labelHi)}
-                      </Button>
-                    ))}
-                  </PopoverContent>
-                </Popover>
-              )}
 
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-4">

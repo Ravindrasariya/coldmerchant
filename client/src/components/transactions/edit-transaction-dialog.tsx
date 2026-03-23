@@ -254,6 +254,16 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
 
+  const EDIT_CHARGE_OPTIONS = [
+    { key: "tulai" as const, label: "Tulai", labelHi: "तुलाई" },
+    { key: "majduri" as const, label: "Majduri", labelHi: "मजदूरी" },
+    { key: "thelaBhada" as const, label: "Thela Bhada", labelHi: "ठेला भाड़ा" },
+    { key: "palaKarai" as const, label: "Pala Karai", labelHi: "पाला कराई" },
+    { key: "bardan" as const, label: "Bardan (Bags)", labelHi: "बरदान (बोरी)" },
+  ] as const;
+  type EditChargeKey = typeof EDIT_CHARGE_OPTIONS[number]["key"];
+  const [visibleEditCharges, setVisibleEditCharges] = useState<EditChargeKey[]>([]);
+
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers"],
     enabled: open,
@@ -315,6 +325,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         palaKarai: transaction.palaKarai ? parseFloat(transaction.palaKarai) : undefined,
         bardan: transaction.bardan ? parseFloat(transaction.bardan) : undefined,
       });
+      const chargeKeys: EditChargeKey[] = ["tulai", "majduri", "thelaBhada", "palaKarai", "bardan"];
+      const activeCharges = chargeKeys.filter(k => transaction[k] && parseFloat(transaction[k] as string) !== 0);
+      setVisibleEditCharges(activeCharges);
       setSelectedBuyerId(transaction.buyerId || null);
       setEditableItems(transaction.items.map(item => ({
         id: item.id,
@@ -1275,32 +1288,69 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium">{t("Additional Charges", "अतिरिक्त शुल्क")}</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {([
-                          { name: "tulai" as const, label: "Tulai", labelHi: "तुलाई" },
-                          { name: "majduri" as const, label: "Majduri", labelHi: "मजदूरी" },
-                          { name: "thelaBhada" as const, label: "Thela Bhada", labelHi: "ठेला भाड़ा" },
-                          { name: "palaKarai" as const, label: "Pala Karai", labelHi: "पाला कराई" },
-                          { name: "bardan" as const, label: "Bardan (Bags)", labelHi: "बरदान (बोरी)" },
-                        ]).map((charge) => (
-                          <FormField
-                            key={charge.name}
-                            control={form.control}
-                            name={charge.name}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">{t(charge.label, charge.labelHi)} (₹)</FormLabel>
-                                <FormControl>
-                                  <Input type="number" step="any" placeholder="0" {...field} data-testid={`input-edit-${charge.name}`} />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        ))}
+                    {visibleEditCharges.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {visibleEditCharges.map((key) => {
+                          const opt = EDIT_CHARGE_OPTIONS.find((o) => o.key === key)!;
+                          return (
+                            <FormField
+                              key={key}
+                              control={form.control}
+                              name={key}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px]">{t(opt.label, opt.labelHi)} (₹)</FormLabel>
+                                  <div className="flex gap-0.5">
+                                    <FormControl>
+                                      <Input type="number" step="any" placeholder="0" className="h-8 text-sm px-2" {...field} data-testid={`input-edit-${key}`} />
+                                    </FormControl>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-500"
+                                      onClick={() => {
+                                        setVisibleEditCharges((prev) => prev.filter((k) => k !== key));
+                                        form.setValue(key, 0);
+                                      }}
+                                      data-testid={`button-remove-edit-charge-${key}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                          );
+                        })}
                       </div>
-                    </div>
+                    )}
+
+                    {visibleEditCharges.length < EDIT_CHARGE_OPTIONS.length && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" data-testid="button-edit-add-charges">
+                            <Plus className="h-3.5 w-3.5" />
+                            {t("Add Charges", "शुल्क जोड़ें")}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1" align="start">
+                          {EDIT_CHARGE_OPTIONS.filter((o) => !visibleEditCharges.includes(o.key)).map((opt) => (
+                            <Button
+                              key={opt.key}
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="w-full justify-start text-xs"
+                              onClick={() => setVisibleEditCharges((prev) => [...prev, opt.key])}
+                              data-testid={`button-edit-charge-option-${opt.key}`}
+                            >
+                              {t(opt.label, opt.labelHi)}
+                            </Button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                    )}
 
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
