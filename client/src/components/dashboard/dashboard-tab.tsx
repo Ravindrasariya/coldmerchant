@@ -39,7 +39,8 @@ function getSavedChartOrder(userId: string | number): ChartId[] {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length === DEFAULT_CHART_ORDER.length) {
         const valid = parsed.every((id: string) => (DEFAULT_CHART_ORDER as readonly string[]).includes(id));
-        if (valid) return parsed as ChartId[];
+        const unique = new Set(parsed).size === parsed.length;
+        if (valid && unique) return parsed as ChartId[];
       }
     }
   } catch {}
@@ -950,9 +951,8 @@ export function DashboardTab() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" ref={chartGridRef}>
-        {chartOrder.map((chartId, index) => {
-          const chartConfigs: Record<ChartId, { borderClass: string; testId: string; title: string; content: JSX.Element }> = {
+      {(() => {
+        const chartConfigs: Record<ChartId, { borderClass: string; testId: string; title: string; content: JSX.Element }> = {
             "cs-total-bags": {
               borderClass: "border-sky-300 dark:border-sky-700",
               testId: "chart-cs-total-bags",
@@ -1117,40 +1117,45 @@ export function DashboardTab() {
             },
           };
 
-          const chart = chartConfigs[chartId];
-          if (!chart) return null;
-
           return (
-            <Card
-              key={chartId}
-              className={`${chart.borderClass} ${chartDragOverIndex === index ? 'ring-2 ring-primary ring-offset-1' : ''} transition-shadow`}
-              data-testid={chart.testId}
-              data-chart-index={index}
-              onDragOver={(e) => handleChartDragOver(e, index)}
-              onDrop={(e) => handleChartDrop(e, index)}
-              onDragEnd={handleChartDragEnd}
-            >
-              <CardHeader className="p-3 pb-0 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm">{chart.title}</CardTitle>
-                <div
-                  draggable
-                  onDragStart={() => handleChartDragStart(index)}
-                  className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none p-1"
-                  onTouchStart={() => handleChartTouchStart(index)}
-                  onTouchMove={handleChartTouchMove}
-                  onTouchEnd={handleChartTouchEnd}
-                  data-testid={`grip-chart-${chartId}`}
-                >
-                  <GripVertical className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent className="p-3">
-                {chart.content}
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" ref={chartGridRef}>
+              {chartOrder.map((chartId, index) => {
+                const chart = chartConfigs[chartId];
+                if (!chart) return null;
+
+                return (
+                  <Card
+                    key={chartId}
+                    className={`${chart.borderClass} ${chartDragOverIndex === index ? 'ring-2 ring-primary ring-offset-1' : ''} transition-shadow`}
+                    data-testid={chart.testId}
+                    data-chart-index={index}
+                    onDragOver={(e) => handleChartDragOver(e, index)}
+                    onDrop={(e) => handleChartDrop(e, index)}
+                    onDragEnd={handleChartDragEnd}
+                  >
+                    <CardHeader className="p-3 pb-0 flex flex-row items-center justify-between">
+                      <CardTitle className="text-sm">{chart.title}</CardTitle>
+                      <div
+                        draggable
+                        onDragStart={() => handleChartDragStart(index)}
+                        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none p-1"
+                        onTouchStart={() => handleChartTouchStart(index)}
+                        onTouchMove={handleChartTouchMove}
+                        onTouchEnd={handleChartTouchEnd}
+                        data-testid={`grip-chart-${chartId}`}
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-3">
+                      {chart.content}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           );
-        })}
-      </div>
+        })()}
     </div>
   );
 }
