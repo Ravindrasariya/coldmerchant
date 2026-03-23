@@ -35,7 +35,6 @@ interface LoadingNakalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   merchantName: string;
-  merchantAddress?: string | null;
   dateLabel: string;
 }
 
@@ -69,26 +68,19 @@ function computeLotAmount(lot: LotData): number {
   return w * p;
 }
 
-function computePurDami(lots: LotData[]): number {
+function computeAadhatPurDami(lots: LotData[]): number {
   return lots.reduce((total, lot) => {
     const w = parseFloat(lot.totalWeight || "0");
     const p = parseFloat(lot.pricePerKg || "0");
     const base = w * p;
     const aadhat = (parseFloat(lot.aadhatCommissionPercent || "0") / 100) * base;
-    const mandi = (parseFloat(lot.mandiCommissionPercent || "0") / 100) * base;
-    const hammali = parseFloat(lot.hammaliPerBag || "0") * lot.originalBags;
-    const extra = parseFloat(lot.mandiExtraCharges || "0");
-    const dynamic = (lot.charges || []).reduce(
-      (s, c) => s + parseFloat(String(c.amount ?? 0)), 0
-    );
-    return total + aadhat + mandi + hammali + extra + dynamic;
+    return total + aadhat;
   }, 0);
 }
 
 function buildPrintHtml(
   entries: EntryData[],
   merchantName: string,
-  merchantAddress: string | null | undefined,
   dateLabel: string
 ): string {
   const sorted = [...entries].sort((a, b) => a.serialNumber - b.serialNumber);
@@ -106,7 +98,7 @@ function buildPrintHtml(
       : `${escHtml(entry.farmerName)} (Sr #${entry.serialNumber})`;
 
     const lotAmounts = entry.lots.map(computeLotAmount);
-    const purDami = isMandi ? computePurDami(entry.lots) : 0;
+    const purDami = isMandi ? computeAadhatPurDami(entry.lots) : 0;
     const showPurDami = isMandi && purDami > 0;
 
     const entryBags = entry.lots.reduce((s, l) => s + l.originalBags, 0);
@@ -152,10 +144,10 @@ function buildPrintHtml(
 
     bodyRows += `
       <tr style="background:#f9f9f9;">
-        <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;font-weight:600;">
-          Qty: ${entryBags} Bags &nbsp;&nbsp; Weight: ${entryWeight.toFixed(1)} Kg
-        </td>
         <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;font-weight:600;">Total</td>
+        <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;font-weight:600;">
+          ${entryBags} Bags &nbsp;&nbsp; ${entryWeight.toFixed(1)} Kg
+        </td>
         <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;">&#8377;${escHtml(fmt(entryTotal))}</td>
       </tr>`;
   });
@@ -168,8 +160,7 @@ function buildPrintHtml(
   <style>
     * { box-sizing: border-box; }
     body { font-family: Georgia, serif; margin: 0; padding: 16px 24px; background: #fff; color: #000; }
-    .merchant-name { text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 4px; }
-    .merchant-address { text-align: center; font-size: 13px; color: #555; margin-bottom: 6px; }
+    .merchant-name { text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 6px; }
     .header-row { display: flex; justify-content: space-between; align-items: center;
       border-top: 2px solid #000; border-bottom: 1px solid #000; padding: 4px 0; }
     .header-date { font-size: 13px; }
@@ -183,7 +174,6 @@ function buildPrintHtml(
 </head>
 <body>
   <div class="merchant-name">${escHtml(merchantName)}</div>
-  ${merchantAddress ? `<div class="merchant-address">${escHtml(merchantAddress)}</div>` : ""}
   <div class="header-row">
     <span class="header-date">Date : ${escHtml(dateLabel)}</span>
     <span class="header-title">LOADING NAKAL</span>
@@ -217,7 +207,6 @@ export function LoadingNakalDialog({
   open,
   onOpenChange,
   merchantName,
-  merchantAddress,
   dateLabel,
 }: LoadingNakalDialogProps) {
   const { toast } = useToast();
@@ -227,7 +216,7 @@ export function LoadingNakalDialog({
   const sorted = [...entries].sort((a, b) => a.serialNumber - b.serialNumber);
 
   const handlePrint = () => {
-    const html = buildPrintHtml(sorted, merchantName, merchantAddress, dateLabel);
+    const html = buildPrintHtml(sorted, merchantName, dateLabel);
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);
@@ -262,7 +251,7 @@ export function LoadingNakalDialog({
       : `${entry.farmerName} (Sr #${entry.serialNumber})`;
 
     const lotAmounts = entry.lots.map(computeLotAmount);
-    const purDami = isMandi ? computePurDami(entry.lots) : 0;
+    const purDami = isMandi ? computeAadhatPurDami(entry.lots) : 0;
     const showPurDami = isMandi && purDami > 0;
     const entryBags = entry.lots.reduce((s, l) => s + l.originalBags, 0);
     const entryWeight = entry.lots.reduce((s, l) => s + parseFloat(l.totalWeight || "0"), 0);
@@ -303,10 +292,7 @@ export function LoadingNakalDialog({
 
         <div className="overflow-x-auto -mx-4 px-4">
           <div ref={printRef} className="bg-white text-black p-4 min-w-[640px]" style={{ fontFamily: "Georgia, serif" }}>
-            <div className="text-center text-2xl font-bold mb-1">{merchantName}</div>
-            {merchantAddress && (
-              <div className="text-center text-sm text-gray-600 mb-2">{merchantAddress}</div>
-            )}
+            <div className="text-center text-2xl font-bold mb-2">{merchantName}</div>
             <div className="flex justify-between items-center border-t-2 border-b border-black py-1 mb-0 text-sm">
               <span>Date : {dateLabel}</span>
               <span className="font-bold text-base tracking-wide">LOADING NAKAL</span>
@@ -373,9 +359,11 @@ export function LoadingNakalDialog({
 
                         <tr key={`${entry.id}-summary`} className="bg-gray-50">
                           <td className="border border-gray-300 px-2 py-1 text-sm font-semibold">
-                            Qty: {entryBags} Bags &nbsp; Weight: {entryWeight.toFixed(1)} Kg
+                            Total
                           </td>
-                          <td className="border border-gray-300 px-2 py-1 text-sm font-semibold">Total</td>
+                          <td className="border border-gray-300 px-2 py-1 text-sm font-semibold">
+                            {entryBags} Bags &nbsp; {entryWeight.toFixed(1)} Kg
+                          </td>
                           <td className="border border-gray-300 px-2 py-1 text-right text-sm font-semibold whitespace-nowrap">
                             ₹{fmt(entryTotal)}
                           </td>

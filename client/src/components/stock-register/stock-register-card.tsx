@@ -797,7 +797,6 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         open={showNakal}
         onOpenChange={setShowNakal}
         merchantName={merchantInfo?.name || user?.merchantName || ""}
-        merchantAddress={merchantInfo?.address ?? user?.merchantAddress}
         dateLabel={nakalDateLabel}
       />
 
