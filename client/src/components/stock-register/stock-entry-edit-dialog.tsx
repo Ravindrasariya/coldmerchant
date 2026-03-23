@@ -1520,8 +1520,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          if (file.size > 500 * 1024) {
-                            alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
+                          if (file.size > 250 * 1024) {
+                            alert(t("File too large. Max 250KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 250KB अनुमत है।"));
                             return;
                           }
                           setNewImageFile(file);
@@ -1544,7 +1544,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
               ) : (
                 <label className="flex items-center gap-2 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="edit-add-image">
                   <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{t("Add Image (max 500KB)", "फोटो जोड़ें (अधिकतम 500KB)")}</span>
+                  <span className="text-muted-foreground">{t("Add Image (max 250KB)", "फोटो जोड़ें (अधिकतम 250KB)")}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -1552,8 +1552,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        if (file.size > 500 * 1024) {
-                          alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
+                        if (file.size > 250 * 1024) {
+                          alert(t("File too large. Max 250KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 250KB अनुमत है।"));
                           return;
                         }
                         setNewImageFile(file);
