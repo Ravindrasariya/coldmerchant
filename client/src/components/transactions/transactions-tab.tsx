@@ -253,7 +253,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       const bardan = parseFloat(txn.bardan || "0");
 
       const totalCost = txn.transactionType === "loading"
-        ? parseFloat(txn.totalCostOfGoods || "0") + mandiComm + aadhatComm + hammali + extraCharges + tulai + majduri + thelaBhada + palaKarai + bardan
+        ? parseFloat(txn.totalCostOfGoods || "0") + mandiComm + aadhatComm + hammali + extraCharges + tulai + majduri + thelaBhada + palaKarai + bardan + parseFloat(txn.advancePayment || "0")
         : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
 
       const fmt = (n: number) => n > 0 ? parseFloat(n.toFixed(1)).toLocaleString('en-IN') : "-";
@@ -501,7 +501,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               <p className="text-sm sm:text-lg font-bold">
                 ₹{filteredTransactions.reduce((sum, t) => {
                   if (t.transactionType === "loading") {
-                    return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.totalMandiCommission || "0") + parseFloat(t.totalAadhatCommission || "0") + parseFloat(t.totalHammali || "0") + parseFloat(t.totalMandiExtraCharges || "0");
+                    return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.totalMandiCommission || "0") + parseFloat(t.totalAadhatCommission || "0") + parseFloat(t.totalHammali || "0") + parseFloat(t.totalMandiExtraCharges || "0") + parseFloat(t.tulai || "0") + parseFloat(t.majduri || "0") + parseFloat(t.thelaBhada || "0") + parseFloat(t.palaKarai || "0") + parseFloat(t.bardan || "0") + parseFloat(t.advancePayment || "0");
                   }
                   return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.transportationCharges || "0") + parseFloat(t.otherCharges || "0");
                 }, 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
@@ -689,7 +689,7 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
   const { t } = useLanguage();
 
   const totalCost = transaction.transactionType === "loading"
-    ? parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.totalMandiCommission || "0") + parseFloat(transaction.totalAadhatCommission || "0") + parseFloat(transaction.totalHammali || "0") + parseFloat(transaction.totalMandiExtraCharges || "0")
+    ? parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.totalMandiCommission || "0") + parseFloat(transaction.totalAadhatCommission || "0") + parseFloat(transaction.totalHammali || "0") + parseFloat(transaction.totalMandiExtraCharges || "0") + parseFloat(transaction.tulai || "0") + parseFloat(transaction.majduri || "0") + parseFloat(transaction.thelaBhada || "0") + parseFloat(transaction.palaKarai || "0") + parseFloat(transaction.bardan || "0") + parseFloat(transaction.advancePayment || "0")
     : parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.transportationCharges || "0") + parseFloat(transaction.otherCharges || "0");
   const revenue = transaction.revenue 
     ? parseFloat(transaction.revenue) 
