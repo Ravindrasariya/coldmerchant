@@ -91,7 +91,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   
   // Filter states
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
-  const [filterMonths, setFilterMonths] = useState<number[]>([]);
+  const [filterMonths, setFilterMonths] = useState<number[]>([new Date().getMonth()]);
   const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
@@ -180,11 +180,13 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   }, [transactions, selectedCrop, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
 
   const currentYear = new Date().getFullYear().toString();
-  const hasActiveFilters = filterYear !== currentYear || filterMonths.length > 0 || filterDay !== null || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
+  const currentMonth = new Date().getMonth();
+  const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
+  const hasActiveFilters = filterYear !== currentYear || !isDefaultMonths || filterDay !== null || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
 
   const clearFilters = () => {
     setFilterYear(new Date().getFullYear().toString());
-    setFilterMonths([]);
+    setFilterMonths([new Date().getMonth()]);
     setFilterDay(null);
     setFilterTxnNumber("");
     setFilterSerialNumber("");

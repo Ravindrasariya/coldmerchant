@@ -69,7 +69,7 @@ export function StockRegisterTable() {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
-  const [filterMonths, setFilterMonths] = useState<number[]>([]);
+  const [filterMonths, setFilterMonths] = useState<number[]>([new Date().getMonth()]);
   const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
@@ -155,7 +155,7 @@ export function StockRegisterTable() {
   const clearFilters = () => {
     setSearchTerm("");
     setFilterYear(new Date().getFullYear().toString());
-    setFilterMonths([]);
+    setFilterMonths([new Date().getMonth()]);
     setFilterDay(null);
     setFilterPaymentStatus("");
     setFilterQuality("");
@@ -163,7 +163,9 @@ export function StockRegisterTable() {
     setFilterColdStore("");
   };
 
-  const hasActiveFilters = searchTerm || filterYear !== currentYear || filterMonths.length > 0 || filterDay !== null || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
+  const currentMonth = new Date().getMonth();
+  const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
+  const hasActiveFilters = searchTerm || filterYear !== currentYear || !isDefaultMonths || filterDay !== null || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
 
   if (error) {
     return (
