@@ -812,7 +812,20 @@ export function CashManagementTab() {
     setBuyerAllocations([]);
   }, [selectedPartyName]);
 
+  useEffect(() => {
+    if (buyerPendingData && buyerPendingData.pyBalance > 0 && buyerAllocations.length === 0) {
+      setBuyerAllocations([{
+        isPyBalance: true,
+        label: t("PY Balance (Previous Year)", "पीवाई शेष (पिछला वर्ष)"),
+        dueAmount: buyerPendingData.pyBalance,
+        amount: 0,
+        pettyAdjustment: 0,
+      }]);
+    }
+  }, [buyerPendingData]);
+
   const buyerGrandTotalCash = buyerAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+  const buyerGrandTotalPetty = buyerAllocations.reduce((sum, a) => sum + (a.pettyAdjustment || 0), 0);
 
   const toggleBuyerEntry = (entry: BuyerPendingEntry | { isPyBalance: true; dueAmount: number }) => {
     if ('isPyBalance' in entry) {
@@ -1848,7 +1861,7 @@ export function CashManagementTab() {
                             <div key={idx} className="p-2 bg-muted rounded-md text-sm" data-testid={`buyer-alloc-detail-${idx}`}>
                               <div className="flex justify-between items-center mb-1">
                                 <span className="font-semibold">
-                                  {alloc.isPyBalance ? t("PY Balance", "पिछला शेष") : `Tnx #${alloc.transactionCode || "?"}`}
+                                  {alloc.isPyBalance ? t("PY Balance", "पिछला शेष") : (alloc.transactionCode || "?")}
                                 </span>
                                 <span className="font-semibold">₹{totalSettled.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                               </div>
@@ -2706,6 +2719,12 @@ export function CashManagementTab() {
                             <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
                             <span className="font-bold text-lg">₹{buyerGrandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                           </div>
+                          {buyerGrandTotalPetty > 0 && (
+                            <div className="flex items-center justify-between p-2 bg-orange-50 dark:bg-orange-950/30 rounded-md" data-testid="buyer-petty-total">
+                              <span className="text-sm text-orange-700 dark:text-orange-400">{t("Total Petty Adj", "कुल पेटी समायोजन")}</span>
+                              <span className="font-semibold text-orange-700 dark:text-orange-400">₹{buyerGrandTotalPetty.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

@@ -3524,8 +3524,12 @@ export class DatabaseStorage implements IStorage {
               const [buyerRow] = await tx.select().from(buyers).where(eq(buyers.id, entryBuyerId));
               if (buyerRow) {
                 const currentReceivable = parseFloat(buyerRow.receivableBalance || "0");
+                const totalSettled = appliedAmount + pettyAdj;
+                if (totalSettled > currentReceivable + 0.01) {
+                  throw new Error(`PY allocation (₹${totalSettled}) exceeds receivable balance (₹${currentReceivable})`);
+                }
                 actualApplied = Math.min(appliedAmount, currentReceivable);
-                const newReceivable = Math.max(0, currentReceivable - actualApplied);
+                const newReceivable = Math.max(0, currentReceivable - actualApplied - pettyAdj);
                 await tx.update(buyers)
                   .set({ receivableBalance: newReceivable.toFixed(2), updatedAt: new Date() })
                   .where(eq(buyers.id, entryBuyerId));
@@ -3535,7 +3539,7 @@ export class DatabaseStorage implements IStorage {
               cashEntryId: createdEntry.id,
               transactionId: null,
               merchantId: entry.merchantId,
-              appliedAmount: actualApplied.toString(),
+              appliedAmount: appliedAmount.toString(),
               pettyAdjustment: pettyAdj.toString(),
               isPyBalance: true,
               transactionCode: "PY Balance",
@@ -3548,7 +3552,13 @@ export class DatabaseStorage implements IStorage {
               throw new Error(`Transaction ${alloc.transactionId} not found or does not belong to this merchant`);
             }
             const currentReceived = parseFloat(txnRow.amountReceived || "0");
-            const newReceived = currentReceived + appliedAmount + pettyAdj;
+            const txnTotal = parseFloat(txnRow.totalAmount || "0");
+            const dueAmount = txnTotal - currentReceived;
+            const totalSettled = appliedAmount + pettyAdj;
+            if (totalSettled > dueAmount + 0.01) {
+              throw new Error(`Allocation (₹${totalSettled}) exceeds due amount (₹${dueAmount.toFixed(2)}) for transaction #${txnRow.transactionNumber}`);
+            }
+            const newReceived = currentReceived + totalSettled;
             await tx.update(transactions)
               .set({ amountReceived: newReceived.toString() })
               .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, entry.merchantId)));
@@ -4193,7 +4203,6 @@ export class DatabaseStorage implements IStorage {
           const totalSettled = appliedAmt + pettyAdj;
 
           if (alloc.isPyBalance) {
-            // Restore buyer receivableBalance
             let buyerIdToRestore = entry.buyerId;
             if (!buyerIdToRestore && entry.partyName) {
               const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
@@ -4205,7 +4214,7 @@ export class DatabaseStorage implements IStorage {
               if (buyer) {
                 const currentReceivable = parseFloat(buyer.receivableBalance || "0");
                 await tx.update(buyers)
-                  .set({ receivableBalance: (currentReceivable + appliedAmt).toFixed(2), updatedAt: new Date() })
+                  .set({ receivableBalance: (currentReceivable + appliedAmt + pettyAdj).toFixed(2), updatedAt: new Date() })
                   .where(eq(buyers.id, buyerIdToRestore));
               }
             }
