@@ -3856,14 +3856,16 @@ export async function registerRoutes(
       }
 
       for (const entry of buyerCashEntries) {
-        const amount = parseFloat(entry.amount || "0");
-        let totalPetty = 0;
+        let fyApplied = 0;
+        let fyPetty = 0;
         if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
           for (const alloc of entry.buyerAllocations) {
-            totalPetty += parseFloat(alloc.pettyAdjustment || "0");
+            if (alloc.isPyBalance) continue;
+            fyApplied += parseFloat(alloc.appliedAmount || "0");
+            fyPetty += parseFloat(alloc.pettyAdjustment || "0");
           }
         }
-        const totalCr = amount + totalPetty;
+        const totalCr = fyApplied + fyPetty;
         if (totalCr > 0) {
           entries.push({
             date: entry.entryDate || "",
@@ -3883,10 +3885,14 @@ export async function registerRoutes(
         return a.sourceId - b.sourceId;
       });
 
+      const merchant = await storage.getMerchant(merchantId);
       res.json({
         buyerId,
         buyerName: buyer.name,
         buyerAddress: buyer.address,
+        merchantName: merchant?.name || "",
+        merchantAddress: merchant?.address || "",
+        merchantContact: merchant?.contactNumber || "",
         openingBalance,
         fyStart,
         fyEnd,

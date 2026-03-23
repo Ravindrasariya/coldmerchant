@@ -46,6 +46,9 @@ interface BuyerLedgerData {
   buyerId: number;
   buyerName: string;
   buyerAddress: string;
+  merchantName: string;
+  merchantAddress: string;
+  merchantContact: string;
   openingBalance: number;
   fyStart: string;
   fyEnd: string;
@@ -101,8 +104,27 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
       const printDiv = document.createElement("div");
       printDiv.style.cssText = "width:780px;padding:20px;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000;";
 
+      const merchantHeader = document.createElement("div");
+      merchantHeader.style.cssText = "text-align:center;margin-bottom:12px;";
+      const merchantH1 = document.createElement("h1");
+      merchantH1.style.cssText = "font-size:18px;margin:0;font-weight:700;";
+      merchantH1.textContent = ledgerData.merchantName;
+      merchantHeader.appendChild(merchantH1);
+      if (ledgerData.merchantAddress) {
+        const merchantAddr = document.createElement("p");
+        merchantAddr.style.cssText = "font-size:12px;color:#555;margin:2px 0;";
+        merchantAddr.textContent = ledgerData.merchantAddress;
+        merchantHeader.appendChild(merchantAddr);
+      }
+      if (ledgerData.merchantContact) {
+        const merchantPhone = document.createElement("p");
+        merchantPhone.style.cssText = "font-size:12px;color:#555;margin:2px 0;";
+        merchantPhone.textContent = ledgerData.merchantContact;
+        merchantHeader.appendChild(merchantPhone);
+      }
+
       const header = document.createElement("div");
-      header.style.cssText = "text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;";
+      header.style.cssText = "text-align:center;border-top:1px solid #999;border-bottom:2px solid #000;padding:10px 0 12px;margin-bottom:16px;";
       const h1 = document.createElement("h1");
       h1.style.cssText = "font-size:20px;margin:0;";
       h1.textContent = buyerName;
@@ -161,7 +183,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
       }
       table.appendChild(tbody);
 
-      printDiv.append(header, table);
+      printDiv.append(merchantHeader, header, table);
       document.body.appendChild(printDiv);
       await shareReceiptAsPdf(printDiv, `${buyerName}_Ledger_FY${fyLabel}`);
       document.body.removeChild(printDiv);
