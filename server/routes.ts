@@ -2859,9 +2859,9 @@ export async function registerRoutes(
         if (revenueType === "raw_potato" && !partyName) {
           return res.status(400).json({ message: "Party name is required for harvest entries" });
         }
-        // Validate buyer allocations for raw_potato
-        if (revenueType === "raw_potato" && Array.isArray(buyerAllocations)) {
-          if (buyerAllocations.length === 0) {
+        // Validate buyer allocations for raw_potato (REQUIRED - manual allocation replaces FIFO)
+        if (revenueType === "raw_potato" && direction === "inward") {
+          if (!Array.isArray(buyerAllocations) || buyerAllocations.length === 0) {
             return res.status(400).json({ message: "At least one allocation is required for buyer payments" });
           }
           for (const alloc of buyerAllocations) {

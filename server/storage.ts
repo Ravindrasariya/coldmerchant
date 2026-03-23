@@ -3519,13 +3519,13 @@ export class DatabaseStorage implements IStorage {
           const pettyAdj = alloc.pettyAdjustment || 0;
 
           if (alloc.isPyBalance) {
-            // Reduce buyer's receivableBalance
+            let actualApplied = appliedAmount;
             if (entryBuyerId) {
               const [buyerRow] = await tx.select().from(buyers).where(eq(buyers.id, entryBuyerId));
               if (buyerRow) {
                 const currentReceivable = parseFloat(buyerRow.receivableBalance || "0");
-                const toApply = Math.min(appliedAmount, currentReceivable);
-                const newReceivable = Math.max(0, currentReceivable - toApply);
+                actualApplied = Math.min(appliedAmount, currentReceivable);
+                const newReceivable = Math.max(0, currentReceivable - actualApplied);
                 await tx.update(buyers)
                   .set({ receivableBalance: newReceivable.toFixed(2), updatedAt: new Date() })
                   .where(eq(buyers.id, entryBuyerId));
@@ -3535,21 +3535,23 @@ export class DatabaseStorage implements IStorage {
               cashEntryId: createdEntry.id,
               transactionId: null,
               merchantId: entry.merchantId,
-              appliedAmount: appliedAmount.toString(),
+              appliedAmount: actualApplied.toString(),
               pettyAdjustment: pettyAdj.toString(),
               isPyBalance: true,
               transactionCode: "PY Balance",
             });
           } else if (alloc.transactionId) {
-            // Reduce amountReceived on the specific transaction
-            const [txnRow] = await tx.select().from(transactions).where(eq(transactions.id, alloc.transactionId));
-            if (txnRow) {
-              const currentReceived = parseFloat(txnRow.amountReceived || "0");
-              const newReceived = currentReceived + appliedAmount + pettyAdj;
-              await tx.update(transactions)
-                .set({ amountReceived: newReceived.toString() })
-                .where(eq(transactions.id, alloc.transactionId));
+            const [txnRow] = await tx.select().from(transactions).where(
+              and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, entry.merchantId))
+            );
+            if (!txnRow) {
+              throw new Error(`Transaction ${alloc.transactionId} not found or does not belong to this merchant`);
             }
+            const currentReceived = parseFloat(txnRow.amountReceived || "0");
+            const newReceived = currentReceived + appliedAmount + pettyAdj;
+            await tx.update(transactions)
+              .set({ amountReceived: newReceived.toString() })
+              .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, entry.merchantId)));
             await tx.insert(buyerPaymentAllocations).values({
               cashEntryId: createdEntry.id,
               transactionId: alloc.transactionId,
@@ -3557,7 +3559,7 @@ export class DatabaseStorage implements IStorage {
               appliedAmount: appliedAmount.toString(),
               pettyAdjustment: pettyAdj.toString(),
               isPyBalance: false,
-              transactionCode: alloc.transactionCode || null,
+              transactionCode: txnRow ? `Tnx #${txnRow.transactionNumber}` : (alloc.transactionCode || null),
             });
           }
         }
@@ -4208,15 +4210,14 @@ export class DatabaseStorage implements IStorage {
               }
             }
           } else if (alloc.transactionId) {
-            // Restore amountReceived on the specific transaction
             const [txn] = await tx.select().from(transactions)
-              .where(eq(transactions.id, alloc.transactionId));
+              .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
             if (txn) {
               const currentReceived = parseFloat(txn.amountReceived || "0");
               const newReceived = Math.max(0, currentReceived - totalSettled);
               await tx.update(transactions)
                 .set({ amountReceived: newReceived.toString() })
-                .where(eq(transactions.id, txn.id));
+                .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
             }
           }
         }

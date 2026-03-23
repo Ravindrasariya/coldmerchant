@@ -174,6 +174,15 @@ When paying a supplier:
 - **Farmer IDs Never Reassigned**: Unique farmer codes (FMYYYYMMDD#) are permanent and never recycled
 - **Accessible via**: User dropdown menu > "Farmer Ledger" link
 
+### Buyer Payment Allocation (Manual)
+- **Table**: `buyer_payment_allocations` stores per-transaction payment breakdown for buyer inward (raw_potato) payments
+- **Fields**: cashEntryId, transactionId (nullable), merchantId, appliedAmount, pettyAdjustment, isPyBalance, transactionCode
+- **No FIFO**: Raw potato buyer inward payments use manual transaction selection (identical to Aadhtiya payment flow)
+- **UI Flow**: User selects buyer → picker shows pending transactions (Tnx #N) + PY Balance → per-row Amount + Petty Adj → Grand Total auto-computes
+- **API Endpoint**: GET `/api/cash/buyer-pending-transactions/:buyerId` returns pending transactions with due > 0 and buyer's receivableBalance as pyBalance
+- **Reversal**: Reversing a buyer payment entry restores amountReceived on each allocated transaction and receivableBalance for PY allocations
+- **Security**: Merchant ownership verified on all transaction updates; allocations scoped to authenticated merchant
+
 ### Cash Tab Filters
 - **Filter Order**: Direction → Expense Category → Buyer Name → Expense Type → Farmer Name → Supplier Name → Month → Year → Remarks
 - **Direction Filter**: All / Inward Cash / Expense / Transfer

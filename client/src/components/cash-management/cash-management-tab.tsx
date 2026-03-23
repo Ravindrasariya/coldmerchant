@@ -78,6 +78,7 @@ interface CashEntry {
   createdAt: string;
   allocations: CashEntryAllocation[];
   aadhatAllocations: AadhatPaymentAllocationDetail[];
+  buyerAllocations: BuyerPaymentAllocationDetail[];
 }
 
 interface CashEntryAllocation {
@@ -163,6 +164,42 @@ interface AadhatPendingEntry {
 interface AadhatPendingResponse {
   pendingEntries: AadhatPendingEntry[];
   pyPayable: number;
+}
+
+interface BuyerPaymentAllocationDetail {
+  id: number;
+  cashEntryId: number;
+  transactionId: number | null;
+  appliedAmount: string;
+  pettyAdjustment: string;
+  isPyBalance: boolean;
+  transactionCode: string | null;
+}
+
+interface BuyerPendingEntry {
+  transactionId: number;
+  transactionNumber: number;
+  crop: string;
+  dateOfLoading: string;
+  totalBags: number;
+  revenue: number;
+  amountReceived: number;
+  dueAmount: number;
+  daysSince: number;
+}
+
+interface BuyerPendingResponse {
+  pendingEntries: BuyerPendingEntry[];
+  pyBalance: number;
+}
+
+interface BuyerAllocationRow {
+  transactionId?: number;
+  isPyBalance?: boolean;
+  label: string;
+  dueAmount: number;
+  amount: number;
+  pettyAdjustment: number;
 }
 
 interface AadhatAllocationRow {
@@ -643,6 +680,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -661,6 +699,8 @@ export function CashManagementTab() {
         description: t("Entry recorded successfully", "प्रविष्टि सफलतापूर्वक दर्ज की गई"),
         variant: "success",
       });
+      setAadhatAllocations([]);
+      setBuyerAllocations([]);
       if (activeTab === "inward") {
         inwardForm.reset({
           receiptType: "cash_received",
@@ -728,6 +768,10 @@ export function CashManagementTab() {
   const [aadhatAllocations, setAadhatAllocations] = useState<AadhatAllocationRow[]>([]);
   const [aadhatEntryPickerOpen, setAadhatEntryPickerOpen] = useState(false);
 
+  // Buyer allocation state (for raw_potato inward)
+  const [buyerAllocations, setBuyerAllocations] = useState<BuyerAllocationRow[]>([]);
+  const [buyerEntryPickerOpen, setBuyerEntryPickerOpen] = useState(false);
+
   const selectedAadhatDbId = outflowForm.watch("aadhatDbId");
 
   const { data: aadhatPendingData } = useQuery<AadhatPendingResponse>({
@@ -746,6 +790,73 @@ export function CashManagementTab() {
   }, [selectedAadhatDbId]);
 
   const aadhatGrandTotalCash = aadhatAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const selectedBuyerDbId = useMemo(() => {
+    if (!selectedPartyName) return null;
+    const buyer = ledgerBuyers.find(b => b.name.toLowerCase() === selectedPartyName.toLowerCase());
+    return buyer?.id || null;
+  }, [selectedPartyName, ledgerBuyers]);
+
+  const { data: buyerPendingData } = useQuery<BuyerPendingResponse>({
+    queryKey: ["/api/cash/buyer-pending-transactions", selectedBuyerDbId],
+    queryFn: async () => {
+      if (!selectedBuyerDbId) return { pendingEntries: [], pyBalance: 0 };
+      const res = await fetch(`/api/cash/buyer-pending-transactions/${selectedBuyerDbId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending transactions");
+      return res.json();
+    },
+    enabled: !!selectedBuyerDbId && revenueType === "raw_potato",
+  });
+
+  useEffect(() => {
+    setBuyerAllocations([]);
+  }, [selectedPartyName]);
+
+  const buyerGrandTotalCash = buyerAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const toggleBuyerEntry = (entry: BuyerPendingEntry | { isPyBalance: true; dueAmount: number }) => {
+    if ('isPyBalance' in entry) {
+      const exists = buyerAllocations.find(a => a.isPyBalance);
+      if (exists) {
+        setBuyerAllocations(prev => prev.filter(a => !a.isPyBalance));
+      } else {
+        setBuyerAllocations(prev => [{
+          isPyBalance: true,
+          label: t("PY Balance (Previous Year)", "पीवाई शेष (पिछला वर्ष)"),
+          dueAmount: entry.dueAmount,
+          amount: 0,
+          pettyAdjustment: 0,
+        }, ...prev]);
+      }
+    } else {
+      const exists = buyerAllocations.find(a => a.transactionId === entry.transactionId);
+      if (exists) {
+        setBuyerAllocations(prev => prev.filter(a => a.transactionId !== entry.transactionId));
+      } else {
+        setBuyerAllocations(prev => [...prev, {
+          transactionId: entry.transactionId,
+          label: `Tnx #${entry.transactionNumber} | ${entry.crop} | ${entry.dateOfLoading ? format(new Date(entry.dateOfLoading), "dd/MM/yy") : "?"} | ${entry.totalBags} bags | ${entry.daysSince}d`,
+          dueAmount: entry.dueAmount,
+          amount: 0,
+          pettyAdjustment: 0,
+        }]);
+      }
+    }
+  };
+
+  const updateBuyerAllocation = (index: number, field: 'amount' | 'pettyAdjustment', value: number) => {
+    setBuyerAllocations(prev => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      if (field === 'amount') {
+        row.amount = value;
+      } else if (field === 'pettyAdjustment') {
+        row.pettyAdjustment = value;
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
 
   const handlePrintCheque = () => {
     const aadhatName = outflowForm.getValues("aadhatName") || "";
@@ -1036,24 +1147,43 @@ export function CashManagementTab() {
 
   const onInwardSubmit = (values: InwardFormValues) => {
     if (values.revenueType === "raw_potato") {
-      // Raw potato inward always requires amount > 0
-      if (!values.amount || values.amount <= 0) {
-        inwardForm.setError("amount", { 
-          type: "manual", 
-          message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
+      if (buyerAllocations.length === 0) {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: t("Please select at least one transaction to allocate", "कृपया आवंटित करने के लिए कम से कम एक लेन-देन चुनें"),
+          variant: "destructive",
+        });
+        return;
+      }
+      for (const alloc of buyerAllocations) {
+        if (!alloc.amount || alloc.amount <= 0) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Each allocation must have a positive amount", "प्रत्येक आवंटन में सकारात्मक राशि होनी चाहिए"),
+            variant: "destructive",
+          });
+          return;
+        }
+        const totalSettled = (alloc.amount || 0) + (alloc.pettyAdjustment || 0);
+        if (totalSettled > alloc.dueAmount + 0.01) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Allocation exceeds due amount for: ", "आवंटन बकाया राशि से अधिक है: ") + alloc.label,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      const totalAmount = buyerGrandTotalCash;
+      if (totalAmount <= 0) {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: t("Total amount must be greater than 0", "कुल राशि 0 से अधिक होनी चाहिए"),
+          variant: "destructive",
         });
         return;
       }
       const selectedBuyer = ledgerBuyers.find(b => b.name.toLowerCase() === values.partyName?.toLowerCase());
-      const selectedMergedParty = mergedPartiesForRawPotato.find(p => p.name.toLowerCase() === values.partyName?.toLowerCase());
-      const partyDue = selectedMergedParty?.overallDue || 0;
-      if (values.amount > partyDue) {
-        inwardForm.setError("amount", {
-          type: "manual",
-          message: t(`Amount cannot exceed due amount (₹${partyDue.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${partyDue.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
-        });
-        return;
-      }
       createEntryMutation.mutate({
         direction: "inward",
         receiptType: values.receiptType,
@@ -1063,9 +1193,15 @@ export function CashManagementTab() {
         buyerId: selectedBuyer?.id || null,
         bankAccountId: (values.receiptType === "account_received" || values.receiptType === "cheque_received") ? values.bankAccountId : null,
         chequeNumber: values.receiptType === "cheque_received" ? (values.chequeNumber || null) : null,
-        amount: values.amount,
+        amount: totalAmount,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
+        buyerAllocations: buyerAllocations.map(a => ({
+          transactionId: a.transactionId || null,
+          isPyBalance: a.isPyBalance || false,
+          amount: a.amount,
+          pettyAdjustment: a.pettyAdjustment || 0,
+        })),
       });
     } else if (values.revenueType === "seed_sale") {
       const selectedLedgerFarmer = ledgerFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
@@ -1697,6 +1833,35 @@ export function CashManagementTab() {
                           <p className="font-medium">{viewDetailsEntry.farmerVillage}</p>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {viewDetailsEntry.buyerAllocations && viewDetailsEntry.buyerAllocations.length > 0 && (
+                    <div className="border-t pt-3">
+                      <h4 className="font-semibold text-sm mb-2">{t("Payment Allocations", "भुगतान आवंटन")}</h4>
+                      <div className="space-y-2">
+                        {viewDetailsEntry.buyerAllocations.map((alloc, idx) => {
+                          const appliedAmt = parseFloat(alloc.appliedAmount || "0");
+                          const pettyAdj = parseFloat(alloc.pettyAdjustment || "0");
+                          const totalSettled = appliedAmt + pettyAdj;
+                          return (
+                            <div key={idx} className="p-2 bg-muted rounded-md text-sm" data-testid={`buyer-alloc-detail-${idx}`}>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-semibold">
+                                  {alloc.isPyBalance ? t("PY Balance", "पिछला शेष") : `Tnx #${alloc.transactionCode || "?"}`}
+                                </span>
+                                <span className="font-semibold">₹{totalSettled.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                                <span>{t("Cash", "नकद")}: ₹{appliedAmt.toLocaleString("en-IN")}</span>
+                                <span className={cn(pettyAdj > 50 ? "text-red-600" : pettyAdj > 1 ? "text-orange-600" : "")}>
+                                  {t("Petty", "पेटी")}: ₹{pettyAdj.toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </>
@@ -2409,6 +2574,143 @@ export function CashManagementTab() {
                     />
                   )}
 
+                  {revenueType === "raw_potato" && selectedBuyerDbId && buyerPendingData && (
+                    <div className="space-y-3" data-testid="buyer-allocation-section">
+                      <div>
+                        <Label className="text-sm font-medium">{t("Select Transactions to Allocate", "आवंटित करने के लिए लेन-देन चुनें")}</Label>
+                        <Popover open={buyerEntryPickerOpen} onOpenChange={setBuyerEntryPickerOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn("w-full justify-between mt-1", buyerAllocations.length === 0 && "text-muted-foreground")}
+                              data-testid="button-pick-buyer-entries"
+                            >
+                              {buyerAllocations.length > 0
+                                ? `${buyerAllocations.length} ${t("transactions selected", "लेन-देन चयनित")}`
+                                : t("Select pending transactions...", "बकाया लेन-देन चुनें...")}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t("Search transactions...", "लेन-देन खोजें...")} />
+                              <CommandList>
+                                <CommandEmpty>{t("No pending transactions found", "कोई बकाया लेन-देन नहीं मिला")}</CommandEmpty>
+                                <CommandGroup>
+                                  {buyerPendingData.pyBalance > 0 && (
+                                    <CommandItem
+                                      value="py-balance"
+                                      onSelect={() => toggleBuyerEntry({ isPyBalance: true, dueAmount: buyerPendingData.pyBalance })}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", buyerAllocations.some(a => a.isPyBalance) ? "opacity-100" : "opacity-0")} />
+                                      <div className="flex items-center justify-between gap-2 w-full">
+                                        <span className="font-medium">{t("PY Balance", "पीवाई शेष")}</span>
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
+                                          ₹{buyerPendingData.pyBalance.toLocaleString('en-IN')}
+                                        </Badge>
+                                      </div>
+                                    </CommandItem>
+                                  )}
+                                  {buyerPendingData.pendingEntries.map((entry) => {
+                                    const isSelected = buyerAllocations.some(a => a.transactionId === entry.transactionId);
+                                    return (
+                                      <CommandItem
+                                        key={entry.transactionId}
+                                        value={`Tnx ${entry.transactionNumber} ${entry.crop} ${entry.dateOfLoading}`}
+                                        onSelect={() => toggleBuyerEntry(entry)}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex items-center justify-between gap-2 w-full text-xs">
+                                          <span className="font-medium">Tnx #{entry.transactionNumber}</span>
+                                          <span className="text-muted-foreground">{entry.crop}</span>
+                                          <span className="text-muted-foreground">{entry.dateOfLoading ? format(new Date(entry.dateOfLoading), "dd/MM/yy") : "?"}</span>
+                                          <span className="text-muted-foreground">{entry.totalBags}B</span>
+                                          <span className="text-muted-foreground">{entry.daysSince}d</span>
+                                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
+                                            ₹{entry.dueAmount.toLocaleString('en-IN')}
+                                          </Badge>
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {buyerAllocations.length > 0 && (
+                        <div className="space-y-3">
+                          {buyerAllocations.map((alloc, idx) => {
+                            const totalSettled = (alloc.amount || 0) + (alloc.pettyAdjustment || 0);
+                            const overLimit = totalSettled > alloc.dueAmount + 0.01;
+                            return (
+                              <Card key={alloc.transactionId || 'py'} className={cn(overLimit && "border-red-400")} data-testid={`card-buyer-alloc-${idx}`}>
+                                <CardContent className="p-3 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-medium truncate">{alloc.label}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400">
+                                        {t("Due", "बकाया")}: ₹{alloc.dueAmount.toLocaleString('en-IN')}
+                                      </Badge>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setBuyerAllocations(prev => prev.filter((_, i) => i !== idx))}
+                                        data-testid={`button-remove-buyer-alloc-${idx}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")} (₹)</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        value={alloc.amount || ""}
+                                        onChange={(e) => updateBuyerAllocation(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                        data-testid={`input-buyer-alloc-amount-${idx}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 50 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 1 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        value={alloc.pettyAdjustment || ""}
+                                        onChange={(e) => updateBuyerAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                        className={cn((alloc.pettyAdjustment || 0) > 50 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 1 ? "border-orange-400 text-orange-600" : "")}
+                                        data-testid={`input-buyer-alloc-petty-${idx}`}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">{t("Total Settled", "कुल निपटान")}</span>
+                                    <span className={cn("font-semibold", overLimit ? "text-red-600" : "text-foreground")}>
+                                      ₹{totalSettled.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      {overLimit && ` (${t("exceeds due", "बकाया से अधिक")})`}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+
+                          <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="buyer-grand-total">
+                            <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                            <span className="font-bold text-lg">₹{buyerGrandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {revenueType === "seed_sale" && (
                     <>
                       <FormField
@@ -2573,29 +2875,31 @@ export function CashManagementTab() {
                     />
                   )}
 
-                  <FormField
-                    control={inwardForm.control}
-                    name="amount"
-                    render={({ field }) => {
-                      const currentDue = revenueType === "raw_potato" ? inwardPartyDue : revenueType === "seed_sale" ? inwardSeedFarmerDue : 0;
-                      return (
-                        <FormItem>
-                          <FormLabel>
-                            {t("Amount", "राशि")} (₹) *
-                            {currentDue > 0 && (
-                              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                                ({t("Max", "अधिकतम")}: ₹{currentDue.toLocaleString('en-IN')})
-                              </span>
-                            )}
-                          </FormLabel>
-                          <FormControl>
-                            <Input type="number" step="any" placeholder="0" min="0" max={currentDue > 0 ? currentDue : undefined} {...field} data-testid="input-amount" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
+                  {revenueType !== "raw_potato" && (
+                    <FormField
+                      control={inwardForm.control}
+                      name="amount"
+                      render={({ field }) => {
+                        const currentDue = revenueType === "seed_sale" ? inwardSeedFarmerDue : 0;
+                        return (
+                          <FormItem>
+                            <FormLabel>
+                              {t("Amount", "राशि")} (₹) *
+                              {currentDue > 0 && (
+                                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  ({t("Max", "अधिकतम")}: ₹{currentDue.toLocaleString('en-IN')})
+                                </span>
+                              )}
+                            </FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" min="0" max={currentDue > 0 ? currentDue : undefined} {...field} data-testid="input-amount" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  )}
 
                   <FormField
                     control={inwardForm.control}
@@ -3644,6 +3948,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
