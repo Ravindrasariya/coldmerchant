@@ -458,13 +458,13 @@ export default function AadhatLedgerTab() {
                         data-testid={`switch-aadhat-active-${index}`}
                       />
                     </div>
-                    <div className="text-xs font-mono">
+                    <div className="text-xs font-mono text-orange-600 dark:text-orange-400">
                       ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
-                    <div className="text-xs font-mono" data-testid={`text-aadhat-stock-due-${index}`}>
+                    <div className="text-xs font-mono text-blue-600 dark:text-blue-400" data-testid={`text-aadhat-stock-due-${index}`}>
                       ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
-                    <div className="text-xs font-mono">
+                    <div className="text-xs font-mono text-green-600 dark:text-green-400 font-semibold">
                       ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
                   </div>
@@ -504,9 +504,9 @@ export default function AadhatLedgerTab() {
                       />
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-muted-foreground">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-xs text-muted-foreground">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-sm font-mono">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="text-xs text-orange-600 dark:text-orange-400">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="text-sm font-mono text-green-600 dark:text-green-400 font-semibold">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
                     </div>
                   </div>
                 </div>
