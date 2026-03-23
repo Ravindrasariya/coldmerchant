@@ -2726,6 +2726,59 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/buyer-pending-transactions/:buyerId - Get pending transactions for a buyer (for manual allocation)
+  app.get("/api/cash/buyer-pending-transactions/:buyerId", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const buyerId = parseInt(req.params.buyerId);
+      if (isNaN(buyerId)) {
+        return res.status(400).json({ message: "Invalid buyer ID" });
+      }
+
+      const buyer = await storage.getBuyerById(buyerId, merchantId);
+      if (!buyer) {
+        return res.status(404).json({ message: "Buyer not found" });
+      }
+
+      const allTransactions = await storage.getTransactionsWithDueByParty(merchantId, buyer.name, buyerId);
+
+      const pendingEntries = allTransactions
+        .filter(txn => {
+          const revenue = parseFloat(txn.revenue || "0");
+          const received = parseFloat(txn.amountReceived || "0");
+          return revenue > received;
+        })
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        .map(txn => {
+          const revenue = parseFloat(txn.revenue || "0");
+          const received = parseFloat(txn.amountReceived || "0");
+          const dueAmount = revenue - received;
+          const daysSince = Math.floor((Date.now() - new Date(txn.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+          return {
+            transactionId: txn.id,
+            transactionNumber: txn.transactionNumber,
+            crop: txn.crop || "potato",
+            dateOfLoading: txn.dateOfLoading,
+            totalBags: txn.totalBags,
+            revenue: parseFloat(revenue.toFixed(2)),
+            amountReceived: parseFloat(received.toFixed(2)),
+            dueAmount: parseFloat(dueAmount.toFixed(2)),
+            daysSince,
+          };
+        });
+
+      const pyBalance = parseFloat(buyer.receivableBalance || "0");
+
+      res.json({
+        pendingEntries,
+        pyBalance: parseFloat(pyBalance.toFixed(2)),
+      });
+    } catch (error) {
+      console.error("Error fetching buyer pending transactions:", error);
+      res.status(500).json({ message: "Failed to fetch buyer pending transactions" });
+    }
+  });
+
   // GET /api/cash/aadhats-with-dues - Get aadhats with outstanding dues (totalDue > 0)
   app.get("/api/cash/aadhats-with-dues", requireMerchant, async (req, res) => {
     try {
@@ -2779,7 +2832,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, buyerAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2805,6 +2858,25 @@ export async function registerRoutes(
         // For raw_potato, partyName is required; for seed_sale, farmerName is required
         if (revenueType === "raw_potato" && !partyName) {
           return res.status(400).json({ message: "Party name is required for harvest entries" });
+        }
+        // Validate buyer allocations for raw_potato
+        if (revenueType === "raw_potato" && Array.isArray(buyerAllocations)) {
+          if (buyerAllocations.length === 0) {
+            return res.status(400).json({ message: "At least one allocation is required for buyer payments" });
+          }
+          for (const alloc of buyerAllocations) {
+            const allocAmount = parseFloat(alloc.amount) || 0;
+            const allocPetty = parseFloat(alloc.pettyAdjustment) || 0;
+            if (allocAmount < 0 || allocPetty < 0) {
+              return res.status(400).json({ message: "Allocation amounts must be non-negative" });
+            }
+            if (allocAmount <= 0) {
+              return res.status(400).json({ message: "Each allocation must have a positive amount" });
+            }
+            if (!alloc.isPyBalance && !alloc.transactionId) {
+              return res.status(400).json({ message: "Each allocation must reference either a transaction or PY balance" });
+            }
+          }
         }
         if (revenueType === "seed_sale" && !farmerName) {
           return res.status(400).json({ message: "Farmer name is required for seed sale entries" });
@@ -2974,9 +3046,8 @@ export async function registerRoutes(
         }
       }
 
-      // Determine if FIFO should be applied
-      const applyFIFO = (direction === "inward" && !!partyName) || 
-                        (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
+      // Determine if FIFO should be applied (raw_potato is now manual allocation, excluded here)
+      const applyFIFO = (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName) ||
                         (direction === "outflow" && expenseType === "supplier" && !!supplierName) ||
@@ -3029,7 +3100,7 @@ export async function registerRoutes(
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,
-          }, applyFIFO, userId, expenseType === "aadhtiya" && Array.isArray(aadhatAllocations) ? aadhatAllocations : undefined);
+          }, applyFIFO, userId, expenseType === "aadhtiya" && Array.isArray(aadhatAllocations) ? aadhatAllocations : undefined, revenueType === "raw_potato" && Array.isArray(buyerAllocations) ? buyerAllocations : undefined);
           break;
         } catch (error: any) {
           if (error?.code === '23505' && error?.constraint?.includes('transaction_code') && attempt < maxRetries - 1) {

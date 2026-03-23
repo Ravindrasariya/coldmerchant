@@ -38,6 +38,7 @@ import {
   type SeedTransactionEditHistory,
   demoVideos, type DemoVideo, type InsertDemoVideo,
   aadhatPaymentAllocations, type AadhatPaymentAllocation,
+  buyerPaymentAllocations, type BuyerPaymentAllocation, type InsertBuyerPaymentAllocation,
   assets, type Asset, type InsertAsset,
   assetDepreciationLog, type AssetDepreciationLog, type InsertAssetDepreciationLog,
   liabilities, type Liability, type InsertLiability,
@@ -285,7 +286,7 @@ export interface IStorage {
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
   
-  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number, aadhatAllocations?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
+  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number, aadhatAllocations?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>, buyerAllocations?: Array<{ transactionId?: number; isPyBalance?: boolean; amount: number; pettyAdjustment: number; transactionCode?: string }>): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
   // Season Reset operations
   checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
@@ -1161,7 +1162,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Cash Entry operations
-  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[]; aadhatAllocations: any[] })[]> {
+  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[]; aadhatAllocations: any[]; buyerAllocations: any[] })[]> {
     const entries = await db.select().from(cashEntries)
       .where(eq(cashEntries.merchantId, merchantId))
       .orderBy(desc(cashEntries.createdAt));
@@ -1183,6 +1184,11 @@ export class DatabaseStorage implements IStorage {
         .where(eq(aadhatPaymentAllocations.merchantId, merchantId))
       : [];
 
+    const allBuyerAllocs = entries.length > 0
+      ? await db.select().from(buyerPaymentAllocations)
+          .where(eq(buyerPaymentAllocations.merchantId, merchantId))
+      : [];
+
     const aadhatAllocsByEntry = new Map<number, any[]>();
     for (const alloc of allAadhatAllocs) {
       const list = aadhatAllocsByEntry.get(alloc.cashEntryId) || [];
@@ -1190,11 +1196,19 @@ export class DatabaseStorage implements IStorage {
       aadhatAllocsByEntry.set(alloc.cashEntryId, list);
     }
 
+    const buyerAllocsByEntry = new Map<number, any[]>();
+    for (const alloc of allBuyerAllocs) {
+      const list = buyerAllocsByEntry.get(alloc.cashEntryId) || [];
+      list.push(alloc);
+      buyerAllocsByEntry.set(alloc.cashEntryId, list);
+    }
+
     const result = await Promise.all(entries.map(async (entry) => {
       const allocations = await db.select().from(cashEntryAllocations)
         .where(eq(cashEntryAllocations.cashEntryId, entry.id));
       const aadhatAllocations = aadhatAllocsByEntry.get(entry.id) || [];
-      return { ...entry, allocations, aadhatAllocations };
+      const buyerAllocations = buyerAllocsByEntry.get(entry.id) || [];
+      return { ...entry, allocations, aadhatAllocations, buyerAllocations };
     }));
     
     return result;
@@ -3488,7 +3502,8 @@ export class DatabaseStorage implements IStorage {
     entry: InsertCashEntry, 
     applyFIFO: boolean, 
     userId?: number,
-    aadhatAllocationsInput?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>
+    aadhatAllocationsInput?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>,
+    buyerAllocationsInput?: Array<{ transactionId?: number; isPyBalance?: boolean; amount: number; pettyAdjustment: number; transactionCode?: string }>
   ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     
     return await db.transaction(async (tx) => {
@@ -3496,80 +3511,54 @@ export class DatabaseStorage implements IStorage {
       const allocations: CashEntryAllocation[] = [];
       const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
 
-      // Apply standard FIFO logic
-      // Party/Buyer payment FIFO
-      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "raw_potato" && entry.partyName) {
-        let remainingAmount = parseFloat(entry.amount);
+      // Buyer payment - manual allocation (replaces FIFO)
+      if (entry.direction === "inward" && entry.revenueType === "raw_potato" && buyerAllocationsInput && buyerAllocationsInput.length > 0) {
         const entryBuyerId = entry.buyerId || null;
-        const normalizedPartyName = normalizeName(entry.partyName);
-        
-        // Use entry.buyerId directly if available, otherwise find by name
-        let matchedBuyerId = entryBuyerId;
-        if (!matchedBuyerId) {
-          const allBuyers = await tx.select().from(buyers)
-            .where(eq(buyers.merchantId, entry.merchantId));
-          const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizedPartyName);
-          matchedBuyerId = matchedBuyer?.id || null;
-        }
-        
-        // STEP 1: First reduce buyer's receivableBalance in buyer ledger
-        if (matchedBuyerId && remainingAmount > 0) {
-          const [matchedBuyer] = await tx.select().from(buyers).where(eq(buyers.id, matchedBuyerId));
-          if (matchedBuyer) {
-            const currentReceivable = parseFloat(matchedBuyer.receivableBalance || "0");
-            if (currentReceivable > 0) {
-              const toApply = Math.min(remainingAmount, currentReceivable);
-              const newReceivable = currentReceivable - toApply;
-              await tx.update(buyers)
-                .set({ receivableBalance: newReceivable.toFixed(2), updatedAt: new Date() })
-                .where(eq(buyers.id, matchedBuyerId));
-              remainingAmount -= toApply;
+        for (const alloc of buyerAllocationsInput) {
+          const appliedAmount = alloc.amount || 0;
+          const pettyAdj = alloc.pettyAdjustment || 0;
+
+          if (alloc.isPyBalance) {
+            // Reduce buyer's receivableBalance
+            if (entryBuyerId) {
+              const [buyerRow] = await tx.select().from(buyers).where(eq(buyers.id, entryBuyerId));
+              if (buyerRow) {
+                const currentReceivable = parseFloat(buyerRow.receivableBalance || "0");
+                const toApply = Math.min(appliedAmount, currentReceivable);
+                const newReceivable = Math.max(0, currentReceivable - toApply);
+                await tx.update(buyers)
+                  .set({ receivableBalance: newReceivable.toFixed(2), updatedAt: new Date() })
+                  .where(eq(buyers.id, entryBuyerId));
+              }
             }
-          }
-        }
-        
-        // STEP 2: Apply remaining to transactions FIFO
-        if (remainingAmount > 0) {
-          const txns = await tx.select().from(transactions)
-            .where(eq(transactions.merchantId, entry.merchantId))
-            .orderBy(asc(transactions.createdAt));
-          
-          const transactionsWithDue = txns.filter(txn => {
-            const matchesBuyer = matchedBuyerId
-              ? (txn.buyerId === matchedBuyerId)
-              : (txn.partyName && normalizeName(txn.partyName) === normalizedPartyName);
-            if (!matchesBuyer) return false;
-            const revenue = parseFloat(txn.revenue || "0");
-            const received = parseFloat(txn.amountReceived || "0");
-            return revenue > received;
-          });
-          
-          for (const txn of transactionsWithDue) {
-            if (remainingAmount <= 0) break;
-            
-            const revenue = parseFloat(txn.revenue || "0");
-            const currentReceived = parseFloat(txn.amountReceived || "0");
-            const due = revenue - currentReceived;
-            
-            if (due <= 0) continue;
-            
-            const toApply = Math.min(remainingAmount, due);
-            
-            const [allocation] = await tx.insert(cashEntryAllocations).values({
+            await tx.insert(buyerPaymentAllocations).values({
               cashEntryId: createdEntry.id,
-              transactionId: txn.id,
+              transactionId: null,
               merchantId: entry.merchantId,
-              appliedAmount: toApply.toString(),
-            }).returning();
-            
-            allocations.push(allocation);
-            
-            const newReceived = currentReceived + toApply;
-            await tx.update(transactions)
-              .set({ amountReceived: newReceived.toString() })
-              .where(eq(transactions.id, txn.id));
-            
-            remainingAmount -= toApply;
+              appliedAmount: appliedAmount.toString(),
+              pettyAdjustment: pettyAdj.toString(),
+              isPyBalance: true,
+              transactionCode: "PY Balance",
+            });
+          } else if (alloc.transactionId) {
+            // Reduce amountReceived on the specific transaction
+            const [txnRow] = await tx.select().from(transactions).where(eq(transactions.id, alloc.transactionId));
+            if (txnRow) {
+              const currentReceived = parseFloat(txnRow.amountReceived || "0");
+              const newReceived = currentReceived + appliedAmount + pettyAdj;
+              await tx.update(transactions)
+                .set({ amountReceived: newReceived.toString() })
+                .where(eq(transactions.id, alloc.transactionId));
+            }
+            await tx.insert(buyerPaymentAllocations).values({
+              cashEntryId: createdEntry.id,
+              transactionId: alloc.transactionId,
+              merchantId: entry.merchantId,
+              appliedAmount: appliedAmount.toString(),
+              pettyAdjustment: pettyAdj.toString(),
+              isPyBalance: false,
+              transactionCode: alloc.transactionCode || null,
+            });
           }
         }
       }
@@ -4191,42 +4180,43 @@ export class DatabaseStorage implements IStorage {
 
       // 4. Reverse allocations based on entry type
       
-      // 4a. Reverse party payment allocations (buyer receipts for raw_potato)
+      // 4a. Reverse party payment allocations (buyer receipts for raw_potato) using buyer_payment_allocations
       if (entry.direction === "inward" && entry.revenueType === "raw_potato") {
-        let totalAllocated = 0;
-        for (const alloc of entryAllocations) {
-          const [txn] = await tx.select().from(transactions)
-            .where(eq(transactions.id, alloc.transactionId));
-          
-          if (txn) {
-            const appliedAmt = parseFloat(alloc.appliedAmount);
-            const currentReceived = parseFloat(txn.amountReceived || "0");
-            const newReceived = Math.max(0, currentReceived - appliedAmt);
-            
-            await tx.update(transactions)
-              .set({ amountReceived: newReceived.toString() })
-              .where(eq(transactions.id, txn.id));
-            totalAllocated += appliedAmt;
-          }
-        }
+        const buyerAllocs = await tx.select().from(buyerPaymentAllocations)
+          .where(eq(buyerPaymentAllocations.cashEntryId, cashEntryId));
         
-        // Restore receivable: whatever was applied to receivables (total payment - allocations to transactions)
-        const totalPayment = parseFloat(entry.amount);
-        const receivableReduction = totalPayment - totalAllocated;
-        if (receivableReduction > 0) {
-          let buyerIdToRestore = entry.buyerId;
-          if (!buyerIdToRestore && entry.partyName) {
-            const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
-            const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizeName(entry.partyName!));
-            buyerIdToRestore = matchedBuyer?.id || null;
-          }
-          if (buyerIdToRestore) {
-            const [buyer] = await tx.select().from(buyers).where(eq(buyers.id, buyerIdToRestore));
-            if (buyer) {
-              const currentReceivable = parseFloat(buyer.receivableBalance || "0");
-              await tx.update(buyers)
-                .set({ receivableBalance: (currentReceivable + receivableReduction).toFixed(2), updatedAt: new Date() })
-                .where(eq(buyers.id, buyerIdToRestore));
+        for (const alloc of buyerAllocs) {
+          const appliedAmt = parseFloat(alloc.appliedAmount || "0");
+          const pettyAdj = parseFloat(alloc.pettyAdjustment || "0");
+          const totalSettled = appliedAmt + pettyAdj;
+
+          if (alloc.isPyBalance) {
+            // Restore buyer receivableBalance
+            let buyerIdToRestore = entry.buyerId;
+            if (!buyerIdToRestore && entry.partyName) {
+              const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
+              const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizeName(entry.partyName!));
+              buyerIdToRestore = matchedBuyer?.id || null;
+            }
+            if (buyerIdToRestore) {
+              const [buyer] = await tx.select().from(buyers).where(eq(buyers.id, buyerIdToRestore));
+              if (buyer) {
+                const currentReceivable = parseFloat(buyer.receivableBalance || "0");
+                await tx.update(buyers)
+                  .set({ receivableBalance: (currentReceivable + appliedAmt).toFixed(2), updatedAt: new Date() })
+                  .where(eq(buyers.id, buyerIdToRestore));
+              }
+            }
+          } else if (alloc.transactionId) {
+            // Restore amountReceived on the specific transaction
+            const [txn] = await tx.select().from(transactions)
+              .where(eq(transactions.id, alloc.transactionId));
+            if (txn) {
+              const currentReceived = parseFloat(txn.amountReceived || "0");
+              const newReceived = Math.max(0, currentReceived - totalSettled);
+              await tx.update(transactions)
+                .set({ amountReceived: newReceived.toString() })
+                .where(eq(transactions.id, txn.id));
             }
           }
         }

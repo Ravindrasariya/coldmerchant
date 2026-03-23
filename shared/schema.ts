@@ -289,6 +289,19 @@ export const aadhatPaymentAllocations = pgTable("aadhat_payment_allocations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Buyer Payment Allocations - tracks manual allocation of inward payments to buyer transactions
+export const buyerPaymentAllocations = pgTable("buyer_payment_allocations", {
+  id: serial("id").primaryKey(),
+  cashEntryId: integer("cash_entry_id").notNull().references(() => cashEntries.id, { onDelete: "cascade" }),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  merchantId: integer("merchant_id").notNull().references(() => merchants.id),
+  appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
+  pettyAdjustment: decimal("petty_adjustment", { precision: 12, scale: 2 }).default("0"),
+  isPyBalance: boolean("is_py_balance").default(false),
+  transactionCode: text("transaction_code"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Cold Store Charge Allocations - tracks which lots a cold store payment was applied to (FIFO)
 export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations", {
   id: serial("id").primaryKey(),
@@ -1396,6 +1409,14 @@ export const insertAadhatPaymentAllocationSchema = createInsertSchema(aadhatPaym
 
 export type InsertAadhatPaymentAllocation = z.infer<typeof insertAadhatPaymentAllocationSchema>;
 export type AadhatPaymentAllocation = typeof aadhatPaymentAllocations.$inferSelect;
+
+export const insertBuyerPaymentAllocationSchema = createInsertSchema(buyerPaymentAllocations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBuyerPaymentAllocation = z.infer<typeof insertBuyerPaymentAllocationSchema>;
+export type BuyerPaymentAllocation = typeof buyerPaymentAllocations.$inferSelect;
 
 // ==================== Cold Store Ledger ====================
 export const coldStores = pgTable("cold_stores", {
