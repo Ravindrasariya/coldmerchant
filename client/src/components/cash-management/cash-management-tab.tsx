@@ -942,7 +942,7 @@ export function CashManagementTab() {
       if (field === 'amount' || field === 'discountPercent') {
         if (row.amount > 0) {
           const remainder = Math.round((row.dueAmount - row.amount - row.discountAmount) * 100) / 100;
-          row.pettyAdjustment = Math.min(Math.max(remainder, 0), 1000);
+          row.pettyAdjustment = Math.min(Math.max(remainder, 0), 100);
         }
       }
       updated[index] = row;
@@ -1166,16 +1166,7 @@ export function CashManagementTab() {
           return;
         }
       }
-      for (const alloc of aadhatAllocations) {
-        if ((alloc.pettyAdjustment || 0) > 1000) {
-          toast({
-            title: t("Error", "त्रुटि"),
-            description: t("Petty adjustment cannot exceed ₹1,000", "पेटी समायोजन ₹1,000 से अधिक नहीं हो सकता"),
-            variant: "destructive",
-          });
-          return;
-        }
-      }
+      
       if (aadhatGrandTotalCash <= 0) {
         toast({
           title: t("Error", "त्रुटि"),
@@ -1812,7 +1803,7 @@ export function CashManagementTab() {
                               <div className="grid grid-cols-3 gap-1 text-xs text-muted-foreground">
                                 <span>{t("Cash", "नकद")}: ₹{appliedAmt.toLocaleString("en-IN")}</span>
                                 <span>{t("Disc", "छूट")}: {discPct}% (₹{discAmt.toLocaleString("en-IN")})</span>
-                                <span className={cn(pettyAdj > 1000 ? "text-red-600" : pettyAdj >= 100 ? "text-orange-600" : "")}>
+                                <span className={cn(pettyAdj > 50 ? "text-red-600" : pettyAdj > 1 ? "text-orange-600" : "")}>
                                   {t("Petty", "पेटी")}: ₹{pettyAdj.toLocaleString("en-IN")}
                                 </span>
                               </div>
@@ -3078,14 +3069,13 @@ export function CashManagementTab() {
                                       )}
                                     </div>
                                     <div>
-                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) >= 500 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) >= 100 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
+                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 50 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 1 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
                                       <Input
                                         type="number"
                                         step="any"
-                                        max="1000"
                                         value={alloc.pettyAdjustment || ""}
-                                        onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', Math.min(parseFloat(e.target.value) || 0, 1000))}
-                                        className={cn((alloc.pettyAdjustment || 0) >= 500 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) >= 100 ? "border-orange-400 text-orange-600" : "")}
+                                        onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                        className={cn((alloc.pettyAdjustment || 0) > 50 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 1 ? "border-orange-400 text-orange-600" : "")}
                                         data-testid={`input-alloc-petty-${idx}`}
                                       />
                                     </div>
