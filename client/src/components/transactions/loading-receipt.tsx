@@ -139,7 +139,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             .receipt-info > div { text-align: left; }
             .receipt-info .right { text-align: right; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: left; }
+            th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; }
+            th:last-child, td:last-child { text-align: right; }
             th { background-color: #f5f5f5; }
             .charges-section { margin-top: 20px; }
             .charges-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
@@ -292,10 +293,10 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="border px-2 py-1" colSpan={2}>Total / कुल</td>
-                  <td className="border px-2 py-1 text-right">{transaction.totalBags}</td>
-                  <td className="border px-2 py-1 text-right">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
-                  <td className="border px-2 py-1"></td>
+                  <td className="border px-2 py-1 text-center" colSpan={2}>Total / कुल</td>
+                  <td className="border px-2 py-1 text-center">{transaction.totalBags}</td>
+                  <td className="border px-2 py-1 text-center">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
+                  <td className="border px-2 py-1 text-center"></td>
                   <td className="border px-2 py-1 text-right">₹{parseFloat(totalAmount.toFixed(1)).toLocaleString('en-IN')}</td>
                 </tr>
               </tfoot>
