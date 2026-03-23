@@ -3552,8 +3552,8 @@ export class DatabaseStorage implements IStorage {
               throw new Error(`Transaction ${alloc.transactionId} not found or does not belong to this merchant`);
             }
             const currentReceived = parseFloat(txnRow.amountReceived || "0");
-            const txnTotal = parseFloat(txnRow.totalAmount || "0");
-            const dueAmount = txnTotal - currentReceived;
+            const txnRevenue = parseFloat(txnRow.revenue || "0");
+            const dueAmount = txnRevenue - currentReceived;
             const totalSettled = appliedAmount + pettyAdj;
             if (totalSettled > dueAmount + 0.01) {
               throw new Error(`Allocation (₹${totalSettled}) exceeds due amount (₹${dueAmount.toFixed(2)}) for transaction #${txnRow.transactionNumber}`);
@@ -4197,36 +4197,55 @@ export class DatabaseStorage implements IStorage {
         const buyerAllocs = await tx.select().from(buyerPaymentAllocations)
           .where(eq(buyerPaymentAllocations.cashEntryId, cashEntryId));
         
-        for (const alloc of buyerAllocs) {
-          const appliedAmt = parseFloat(alloc.appliedAmount || "0");
-          const pettyAdj = parseFloat(alloc.pettyAdjustment || "0");
-          const totalSettled = appliedAmt + pettyAdj;
+        if (buyerAllocs.length > 0) {
+          for (const alloc of buyerAllocs) {
+            const appliedAmt = parseFloat(alloc.appliedAmount || "0");
+            const pettyAdj = parseFloat(alloc.pettyAdjustment || "0");
+            const totalSettled = appliedAmt + pettyAdj;
 
-          if (alloc.isPyBalance) {
-            let buyerIdToRestore = entry.buyerId;
-            if (!buyerIdToRestore && entry.partyName) {
-              const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
-              const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizeName(entry.partyName!));
-              buyerIdToRestore = matchedBuyer?.id || null;
-            }
-            if (buyerIdToRestore) {
-              const [buyer] = await tx.select().from(buyers).where(eq(buyers.id, buyerIdToRestore));
-              if (buyer) {
-                const currentReceivable = parseFloat(buyer.receivableBalance || "0");
-                await tx.update(buyers)
-                  .set({ receivableBalance: (currentReceivable + appliedAmt + pettyAdj).toFixed(2), updatedAt: new Date() })
-                  .where(eq(buyers.id, buyerIdToRestore));
+            if (alloc.isPyBalance) {
+              let buyerIdToRestore = entry.buyerId;
+              if (!buyerIdToRestore && entry.partyName) {
+                const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
+                const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizeName(entry.partyName!));
+                buyerIdToRestore = matchedBuyer?.id || null;
+              }
+              if (buyerIdToRestore) {
+                const [buyer] = await tx.select().from(buyers).where(eq(buyers.id, buyerIdToRestore));
+                if (buyer) {
+                  const currentReceivable = parseFloat(buyer.receivableBalance || "0");
+                  await tx.update(buyers)
+                    .set({ receivableBalance: (currentReceivable + appliedAmt + pettyAdj).toFixed(2), updatedAt: new Date() })
+                    .where(eq(buyers.id, buyerIdToRestore));
+                }
+              }
+            } else if (alloc.transactionId) {
+              const [txn] = await tx.select().from(transactions)
+                .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
+              if (txn) {
+                const currentReceived = parseFloat(txn.amountReceived || "0");
+                const newReceived = Math.max(0, currentReceived - totalSettled);
+                await tx.update(transactions)
+                  .set({ amountReceived: newReceived.toString() })
+                  .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
               }
             }
-          } else if (alloc.transactionId) {
-            const [txn] = await tx.select().from(transactions)
-              .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
-            if (txn) {
-              const currentReceived = parseFloat(txn.amountReceived || "0");
-              const newReceived = Math.max(0, currentReceived - totalSettled);
-              await tx.update(transactions)
-                .set({ amountReceived: newReceived.toString() })
-                .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
+          }
+        } else {
+          // Legacy fallback: reverse old FIFO-era cash_entry_allocations for pre-manual-allocation entries
+          const legacyAllocs = entryAllocations.filter(a => a.transactionId !== null);
+          for (const alloc of legacyAllocs) {
+            if (alloc.transactionId) {
+              const [txn] = await tx.select().from(transactions)
+                .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
+              if (txn) {
+                const currentReceived = parseFloat(txn.amountReceived || "0");
+                const allocAmt = parseFloat(alloc.appliedAmount || "0");
+                const newReceived = Math.max(0, currentReceived - allocAmt);
+                await tx.update(transactions)
+                  .set({ amountReceived: newReceived.toString() })
+                  .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
+              }
             }
           }
         }

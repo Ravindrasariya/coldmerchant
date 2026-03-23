@@ -2864,6 +2864,7 @@ export async function registerRoutes(
           if (!Array.isArray(buyerAllocations) || buyerAllocations.length === 0) {
             return res.status(400).json({ message: "At least one allocation is required for buyer payments" });
           }
+          let allocCashSum = 0;
           for (const alloc of buyerAllocations) {
             const allocAmount = parseFloat(alloc.amount) || 0;
             const allocPetty = parseFloat(alloc.pettyAdjustment) || 0;
@@ -2876,6 +2877,11 @@ export async function registerRoutes(
             if (!alloc.isPyBalance && !alloc.transactionId) {
               return res.status(400).json({ message: "Each allocation must reference either a transaction or PY balance" });
             }
+            allocCashSum += allocAmount;
+          }
+          const entryAmount = parseFloat(amount) || 0;
+          if (Math.abs(allocCashSum - entryAmount) > 0.01) {
+            return res.status(400).json({ message: `Sum of allocation cash amounts (₹${allocCashSum.toFixed(2)}) must equal entry amount (₹${entryAmount.toFixed(2)})` });
           }
         }
         if (revenueType === "seed_sale" && !farmerName) {
