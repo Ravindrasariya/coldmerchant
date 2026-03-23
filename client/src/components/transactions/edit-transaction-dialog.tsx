@@ -440,6 +440,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     return editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.bagsMoved || 0), 0);
   }, [editableItems]);
 
+  useEffect(() => {
+    if (!isLoadingType) return;
+    form.setValue("totalMandiCommission", Math.round(totalLotAmount * mandiPct / 100 * 100) / 100 || undefined);
+    form.setValue("totalAadhatCommission", Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100 || undefined);
+    form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || undefined);
+    form.setValue("salesCommission", Math.round(totalLotAmount * salesCommPct / 100 * 100) / 100 || undefined);
+  }, [mandiPct, aadhatPct, hammaliRate, salesCommPct, totalLotAmount, totalEditBags, isLoadingType, form]);
+
   const adjustMandiCharges = (delta: { mc: number; ac: number; hm: number; ec: number }, sign: 1 | -1, itemAmount: number = 0, itemBags: number = 0) => {
     const cur = {
       mc: Number(form.getValues("totalMandiCommission")) || 0,
