@@ -721,19 +721,6 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-teal-300 dark:border-teal-700" data-testid="card-seed">
-          <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("Seed", "बीज")}</div>
-            <div className="text-sm font-bold mt-1" data-testid="text-seed-bags">
-              {seedSummary.totalBags} / {seedSummary.remainingBags} {t("bags", "बैग")}
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
-              <span className="font-medium" data-testid="text-seed-amount">{formatINR(seedSummary.totalCost)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
         <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-harvest">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Harvest", "किसान - फसल")}</div>
@@ -748,34 +735,16 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-red-300 dark:border-red-700" data-testid="card-farmer-seed">
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi">
           <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Seed", "किसान - बीज")}</div>
-            <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Receivable", "प्राप्य")}: </span>
-              <span className="font-medium" data-testid="text-farmer-seed-payable">{formatINR(farmerSummary.seedPayable)}</span>
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground">{t("Net Due", "शुद्ध बकाया")}: </span>
-              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-farmer-seed-due">{formatINR(farmerSummary.seedDue)}</span>
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground">{t("PY Due", "PY बकाया")}: </span>
-              <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-farmer-py-due">{formatINR(farmerPyReceivable.due)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-sky-300 dark:border-sky-700" data-testid="card-cold-store">
-          <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
+            <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
             <div className="text-xs mt-1">
               <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
-              <span className="font-medium" data-testid="text-cold-total">{formatINR(coldStoreSummary.totalCharges)}</span>
+              <span className="font-medium" data-testid="text-mandi-total">{formatINR(mandiSummary.total)}</span>
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
-              <span className="font-bold text-blue-600 dark:text-blue-400" data-testid="text-cold-due">{formatINR(coldStoreSummary.totalDue)}</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-mandi-due">{formatINR(mandiSummary.due)}</span>
             </div>
           </CardContent>
         </Card>
@@ -798,16 +767,47 @@ export function DashboardTab() {
           </CardContent>
         </Card>
 
-        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi">
+        <Card className="border-sky-300 dark:border-sky-700" data-testid="card-cold-store">
           <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
+            <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
             <div className="text-xs mt-1">
               <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
-              <span className="font-medium" data-testid="text-mandi-total">{formatINR(mandiSummary.total)}</span>
+              <span className="font-medium" data-testid="text-cold-total">{formatINR(coldStoreSummary.totalCharges)}</span>
             </div>
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बकाया")}: </span>
-              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-mandi-due">{formatINR(mandiSummary.due)}</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400" data-testid="text-cold-due">{formatINR(coldStoreSummary.totalDue)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-teal-300 dark:border-teal-700" data-testid="card-seed">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Seed", "बीज")}</div>
+            <div className="text-sm font-bold mt-1" data-testid="text-seed-bags">
+              {seedSummary.totalBags} / {seedSummary.remainingBags} {t("bags", "बैग")}
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-seed-amount">{formatINR(seedSummary.totalCost)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-300 dark:border-red-700" data-testid="card-farmer-seed">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Farmer - Seed", "किसान - बीज")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Receivable", "प्राप्य")}: </span>
+              <span className="font-medium" data-testid="text-farmer-seed-payable">{formatINR(farmerSummary.seedPayable)}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Net Due", "शुद्ध बकाया")}: </span>
+              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-farmer-seed-due">{formatINR(farmerSummary.seedDue)}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("PY Due", "PY बकाया")}: </span>
+              <span className="font-bold text-purple-600 dark:text-purple-400" data-testid="text-farmer-py-due">{formatINR(farmerPyReceivable.due)}</span>
             </div>
           </CardContent>
         </Card>
