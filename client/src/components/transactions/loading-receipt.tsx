@@ -184,7 +184,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const palaKarai = parseFloat(transaction?.palaKarai || "0");
   const bardan = parseFloat(transaction?.bardan || "0");
   const totalAdditionalCharges = tulai + majduri + thelaBhada + palaKarai + bardan;
-  const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges - advanceAmount;
+  const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges + driverAdvance - advanceAmount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -328,13 +328,6 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 </div>
               )}
 
-              {totalMandiCharges > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "600", borderTop: "1px solid #ccc", paddingTop: "8px", marginTop: "4px" }}>
-                  <span>Total Mandi Charges / कुल मंडी शुल्क</span>
-                  <span>₹{parseFloat(totalMandiCharges.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
               {salesCommission > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px" }}>
                   <span>Sales Commission / बिक्री कमीशन</span>
@@ -370,6 +363,13 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
                   <span>Bardan (Bags) / बरदान (बोरी)</span>
                   <span>₹{parseFloat(bardan.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {driverAdvance > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span>Driver Advance / ड्राइवर अग्रिम</span>
+                  <span>₹{parseFloat(driverAdvance.toFixed(1)).toLocaleString('en-IN')}</span>
                 </div>
               )}
 
