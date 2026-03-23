@@ -2,12 +2,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLanguage } from "@/hooks/use-language";
 import { CropType } from "@shared/schema";
 
-interface CropToggleProps {
+interface CropToggleBaseProps {
+  allowedCrops?: CropType[];
+}
+
+interface CropToggleNoAll extends CropToggleBaseProps {
+  showAll?: false | undefined;
+  value: CropType;
+  onChange: (value: CropType) => void;
+}
+
+interface CropToggleWithAll extends CropToggleBaseProps {
+  showAll: true;
   value: CropType | "all";
   onChange: (value: CropType | "all") => void;
-  allowedCrops?: CropType[];
-  showAll?: boolean;
 }
+
+type CropToggleProps = CropToggleNoAll | CropToggleWithAll;
 
 export function CropToggle({ value, onChange, allowedCrops, showAll }: CropToggleProps) {
   const { t } = useLanguage();
@@ -19,9 +30,17 @@ export function CropToggle({ value, onChange, allowedCrops, showAll }: CropToggl
   ];
 
   const crops = allowedCrops ? allCrops.filter(c => allowedCrops.includes(c.value)) : allCrops;
+
+  const handleChange = (v: string) => {
+    if (showAll) {
+      (onChange as (value: CropType | "all") => void)(v as CropType | "all");
+    } else {
+      (onChange as (value: CropType) => void)(v as CropType);
+    }
+  };
   
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as CropType | "all")}>
+    <Select value={value} onValueChange={handleChange}>
       <SelectTrigger 
         className="w-fit shrink-0 bg-green-600 text-white border-green-600 focus:ring-green-500 font-bold [&>svg]:text-white [&>span]:!line-clamp-none"
         data-testid="toggle-crop"

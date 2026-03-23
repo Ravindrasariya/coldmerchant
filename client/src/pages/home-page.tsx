@@ -541,7 +541,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CropToggle value={registerCrop} onChange={(v) => setRegisterCrop(v as "all" | "potato" | "onion" | "garlic")} showAll />
+                  <CropToggle value={registerCrop} onChange={setRegisterCrop} showAll />
                   <Button
                     variant="ghost"
                     size="icon"
