@@ -244,7 +244,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
         )}
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {place === "cold_store" && (
             <>
               <FormField
@@ -963,8 +963,8 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                 <FormControl>
                   <Textarea 
                     placeholder={t("Enter any remarks for this lot...", "इस लॉट के लिए कोई टिप्पणी दर्ज करें...")} 
-                    className="resize-none"
-                    rows={2}
+                    className="resize-none min-h-0"
+                    rows={1}
                     {...field} 
                     value={field.value || ""}
                     data-testid={`textarea-remarks-${lotIndex}`}

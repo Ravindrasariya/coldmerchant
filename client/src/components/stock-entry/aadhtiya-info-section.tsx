@@ -90,7 +90,7 @@ export function AadhtiyaInfoSection({ form, attachmentFile, onAttachmentChange }
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="purchaseDate"
@@ -219,57 +219,58 @@ export function AadhtiyaInfoSection({ form, attachmentFile, onAttachmentChange }
               </FormItem>
             )}
           />
+
+          {onAttachmentChange && (
+            <div>
+              <label className="text-sm font-medium">{t("Attachment", "अटैचमेंट")}</label>
+              <div className="flex items-center gap-3 mt-1">
+                {attachmentFile ? (
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={attachmentPreviewUrl || ""}
+                      alt="Preview"
+                      className="h-16 w-16 rounded-md object-cover border"
+                      data-testid="img-attachment-preview-mandi"
+                    />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-muted-foreground truncate max-w-[200px]">{attachmentFile.name}</span>
+                      <button type="button" onClick={() => onAttachmentChange(null)} className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1" data-testid="button-remove-attachment-mandi">
+                        <X className="h-3 w-3" />
+                        {t("Remove", "हटाएं")}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="button-add-attachment-mandi">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">{t("Add Image (max 500KB)", "फोटो जोड़ें (अधिकतम 500KB)")}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 500 * 1024) {
+                            alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
+                            return;
+                          }
+                          onAttachmentChange(file);
+                        }
+                        e.target.value = "";
+                      }}
+                      data-testid="input-attachment-file-mandi"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
         </div>
         {selectedAadhat?.redFlag && (
           <div className="mt-3 flex items-center gap-2 rounded-md bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm text-orange-700 dark:text-orange-400">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span>{selectedAadhat.name} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
-          </div>
-        )}
-        {onAttachmentChange && (
-          <div className="mt-3">
-            <label className="text-sm font-medium">{t("Attachment", "अटैचमेंट")}</label>
-            <div className="flex items-center gap-3 mt-1">
-              {attachmentFile ? (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={attachmentPreviewUrl || ""}
-                    alt="Preview"
-                    className="h-16 w-16 rounded-md object-cover border"
-                    data-testid="img-attachment-preview-mandi"
-                  />
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm text-muted-foreground truncate max-w-[200px]">{attachmentFile.name}</span>
-                    <button type="button" onClick={() => onAttachmentChange(null)} className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1" data-testid="button-remove-attachment-mandi">
-                      <X className="h-3 w-3" />
-                      {t("Remove", "हटाएं")}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <label className="flex items-center gap-2 text-sm cursor-pointer border rounded-md px-3 py-1.5 hover:bg-muted transition-colors" data-testid="button-add-attachment-mandi">
-                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{t("Add Image (max 500KB)", "फोटो जोड़ें (अधिकतम 500KB)")}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (file.size > 500 * 1024) {
-                          alert(t("File too large. Max 500KB allowed.", "फ़ाइल बहुत बड़ी है। अधिकतम 500KB अनुमत है।"));
-                          return;
-                        }
-                        onAttachmentChange(file);
-                      }
-                      e.target.value = "";
-                    }}
-                    data-testid="input-attachment-file-mandi"
-                  />
-                </label>
-              )}
-            </div>
           </div>
         )}
       </CardContent>
