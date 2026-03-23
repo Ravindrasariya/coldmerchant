@@ -22,8 +22,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Filter, Edit, Printer, Package, X } from "lucide-react";
 import { QUALITY_OPTIONS } from "@shared/schema";
-import { MonthFilter } from "@/components/ui/month-filter";
-import { DateFilter } from "@/components/ui/date-filter";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
 import { useLanguage } from "@/hooks/use-language";
@@ -68,9 +66,6 @@ interface StockEntryWithLots {
 export function StockRegisterTable() {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
-  const [filterMonths, setFilterMonths] = useState<number[]>([new Date().getMonth()]);
-  const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
@@ -93,31 +88,10 @@ export function StockRegisterTable() {
     return Array.from(stores);
   }, [entries]);
 
-  const availableYears = useMemo(() => {
-    if (!entries) return [new Date().getFullYear().toString()];
-    const years = entries.map(e => new Date(e.purchaseDate).getFullYear().toString());
-    const uniqueYears = Array.from(new Set(years)).sort((a, b) => parseInt(b) - parseInt(a));
-    return uniqueYears.length > 0 ? uniqueYears : [new Date().getFullYear().toString()];
-  }, [entries]);
-
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     
     return entries.filter((entry) => {
-      const entryDate = new Date(entry.purchaseDate);
-
-      if (filterYear && entryDate.getFullYear().toString() !== filterYear) {
-        return false;
-      }
-
-      if (filterMonths.length > 0 && filterMonths.length < 12) {
-        if (!filterMonths.includes(entryDate.getMonth())) return false;
-      }
-
-      if (filterDay !== null) {
-        if (entryDate.getDate() !== filterDay) return false;
-      }
-
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         const matchesSearch = 
@@ -148,24 +122,17 @@ export function StockRegisterTable() {
 
       return true;
     });
-  }, [entries, filterYear, filterMonths, filterDay, searchTerm, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
-
-  const currentYear = new Date().getFullYear().toString();
+  }, [entries, searchTerm, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const clearFilters = () => {
     setSearchTerm("");
-    setFilterYear(new Date().getFullYear().toString());
-    setFilterMonths([new Date().getMonth()]);
-    setFilterDay(null);
     setFilterPaymentStatus("");
     setFilterQuality("");
     setFilterUnsold(false);
     setFilterColdStore("");
   };
 
-  const currentMonth = new Date().getMonth();
-  const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
-  const hasActiveFilters = searchTerm || filterYear !== currentYear || !isDefaultMonths || filterDay !== null || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
+  const hasActiveFilters = searchTerm || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore;
 
   if (error) {
     return (
@@ -200,20 +167,6 @@ export function StockRegisterTable() {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex flex-wrap gap-3">
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger className="w-[100px]" data-testid="filter-year">
-                <SelectValue placeholder={t("Year", "वर्ष")} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map(year => (
-                  <SelectItem key={year} value={year}>{year}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <MonthFilter selectedMonths={filterMonths} onSelectedMonthsChange={setFilterMonths} />
-            <DateFilter selectedDay={filterDay} onSelectedDayChange={setFilterDay} />
-
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
               <SelectTrigger className="w-[140px]" data-testid="filter-payment-status">
                 <SelectValue placeholder={t("Payment", "भुगतान")} />
