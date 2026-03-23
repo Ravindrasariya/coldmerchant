@@ -110,6 +110,11 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   });
   const [visibleCharges, setVisibleCharges] = useState<ChargeKey[]>([]);
 
+  const [editMandiCommission, setEditMandiCommission] = useState(0);
+  const [editAadhatCommission, setEditAadhatCommission] = useState(0);
+  const [editHammali, setEditHammali] = useState(0);
+  const [editExtraCharges, setEditExtraCharges] = useState(0);
+
   const { data: inventory = [], isLoading: loadingInventory } = useQuery<UnsoldInventoryItem[]>({
     queryKey: ["/api/inventory/unsold"],
     enabled: open,
@@ -208,12 +213,16 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     };
   }, [items, findInventoryByKey]);
 
-  const totalMandiCharges = useMemo(() => {
-    return mandiChargesAggregated.totalMandiCommission +
-      mandiChargesAggregated.totalAadhatCommission +
-      mandiChargesAggregated.totalHammali +
-      mandiChargesAggregated.totalMandiExtraCharges;
+  useEffect(() => {
+    setEditMandiCommission(mandiChargesAggregated.totalMandiCommission);
+    setEditAadhatCommission(mandiChargesAggregated.totalAadhatCommission);
+    setEditHammali(mandiChargesAggregated.totalHammali);
+    setEditExtraCharges(mandiChargesAggregated.totalMandiExtraCharges);
   }, [mandiChargesAggregated]);
+
+  const totalMandiCharges = useMemo(() => {
+    return editMandiCommission + editAadhatCommission + editHammali + editExtraCharges;
+  }, [editMandiCommission, editAadhatCommission, editHammali, editExtraCharges]);
 
   const totals = useMemo(() => {
     let totalBags = 0;
@@ -292,10 +301,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         items: validItems,
         revenue: totals.totalAmount,
         salesCommission,
-        totalMandiCommission: mandiChargesAggregated.totalMandiCommission,
-        totalAadhatCommission: mandiChargesAggregated.totalAadhatCommission,
-        totalHammali: mandiChargesAggregated.totalHammali,
-        totalMandiExtraCharges: mandiChargesAggregated.totalMandiExtraCharges,
+        totalMandiCommission: editMandiCommission,
+        totalAadhatCommission: editAadhatCommission,
+        totalHammali: editHammali,
+        totalMandiExtraCharges: editExtraCharges,
         transportationCharges: 0,
         otherCharges: advanceAmount,
         tulai: additionalCharges.tulai,
@@ -347,6 +356,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
     setVisibleCharges([]);
+    setEditMandiCommission(0);
+    setEditAadhatCommission(0);
+    setEditHammali(0);
+    setEditExtraCharges(0);
   };
 
   const handleSubmit = () => {
@@ -746,30 +759,66 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
               <Separator />
 
               <div className="space-y-3">
-                <Label className="text-xs font-semibold">{t("Mandi Charges (Auto-calculated)", "मंडी शुल्क (स्वत: गणना)")}</Label>
+                <Label className="text-xs font-semibold">{t("Mandi Charges", "मंडी शुल्क")}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Mandi Commission", "मंडी कमीशन")}</Label>
-                    <div className="h-9 px-2 flex items-center bg-muted/50 rounded-md text-sm font-medium">
-                      ₹{parseFloat(mandiChargesAggregated.totalMandiCommission.toFixed(1)).toLocaleString('en-IN')}
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <Input
+                        type="number"
+                        step="any"
+                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={editMandiCommission || ""}
+                        placeholder="0"
+                        onChange={(e) => setEditMandiCommission(Number(e.target.value) || 0)}
+                        data-testid="input-loading-mandi-commission"
+                      />
                     </div>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Aadhat Commission", "आढ़त कमीशन")}</Label>
-                    <div className="h-9 px-2 flex items-center bg-muted/50 rounded-md text-sm font-medium">
-                      ₹{parseFloat(mandiChargesAggregated.totalAadhatCommission.toFixed(1)).toLocaleString('en-IN')}
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <Input
+                        type="number"
+                        step="any"
+                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={editAadhatCommission || ""}
+                        placeholder="0"
+                        onChange={(e) => setEditAadhatCommission(Number(e.target.value) || 0)}
+                        data-testid="input-loading-aadhat-commission"
+                      />
                     </div>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Hammali", "हम्माली")}</Label>
-                    <div className="h-9 px-2 flex items-center bg-muted/50 rounded-md text-sm font-medium">
-                      ₹{parseFloat(mandiChargesAggregated.totalHammali.toFixed(1)).toLocaleString('en-IN')}
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <Input
+                        type="number"
+                        step="any"
+                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={editHammali || ""}
+                        placeholder="0"
+                        onChange={(e) => setEditHammali(Number(e.target.value) || 0)}
+                        data-testid="input-loading-hammali"
+                      />
                     </div>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Extra Charges", "अतिरिक्त शुल्क")}</Label>
-                    <div className="h-9 px-2 flex items-center bg-muted/50 rounded-md text-sm font-medium">
-                      ₹{parseFloat(mandiChargesAggregated.totalMandiExtraCharges.toFixed(1)).toLocaleString('en-IN')}
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <Input
+                        type="number"
+                        step="any"
+                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={editExtraCharges || ""}
+                        placeholder="0"
+                        onChange={(e) => setEditExtraCharges(Number(e.target.value) || 0)}
+                        data-testid="input-loading-extra-charges"
+                      />
                     </div>
                   </div>
                 </div>

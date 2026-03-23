@@ -217,6 +217,15 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       t("Net Weight", "शुद्ध वज़न"),
       t("Total Cost", "कुल लागत"),
       t("Revenue", "राजस्व"),
+      t("Mandi Comm", "मंडी कमीशन"),
+      t("Aadhat Comm", "आढ़त कमीशन"),
+      t("Hammali", "हम्माली"),
+      t("Extra Charges", "अतिरिक्त शुल्क"),
+      t("Tulai", "तुलाई"),
+      t("Majduri", "मजदूरी"),
+      t("Thela Bhada", "ठेला भाड़ा"),
+      t("Pala Karai", "पाला कराई"),
+      t("Bardan", "बरदान"),
       t("Amount Received", "प्राप्त राशि"),
       t("Due Amount", "बकाया राशि"),
       t("Profit/Loss", "लाभ/हानि"),
@@ -229,14 +238,26 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       const amountReceived = parseFloat(txn.amountReceived || "0");
       const dueAmount = Math.max(revenue - amountReceived, 0);
       
-      // Format items as "S#2 (48 - Large) - Ram Vilas (Kachnariya), S#3 (180 - Large) - Arun (Kachnariya)"
       const itemsDetail = txn.items.map(item => 
         `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})${item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}`
       ).join(", ");
-      
+
+      const mandiComm = parseFloat(txn.totalMandiCommission || "0");
+      const aadhatComm = parseFloat(txn.totalAadhatCommission || "0");
+      const hammali = parseFloat(txn.totalHammali || "0");
+      const extraCharges = parseFloat(txn.totalMandiExtraCharges || "0");
+      const tulai = parseFloat(txn.tulai || "0");
+      const majduri = parseFloat(txn.majduri || "0");
+      const thelaBhada = parseFloat(txn.thelaBhada || "0");
+      const palaKarai = parseFloat(txn.palaKarai || "0");
+      const bardan = parseFloat(txn.bardan || "0");
+
       const totalCost = txn.transactionType === "loading"
-        ? parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalAadhatCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.totalMandiExtraCharges || "0")
+        ? parseFloat(txn.totalCostOfGoods || "0") + mandiComm + aadhatComm + hammali + extraCharges + tulai + majduri + thelaBhada + palaKarai + bardan
         : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+
+      const fmt = (n: number) => n > 0 ? parseFloat(n.toFixed(1)).toLocaleString('en-IN') : "-";
+
       return [
         txn.transactionNumber.toString(),
         format(new Date(txn.createdAt), "dd/MM/yyyy"),
@@ -247,6 +268,15 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         txn.totalNetWeight || "-",
         parseFloat(totalCost.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(revenue.toFixed(1)).toLocaleString('en-IN'),
+        fmt(mandiComm),
+        fmt(aadhatComm),
+        fmt(hammali),
+        fmt(extraCharges),
+        fmt(tulai),
+        fmt(majduri),
+        fmt(thelaBhada),
+        fmt(palaKarai),
+        fmt(bardan),
         parseFloat(amountReceived.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN'),
         txn.profitLoss || "-",
