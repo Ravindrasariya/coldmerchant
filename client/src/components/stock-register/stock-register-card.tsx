@@ -308,7 +308,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
   const serialNumbers = useMemo(() => {
     if (!entries) return [];
-    return entries.map(e => e.serialNumber).sort((a, b) => a - b);
+    return Array.from(new Set(entries.map(e => e.serialNumber))).sort((a, b) => a - b);
   }, [entries]);
 
   const farmerOptions = useMemo(() => {
