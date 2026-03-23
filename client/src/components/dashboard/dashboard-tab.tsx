@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import { computeNetWeight } from "@shared/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -304,6 +304,10 @@ export function DashboardTab() {
   const userId = user?.id ?? "anonymous";
   const [chartOrder, setChartOrder] = useState<ChartId[]>(() => getSavedChartOrder(userId));
   const isCustomChartOrder = chartOrder.some((id, i) => id !== DEFAULT_CHART_ORDER[i]);
+
+  useEffect(() => {
+    setChartOrder(getSavedChartOrder(userId));
+  }, [userId]);
   const chartDragItemRef = useRef<number | null>(null);
   const chartDragOverItemRef = useRef<number | null>(null);
   const [chartDragOverIndex, setChartDragOverIndex] = useState<number | null>(null);
@@ -314,7 +318,8 @@ export function DashboardTab() {
     setChartOrder(prev => {
       const updated = [...prev];
       const [moved] = updated.splice(from, 1);
-      updated.splice(to, 0, moved);
+      const insertAt = from < to ? to - 1 : to;
+      updated.splice(insertAt, 0, moved);
       saveChartOrder(userId, updated);
       return updated;
     });
@@ -1121,8 +1126,6 @@ export function DashboardTab() {
               className={`${chart.borderClass} ${chartDragOverIndex === index ? 'ring-2 ring-primary ring-offset-1' : ''} transition-shadow`}
               data-testid={chart.testId}
               data-chart-index={index}
-              draggable
-              onDragStart={() => handleChartDragStart(index)}
               onDragOver={(e) => handleChartDragOver(e, index)}
               onDrop={(e) => handleChartDrop(e, index)}
               onDragEnd={handleChartDragEnd}
@@ -1130,7 +1133,9 @@ export function DashboardTab() {
               <CardHeader className="p-3 pb-0 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm">{chart.title}</CardTitle>
                 <div
-                  className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+                  draggable
+                  onDragStart={() => handleChartDragStart(index)}
+                  className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none p-1"
                   onTouchStart={() => handleChartTouchStart(index)}
                   onTouchMove={handleChartTouchMove}
                   onTouchEnd={handleChartTouchEnd}
