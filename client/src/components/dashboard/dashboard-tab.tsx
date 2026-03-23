@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import { computeNetWeight } from "@shared/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -10,8 +10,45 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, GripVertical, RotateCcw } from "lucide-react";
 import type { ChartConfig } from "@/components/ui/chart";
+
+const DEFAULT_CHART_ORDER = [
+  "cs-total-bags",
+  "cs-remaining-bags",
+  "farmer-due-crop",
+  "buyer-due-name",
+  "aadhat-bags",
+  "aadhat-due",
+  "farmer-due-line",
+  "buyer-due-line",
+  "daily-volume",
+  "cumulative-pnl",
+] as const;
+
+type ChartId = typeof DEFAULT_CHART_ORDER[number];
+
+function getChartOrderKey(userId: string | number) {
+  return `vyapar_chart_order_${userId}`;
+}
+
+function getSavedChartOrder(userId: string | number): ChartId[] {
+  try {
+    const saved = localStorage.getItem(getChartOrderKey(userId));
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === DEFAULT_CHART_ORDER.length) {
+        const valid = parsed.every((id: string) => (DEFAULT_CHART_ORDER as readonly string[]).includes(id));
+        if (valid) return parsed as ChartId[];
+      }
+    }
+  } catch {}
+  return [...DEFAULT_CHART_ORDER];
+}
+
+function saveChartOrder(userId: string | number, order: ChartId[]) {
+  localStorage.setItem(getChartOrderKey(userId), JSON.stringify(order));
+}
 
 interface StockEntryWithLots {
   id: number;
@@ -263,6 +300,86 @@ export function DashboardTab() {
   const [selectedMonths, setSelectedMonths] = useState<number[]>([currentMonth]);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [allDays, setAllDays] = useState(true);
+
+  const userId = user?.id ?? "anonymous";
+  const [chartOrder, setChartOrder] = useState<ChartId[]>(() => getSavedChartOrder(userId));
+  const isCustomChartOrder = chartOrder.some((id, i) => id !== DEFAULT_CHART_ORDER[i]);
+  const chartDragItemRef = useRef<number | null>(null);
+  const chartDragOverItemRef = useRef<number | null>(null);
+  const [chartDragOverIndex, setChartDragOverIndex] = useState<number | null>(null);
+  const chartGridRef = useRef<HTMLDivElement>(null);
+
+  const reorderCharts = useCallback((from: number, to: number) => {
+    if (from === to) return;
+    setChartOrder(prev => {
+      const updated = [...prev];
+      const [moved] = updated.splice(from, 1);
+      updated.splice(to, 0, moved);
+      saveChartOrder(userId, updated);
+      return updated;
+    });
+  }, [userId]);
+
+  const handleChartDragStart = useCallback((index: number) => {
+    chartDragItemRef.current = index;
+  }, []);
+
+  const handleChartDragOver = useCallback((e: DragEvent<HTMLElement>, index: number) => {
+    e.preventDefault();
+    chartDragOverItemRef.current = index;
+    setChartDragOverIndex(index);
+  }, []);
+
+  const handleChartDrop = useCallback((e: DragEvent<HTMLElement>, dropIndex: number) => {
+    e.preventDefault();
+    const from = chartDragItemRef.current;
+    if (from === null) return;
+    reorderCharts(from, dropIndex);
+  }, [reorderCharts]);
+
+  const handleChartDragEnd = useCallback(() => {
+    chartDragItemRef.current = null;
+    chartDragOverItemRef.current = null;
+    setChartDragOverIndex(null);
+  }, []);
+
+  const handleChartTouchStart = useCallback((index: number) => {
+    chartDragItemRef.current = index;
+  }, []);
+
+  const handleChartTouchMove = useCallback((e: ReactTouchEvent) => {
+    if (chartDragItemRef.current === null || !chartGridRef.current) return;
+    const touch = e.touches[0];
+    const items = chartGridRef.current.querySelectorAll<HTMLElement>('[data-chart-index]');
+    for (let i = 0; i < items.length; i++) {
+      const rect = items[i].getBoundingClientRect();
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom &&
+          touch.clientX >= rect.left && touch.clientX <= rect.right) {
+        const idx = parseInt(items[i].getAttribute('data-chart-index') || '-1', 10);
+        if (idx >= 0 && idx !== chartDragOverItemRef.current) {
+          chartDragOverItemRef.current = idx;
+          setChartDragOverIndex(idx);
+        }
+        break;
+      }
+    }
+  }, []);
+
+  const handleChartTouchEnd = useCallback(() => {
+    const from = chartDragItemRef.current;
+    const to = chartDragOverItemRef.current;
+    if (from !== null && to !== null) {
+      reorderCharts(from, to);
+    }
+    chartDragItemRef.current = null;
+    chartDragOverItemRef.current = null;
+    setChartDragOverIndex(null);
+  }, [reorderCharts]);
+
+  const resetChartOrder = useCallback(() => {
+    setChartOrder([...DEFAULT_CHART_ORDER]);
+    localStorage.removeItem(getChartOrderKey(userId));
+  }, [userId]);
 
   const availableYears = useMemo(() => {
     const years: number[] = [];
@@ -813,320 +930,221 @@ export function DashboardTab() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-sky-300 dark:border-sky-700" data-testid="chart-cs-total-bags">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Total Bags by Cold Store", "कोल्ड स्टोर के अनुसार कुल बैग")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {coldStoreBagsSplit.total.length > 0 ? (
-              <ChartContainer config={coldStoreTotalPieConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={coldStoreBagsSplit.total}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={55}
-                    labelLine={renderShortLabelLine(PIE_COLORS)}
-                    label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
-                  >
-                    {coldStoreBagsSplit.total.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {isCustomChartOrder && (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetChartOrder}
+            className="text-xs text-muted-foreground gap-1"
+            data-testid="button-reset-chart-order"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {t("Reset Chart Order", "चार्ट क्रम रीसेट करें")}
+          </Button>
+        </div>
+      )}
 
-        <Card className="border-sky-300 dark:border-sky-700" data-testid="chart-cs-remaining-bags">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Remaining Bags by Cold Store", "कोल्ड स्टोर के अनुसार शेष बैग")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {coldStoreBagsSplit.remaining.length > 0 ? (
-              <ChartContainer config={coldStoreRemPieConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={coldStoreBagsSplit.remaining}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={55}
-                    labelLine={renderShortLabelLine(PIE_COLORS)}
-                    label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
-                  >
-                    {coldStoreBagsSplit.remaining.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" ref={chartGridRef}>
+        {chartOrder.map((chartId, index) => {
+          const chartConfigs: Record<ChartId, { borderClass: string; testId: string; title: string; content: JSX.Element }> = {
+            "cs-total-bags": {
+              borderClass: "border-sky-300 dark:border-sky-700",
+              testId: "chart-cs-total-bags",
+              title: t("Total Bags by Cold Store", "कोल्ड स्टोर के अनुसार कुल बैग"),
+              content: coldStoreBagsSplit.total.length > 0 ? (
+                <ChartContainer config={coldStoreTotalPieConfig} className="h-[200px] w-full">
+                  <PieChart>
+                    <Pie data={coldStoreBagsSplit.total} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} labelLine={renderShortLabelLine(PIE_COLORS)} label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}>
+                      {coldStoreBagsSplit.total.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "cs-remaining-bags": {
+              borderClass: "border-sky-300 dark:border-sky-700",
+              testId: "chart-cs-remaining-bags",
+              title: t("Remaining Bags by Cold Store", "कोल्ड स्टोर के अनुसार शेष बैग"),
+              content: coldStoreBagsSplit.remaining.length > 0 ? (
+                <ChartContainer config={coldStoreRemPieConfig} className="h-[200px] w-full">
+                  <PieChart>
+                    <Pie data={coldStoreBagsSplit.remaining} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} labelLine={renderShortLabelLine(PIE_COLORS)} label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}>
+                      {coldStoreBagsSplit.remaining.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "farmer-due-crop": {
+              borderClass: "border-green-300 dark:border-green-700",
+              testId: "chart-farmer-due-crop",
+              title: t("Farmer Due by Crop", "फसल के अनुसार किसान बकाया"),
+              content: farmerDueByCrop.length > 0 ? (
+                <ChartContainer config={pieChartConfig} className="h-[200px] w-full">
+                  <PieChart>
+                    <Pie data={farmerDueByCrop} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} labelLine={renderShortLabelLine(PIE_COLORS)} label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}>
+                      {farmerDueByCrop.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "buyer-due-name": {
+              borderClass: "border-orange-300 dark:border-orange-700",
+              testId: "chart-buyer-due-name",
+              title: t("Buyer Due by Name", "नाम के अनुसार खरीदार बकाया"),
+              content: buyerDueByName.length > 0 ? (
+                <ChartContainer config={buyerPieConfig} className="h-[200px] w-full">
+                  <PieChart>
+                    <Pie data={buyerDueByName} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} labelLine={renderShortLabelLine(PIE_COLORS)} label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}>
+                      {buyerDueByName.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "aadhat-bags": {
+              borderClass: "border-amber-300 dark:border-amber-700",
+              testId: "chart-aadhat-bags",
+              title: t("Bags by Aadhatiya", "आढ़तिया के अनुसार बैग"),
+              content: aadhatBagsByName.length > 0 ? (
+                <ChartContainer config={aadhatBagsPieConfig} className="h-[200px] w-full">
+                  <PieChart>
+                    <Pie data={aadhatBagsByName} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} labelLine={renderShortLabelLine(PIE_COLORS)} label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}>
+                      {aadhatBagsByName.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "aadhat-due": {
+              borderClass: "border-amber-300 dark:border-amber-700",
+              testId: "chart-aadhat-due",
+              title: t("Due by Aadhatiya", "आढ़तिया के अनुसार बकाया"),
+              content: aadhatDueByName.length > 0 ? (
+                <ChartContainer config={aadhatDuePieConfig} className="h-[200px] w-full">
+                  <PieChart>
+                    <Pie data={aadhatDueByName} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} labelLine={renderShortLabelLine(PIE_COLORS)} label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}>
+                      {aadhatDueByName.map((_, i) => (<Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "farmer-due-line": {
+              borderClass: "border-green-300 dark:border-green-700",
+              testId: "chart-farmer-due-line",
+              title: t("Farmer Due", "किसान बकाया"),
+              content: timeseriesLoading ? (
+                <div className="h-[200px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : timeseries?.farmerDueTimeSeries && timeseries.farmerDueTimeSeries.length > 0 ? (
+                <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
+                  <LineChart data={timeseries.farmerDueTimeSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="amount" stroke="#16a34a" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "buyer-due-line": {
+              borderClass: "border-orange-300 dark:border-orange-700",
+              testId: "chart-buyer-due-line",
+              title: t("Buyer Due", "खरीदार बकाया"),
+              content: timeseriesLoading ? (
+                <div className="h-[200px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : timeseries?.buyerDueTimeSeries && timeseries.buyerDueTimeSeries.length > 0 ? (
+                <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
+                  <LineChart data={timeseries.buyerDueTimeSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="amount" stroke="#f97316" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "daily-volume": {
+              borderClass: "border-blue-300 dark:border-blue-700",
+              testId: "chart-daily-volume",
+              title: t("Daily Volume (Kg)", "दैनिक मात्रा (किलो)"),
+              content: timeseriesLoading ? (
+                <div className="h-[200px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : timeseries?.dailyVolumeTimeSeries && timeseries.dailyVolumeTimeSeries.length > 0 ? (
+                <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
+                  <LineChart data={timeseries.dailyVolumeTimeSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="volume" stroke="#16a34a" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+            "cumulative-pnl": {
+              borderClass: "border-purple-300 dark:border-purple-700",
+              testId: "chart-cumulative-pnl",
+              title: t("Cumulative P&L", "संचयी लाभ/हानि"),
+              content: timeseriesLoading ? (
+                <div className="h-[200px] flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : timeseries?.cumulativePnlTimeSeries && timeseries.cumulativePnlTimeSeries.length > 0 ? (
+                <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
+                  <LineChart data={timeseries.cumulativePnlTimeSeries}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line type="monotone" dataKey="pnl" stroke="#f97316" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ChartContainer>
+              ) : (<div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">{t("No data", "कोई डेटा नहीं")}</div>),
+            },
+          };
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-farmer-due-crop">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Farmer Due by Crop", "फसल के अनुसार किसान बकाया")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {farmerDueByCrop.length > 0 ? (
-              <ChartContainer config={pieChartConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={farmerDueByCrop}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={55}
-                    labelLine={renderShortLabelLine(PIE_COLORS)}
-                    label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
-                  >
-                    {farmerDueByCrop.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          const chart = chartConfigs[chartId];
+          if (!chart) return null;
 
-        <Card className="border-orange-300 dark:border-orange-700" data-testid="chart-buyer-due-name">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Buyer Due by Name", "नाम के अनुसार खरीदार बकाया")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {buyerDueByName.length > 0 ? (
-              <ChartContainer config={buyerPieConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={buyerDueByName}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={55}
-                    labelLine={renderShortLabelLine(PIE_COLORS)}
-                    label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
-                  >
-                    {buyerDueByName.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-amber-300 dark:border-amber-700" data-testid="chart-aadhat-bags">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Bags by Aadhatiya", "आढ़तिया के अनुसार बैग")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {aadhatBagsByName.length > 0 ? (
-              <ChartContainer config={aadhatBagsPieConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={aadhatBagsByName}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={55}
-                    labelLine={renderShortLabelLine(PIE_COLORS)}
-                    label={renderOuterLabel((v) => `${v}`, PIE_COLORS)}
-                  >
-                    {aadhatBagsByName.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-300 dark:border-amber-700" data-testid="chart-aadhat-due">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Due by Aadhatiya", "आढ़तिया के अनुसार बकाया")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {aadhatDueByName.length > 0 ? (
-              <ChartContainer config={aadhatDuePieConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={aadhatDueByName}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={55}
-                    labelLine={renderShortLabelLine(PIE_COLORS)}
-                    label={renderOuterLabel((v) => formatINR(v), PIE_COLORS)}
-                  >
-                    {aadhatDueByName.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-green-300 dark:border-green-700" data-testid="chart-farmer-due-line">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Farmer Due", "किसान बकाया")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {timeseriesLoading ? (
-              <div className="h-[200px] flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : timeseries?.farmerDueTimeSeries && timeseries.farmerDueTimeSeries.length > 0 ? (
-              <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
-                <LineChart data={timeseries.farmerDueTimeSeries}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="amount" stroke="#16a34a" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-300 dark:border-orange-700" data-testid="chart-buyer-due-line">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Buyer Due", "खरीदार बकाया")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {timeseriesLoading ? (
-              <div className="h-[200px] flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : timeseries?.buyerDueTimeSeries && timeseries.buyerDueTimeSeries.length > 0 ? (
-              <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
-                <LineChart data={timeseries.buyerDueTimeSeries}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="amount" stroke="#f97316" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-blue-300 dark:border-blue-700" data-testid="chart-daily-volume">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Daily Volume (Kg)", "दैनिक मात्रा (किलो)")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {timeseriesLoading ? (
-              <div className="h-[200px] flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : timeseries?.dailyVolumeTimeSeries && timeseries.dailyVolumeTimeSeries.length > 0 ? (
-              <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
-                <LineChart data={timeseries.dailyVolumeTimeSeries}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="volume" stroke="#16a34a" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-300 dark:border-purple-700" data-testid="chart-cumulative-pnl">
-          <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-sm">{t("Cumulative P&L", "संचयी लाभ/हानि")}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            {timeseriesLoading ? (
-              <div className="h-[200px] flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : timeseries?.cumulativePnlTimeSeries && timeseries.cumulativePnlTimeSeries.length > 0 ? (
-              <ChartContainer config={lineChartConfig} className="h-[200px] w-full">
-                <LineChart data={timeseries.cumulativePnlTimeSeries}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="pnl" stroke="#f97316" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ChartContainer>
-            ) : (
-              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground">
-                {t("No data", "कोई डेटा नहीं")}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          return (
+            <Card
+              key={chartId}
+              className={`${chart.borderClass} ${chartDragOverIndex === index ? 'ring-2 ring-primary ring-offset-1' : ''} transition-shadow`}
+              data-testid={chart.testId}
+              data-chart-index={index}
+              draggable
+              onDragStart={() => handleChartDragStart(index)}
+              onDragOver={(e) => handleChartDragOver(e, index)}
+              onDrop={(e) => handleChartDrop(e, index)}
+              onDragEnd={handleChartDragEnd}
+            >
+              <CardHeader className="p-3 pb-0 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm">{chart.title}</CardTitle>
+                <div
+                  className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+                  onTouchStart={() => handleChartTouchStart(index)}
+                  onTouchMove={handleChartTouchMove}
+                  onTouchEnd={handleChartTouchEnd}
+                  data-testid={`grip-chart-${chartId}`}
+                >
+                  <GripVertical className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent className="p-3">
+                {chart.content}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
