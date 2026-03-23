@@ -136,7 +136,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             .header h1 { margin: 0; font-size: 24px; }
             .header p { margin: 5px 0; color: #555; }
             .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; line-height: 1.4; }
-            .receipt-info div { text-align: left; }
+            .receipt-info > div { text-align: left; }
             .receipt-info .right { text-align: right; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
             th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
