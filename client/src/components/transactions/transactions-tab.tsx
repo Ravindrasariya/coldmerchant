@@ -19,6 +19,8 @@ import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
 import { SalesReceiptDialog } from "./sales-receipt";
 import { LoadingReceiptDialog } from "./loading-receipt";
+import { MonthFilter } from "@/components/ui/month-filter";
+import { DateFilter } from "@/components/ui/date-filter";
 
 interface TransactionItem {
   id: number;
@@ -89,6 +91,8 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   
   // Filter states
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [filterMonths, setFilterMonths] = useState<number[]>([]);
+  const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterParty, setFilterParty] = useState("all");
@@ -125,8 +129,19 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       if (txnCrop !== selectedCrop) return false;
 
       // Filter by year
-      if (filterYear && new Date(txn.createdAt).getFullYear().toString() !== filterYear) {
+      const txnDate = new Date(txn.createdAt);
+      if (filterYear && txnDate.getFullYear().toString() !== filterYear) {
         return false;
+      }
+
+      // Filter by month (multi-select)
+      if (filterMonths.length > 0 && filterMonths.length < 12) {
+        if (!filterMonths.includes(txnDate.getMonth())) return false;
+      }
+
+      // Filter by day
+      if (filterDay !== null) {
+        if (txnDate.getDate() !== filterDay) return false;
       }
       
       // Filter by transaction number
@@ -162,13 +177,15 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       
       return true;
     });
-  }, [transactions, selectedCrop, filterYear, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
+  }, [transactions, selectedCrop, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
 
   const currentYear = new Date().getFullYear().toString();
-  const hasActiveFilters = filterYear !== currentYear || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
+  const hasActiveFilters = filterYear !== currentYear || filterMonths.length > 0 || filterDay !== null || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
 
   const clearFilters = () => {
     setFilterYear(new Date().getFullYear().toString());
+    setFilterMonths([]);
+    setFilterDay(null);
     setFilterTxnNumber("");
     setFilterSerialNumber("");
     setFilterParty("all");
@@ -363,6 +380,9 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                     ))}
                   </SelectContent>
                 </Select>
+
+                <MonthFilter selectedMonths={filterMonths} onSelectedMonthsChange={setFilterMonths} />
+                <DateFilter selectedDay={filterDay} onSelectedDayChange={setFilterDay} />
                 
                 <Input
                   placeholder={t("Transaction #", "लेनदेन #")}
