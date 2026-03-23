@@ -3791,6 +3791,113 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/buyers/:id/ledger - Get buyer ledger entries for current FY
+  app.get("/api/buyers/:id/ledger", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const buyerId = parseInt(req.params.id);
+      if (isNaN(buyerId)) return res.status(400).json({ message: "Invalid buyer ID" });
+
+      const buyer = await storage.getBuyerById(buyerId, merchantId);
+      if (!buyer) {
+        return res.status(404).json({ message: "Buyer not found" });
+      }
+
+      const todayStr = getISTDateString();
+      const todayDate = new Date(todayStr + "T00:00:00+05:30");
+      const currentMonth = todayDate.getMonth();
+      const currentYear = todayDate.getFullYear();
+      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const fyStart = `${fyStartYear}-04-01`;
+      const fyEnd = `${fyStartYear + 1}-03-31`;
+
+      const openingBalance = parseFloat(buyer.receivableBalance || "0");
+
+      const allTransactions = await storage.getTransactionsByMerchant(merchantId);
+      const buyerTxns = allTransactions.filter(txn => 
+        txn.buyerId === buyerId && 
+        txn.dateOfLoading && txn.dateOfLoading >= fyStart && txn.dateOfLoading <= fyEnd
+      );
+
+      const allCashEntries = await storage.getCashEntriesByMerchant(merchantId);
+      const buyerCashEntries = allCashEntries.filter(entry =>
+        entry.buyerId === buyerId &&
+        entry.direction === "inward" &&
+        entry.revenueType === "raw_potato" &&
+        !entry.isReversed &&
+        entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
+      );
+
+      interface LedgerEntry {
+        date: string;
+        tnxCode: string;
+        particulars: string;
+        dr: number;
+        cr: number;
+        sourceType: "transaction" | "payment";
+        sourceId: number;
+      }
+
+      const entries: LedgerEntry[] = [];
+
+      for (const txn of buyerTxns) {
+        const revenue = parseFloat(txn.revenue || "0");
+        if (revenue > 0) {
+          entries.push({
+            date: txn.dateOfLoading || "",
+            tnxCode: `Tnx #${txn.transactionNumber}`,
+            particulars: "Harvest Sale",
+            dr: revenue,
+            cr: 0,
+            sourceType: "transaction",
+            sourceId: txn.id,
+          });
+        }
+      }
+
+      for (const entry of buyerCashEntries) {
+        const amount = parseFloat(entry.amount || "0");
+        let totalPetty = 0;
+        if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
+          for (const alloc of entry.buyerAllocations) {
+            totalPetty += parseFloat(alloc.pettyAdjustment || "0");
+          }
+        }
+        const totalCr = amount + totalPetty;
+        if (totalCr > 0) {
+          entries.push({
+            date: entry.entryDate || "",
+            tnxCode: entry.transactionCode || "",
+            particulars: "Payment (Cash)",
+            dr: 0,
+            cr: totalCr,
+            sourceType: "payment",
+            sourceId: entry.id,
+          });
+        }
+      }
+
+      entries.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.sourceType !== b.sourceType) return a.sourceType === "transaction" ? -1 : 1;
+        return a.sourceId - b.sourceId;
+      });
+
+      res.json({
+        buyerId,
+        buyerName: buyer.name,
+        buyerAddress: buyer.address,
+        openingBalance,
+        fyStart,
+        fyEnd,
+        entries,
+      });
+    } catch (error) {
+      console.error("Error fetching buyer ledger:", error);
+      res.status(500).json({ message: "Failed to fetch buyer ledger" });
+    }
+  });
+
   // GET /api/buyers/:id/history - Get edit history for a buyer
   app.get("/api/buyers/:id/history", requireMerchant, async (req, res) => {
     try {

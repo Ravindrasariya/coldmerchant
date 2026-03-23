@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getTodayIST } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
@@ -21,13 +21,36 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Search,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { type Buyer, type BuyerEditHistory } from "@shared/schema";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
+
+interface LedgerEntry {
+  date: string;
+  tnxCode: string;
+  particulars: string;
+  dr: number;
+  cr: number;
+  sourceType: "transaction" | "payment";
+  sourceId: number;
+}
+
+interface BuyerLedgerData {
+  buyerId: number;
+  buyerName: string;
+  buyerAddress: string;
+  openingBalance: number;
+  fyStart: string;
+  fyEnd: string;
+  entries: LedgerEntry[];
+}
 
 interface BuyerWithDues extends Buyer {
   overallDue: number;
@@ -36,6 +59,182 @@ interface BuyerWithDues extends Buyer {
   dueTodayAmount: number;
   dueOver15Days: number;
   dueOver30Days: number;
+}
+
+function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatDate }: {
+  buyerId: number;
+  buyerName: string;
+  t: (en: string, hi: string) => string;
+  formatLedgerAmount: (v: number) => string;
+  formatDate: (d: string) => string;
+}) {
+  const ledgerRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const { data: ledgerData, isLoading } = useQuery<BuyerLedgerData>({
+    queryKey: ["/api/buyers", buyerId, "ledger"],
+    queryFn: async () => {
+      const res = await fetch(`/api/buyers/${buyerId}/ledger`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger");
+      return res.json();
+    },
+    enabled: !!buyerId,
+  });
+
+  const ledgerRows = useMemo(() => {
+    if (!ledgerData) return [];
+    const rows: { kramank: number; date: string; tnxCode: string; particulars: string; dr: number; cr: number; balance: number }[] = [];
+    let balance = ledgerData.openingBalance;
+    rows.push({ kramank: 0, date: ledgerData.fyStart, tnxCode: "", particulars: "Opening Balance", dr: ledgerData.openingBalance, cr: 0, balance });
+    ledgerData.entries.forEach((entry, idx) => {
+      balance = balance + entry.dr - entry.cr;
+      rows.push({ kramank: idx + 1, date: entry.date, tnxCode: entry.tnxCode, particulars: entry.particulars, dr: entry.dr, cr: entry.cr, balance });
+    });
+    return rows;
+  }, [ledgerData]);
+
+  const handlePdfExport = async () => {
+    if (!ledgerRef.current || !ledgerData) return;
+    setPdfLoading(true);
+    try {
+      const fyLabel = `${ledgerData.fyStart.substring(0, 4)}-${ledgerData.fyEnd.substring(2, 4)}`;
+      const printDiv = document.createElement("div");
+      printDiv.style.cssText = "width:780px;padding:20px;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000;";
+
+      const header = document.createElement("div");
+      header.style.cssText = "text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px;";
+      const h1 = document.createElement("h1");
+      h1.style.cssText = "font-size:20px;margin:0;";
+      h1.textContent = buyerName;
+      const addrP = document.createElement("p");
+      addrP.style.cssText = "font-size:13px;color:#555;margin:4px 0;";
+      addrP.textContent = ledgerData.buyerAddress || "";
+      const fyP = document.createElement("p");
+      fyP.style.cssText = "font-size:14px;font-weight:600;margin:6px 0 0 0;";
+      fyP.textContent = `${t("Buyer Ledger", "खरीदार खाता")} — FY ${fyLabel}`;
+      header.append(h1, addrP, fyP);
+
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12px;";
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      headerRow.style.background = "#f0f0f0";
+      const headers = [
+        { text: t("Sr", "क्र."), align: "center", width: "40px" },
+        { text: t("Date", "तारीख"), align: "left" },
+        { text: t("Tnx #", "Tnx #"), align: "left" },
+        { text: t("Particulars", "विवरण"), align: "left" },
+        { text: t("Dr", "डेबिट"), align: "right" },
+        { text: t("Cr", "क्रेडिट"), align: "right" },
+        { text: t("Balance", "शेष"), align: "right" },
+      ];
+      for (const h of headers) {
+        const th = document.createElement("th");
+        th.style.cssText = `border:1px solid #999;padding:5px 6px;text-align:${h.align};${h.width ? `width:${h.width}` : ""}`;
+        th.textContent = h.text;
+        headerRow.appendChild(th);
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (let i = 0; i < ledgerRows.length; i++) {
+        const row = ledgerRows[i];
+        const tr = document.createElement("tr");
+        if (i === 0) tr.style.cssText = "background:#f9f9f9;font-weight:600;";
+        const cellData = [
+          { text: String(row.kramank), align: "center" },
+          { text: formatDate(row.date), align: "left" },
+          { text: row.tnxCode || "—", align: "left" },
+          { text: row.particulars, align: "left" },
+          { text: row.dr > 0 ? `₹${row.dr.toLocaleString("en-IN")}` : "—", align: "right" },
+          { text: row.cr > 0 ? `₹${row.cr.toLocaleString("en-IN")}` : "—", align: "right" },
+          { text: `₹${row.balance.toLocaleString("en-IN")}`, align: "right", bold: true },
+        ];
+        for (const cell of cellData) {
+          const td = document.createElement("td");
+          td.style.cssText = `border:1px solid #ccc;padding:4px 6px;text-align:${cell.align};${(cell as any).bold ? "font-weight:600;" : ""}`;
+          td.textContent = cell.text;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+
+      printDiv.append(header, table);
+      document.body.appendChild(printDiv);
+      await shareReceiptAsPdf(printDiv, `${buyerName}_Ledger_FY${fyLabel}`);
+      document.body.removeChild(printDiv);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-6 bg-muted/20 border-b">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!ledgerData || ledgerRows.length === 0) {
+    return (
+      <div className="text-center py-4 text-sm text-muted-foreground bg-muted/20 border-b">
+        {t("No ledger entries found", "कोई खाता प्रविष्टि नहीं मिली")}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ledgerRef} className="bg-muted/10 border-b" data-testid={`buyer-ledger-${buyerId}`}>
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+        <span className="text-xs font-semibold text-muted-foreground">
+          {t("Ledger", "खाता")} — {buyerName} (FY {ledgerData.fyStart.substring(0, 4)}-{ledgerData.fyEnd.substring(2, 4)})
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handlePdfExport}
+          disabled={pdfLoading}
+          data-testid={`button-pdf-ledger-${buyerId}`}
+        >
+          {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+          <span className="ml-1 text-xs">{t("PDF", "PDF")}</span>
+        </Button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse min-w-[600px]">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="border px-2 py-1.5 text-center w-10">{t("Sr", "क्र.")}</th>
+              <th className="border px-2 py-1.5 text-left w-24">{t("Date", "तारीख")}</th>
+              <th className="border px-2 py-1.5 text-left w-20">{t("Tnx #", "Tnx #")}</th>
+              <th className="border px-2 py-1.5 text-left">{t("Particulars", "विवरण")}</th>
+              <th className="border px-2 py-1.5 text-right w-24">{t("Dr", "डेबिट")}</th>
+              <th className="border px-2 py-1.5 text-right w-24">{t("Cr", "क्रेडिट")}</th>
+              <th className="border px-2 py-1.5 text-right w-28">{t("Balance", "शेष")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ledgerRows.map((row, i) => (
+              <tr key={i} className={i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.cr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : ""} data-testid={`ledger-row-${buyerId}-${i}`}>
+                <td className="border px-2 py-1.5 text-center text-muted-foreground">{row.kramank}</td>
+                <td className="border px-2 py-1.5">{formatDate(row.date)}</td>
+                <td className="border px-2 py-1.5 font-mono">{row.tnxCode || "—"}</td>
+                <td className="border px-2 py-1.5">{row.particulars}</td>
+                <td className="border px-2 py-1.5 text-right">{formatLedgerAmount(row.dr)}</td>
+                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{formatLedgerAmount(row.cr)}</td>
+                <td className="border px-2 py-1.5 text-right font-semibold">{formatLedgerAmount(row.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 export default function BuyersTab() {
@@ -58,6 +257,7 @@ export default function BuyersTab() {
   
   const [sortColumn, setSortColumn] = useState<'buyerCode' | 'overallDue' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [expandedBuyerId, setExpandedBuyerId] = useState<number | null>(null);
 
   const { data: buyers = [], isLoading } = useQuery<BuyerWithDues[]>({
     queryKey: ["/api/buyers"],
@@ -340,6 +540,23 @@ export default function BuyersTab() {
     }).format(value);
   };
 
+  const formatLedgerAmount = (value: number) => {
+    if (value === 0) return "—";
+    return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr + "T00:00:00");
+      return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" });
+    } catch { return dateStr; }
+  };
+
+  const toggleExpand = (buyerId: number) => {
+    setExpandedBuyerId(prev => prev === buyerId ? null : buyerId);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -473,23 +690,25 @@ export default function BuyersTab() {
                 </div>
                 
                 {filteredBuyers.map((buyer, index) => (
+                  <div key={buyer.id}>
                   <div 
-                    key={buyer.id} 
-                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[900px]"
+                    className="grid items-center gap-2 px-3 py-2 border-b min-w-[900px] cursor-pointer hover:bg-muted/30 transition-colors"
                     style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr)' }}
                     data-testid={`buyer-row-${index}`}
+                    onClick={() => toggleExpand(buyer.id)}
                   >
                     <div className="flex items-center justify-center">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleEditClick(buyer)}
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(buyer); }}
                         data-testid={`button-edit-buyer-${index}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="text-xs font-mono text-muted-foreground truncate" data-testid={`text-buyer-code-${index}`}>
+                    <div className="text-xs font-mono text-muted-foreground truncate flex items-center gap-1" data-testid={`text-buyer-code-${index}`}>
+                      {expandedBuyerId === buyer.id ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                       {buyer.buyerCode || '-'}
                     </div>
                     <div className="text-xs truncate" data-testid={`text-name-${index}`}>
@@ -515,6 +734,7 @@ export default function BuyersTab() {
                       <Switch
                         checked={buyer.isActive ?? true}
                         onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })}
+                        onClick={(e) => e.stopPropagation()}
                         data-testid={`switch-active-${index}`}
                       />
                     </div>
@@ -525,47 +745,62 @@ export default function BuyersTab() {
                       ₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
                   </div>
+                  {expandedBuyerId === buyer.id && (
+                    <BuyerLedgerSection buyerId={buyer.id} buyerName={buyer.name} t={t} formatLedgerAmount={formatLedgerAmount} formatDate={formatDate} />
+                  )}
+                  </div>
                 ))}
               </div>
               
               {filteredBuyers.map((buyer, index) => (
                 <div 
                   key={`mobile-${buyer.id}`} 
-                  className="md:hidden p-4 border rounded-lg bg-card space-y-3"
+                  className="md:hidden border rounded-lg bg-card"
                   data-testid={`buyer-card-${index}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-muted-foreground">{buyer.buyerCode || '-'}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(buyer)}
-                      data-testid={`button-edit-buyer-mobile-${index}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="font-medium">{buyer.name}</div>
-                  <div className="text-sm text-muted-foreground">{buyer.address}</div>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {buyer.mandiCode && <span>{t("Mandi", "मंडी")}: {buyer.mandiCode}</span>}
-                    {buyer.contact && <span>{t("Contact", "संपर्क")}: {buyer.contact}</span>}
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      {buyer.redFlag ? (
-                        <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
-                      ) : null}
-                      <Switch
-                        checked={buyer.isActive ?? true}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })}
-                      />
+                  <div className="p-4 space-y-3 cursor-pointer" onClick={() => toggleExpand(buyer.id)}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                        {expandedBuyerId === buyer.id ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        {buyer.buyerCode || '-'}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(buyer); }}
+                        data-testid={`button-edit-buyer-mobile-${index}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                    <div className="font-medium">{buyer.name}</div>
+                    <div className="text-sm text-muted-foreground">{buyer.address}</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {buyer.mandiCode && <span>{t("Mandi", "मंडी")}: {buyer.mandiCode}</span>}
+                      {buyer.contact && <span>{t("Contact", "संपर्क")}: {buyer.contact}</span>}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="flex items-center gap-2">
+                        {buyer.redFlag ? (
+                          <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
+                        ) : null}
+                        <Switch
+                          checked={buyer.isActive ?? true}
+                          onCheckedChange={(checked) => { toggleActiveMutation.mutate({ id: buyer.id, isActive: checked }); }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      </div>
                     </div>
                   </div>
+                  {expandedBuyerId === buyer.id && (
+                    <div className="border-t">
+                      <BuyerLedgerSection buyerId={buyer.id} buyerName={buyer.name} t={t} formatLedgerAmount={formatLedgerAmount} formatDate={formatDate} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
