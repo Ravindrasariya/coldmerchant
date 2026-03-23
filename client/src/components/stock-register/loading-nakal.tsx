@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Printer, Share2 } from "lucide-react";
@@ -328,7 +328,7 @@ export function LoadingNakalDialog({
                   {entryBlocks.map(({ entry, particulars, lotAmounts, purDami, showPurDami, entryBags, entryWeight, entryTotal }) => {
                     const rowspan = entry.lots.length + (showPurDami ? 1 : 0);
                     return (
-                      <>
+                      <Fragment key={entry.id}>
                         {entry.lots.map((lot, idx) => {
                           const crop = getCropLabel(lot.crop || entry.crop);
                           const w = parseFloat(lot.totalWeight || "0");
@@ -380,7 +380,7 @@ export function LoadingNakalDialog({
                             ₹{fmt(entryTotal)}
                           </td>
                         </tr>
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>
