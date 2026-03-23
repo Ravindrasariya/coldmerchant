@@ -1038,24 +1038,25 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               </SelectContent>
             </Select>
 
-            <Button
-              variant={filterUnsold ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterUnsold(!filterUnsold)}
-              data-testid="filter-unsold"
-            >
-              {t("Unsold Only", "केवल बिना बिके")}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowNakal(true)}
-              data-testid="button-loading-nakal"
-              title={t("Loading Nakal", "लोडिंग नकल")}
-            >
-              <FileDown className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant={filterUnsold ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterUnsold(!filterUnsold)}
+                data-testid="filter-unsold"
+              >
+                {t("Unsold", "बिना बिके")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNakal(true)}
+                data-testid="button-loading-nakal"
+                title={t("Loading Nakal", "लोडिंग नकल")}
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            </div>
 
             {hasActiveFilters && (
               <Button
@@ -1354,46 +1355,52 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                           className="py-2 px-3 bg-muted/20 rounded-md border border-border/30"
                           data-testid={`lot-card-${entry.id}-${lotIndex}`}
                         >
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px]">
-                            <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1}</span>
-                            <div className="flex items-center gap-1.5">
-                              <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="font-medium">{lot.place === "farm_gate" ? t("Farm Gate", "फार्म गेट") : lot.coldStoreName}</span>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[13px]">
+                              <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1}</span>
+                              <div className="flex items-center gap-1.5">
+                                <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="font-medium">{lot.place === "farm_gate" ? t("Farm Gate", "फार्म गेट") : lot.coldStoreName}</span>
+                              </div>
+                              {lot.potatoType && (
+                                <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
+                                  {lot.potatoType}
+                                </Badge>
+                              )}
+                              {lot.quality && (
+                                <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
+                                  lot.quality === "Good"
+                                    ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                    : lot.quality === "Medium"
+                                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
+                                      : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                                }`}>
+                                  {lot.quality}
+                                </Badge>
+                              )}
+                              {lot.size && (
+                                <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0">
+                                  {lot.size}
+                                </Badge>
+                              )}
+                              <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
+                                lot.cutType === "bilty_cut"
+                                  ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"
+                                  : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+                              }`}>
+                                {lot.cutType === "bilty_cut" ? t("Bilty Cut", "बिल्टी कट") : t("Gate Cut", "गेट कट")}
+                              </Badge>
                             </div>
                             {lotIndex === 0 && entry.attachmentImage && (
                               <button
                                 type="button"
                                 onClick={() => { setImageViewEntryId(entry.id); setImageViewEntryLabel(entry.uniqueId || `#${entry.serialNumber}`); }}
-                                className="ml-auto inline-flex items-center"
+                                className="shrink-0 inline-flex items-center"
                                 data-testid={`button-view-image-${entry.id}`}
                               >
                                 <Paperclip className="h-4 w-4 text-blue-500" />
                               </button>
                             )}
-                            <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
-                              {lot.potatoType}
-                            </Badge>
-                            <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
-                              lot.quality === "Good" 
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                                : lot.quality === "Medium"
-                                  ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
-                                  : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-                            }`}>
-                              {lot.quality}
-                            </Badge>
-                            {lot.size && (
-                              <Badge className="text-[11px] px-2 py-0.5 font-medium bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-0">
-                                {lot.size}
-                              </Badge>
-                            )}
-                            <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
-                              lot.cutType === "bilty_cut"
-                                ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"
-                                : "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
-                            }`}>
-                              {lot.cutType === "bilty_cut" ? t("Bilty Cut", "बिल्टी कट") : t("Gate Cut", "गेट कट")}
-                            </Badge>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] mt-1">
                             <div>
