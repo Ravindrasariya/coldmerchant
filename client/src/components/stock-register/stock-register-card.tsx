@@ -29,6 +29,8 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { QUALITY_OPTIONS } from "@shared/schema";
+import { MonthFilter } from "@/components/ui/month-filter";
+import { DateFilter } from "@/components/ui/date-filter";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
 import { useLanguage } from "@/hooks/use-language";
@@ -213,6 +215,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const { toast } = useToast();
   const currentYear = new Date().getFullYear();
   const [filterYear, setFilterYear] = useState<string>(currentYear.toString());
+  const [filterMonths, setFilterMonths] = useState<number[]>([new Date().getMonth()]);
+  const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterSerial, setFilterSerial] = useState<string>("");
   const [serialPopoverOpen, setSerialPopoverOpen] = useState(false);
   const [filterFarmer, setFilterFarmer] = useState<string>("");
@@ -312,10 +316,21 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     if (!entries) return [];
     
     return entries.filter((entry) => {
+      const entryDate = new Date(entry.purchaseDate);
+
       // Filter by year
       if (filterYear) {
-        const entryYear = new Date(entry.purchaseDate).getFullYear();
-        if (entryYear.toString() !== filterYear) return false;
+        if (entryDate.getFullYear().toString() !== filterYear) return false;
+      }
+
+      // Filter by month
+      if (filterMonths.length > 0 && filterMonths.length < 12) {
+        if (!filterMonths.includes(entryDate.getMonth())) return false;
+      }
+
+      // Filter by day
+      if (filterDay !== null) {
+        if (entryDate.getDate() !== filterDay) return false;
       }
 
       // Filter by crop - entry must have at least one lot with matching crop
@@ -355,10 +370,15 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
       return true;
     });
-  }, [entries, selectedCrop, filterYear, filterSerial, filterFarmerId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, selectedCrop, filterYear, filterMonths, filterDay, filterSerial, filterFarmerId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+
+  const currentMonth = new Date().getMonth();
+  const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
 
   const clearFilters = () => {
     setFilterYear(currentYear.toString());
+    setFilterMonths([new Date().getMonth()]);
+    setFilterDay(null);
     setFilterSerial("");
     setFilterFarmer("");
     setFilterFarmerId(null);
@@ -368,8 +388,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     setFilterColdStore("");
   };
 
-  // Year filter is not included in hasActiveFilters since it always has a value (current year by default)
-  const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString());
+  const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString()) || !isDefaultMonths || filterDay !== null;
 
   const lotMetricsMap = useMemo(() => {
     const map = new Map<number, ReturnType<typeof computeLotMetrics>>();
@@ -736,6 +755,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                 ))}
               </SelectContent>
             </Select>
+
+            <MonthFilter selectedMonths={filterMonths} onSelectedMonthsChange={setFilterMonths} />
+            <DateFilter selectedDay={filterDay} onSelectedDayChange={setFilterDay} />
 
             <Popover open={serialPopoverOpen} onOpenChange={setSerialPopoverOpen}>
               <PopoverTrigger asChild>
