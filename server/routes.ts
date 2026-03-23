@@ -2682,10 +2682,11 @@ export async function registerRoutes(
         lotsByEntryId.set(lot.stockEntryId, arr);
       }
 
-      const pendingEntries = stockEntryList
+      type AadhatStockEntry = { id: number; aadhatDbId?: number | null; paymentStatus?: string | null; createdAt?: Date | string | null; amountPaid?: string | null; uniqueId?: string | null; serialNumber?: number | null; purchaseDate?: string | null };
+      const pendingEntries = (stockEntryList as AadhatStockEntry[])
         .filter(se => se.aadhatDbId === aadhatDbId && (se.paymentStatus === "due" || se.paymentStatus === "partial"))
-        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .map((se: any) => {
+        .sort((a, b) => new Date(String(a.createdAt || 0)).getTime() - new Date(String(b.createdAt || 0)).getTime())
+        .map(se => {
           const entryLots = lotsByEntryId.get(se.id) || [];
           let netPayable = 0;
           let totalBags = 0;
@@ -3968,7 +3969,10 @@ export async function registerRoutes(
       const allLots = await storage.getAllLotsByMerchant(merchantId);
       const allCashEntries = await storage.getCashEntriesByMerchant(merchantId);
 
-      const aadhatStockEntries = allStockEntries.filter((se: any) => se.aadhatDbId === aadhatId);
+      type StockEntryRecord = { id: number; aadhatDbId?: number | null; purchaseDate?: string | null; amountPaid?: string | null; uniqueId?: string | null; serialNumber?: number | null };
+      type LotRecord = typeof allLots[number];
+
+      const aadhatStockEntries = (allStockEntries as StockEntryRecord[]).filter(se => se.aadhatDbId === aadhatId);
       const aadhatCashEntries = allCashEntries.filter(entry =>
         entry.aadhatDbId === aadhatId &&
         entry.direction === "outflow" &&
@@ -3976,14 +3980,14 @@ export async function registerRoutes(
         !entry.isReversed
       );
 
-      const lotsByEntryId = new Map<number, any[]>();
+      const lotsByEntryId = new Map<number, LotRecord[]>();
       for (const lot of allLots) {
         const arr = lotsByEntryId.get(lot.stockEntryId) || [];
         arr.push(lot);
         lotsByEntryId.set(lot.stockEntryId, arr);
       }
 
-      const fyStockEntries = aadhatStockEntries.filter((se: any) =>
+      const fyStockEntries = aadhatStockEntries.filter(se =>
         se.purchaseDate && se.purchaseDate >= fyStart && se.purchaseDate <= fyEnd
       );
       const fyCashEntries = aadhatCashEntries.filter(entry =>
@@ -4077,7 +4081,7 @@ export async function registerRoutes(
         }
         const totalDr = totalApplied + totalDiscount + totalPetty;
         if (totalDr > 0) {
-          const hasPy = entry.aadhatAllocations?.some((a: { isPyPayable?: boolean }) => a.isPyPayable);
+          const hasPy = entry.aadhatAllocations?.some((a: Record<string, unknown>) => a.isPyPayable);
           entries.push({
             date: entry.entryDate || "",
             tnxCode: entry.transactionCode || "",
