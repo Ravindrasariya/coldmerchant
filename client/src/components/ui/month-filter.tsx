@@ -12,12 +12,6 @@ const MONTHS = [
   "Sep", "Oct", "Nov", "Dec",
 ];
 
-const MONTHS_HI = [
-  "जन", "फर", "मार्च", "अप्रै",
-  "मई", "जून", "जुल", "अग",
-  "सित", "अक्टू", "नवं", "दिसं",
-];
-
 interface MonthFilterProps {
   selectedMonths: number[];
   onSelectedMonthsChange: (months: number[]) => void;
