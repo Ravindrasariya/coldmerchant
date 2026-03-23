@@ -2,10 +2,8 @@ import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Printer, Share2 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 
 interface LotData {
   id: number;
@@ -36,9 +34,9 @@ interface LoadingNakalDialogProps {
   entries: EntryData[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  filterDay: number | null;
-  filterMonths: number[];
-  filterYear: string;
+  merchantName: string;
+  merchantAddress?: string | null;
+  dateLabel: string;
 }
 
 function getCropLabel(crop: string | undefined): string {
@@ -73,27 +71,11 @@ function computePurDami(lots: LotData[]): number {
   }, 0);
 }
 
-function getDateLabel(filterDay: number | null, filterMonths: number[], filterYear: string): string {
-  let date: Date;
-  if (filterDay !== null && filterMonths.length === 1) {
-    date = new Date(parseInt(filterYear), filterMonths[0], filterDay);
-  } else {
-    date = new Date();
-  }
-  const dayName = format(date, "EEEE");
-  const dd = format(date, "d");
-  const month = format(date, "MMMM");
-  const yyyy = format(date, "yyyy");
-  const compact = `${format(date, "d")}-${format(date, "M")}-${format(date, "yyyy")}`;
-  return `${dayName}, ${dd} ${month}, ${yyyy} (${compact})`;
-}
-
 function buildPrintHtml(
   entries: EntryData[],
   merchantName: string,
   merchantAddress: string | null | undefined,
-  dateLabel: string,
-  totalPages: number
+  dateLabel: string
 ): string {
   const sorted = [...entries].sort((a, b) => a.serialNumber - b.serialNumber);
 
@@ -111,6 +93,8 @@ function buildPrintHtml(
 
     const lotAmounts = entry.lots.map(computeLotAmount);
     const purDami = isMandi ? computePurDami(entry.lots) : 0;
+    const showPurDami = isMandi && purDami > 0;
+
     const entryBags = entry.lots.reduce((s, l) => s + l.originalBags, 0);
     const entryWeight = entry.lots.reduce((s, l) => s + parseFloat(l.totalWeight || "0"), 0);
     const entryTotal = lotAmounts.reduce((s, a) => s + a, 0) + purDami;
@@ -119,7 +103,7 @@ function buildPrintHtml(
     grandWeight += entryWeight;
     grandAmount += entryTotal;
 
-    const rowspan = entry.lots.length + (isMandi ? 1 : 0);
+    const rowspan = entry.lots.length + (showPurDami ? 1 : 0);
 
     entry.lots.forEach((lot, idx) => {
       const crop = getCropLabel(lot.crop || entry.crop);
@@ -144,7 +128,7 @@ function buildPrintHtml(
       }
     });
 
-    if (isMandi && purDami > 0) {
+    if (showPurDami) {
       bodyRows += `
         <tr>
           <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;">Add: Pur. Dami</td>
@@ -170,10 +154,10 @@ function buildPrintHtml(
   <style>
     * { box-sizing: border-box; }
     body { font-family: Georgia, serif; margin: 0; padding: 16px 24px; background: #fff; color: #000; }
-    .nakal-header { margin-bottom: 12px; }
     .merchant-name { text-align: center; font-size: 22px; font-weight: bold; margin-bottom: 4px; }
     .merchant-address { text-align: center; font-size: 13px; color: #555; margin-bottom: 6px; }
-    .header-row { display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #000; border-bottom: 1px solid #000; padding: 4px 0; margin-bottom: 0; }
+    .header-row { display: flex; justify-content: space-between; align-items: center;
+      border-top: 2px solid #000; border-bottom: 1px solid #000; padding: 4px 0; }
     .header-date { font-size: 13px; }
     .header-title { font-size: 16px; font-weight: bold; letter-spacing: 1px; }
     .header-page { font-size: 13px; }
@@ -184,14 +168,12 @@ function buildPrintHtml(
   </style>
 </head>
 <body>
-  <div class="nakal-header">
-    <div class="merchant-name">${merchantName}</div>
-    ${merchantAddress ? `<div class="merchant-address">${merchantAddress}</div>` : ""}
-    <div class="header-row">
-      <span class="header-date">Date : ${dateLabel}</span>
-      <span class="header-title">LOADING NAKAL</span>
-      <span class="header-page">Page 1 of ${totalPages}</span>
-    </div>
+  <div class="merchant-name">${merchantName}</div>
+  ${merchantAddress ? `<div class="merchant-address">${merchantAddress}</div>` : ""}
+  <div class="header-row">
+    <span class="header-date">Date : ${dateLabel}</span>
+    <span class="header-title">LOADING NAKAL</span>
+    <span class="header-page">Page 1 of 1</span>
   </div>
   <table>
     <thead>
@@ -220,23 +202,18 @@ export function LoadingNakalDialog({
   entries,
   open,
   onOpenChange,
-  filterDay,
-  filterMonths,
-  filterYear,
+  merchantName,
+  merchantAddress,
+  dateLabel,
 }: LoadingNakalDialogProps) {
-  const { user } = useAuth();
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
 
-  const merchantName = user?.merchantName || "Merchant";
-  const merchantAddress = user?.merchantAddress || null;
-  const dateLabel = getDateLabel(filterDay, filterMonths, filterYear);
-
   const sorted = [...entries].sort((a, b) => a.serialNumber - b.serialNumber);
 
   const handlePrint = () => {
-    const html = buildPrintHtml(sorted, merchantName, merchantAddress, dateLabel, 1);
+    const html = buildPrintHtml(sorted, merchantName, merchantAddress, dateLabel);
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);
@@ -272,6 +249,7 @@ export function LoadingNakalDialog({
 
     const lotAmounts = entry.lots.map(computeLotAmount);
     const purDami = isMandi ? computePurDami(entry.lots) : 0;
+    const showPurDami = isMandi && purDami > 0;
     const entryBags = entry.lots.reduce((s, l) => s + l.originalBags, 0);
     const entryWeight = entry.lots.reduce((s, l) => s + parseFloat(l.totalWeight || "0"), 0);
     const entryTotal = lotAmounts.reduce((s, a) => s + a, 0) + purDami;
@@ -280,7 +258,7 @@ export function LoadingNakalDialog({
     grandWeight += entryWeight;
     grandAmount += entryTotal;
 
-    return { entry, isMandi, particulars, lotAmounts, purDami, entryBags, entryWeight, entryTotal };
+    return { entry, isMandi, particulars, lotAmounts, purDami, showPurDami, entryBags, entryWeight, entryTotal };
   });
 
   return (
@@ -305,7 +283,7 @@ export function LoadingNakalDialog({
             </div>
           </div>
           <DialogDescription>
-            Preview and print the loading nakal for {entries.length} entries
+            Preview and print the loading nakal for {entries.length} {entries.length === 1 ? "entry" : "entries"}
           </DialogDescription>
         </DialogHeader>
 
@@ -333,8 +311,8 @@ export function LoadingNakalDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {entryBlocks.map(({ entry, isMandi, particulars, lotAmounts, purDami, entryBags, entryWeight, entryTotal }) => {
-                    const rowspan = entry.lots.length + (isMandi && purDami > 0 ? 1 : 0);
+                  {entryBlocks.map(({ entry, particulars, lotAmounts, purDami, showPurDami, entryBags, entryWeight, entryTotal }) => {
+                    const rowspan = entry.lots.length + (showPurDami ? 1 : 0);
                     return (
                       <>
                         {entry.lots.map((lot, idx) => {
@@ -370,7 +348,7 @@ export function LoadingNakalDialog({
                           );
                         })}
 
-                        {isMandi && purDami > 0 && (
+                        {showPurDami && (
                           <tr key={`${entry.id}-purdami`}>
                             <td className="border border-gray-300 px-2 py-1 text-sm">Add: Pur. Dami</td>
                             <td className="border border-gray-300 px-2 py-1 text-right text-sm whitespace-nowrap">

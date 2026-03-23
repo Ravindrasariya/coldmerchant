@@ -35,6 +35,7 @@ import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
 import { LoadingNakalDialog } from "./loading-nakal";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
 
 interface StockEntryWithLots {
   id: number;
@@ -214,6 +215,7 @@ interface StockRegisterCardProps {
 export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose, selectedCrop = "potato" }: StockRegisterCardProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
   const currentYear = new Date().getFullYear();
   const [filterYear, setFilterYear] = useState<string>(currentYear.toString());
   const [filterMonths, setFilterMonths] = useState<number[]>([new Date().getMonth()]);
@@ -726,6 +728,22 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     );
   }
 
+  const nakalDateLabel = (() => {
+    let date: Date;
+    if (filterDay !== null) {
+      const monthIdx = filterMonths.length > 0 ? filterMonths[0] : new Date().getMonth();
+      date = new Date(parseInt(filterYear), monthIdx, filterDay);
+    } else {
+      date = new Date();
+    }
+    const dayName = format(date, "EEEE");
+    const dd = format(date, "d");
+    const monthName = format(date, "MMMM");
+    const yyyy = format(date, "yyyy");
+    const compact = `${format(date, "d")}-${format(date, "M")}-${format(date, "yyyy")}`;
+    return `${dayName}, ${dd} ${monthName}, ${yyyy} (${compact})`;
+  })();
+
   return (
     <div className="space-y-4">
       {/* Download Dialog - Shows confirmation based on current filters */}
@@ -766,9 +784,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         entries={filteredEntries}
         open={showNakal}
         onOpenChange={setShowNakal}
-        filterDay={filterDay}
-        filterMonths={filterMonths}
-        filterYear={filterYear}
+        merchantName={user?.merchantName || ""}
+        merchantAddress={user?.merchantAddress}
+        dateLabel={nakalDateLabel}
       />
 
       <Card className="border-green-300 dark:border-green-700">
