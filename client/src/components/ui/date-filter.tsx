@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/use-language";
 
 interface DateFilterProps {
   selectedDay: number | null;
@@ -11,6 +12,7 @@ interface DateFilterProps {
 }
 
 export function DateFilter({ selectedDay, onSelectedDayChange }: DateFilterProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
 
   const allSelected = selectedDay === null;
@@ -23,7 +25,7 @@ export function DateFilter({ selectedDay, onSelectedDayChange }: DateFilterProps
     }
   };
 
-  const label = allSelected ? "All" : selectedDay!.toString();
+  const label = allSelected ? t("All", "सभी") : selectedDay!.toString();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -46,7 +48,7 @@ export function DateFilter({ selectedDay, onSelectedDayChange }: DateFilterProps
             onCheckedChange={toggleAll}
             data-testid="filter-day-all"
           />
-          <span className="text-sm font-medium">All Days</span>
+          <span className="text-sm font-medium">{t("All Days", "सभी दिन")}</span>
         </label>
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {

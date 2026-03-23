@@ -4,11 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/hooks/use-language";
 
 const MONTHS = [
   "Jan", "Feb", "Mar", "Apr",
   "May", "Jun", "Jul", "Aug",
   "Sep", "Oct", "Nov", "Dec",
+];
+
+const MONTHS_HI = [
+  "जन", "फर", "मार्च", "अप्रै",
+  "मई", "जून", "जुल", "अग",
+  "सित", "अक्टू", "नवं", "दिसं",
 ];
 
 interface MonthFilterProps {
@@ -17,6 +24,7 @@ interface MonthFilterProps {
 }
 
 export function MonthFilter({ selectedMonths, onSelectedMonthsChange }: MonthFilterProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
 
   const allSelected = selectedMonths.length === 0 || selectedMonths.length === 12;
@@ -40,10 +48,10 @@ export function MonthFilter({ selectedMonths, onSelectedMonthsChange }: MonthFil
   };
 
   const label = allSelected
-    ? "All"
+    ? t("All", "सभी")
     : selectedMonths.length === 1
       ? MONTHS[selectedMonths[0]]
-      : `${selectedMonths.length} mo`;
+      : `${selectedMonths.length} ${t("mo", "मा")}`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -66,7 +74,7 @@ export function MonthFilter({ selectedMonths, onSelectedMonthsChange }: MonthFil
             onCheckedChange={toggleAll}
             data-testid="filter-month-all"
           />
-          <span className="text-sm font-medium">All Months</span>
+          <span className="text-sm font-medium">{t("All Months", "सभी महीने")}</span>
         </label>
         <div className="grid grid-cols-4 gap-1.5">
           {MONTHS.map((m, i) => {
