@@ -93,8 +93,22 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   ]);
 
   const [salesCommission, setSalesCommission] = useState(0);
-  const [advanceAmount, setAdvanceAmount] = useState(0);
   const [driverAdvance, setDriverAdvance] = useState(0);
+  const [advanceAmount, setAdvanceAmount] = useState(0);
+
+  const ADDITIONAL_CHARGE_OPTIONS = [
+    { key: "tulai", label: "Tulai", labelHi: "तुलाई" },
+    { key: "majduri", label: "Majduri", labelHi: "मजदूरी" },
+    { key: "thelaBhada", label: "Thela Bhada", labelHi: "ठेला भाड़ा" },
+    { key: "palaKarai", label: "Pala Karai", labelHi: "पाला कराई" },
+    { key: "bardan", label: "Bardan (Bags)", labelHi: "बरदान (बोरी)" },
+  ] as const;
+
+  type ChargeKey = typeof ADDITIONAL_CHARGE_OPTIONS[number]["key"];
+  const [additionalCharges, setAdditionalCharges] = useState<Record<ChargeKey, number>>({
+    tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0,
+  });
+  const [visibleCharges, setVisibleCharges] = useState<ChargeKey[]>([]);
 
   const { data: inventory = [], isLoading: loadingInventory } = useQuery<UnsoldInventoryItem[]>({
     queryKey: ["/api/inventory/unsold"],
@@ -217,7 +231,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalCostOfGoods += breakdownPricePerKg * (Number(item.netWeight) || 0);
     });
 
-    const grandTotal = totalAmount + totalMandiCharges + salesCommission - advanceAmount;
+    const totalAdditionalCharges = Object.values(additionalCharges).reduce((sum, v) => sum + v, 0);
+    const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges - advanceAmount;
     const totalPL = (totalAmount - totalCostOfGoods) + salesCommission;
 
     return {
@@ -228,7 +243,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       grandTotal,
       totalPL,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, salesCommission, advanceAmount]);
+  }, [items, findInventoryByKey, totalMandiCharges, salesCommission, advanceAmount, additionalCharges]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -283,6 +298,11 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         totalMandiExtraCharges: mandiChargesAggregated.totalMandiExtraCharges,
         transportationCharges: 0,
         otherCharges: advanceAmount,
+        tulai: additionalCharges.tulai,
+        majduri: additionalCharges.majduri,
+        thelaBhada: additionalCharges.thelaBhada,
+        palaKarai: additionalCharges.palaKarai,
+        bardan: additionalCharges.bardan,
       });
     },
     onSuccess: () => {
@@ -323,8 +343,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setPartyAddress("");
     setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 }]);
     setSalesCommission(0);
-    setAdvanceAmount(0);
     setDriverAdvance(0);
+    setAdvanceAmount(0);
+    setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
+    setVisibleCharges([]);
   };
 
   const handleSubmit = () => {
@@ -768,17 +790,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">{t("Advance Amount", "अग्रिम राशि")}</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={advanceAmount || ""}
-                    onChange={(e) => setAdvanceAmount(Number(e.target.value) || 0)}
-                    placeholder="0"
-                    data-testid="input-loading-advance-amount"
-                  />
-                </div>
-                <div>
                   <Label className="text-xs">{t("Driver Advance", "ड्राइवर अग्रिम")}</Label>
                   <Input
                     type="number"
@@ -789,7 +800,80 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     data-testid="input-loading-driver-advance"
                   />
                 </div>
+                <div>
+                  <Label className="text-xs">{t("Advance Amount", "अग्रिम राशि")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={advanceAmount || ""}
+                    onChange={(e) => setAdvanceAmount(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    data-testid="input-loading-advance-amount"
+                  />
+                </div>
               </div>
+
+              {visibleCharges.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {visibleCharges.map((key) => {
+                    const opt = ADDITIONAL_CHARGE_OPTIONS.find((o) => o.key === key)!;
+                    return (
+                      <div key={key} className="relative">
+                        <Label className="text-xs">{t(opt.label, opt.labelHi)}</Label>
+                        <div className="flex gap-1">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={additionalCharges[key] || ""}
+                            onChange={(e) => setAdditionalCharges((prev) => ({ ...prev, [key]: Number(e.target.value) || 0 }))}
+                            placeholder="0"
+                            data-testid={`input-loading-${key}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 shrink-0 text-muted-foreground hover:text-red-500"
+                            onClick={() => {
+                              setVisibleCharges((prev) => prev.filter((k) => k !== key));
+                              setAdditionalCharges((prev) => ({ ...prev, [key]: 0 }));
+                            }}
+                            data-testid={`button-remove-charge-${key}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {visibleCharges.length < ADDITIONAL_CHARGE_OPTIONS.length && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="gap-1 text-xs" data-testid="button-add-charges">
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("Add Charges", "शुल्क जोड़ें")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-1" align="start">
+                    {ADDITIONAL_CHARGE_OPTIONS.filter((o) => !visibleCharges.includes(o.key)).map((opt) => (
+                      <Button
+                        key={opt.key}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-xs"
+                        onClick={() => setVisibleCharges((prev) => [...prev, opt.key])}
+                        data-testid={`button-charge-option-${opt.key}`}
+                      >
+                        {t(opt.label, opt.labelHi)}
+                      </Button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              )}
 
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-4">

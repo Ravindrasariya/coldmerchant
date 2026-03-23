@@ -53,6 +53,11 @@ interface Transaction {
   totalAadhatCommission: string | null;
   totalHammali: string | null;
   totalMandiExtraCharges: string | null;
+  tulai: string | null;
+  majduri: string | null;
+  thelaBhada: string | null;
+  palaKarai: string | null;
+  bardan: string | null;
   revenue: string | null;
   totalBags: number;
   totalNetWeight: string | null;
@@ -725,6 +730,26 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 </div>
               )}
             </div>
+
+            {transaction.transactionType === "loading" && (() => {
+              const charges = [
+                { key: "tulai", label: t("Tulai", "तुलाई"), value: parseFloat(transaction.tulai || "0") },
+                { key: "majduri", label: t("Majduri", "मजदूरी"), value: parseFloat(transaction.majduri || "0") },
+                { key: "thelaBhada", label: t("Thela Bhada", "ठेला भाड़ा"), value: parseFloat(transaction.thelaBhada || "0") },
+                { key: "palaKarai", label: t("Pala Karai", "पाला कराई"), value: parseFloat(transaction.palaKarai || "0") },
+                { key: "bardan", label: t("Bardan", "बरदान"), value: parseFloat(transaction.bardan || "0") },
+              ].filter(c => c.value > 0);
+              if (charges.length === 0) return null;
+              return (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {charges.map(c => (
+                    <span key={c.key}>
+                      {c.label}: <span className="font-medium text-foreground">₹{parseFloat(c.value.toFixed(1)).toLocaleString('en-IN')}</span>
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
 
             <div className="flex flex-wrap gap-1.5 pt-1 border-t sm:border-0 mt-2 sm:mt-0">
               {transaction.items.map((item) => {

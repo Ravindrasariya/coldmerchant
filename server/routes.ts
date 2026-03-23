@@ -1782,7 +1782,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -1925,9 +1925,15 @@ export async function registerRoutes(
         const acNum = parseFloat(totalAadhatCommission) || 0;
         const hNum = parseFloat(totalHammali) || 0;
         const ecNum = parseFloat(totalMandiExtraCharges) || 0;
+        const tulaiNum = parseFloat(tulai) || 0;
+        const majduriNum = parseFloat(majduri) || 0;
+        const thelaBhadaNum = parseFloat(thelaBhada) || 0;
+        const palaKaraiNum = parseFloat(palaKarai) || 0;
+        const bardanNum = parseFloat(bardan) || 0;
         const mandiTotal = mcNum + acNum + hNum + ecNum;
+        const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
         const lotAmounts = transactionItems.reduce((sum: number, item: any) => sum + (parseFloat(item.amount || item.revenue || "0")), 0);
-        revenueNum = lotAmounts + mandiTotal + scNum;
+        revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges;
         profitLoss = (lotAmounts - totalCostOfGoods) + scNum;
       }
 
@@ -1957,6 +1963,11 @@ export async function registerRoutes(
           totalAadhatCommission: totalAadhatCommission ? totalAadhatCommission.toString() : null,
           totalHammali: totalHammali ? totalHammali.toString() : null,
           totalMandiExtraCharges: totalMandiExtraCharges ? totalMandiExtraCharges.toString() : null,
+          tulai: tulai ? tulai.toString() : null,
+          majduri: majduri ? majduri.toString() : null,
+          thelaBhada: thelaBhada ? thelaBhada.toString() : null,
+          palaKarai: palaKarai ? palaKarai.toString() : null,
+          bardan: bardan ? bardan.toString() : null,
         },
         transactionItems
       );
@@ -1999,7 +2010,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -2059,10 +2070,16 @@ export async function registerRoutes(
         const acNum = parseFloat(totalAadhatCommission !== undefined ? totalAadhatCommission : existingTxn.totalAadhatCommission) || 0;
         const hNum = parseFloat(totalHammali !== undefined ? totalHammali : existingTxn.totalHammali) || 0;
         const ecNum = parseFloat(totalMandiExtraCharges !== undefined ? totalMandiExtraCharges : existingTxn.totalMandiExtraCharges) || 0;
+        const tulaiNum = parseFloat(tulai !== undefined ? tulai : existingTxn.tulai) || 0;
+        const majduriNum = parseFloat(majduri !== undefined ? majduri : existingTxn.majduri) || 0;
+        const thelaBhadaNum = parseFloat(thelaBhada !== undefined ? thelaBhada : existingTxn.thelaBhada) || 0;
+        const palaKaraiNum = parseFloat(palaKarai !== undefined ? palaKarai : existingTxn.palaKarai) || 0;
+        const bardanNum = parseFloat(bardan !== undefined ? bardan : existingTxn.bardan) || 0;
         const mandiTotal = mcNum + acNum + hNum + ecNum;
+        const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
         const existingItems = existingTxn.items || [];
         const lotAmounts = existingItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || item.revenue || "0"), 0);
-        newRevenue = lotAmounts + mandiTotal + scNum;
+        newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges;
         newProfitLoss = (lotAmounts - totalCostOfGoods) + scNum;
       } else {
         const existingRevenueNum = parseFloat(existingTxn.revenue || "0");
@@ -2089,6 +2106,21 @@ export async function registerRoutes(
       if (totalMandiExtraCharges !== undefined && !decimalEqual(totalMandiExtraCharges, existingTxn.totalMandiExtraCharges)) {
         changes.push({ field: "totalMandiExtraCharges", oldValue: existingTxn.totalMandiExtraCharges, newValue: totalMandiExtraCharges?.toString() || null });
       }
+      if (tulai !== undefined && !decimalEqual(tulai, existingTxn.tulai)) {
+        changes.push({ field: "tulai", oldValue: existingTxn.tulai, newValue: tulai?.toString() || null });
+      }
+      if (majduri !== undefined && !decimalEqual(majduri, existingTxn.majduri)) {
+        changes.push({ field: "majduri", oldValue: existingTxn.majduri, newValue: majduri?.toString() || null });
+      }
+      if (thelaBhada !== undefined && !decimalEqual(thelaBhada, existingTxn.thelaBhada)) {
+        changes.push({ field: "thelaBhada", oldValue: existingTxn.thelaBhada, newValue: thelaBhada?.toString() || null });
+      }
+      if (palaKarai !== undefined && !decimalEqual(palaKarai, existingTxn.palaKarai)) {
+        changes.push({ field: "palaKarai", oldValue: existingTxn.palaKarai, newValue: palaKarai?.toString() || null });
+      }
+      if (bardan !== undefined && !decimalEqual(bardan, existingTxn.bardan)) {
+        changes.push({ field: "bardan", oldValue: existingTxn.bardan, newValue: bardan?.toString() || null });
+      }
 
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: titleCase(partyName) || null,
@@ -2108,6 +2140,11 @@ export async function registerRoutes(
         ...(totalAadhatCommission !== undefined ? { totalAadhatCommission: totalAadhatCommission ? totalAadhatCommission.toString() : null } : {}),
         ...(totalHammali !== undefined ? { totalHammali: totalHammali ? totalHammali.toString() : null } : {}),
         ...(totalMandiExtraCharges !== undefined ? { totalMandiExtraCharges: totalMandiExtraCharges ? totalMandiExtraCharges.toString() : null } : {}),
+        ...(tulai !== undefined ? { tulai: tulai ? tulai.toString() : null } : {}),
+        ...(majduri !== undefined ? { majduri: majduri ? majduri.toString() : null } : {}),
+        ...(thelaBhada !== undefined ? { thelaBhada: thelaBhada ? thelaBhada.toString() : null } : {}),
+        ...(palaKarai !== undefined ? { palaKarai: palaKarai ? palaKarai.toString() : null } : {}),
+        ...(bardan !== undefined ? { bardan: bardan ? bardan.toString() : null } : {}),
       });
       
       // Record edit history if there are changes

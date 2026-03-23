@@ -148,6 +148,11 @@ interface TransactionWithHistory {
   totalAadhatCommission: string | null;
   totalHammali: string | null;
   totalMandiExtraCharges: string | null;
+  tulai: string | null;
+  majduri: string | null;
+  thelaBhada: string | null;
+  palaKarai: string | null;
+  bardan: string | null;
   createdAt: string;
   items: TransactionItem[];
   editHistory: EditHistoryEntry[];
@@ -167,6 +172,11 @@ const editTransactionSchema = z.object({
   totalAadhatCommission: z.coerce.number().optional(),
   totalHammali: z.coerce.number().optional(),
   totalMandiExtraCharges: z.coerce.number().optional(),
+  tulai: z.coerce.number().optional(),
+  majduri: z.coerce.number().optional(),
+  thelaBhada: z.coerce.number().optional(),
+  palaKarai: z.coerce.number().optional(),
+  bardan: z.coerce.number().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -275,6 +285,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       totalAadhatCommission: undefined,
       totalHammali: undefined,
       totalMandiExtraCharges: undefined,
+      tulai: undefined,
+      majduri: undefined,
+      thelaBhada: undefined,
+      palaKarai: undefined,
+      bardan: undefined,
     },
   });
 
@@ -294,6 +309,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         totalAadhatCommission: transaction.totalAadhatCommission ? parseFloat(transaction.totalAadhatCommission) : undefined,
         totalHammali: transaction.totalHammali ? parseFloat(transaction.totalHammali) : undefined,
         totalMandiExtraCharges: transaction.totalMandiExtraCharges ? parseFloat(transaction.totalMandiExtraCharges) : undefined,
+        tulai: transaction.tulai ? parseFloat(transaction.tulai) : undefined,
+        majduri: transaction.majduri ? parseFloat(transaction.majduri) : undefined,
+        thelaBhada: transaction.thelaBhada ? parseFloat(transaction.thelaBhada) : undefined,
+        palaKarai: transaction.palaKarai ? parseFloat(transaction.palaKarai) : undefined,
+        bardan: transaction.bardan ? parseFloat(transaction.bardan) : undefined,
       });
       setSelectedBuyerId(transaction.buyerId || null);
       setEditableItems(transaction.items.map(item => ({
@@ -1234,7 +1254,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             const lotAmounts = editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.loadingAmount || 0), 0);
                             const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
                             const sc = Number(form.watch("salesCommission")) || 0;
-                            return parseFloat((lotAmounts + mandiTotal + sc).toFixed(1)).toLocaleString('en-IN');
+                            const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
+                            return parseFloat((lotAmounts + mandiTotal + sc + addlCharges).toFixed(1)).toLocaleString('en-IN');
                           })()}
                         </div>
                       </div>
@@ -1252,6 +1273,33 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           </FormItem>
                         )}
                       />
+                    </div>
+
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">{t("Additional Charges", "अतिरिक्त शुल्क")}</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {([
+                          { name: "tulai" as const, label: "Tulai", labelHi: "तुलाई" },
+                          { name: "majduri" as const, label: "Majduri", labelHi: "मजदूरी" },
+                          { name: "thelaBhada" as const, label: "Thela Bhada", labelHi: "ठेला भाड़ा" },
+                          { name: "palaKarai" as const, label: "Pala Karai", labelHi: "पाला कराई" },
+                          { name: "bardan" as const, label: "Bardan (Bags)", labelHi: "बरदान (बोरी)" },
+                        ]).map((charge) => (
+                          <FormField
+                            key={charge.name}
+                            control={form.control}
+                            name={charge.name}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">{t(charge.label, charge.labelHi)} (₹)</FormLabel>
+                                <FormControl>
+                                  <Input type="number" step="any" placeholder="0" {...field} data-testid={`input-edit-${charge.name}`} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     {(() => {

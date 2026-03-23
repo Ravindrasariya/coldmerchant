@@ -44,6 +44,11 @@ interface LoadingTransaction {
   totalAadhatCommission: string | null;
   totalHammali: string | null;
   totalMandiExtraCharges: string | null;
+  tulai: string | null;
+  majduri: string | null;
+  thelaBhada: string | null;
+  palaKarai: string | null;
+  bardan: string | null;
   createdAt: string;
   items: TransactionItem[];
 }
@@ -173,7 +178,13 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const salesCommission = parseFloat(transaction?.salesCommission || "0");
   const advanceAmount = parseFloat(transaction?.otherCharges || "0");
   const driverAdvance = parseFloat(transaction?.advancePayment || "0");
-  const grandTotal = totalAmount + totalMandiCharges + salesCommission - advanceAmount;
+  const tulai = parseFloat(transaction?.tulai || "0");
+  const majduri = parseFloat(transaction?.majduri || "0");
+  const thelaBhada = parseFloat(transaction?.thelaBhada || "0");
+  const palaKarai = parseFloat(transaction?.palaKarai || "0");
+  const bardan = parseFloat(transaction?.bardan || "0");
+  const totalAdditionalCharges = tulai + majduri + thelaBhada + palaKarai + bardan;
+  const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges - advanceAmount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -328,6 +339,37 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px" }}>
                   <span>Sales Commission / बिक्री कमीशन</span>
                   <span>₹{parseFloat(salesCommission.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {tulai > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span>Tulai / तुलाई</span>
+                  <span>₹{parseFloat(tulai.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {majduri > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span>Majduri / मजदूरी</span>
+                  <span>₹{parseFloat(majduri.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {thelaBhada > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span>Thela Bhada / ठेला भाड़ा</span>
+                  <span>₹{parseFloat(thelaBhada.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {palaKarai > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span>Pala Karai / पाला कराई</span>
+                  <span>₹{parseFloat(palaKarai.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {bardan > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span>Bardan (Bags) / बरदान (बोरी)</span>
+                  <span>₹{parseFloat(bardan.toFixed(1)).toLocaleString('en-IN')}</span>
                 </div>
               )}
 

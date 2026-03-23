@@ -179,6 +179,11 @@ export const transactions = pgTable("transactions", {
   totalAadhatCommission: decimal("total_aadhat_commission", { precision: 12, scale: 2 }),
   totalHammali: decimal("total_hammali", { precision: 12, scale: 2 }),
   totalMandiExtraCharges: decimal("total_mandi_extra_charges", { precision: 12, scale: 2 }),
+  tulai: decimal("tulai", { precision: 12, scale: 2 }),
+  majduri: decimal("majduri", { precision: 12, scale: 2 }),
+  thelaBhada: decimal("thela_bhada", { precision: 12, scale: 2 }),
+  palaKarai: decimal("pala_karai", { precision: 12, scale: 2 }),
+  bardan: decimal("bardan", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
