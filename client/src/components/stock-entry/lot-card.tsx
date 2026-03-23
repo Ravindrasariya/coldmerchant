@@ -350,6 +350,61 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             )}
           />
 
+          <FormField
+            control={form.control}
+            name={`lots.${lotIndex}.pricePerKg`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("Price/kg", "मूल्य/किलो")}</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="number"
+                    step="any"
+                    placeholder="" 
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
+                    }}
+                    data-testid={`input-price-per-kg-${lotIndex}`}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name={`lots.${lotIndex}.totalWeight`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("Total Weight (Kg)", "कुल वजन (किलो)")}</FormLabel>
+                <FormControl>
+                  <Input 
+                    type="number"
+                    step="any"
+                    placeholder="" 
+                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(e) => {
+                      field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
+                    }}
+                    data-testid={`input-total-weight-${lotIndex}`}
+                  />
+                </FormControl>
+                {totalWeight && originalBags > 0 && (
+                  <p className="text-xs font-semibold text-orange-600 mt-1" data-testid={`text-avg-weight-${lotIndex}`}>
+                    {t("Avg. Weight", "औसत वजन")} {parseFloat((totalWeight / originalBags).toFixed(1))} Kg
+                  </p>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           {crop === "potato" && (
             <>
               <FormField
@@ -454,87 +509,30 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
           />
 
           {cutType === "gate_cut" && (
-            <>
-              <FormField
-                control={form.control}
-                name={`lots.${lotIndex}.size`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("Size", "आकार")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger data-testid={`select-size-${lotIndex}`}>
-                          <SelectValue placeholder={t("Select size", "आकार चुनें")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {SIZE_OPTIONS.filter(s => s !== "Wastage").map((size) => (
-                          <SelectItem key={size} value={size}>
-                            {size}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name={`lots.${lotIndex}.pricePerKg`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("Price/kg", "मूल्य/किलो")}</FormLabel>
+            <FormField
+              control={form.control}
+              name={`lots.${lotIndex}.size`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("Size", "आकार")}</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
-                      <Input 
-                        type="number"
-                        step="any"
-                        placeholder="" 
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        {...field}
-                        value={field.value ?? ""}
-                        onChange={(e) => {
-                          field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
-                        }}
-                        data-testid={`input-price-per-kg-${lotIndex}`}
-                      />
+                      <SelectTrigger data-testid={`select-size-${lotIndex}`}>
+                        <SelectValue placeholder={t("Select size", "आकार चुनें")} />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name={`lots.${lotIndex}.totalWeight`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("Total Weight (Kg)", "कुल वजन (किलो)")}</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number"
-                        step="any"
-                        placeholder="" 
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        {...field}
-                        value={field.value ?? ""}
-                        onChange={(e) => {
-                          field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value));
-                        }}
-                        data-testid={`input-total-weight-${lotIndex}`}
-                      />
-                    </FormControl>
-                    {totalWeight && originalBags > 0 && (
-                      <p className="text-xs font-semibold text-orange-600 mt-1" data-testid={`text-avg-weight-${lotIndex}`}>
-                        {t("Avg. Weight", "औसत वजन")} {parseFloat((totalWeight / originalBags).toFixed(1))} Kg
-                      </p>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </>
+                    <SelectContent>
+                      {SIZE_OPTIONS.filter(s => s !== "Wastage").map((size) => (
+                        <SelectItem key={size} value={size}>
+                          {size}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           )}
 
         </div>
