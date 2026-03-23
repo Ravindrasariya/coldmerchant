@@ -936,21 +936,6 @@ export function DashboardTab() {
         </Card>
       </div>
 
-      {isCustomChartOrder && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={resetChartOrder}
-            className="text-xs text-muted-foreground gap-1"
-            data-testid="button-reset-chart-order"
-          >
-            <RotateCcw className="h-3 w-3" />
-            {t("Reset Chart Order", "चार्ट क्रम रीसेट करें")}
-          </Button>
-        </div>
-      )}
-
       {(() => {
         const chartConfigs: Record<ChartId, { borderClass: string; testId: string; title: string; content: JSX.Element }> = {
             "cs-total-bags": {
@@ -1156,6 +1141,21 @@ export function DashboardTab() {
             </div>
           );
         })()}
+
+      {isCustomChartOrder && (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetChartOrder}
+            className="text-xs text-muted-foreground gap-1"
+            data-testid="button-reset-chart-order"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {t("Reset Chart Order", "चार्ट क्रम रीसेट करें")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
