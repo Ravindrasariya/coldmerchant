@@ -1268,7 +1268,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
                             const sc = Number(form.watch("salesCommission")) || 0;
                             const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
-                            return parseFloat((lotAmounts + mandiTotal + sc + addlCharges).toFixed(1)).toLocaleString('en-IN');
+                            const drvAdv = Number(form.watch("advancePayment")) || 0;
+                            return parseFloat((lotAmounts + mandiTotal + sc + addlCharges + drvAdv).toFixed(1)).toLocaleString('en-IN');
                           })()}
                         </div>
                       </div>

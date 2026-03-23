@@ -232,7 +232,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     });
 
     const totalAdditionalCharges = Object.values(additionalCharges).reduce((sum, v) => sum + v, 0);
-    const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges - advanceAmount;
+    const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges + driverAdvance - advanceAmount;
     const totalPL = (totalAmount - totalCostOfGoods) + salesCommission;
 
     return {
@@ -243,7 +243,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       grandTotal,
       totalPL,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, salesCommission, advanceAmount, additionalCharges]);
+  }, [items, findInventoryByKey, totalMandiCharges, salesCommission, driverAdvance, advanceAmount, additionalCharges]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));

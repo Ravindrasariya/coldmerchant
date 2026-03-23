@@ -1932,8 +1932,9 @@ export async function registerRoutes(
         const bardanNum = parseFloat(bardan) || 0;
         const mandiTotal = mcNum + acNum + hNum + ecNum;
         const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
+        const advancePaymentNum = parseFloat(advancePayment) || 0;
         const lotAmounts = transactionItems.reduce((sum: number, item: any) => sum + (parseFloat(item.amount || item.revenue || "0")), 0);
-        revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges;
+        revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum;
         profitLoss = (lotAmounts - totalCostOfGoods) + scNum;
       }
 
@@ -2077,9 +2078,10 @@ export async function registerRoutes(
         const bardanNum = parseFloat(bardan !== undefined ? bardan : existingTxn.bardan) || 0;
         const mandiTotal = mcNum + acNum + hNum + ecNum;
         const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
+        const advancePaymentNum = parseFloat(advancePayment !== undefined ? advancePayment : existingTxn.advancePayment) || 0;
         const existingItems = existingTxn.items || [];
         const lotAmounts = existingItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || item.revenue || "0"), 0);
-        newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges;
+        newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum;
         newProfitLoss = (lotAmounts - totalCostOfGoods) + scNum;
       } else {
         const existingRevenueNum = parseFloat(existingTxn.revenue || "0");
