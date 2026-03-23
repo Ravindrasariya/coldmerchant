@@ -538,9 +538,10 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
         </div>
 
         {place === "mandi" ? (
-          <div className="space-y-4 pt-4 border-t">
-            <h4 className="text-sm font-medium">{t("Mandi Charges", "मंडी शुल्क")}</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="pt-4 border-t">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4">
+            <h4 className="text-sm font-medium mb-3 lg:mb-0 lg:shrink-0 lg:min-w-[110px]">{t("Mandi Charges", "मंडी शुल्क")}</h4>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:flex-1">
               <FormField
                 control={form.control}
                 name={`lots.${lotIndex}.mandiCommissionPercent`}
@@ -641,6 +642,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                   </FormItem>
                 )}
               />
+            </div>
             </div>
           </div>
         ) : (
@@ -956,9 +958,9 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             control={form.control}
             name={`lots.${lotIndex}.remarks`}
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
-                <FormControl>
+              <FormItem className="flex flex-col lg:flex-row lg:items-center lg:gap-4 lg:space-y-0">
+                <FormLabel className="lg:shrink-0 lg:min-w-[110px]">{t("Remarks", "टिप्पणी")}</FormLabel>
+                <FormControl className="lg:flex-1">
                   <Textarea 
                     placeholder={t("Enter any remarks for this lot...", "इस लॉट के लिए कोई टिप्पणी दर्ज करें...")} 
                     className="resize-none min-h-0"
