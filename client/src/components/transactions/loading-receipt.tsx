@@ -139,7 +139,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             .receipt-info > div { text-align: left; }
             .receipt-info .right { text-align: right; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: left; }
             th { background-color: #f5f5f5; }
             .charges-section { margin-top: 20px; }
             .charges-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
@@ -264,40 +264,39 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                   <div className="text-gray-600">{buyer?.address || transaction.partyAddress}</div>
                 )}
                 <div><strong>Driver Contact:</strong> {transaction.driverContact ? ` ${transaction.driverContact}` : " ___________"}</div>
-                <div><strong>Driver Advance:</strong> {driverAdvance > 0 ? ` ₹${driverAdvance.toLocaleString("en-IN")}` : " ___________"}</div>
               </div>
             </div>
 
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border p-2 text-left">S.No / क्र.सं.</th>
-                  <th className="border p-2 text-left">Variety / किस्म</th>
-                  <th className="border p-2 text-right">Bags / बोरी</th>
-                  <th className="border p-2 text-right">Weight (Kg) / वजन</th>
-                  <th className="border p-2 text-right">₹/Kg</th>
-                  <th className="border p-2 text-right">Amount / राशि</th>
+                  <th className="border px-2 py-1 text-left">S.No / क्र.सं.</th>
+                  <th className="border px-2 py-1 text-left">Variety / किस्म</th>
+                  <th className="border px-2 py-1 text-right">Bags / बोरी</th>
+                  <th className="border px-2 py-1 text-right">Weight (Kg) / वजन</th>
+                  <th className="border px-2 py-1 text-right">₹/Kg</th>
+                  <th className="border px-2 py-1 text-right">Amount / राशि</th>
                 </tr>
               </thead>
               <tbody>
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
-                    <td className="border p-2">{idx + 1}</td>
-                    <td className="border p-2">{item.potatoType || "-"}</td>
-                    <td className="border p-2 text-right">{item.bagsMoved}</td>
-                    <td className="border p-2 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
-                    <td className="border p-2 text-right">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
-                    <td className="border p-2 text-right">₹{parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString('en-IN')}</td>
+                    <td className="border px-2 py-1">{idx + 1}</td>
+                    <td className="border px-2 py-1">{item.potatoType || "-"}</td>
+                    <td className="border px-2 py-1 text-right">{item.bagsMoved}</td>
+                    <td className="border px-2 py-1 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
+                    <td className="border px-2 py-1 text-right">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
+                    <td className="border px-2 py-1 text-right">₹{parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="border p-2" colSpan={2}>Total / कुल</td>
-                  <td className="border p-2 text-right">{transaction.totalBags}</td>
-                  <td className="border p-2 text-right">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
-                  <td className="border p-2"></td>
-                  <td className="border p-2 text-right">₹{parseFloat(totalAmount.toFixed(1)).toLocaleString('en-IN')}</td>
+                  <td className="border px-2 py-1" colSpan={2}>Total / कुल</td>
+                  <td className="border px-2 py-1 text-right">{transaction.totalBags}</td>
+                  <td className="border px-2 py-1 text-right">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
+                  <td className="border px-2 py-1"></td>
+                  <td className="border px-2 py-1 text-right">₹{parseFloat(totalAmount.toFixed(1)).toLocaleString('en-IN')}</td>
                 </tr>
               </tfoot>
             </table>
