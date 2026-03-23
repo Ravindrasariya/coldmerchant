@@ -3811,22 +3811,62 @@ export async function registerRoutes(
       const fyStart = `${fyStartYear}-04-01`;
       const fyEnd = `${fyStartYear + 1}-03-31`;
 
-      const openingBalance = parseFloat(buyer.receivableBalance || "0");
-
       const allTransactions = await storage.getTransactionsByMerchant(merchantId);
-      const buyerTxns = allTransactions.filter(txn => 
-        txn.buyerId === buyerId && 
-        txn.dateOfLoading && txn.dateOfLoading >= fyStart && txn.dateOfLoading <= fyEnd
-      );
-
       const allCashEntries = await storage.getCashEntriesByMerchant(merchantId);
+
+      const buyerTxns = allTransactions.filter(txn => txn.buyerId === buyerId);
       const buyerCashEntries = allCashEntries.filter(entry =>
         entry.buyerId === buyerId &&
         entry.direction === "inward" &&
         entry.revenueType === "raw_potato" &&
-        !entry.isReversed &&
+        !entry.isReversed
+      );
+
+      const fyTxns = buyerTxns.filter(txn =>
+        txn.dateOfLoading && txn.dateOfLoading >= fyStart && txn.dateOfLoading <= fyEnd
+      );
+      const fyCashEntries = buyerCashEntries.filter(entry =>
         entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
       );
+
+      let pyAllocPaid = 0;
+      for (const entry of fyCashEntries) {
+        if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
+          for (const alloc of entry.buyerAllocations) {
+            if (alloc.isPyBalance) {
+              pyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            }
+          }
+        }
+      }
+
+      const currentReceivable = parseFloat(buyer.receivableBalance || "0");
+      const openingBalance = currentReceivable + pyAllocPaid;
+
+      const preFyTxnIds = new Set<number>();
+      let preFyTxnDueCurrent = 0;
+      for (const txn of buyerTxns) {
+        if (txn.dateOfLoading && txn.dateOfLoading < fyStart) {
+          preFyTxnIds.add(txn.id);
+          const revenue = parseFloat(txn.revenue || "0");
+          const received = parseFloat(txn.amountReceived || "0");
+          preFyTxnDueCurrent += Math.max(0, revenue - received);
+        }
+      }
+
+      let fyAllocsToPreFyTxns = 0;
+      for (const entry of fyCashEntries) {
+        if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
+          for (const alloc of entry.buyerAllocations) {
+            if (!alloc.isPyBalance && alloc.transactionId && preFyTxnIds.has(alloc.transactionId)) {
+              fyAllocsToPreFyTxns += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            }
+          }
+        }
+      }
+
+      const preFyTxnDueAtFyStart = preFyTxnDueCurrent + fyAllocsToPreFyTxns;
+      const totalOpening = openingBalance + preFyTxnDueAtFyStart;
 
       interface LedgerEntry {
         date: string;
@@ -3840,7 +3880,7 @@ export async function registerRoutes(
 
       const entries: LedgerEntry[] = [];
 
-      for (const txn of buyerTxns) {
+      for (const txn of fyTxns) {
         const revenue = parseFloat(txn.revenue || "0");
         if (revenue > 0) {
           entries.push({
@@ -3855,22 +3895,22 @@ export async function registerRoutes(
         }
       }
 
-      for (const entry of buyerCashEntries) {
-        let fyApplied = 0;
-        let fyPetty = 0;
+      for (const entry of fyCashEntries) {
+        let totalApplied = 0;
+        let totalPetty = 0;
         if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
           for (const alloc of entry.buyerAllocations) {
-            if (alloc.isPyBalance) continue;
-            fyApplied += parseFloat(alloc.appliedAmount || "0");
-            fyPetty += parseFloat(alloc.pettyAdjustment || "0");
+            totalApplied += parseFloat(alloc.appliedAmount || "0");
+            totalPetty += parseFloat(alloc.pettyAdjustment || "0");
           }
         }
-        const totalCr = fyApplied + fyPetty;
+        const totalCr = totalApplied + totalPetty;
         if (totalCr > 0) {
+          const hasPy = entry.buyerAllocations?.some((a: { isPyBalance?: boolean }) => a.isPyBalance);
           entries.push({
             date: entry.entryDate || "",
             tnxCode: entry.transactionCode || "",
-            particulars: "Payment (Cash)",
+            particulars: hasPy ? "Payment (incl. PY)" : "Payment (Cash)",
             dr: 0,
             cr: totalCr,
             sourceType: "payment",
@@ -3893,7 +3933,7 @@ export async function registerRoutes(
         merchantName: merchant?.name || "",
         merchantAddress: merchant?.address || "",
         merchantContact: merchant?.contactNumber || "",
-        openingBalance,
+        openingBalance: totalOpening,
         fyStart,
         fyEnd,
         entries,

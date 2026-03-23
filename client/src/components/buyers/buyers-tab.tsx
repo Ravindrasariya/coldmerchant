@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getTodayIST } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,6 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
   formatLedgerAmount: (v: number) => string;
   formatDate: (d: string) => string;
 }) {
-  const ledgerRef = useRef<HTMLDivElement>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const { data: ledgerData, isLoading } = useQuery<BuyerLedgerData>({
@@ -97,7 +96,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
   }, [ledgerData]);
 
   const handlePdfExport = async () => {
-    if (!ledgerRef.current || !ledgerData) return;
+    if (!ledgerData) return;
     setPdfLoading(true);
     try {
       const fyLabel = `${ledgerData.fyStart.substring(0, 4)}-${ledgerData.fyEnd.substring(2, 4)}`;
@@ -211,7 +210,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
   }
 
   return (
-    <div ref={ledgerRef} className="bg-muted/10 border-b" data-testid={`buyer-ledger-${buyerId}`}>
+    <div className="bg-muted/10 border-b" data-testid={`buyer-ledger-${buyerId}`}>
       <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
         <span className="text-xs font-semibold text-muted-foreground">
           {t("Ledger", "खाता")} — {buyerName} (FY {ledgerData.fyStart.substring(0, 4)}-{ledgerData.fyEnd.substring(2, 4)})
