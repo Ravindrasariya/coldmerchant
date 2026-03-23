@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -12,6 +13,71 @@ import { SupplierInfoSection } from "./supplier-info-section";
 import { SeedLotCard } from "./seed-lot-card";
 import { useLanguage } from "@/hooks/use-language";
 
+const SEED_STORAGE_KEY = "vyapar_seed_stock_entry_draft";
+
+function getDefaultSeedFormValues(): SeedStockEntryFormType {
+  return {
+    purchaseDate: getTodayIST(),
+    supplierName: "",
+    supplierContact: "",
+    address: "",
+    district: "",
+    state: "",
+    remarks: "",
+    seedLots: [
+      {
+        coldStoreName: "",
+        originalBags: "" as any,
+        potatoType: "",
+        bagType: "",
+        size: "",
+        pricePerBag: "" as any,
+        coldStoreChargesPerBag: undefined,
+        remarks: "",
+      },
+    ],
+  };
+}
+
+function loadSavedSeedFormData(): SeedStockEntryFormType {
+  try {
+    const saved = localStorage.getItem(SEED_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === "object" && parsed.seedLots && Array.isArray(parsed.seedLots)) {
+        const today = getTodayIST();
+        const savedDay = parsed._savedDay;
+        if (savedDay && savedDay !== today) {
+          localStorage.removeItem(SEED_STORAGE_KEY);
+          return getDefaultSeedFormValues();
+        }
+        const { _savedDay: _, ...formData } = parsed;
+        return formData;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load saved seed form data:", e);
+  }
+  return getDefaultSeedFormValues();
+}
+
+function saveSeedFormData(data: SeedStockEntryFormType) {
+  try {
+    const toSave = { ...data, _savedDay: getTodayIST() };
+    localStorage.setItem(SEED_STORAGE_KEY, JSON.stringify(toSave));
+  } catch (e) {
+    console.error("Failed to save seed form data:", e);
+  }
+}
+
+function clearSavedSeedFormData() {
+  try {
+    localStorage.removeItem(SEED_STORAGE_KEY);
+  } catch (e) {
+    console.error("Failed to clear saved seed form data:", e);
+  }
+}
+
 interface SeedStockEntryFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -20,31 +86,21 @@ interface SeedStockEntryFormProps {
 export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const isPausingAutoSaveRef = useRef(false);
   
   const form = useForm<SeedStockEntryFormType>({
     resolver: zodResolver(seedStockEntryFormSchema),
-    defaultValues: {
-      purchaseDate: getTodayIST(),
-      supplierName: "",
-      supplierContact: "",
-      address: "",
-      district: "",
-      state: "",
-      remarks: "",
-      seedLots: [
-        {
-          coldStoreName: "",
-          originalBags: "" as any,
-          potatoType: "",
-          bagType: "",
-          size: "",
-          pricePerBag: "" as any,
-          coldStoreChargesPerBag: undefined,
-          remarks: "",
-        },
-      ],
-    },
+    defaultValues: loadSavedSeedFormData(),
   });
+
+  useEffect(() => {
+    const subscription = form.watch((data) => {
+      if (data && !isPausingAutoSaveRef.current) {
+        saveSeedFormData(data as SeedStockEntryFormType);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   const { fields: lotFields, append: appendLot, remove: removeLot } = useFieldArray({
     control: form.control,
@@ -66,7 +122,10 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
-      form.reset();
+      isPausingAutoSaveRef.current = true;
+      clearSavedSeedFormData();
+      form.reset(getDefaultSeedFormValues());
+      setTimeout(() => { isPausingAutoSaveRef.current = false; }, 100);
       onSuccess?.();
     },
     onError: (error: Error) => {
@@ -130,7 +189,10 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
             type="button"
             variant="outline"
             onClick={() => {
-              form.reset();
+              isPausingAutoSaveRef.current = true;
+              clearSavedSeedFormData();
+              form.reset(getDefaultSeedFormValues());
+              setTimeout(() => { isPausingAutoSaveRef.current = false; }, 100);
               onCancel?.();
             }}
             data-testid="button-cancel-seed"

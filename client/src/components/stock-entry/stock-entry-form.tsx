@@ -65,7 +65,14 @@ function loadSavedFormData(selectedCrop: "potato" | "onion" | "garlic", selected
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed && typeof parsed === "object" && parsed.lots && Array.isArray(parsed.lots)) {
-        return parsed;
+        const today = getTodayIST();
+        const savedDay = parsed._savedDay;
+        if (savedDay && savedDay !== today) {
+          localStorage.removeItem(getStorageKey(selectedCrop));
+          return getDefaultFormValues(selectedCrop, selectedPlace);
+        }
+        const { _savedDay: _, ...formData } = parsed;
+        return formData;
       }
     }
   } catch (e) {
@@ -76,7 +83,8 @@ function loadSavedFormData(selectedCrop: "potato" | "onion" | "garlic", selected
 
 function saveFormData(data: StockEntryFormType, crop: "potato" | "onion" | "garlic") {
   try {
-    localStorage.setItem(getStorageKey(crop), JSON.stringify(data));
+    const toSave = { ...data, _savedDay: getTodayIST() };
+    localStorage.setItem(getStorageKey(crop), JSON.stringify(toSave));
   } catch (e) {
     console.error("Failed to save form data:", e);
   }
