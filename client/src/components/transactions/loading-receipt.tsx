@@ -135,7 +135,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
             .header h1 { margin: 0; font-size: 24px; }
             .header p { margin: 5px 0; color: #555; }
-            .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; line-height: 1.4; }
             .receipt-info div { text-align: left; }
             .receipt-info .right { text-align: right; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -243,28 +243,28 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
               </h2>
             </div>
 
-            <div className="receipt-info flex justify-between text-sm">
+            <div className="receipt-info flex justify-between text-sm" style={{ lineHeight: "1.4" }}>
               <div>
-                <p><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</p>
-                <p><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
+                <div><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</div>
+                <div><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
-                })}</p>
+                })}</div>
                 {transaction.vehicleNumber && (
-                  <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
+                  <div><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</div>
                 )}
-                <p><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
+                <div><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</div>
               </div>
               <div className="text-right right">
                 {transaction.partyName && (
-                  <p><strong>Buyer / खरीदार:</strong> {transaction.partyName}</p>
+                  <div><strong>Buyer / खरीदार:</strong> {transaction.partyName}</div>
                 )}
                 {(buyer?.address || transaction.partyAddress) && (
-                  <p className="text-sm text-gray-600">{buyer?.address || transaction.partyAddress}</p>
+                  <div className="text-gray-600">{buyer?.address || transaction.partyAddress}</div>
                 )}
-                <p><strong>Driver Contact:</strong> {transaction.driverContact ? ` ${transaction.driverContact}` : " ___________"}</p>
-                <p><strong>Driver Advance:</strong> {driverAdvance > 0 ? ` ₹${driverAdvance.toLocaleString("en-IN")}` : " ___________"}</p>
+                <div><strong>Driver Contact:</strong> {transaction.driverContact ? ` ${transaction.driverContact}` : " ___________"}</div>
+                <div><strong>Driver Advance:</strong> {driverAdvance > 0 ? ` ₹${driverAdvance.toLocaleString("en-IN")}` : " ___________"}</div>
               </div>
             </div>
 
