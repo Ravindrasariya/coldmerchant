@@ -142,7 +142,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
         const row = ledgerRows[i];
         const tr = document.createElement("tr");
         if (i === 0) tr.style.cssText = "background:#f9f9f9;font-weight:600;";
-        const cellData = [
+        const cellData: { text: string; align: string; bold?: boolean }[] = [
           { text: String(row.kramank), align: "center" },
           { text: formatDate(row.date), align: "left" },
           { text: row.tnxCode || "—", align: "left" },
@@ -153,7 +153,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
         ];
         for (const cell of cellData) {
           const td = document.createElement("td");
-          td.style.cssText = `border:1px solid #ccc;padding:4px 6px;text-align:${cell.align};${(cell as any).bold ? "font-weight:600;" : ""}`;
+          td.style.cssText = `border:1px solid #ccc;padding:4px 6px;text-align:${cell.align};${cell.bold ? "font-weight:600;" : ""}`;
           td.textContent = cell.text;
           tr.appendChild(td);
         }
@@ -205,7 +205,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
           <span className="ml-1 text-xs">{t("PDF", "PDF")}</span>
         </Button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-xs border-collapse min-w-[600px]">
           <thead>
             <tr className="bg-muted/50">
@@ -232,6 +232,28 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="md:hidden space-y-2 px-3 py-2">
+        {ledgerRows.map((row, i) => (
+          <div
+            key={i}
+            className={`rounded-md border p-3 text-xs ${i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.cr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : "bg-card"}`}
+            data-testid={`ledger-card-${buyerId}-${i}`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-muted-foreground">#{row.kramank} · {formatDate(row.date)}</span>
+              {row.tnxCode && <span className="font-mono text-muted-foreground">{row.tnxCode}</span>}
+            </div>
+            <div className="mb-1.5">{row.particulars}</div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-3">
+                {row.dr > 0 && <span>{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
+                {row.cr > 0 && <span className="text-green-700 dark:text-green-400">{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
+              </div>
+              <span className="font-semibold">{t("Bal", "शेष")}: {formatLedgerAmount(row.balance)}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
