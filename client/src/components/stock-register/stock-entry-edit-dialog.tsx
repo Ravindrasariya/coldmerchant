@@ -981,74 +981,66 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       const aadhatTotal = costOfGoods * aadhatPct / 100;
                       const hammaliTotal = totalBags * hammaliRate;
                       return (
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
-                            <div className="space-y-1">
-                              <Label className="text-xs">{t("Mandi %", "मंडी %")}</Label>
-                              <Input
-                                type="number"
-                                step="any"
-                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder="0"
-                                value={lot.mandiCommissionPercent ?? ""}
-                                onChange={(e) => handleLotFieldChange(lotIndex, "mandiCommissionPercent", e.target.value === "" ? null : parseFloat(e.target.value))}
-                                data-testid={`edit-mandi-commission-${lotIndex}`}
-                              />
-                            </div>
-                            <div className="col-span-2 text-sm font-mono text-right">
-                              {t("Mandi Commission", "मंडी कमीशन")}: ₹{mandiTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                            </div>
+                        <div className="grid grid-cols-4 gap-2 p-2 bg-muted/30 rounded-md">
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("Mandi %", "मंडी %")}</Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="0"
+                              value={lot.mandiCommissionPercent ?? ""}
+                              onChange={(e) => handleLotFieldChange(lotIndex, "mandiCommissionPercent", e.target.value === "" ? null : parseFloat(e.target.value))}
+                              data-testid={`edit-mandi-commission-${lotIndex}`}
+                            />
+                            <p className="text-xs font-mono text-muted-foreground">
+                              ₹{mandiTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
-                            <div className="space-y-1">
-                              <Label className="text-xs">{t("Aadhat %", "आढ़त %")}</Label>
-                              <Input
-                                type="number"
-                                step="any"
-                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder="0"
-                                value={lot.aadhatCommissionPercent ?? ""}
-                                onChange={(e) => handleLotFieldChange(lotIndex, "aadhatCommissionPercent", e.target.value === "" ? null : parseFloat(e.target.value))}
-                                data-testid={`edit-aadhat-commission-${lotIndex}`}
-                              />
-                            </div>
-                            <div className="col-span-2 text-sm font-mono text-right">
-                              {t("Aadhat Commission", "आढ़त कमीशन")}: ₹{aadhatTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                            </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("Aadhat %", "आढ़त %")}</Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="0"
+                              value={lot.aadhatCommissionPercent ?? ""}
+                              onChange={(e) => handleLotFieldChange(lotIndex, "aadhatCommissionPercent", e.target.value === "" ? null : parseFloat(e.target.value))}
+                              data-testid={`edit-aadhat-commission-${lotIndex}`}
+                            />
+                            <p className="text-xs font-mono text-muted-foreground">
+                              ₹{aadhatTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
-                            <div className="space-y-1">
-                              <Label className="text-xs">{t("Hammali/Bag", "हम्माली/बोरी")}</Label>
-                              <Input
-                                type="number"
-                                step="any"
-                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder="₹0"
-                                value={lot.hammaliPerBag ?? ""}
-                                onChange={(e) => handleLotFieldChange(lotIndex, "hammaliPerBag", e.target.value === "" ? null : parseFloat(e.target.value))}
-                                data-testid={`edit-hammali-per-bag-${lotIndex}`}
-                              />
-                            </div>
-                            <div className="col-span-2 text-sm font-mono text-right">
-                              {t("Hammali", "हम्माली")} ({totalBags} × ₹{hammaliRate}): ₹{hammaliTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                            </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("Hammali/Bag", "हम्माली/बोरी")}</Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="₹0"
+                              value={lot.hammaliPerBag ?? ""}
+                              onChange={(e) => handleLotFieldChange(lotIndex, "hammaliPerBag", e.target.value === "" ? null : parseFloat(e.target.value))}
+                              data-testid={`edit-hammali-per-bag-${lotIndex}`}
+                            />
+                            <p className="text-xs font-mono text-muted-foreground">
+                              {totalBags} × ₹{hammaliRate} = ₹{hammaliTotal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 p-2 bg-muted/30 rounded-md items-end">
-                            <div className="space-y-1">
-                              <Label className="text-xs">{t("Extra Charges", "अन्य शुल्क")}</Label>
-                              <Input
-                                type="number"
-                                step="any"
-                                className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                placeholder="₹0"
-                                value={lot.mandiExtraCharges ?? ""}
-                                onChange={(e) => handleLotFieldChange(lotIndex, "mandiExtraCharges", e.target.value === "" ? null : parseFloat(e.target.value))}
-                                data-testid={`edit-mandi-extra-charges-${lotIndex}`}
-                              />
-                            </div>
-                            <div className="col-span-2 text-sm font-mono text-right">
-                              {t("Extra Charges", "अन्य शुल्क")}: ₹{(lot.mandiExtraCharges || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                            </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("Extra Charges", "अन्य शुल्क")}</Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              className="h-8 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="₹0"
+                              value={lot.mandiExtraCharges ?? ""}
+                              onChange={(e) => handleLotFieldChange(lotIndex, "mandiExtraCharges", e.target.value === "" ? null : parseFloat(e.target.value))}
+                              data-testid={`edit-mandi-extra-charges-${lotIndex}`}
+                            />
+                            <p className="text-xs font-mono text-muted-foreground">
+                              ₹{(lot.mandiExtraCharges || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                            </p>
                           </div>
                         </div>
                       );
