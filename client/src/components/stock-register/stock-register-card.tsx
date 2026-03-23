@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import { computeNetWeight } from "@shared/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -209,7 +209,7 @@ function computeEntryStatusFromMetrics(lotsWithMetrics: Array<{ metrics: ReturnT
 interface StockRegisterCardProps {
   downloadDialogOpen?: boolean;
   onDownloadDialogClose?: () => void;
-  selectedCrop?: "potato" | "onion" | "garlic";
+  selectedCrop?: "all" | "potato" | "onion" | "garlic";
 }
 
 interface MerchantInfo {
@@ -250,12 +250,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [imageViewEntryId, setImageViewEntryId] = useState<number | null>(null);
   const [imageViewEntryLabel, setImageViewEntryLabel] = useState<string>("");
   const [showNakal, setShowNakal] = useState(false);
-  const [filterCrop, setFilterCrop] = useState<"all" | "potato" | "onion" | "garlic">(selectedCrop);
 
-  useEffect(() => {
-    setFilterCrop(selectedCrop);
-  }, [selectedCrop]);
-  
   // Download dialog state (simplified - now uses filtered entries directly)
   const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
   const isDownloadDialogOpen = downloadDialogOpen || internalDownloadDialogOpen;
@@ -369,8 +364,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       }
 
       // Filter by crop - entry must have at least one lot with matching crop
-      if (filterCrop !== "all") {
-        const hasCropMatch = entry.lots.some(lot => (lot.crop || "potato") === filterCrop);
+      if (selectedCrop !== "all") {
+        const hasCropMatch = entry.lots.some(lot => (lot.crop || "potato") === selectedCrop);
         if (!hasCropMatch) return false;
       }
 
@@ -411,7 +406,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
       return true;
     });
-  }, [entries, filterCrop, filterYear, filterMonths, filterDay, filterSerial, filterFarmerId, filterAadhatId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, selectedCrop, filterYear, filterMonths, filterDay, filterSerial, filterFarmerId, filterAadhatId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const currentMonth = new Date().getMonth();
   const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
@@ -429,10 +424,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     setFilterQuality("");
     setFilterUnsold(false);
     setFilterColdStore("");
-    setFilterCrop(selectedCrop);
   };
 
-  const hasActiveFilters = filterCrop !== selectedCrop || filterSerial || filterFarmer || filterAadhat || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString()) || !isDefaultMonths || filterDay !== null;
+  const hasActiveFilters = filterSerial || filterFarmer || filterAadhat || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString()) || !isDefaultMonths || filterDay !== null;
 
   const lotMetricsMap = useMemo(() => {
     const map = new Map<number, ReturnType<typeof computeLotMetrics>>();
@@ -715,7 +709,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     link.href = URL.createObjectURL(blob);
     
     // Generate descriptive filename based on applied filters
-    const parts = [filterCrop, "stock_entries"];
+    const parts = [selectedCrop, "stock_entries"];
     if (filterYear) parts.push(filterYear);
     if (filterSerial) parts.push(`sr${filterSerial}`);
     if (filterFarmer) parts.push(filterFarmer.replace(/\s+/g, "_"));
@@ -777,7 +771,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               {t("Download will include entries based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर प्रविष्टियाँ शामिल होंगी:")}
             </p>
             <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-              <p><strong>{t("Crop:", "फसल:")}</strong> {filterCrop === "all" ? t("All", "सभी") : filterCrop === "potato" ? t("Potato", "आलू") : filterCrop === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन")}</p>
+              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "all" ? t("All", "सभी") : selectedCrop === "potato" ? t("Potato", "आलू") : selectedCrop === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन")}</p>
               <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
               {filterSerial && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerial}</p>}
               {filterFarmer && <p><strong>{t("Farmer:", "किसान:")}</strong> {filterFarmer}</p>}
@@ -813,18 +807,6 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           <div className="flex items-start gap-2">
             <Filter className="h-4 w-4 text-muted-foreground mt-2.5" />
             <div className="grid grid-cols-2 gap-2 flex-1 sm:flex sm:flex-wrap sm:items-center">
-            <Select value={filterCrop} onValueChange={(v) => setFilterCrop(v as "all" | "potato" | "onion" | "garlic")}>
-              <SelectTrigger className="text-sm sm:w-[110px]" data-testid="filter-crop">
-                <SelectValue placeholder={t("Crop", "फसल")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" data-testid="filter-crop-all">{t("All", "सभी")}</SelectItem>
-                <SelectItem value="potato" data-testid="filter-crop-potato">{t("Potato", "आलू")}</SelectItem>
-                <SelectItem value="onion" data-testid="filter-crop-onion">{t("Onion", "प्याज")}</SelectItem>
-                <SelectItem value="garlic" data-testid="filter-crop-garlic">{t("Garlic", "लहसुन")}</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Select value={filterYear} onValueChange={setFilterYear}>
               <SelectTrigger className="text-sm sm:w-[100px]" data-testid="filter-year">
                 <SelectValue placeholder={t("Year", "वर्ष")} />

@@ -141,6 +141,15 @@ export default function HomePage() {
     setSelectedCropState(crop);
     localStorage.setItem("vyapar_selected_crop", crop);
   };
+  const [registerCrop, setRegisterCropState] = useState<"all" | "potato" | "onion" | "garlic">(() => {
+    const saved = localStorage.getItem("vyapar_register_crop");
+    if (saved === "all" || saved === "potato" || saved === "onion" || saved === "garlic") return saved;
+    return "potato";
+  });
+  const setRegisterCrop = (crop: "all" | "potato" | "onion" | "garlic") => {
+    setRegisterCropState(crop);
+    localStorage.setItem("vyapar_register_crop", crop);
+  };
   const [selectedPlace, setSelectedPlaceState] = useState<"farm_gate" | "cold_store" | "mandi">(() => {
     const saved = localStorage.getItem("vyapar_selected_place");
     if (saved === "farm_gate" || saved === "cold_store" || saved === "mandi") return saved;
@@ -521,16 +530,18 @@ export default function HomePage() {
                     {t("Stock Register", "स्टॉक रजिस्टर")}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {selectedCrop === "potato"
+                    {registerCrop === "potato"
                       ? t("View and manage your potato stock", "अपने आलू स्टॉक को देखें और प्रबंधित करें")
-                      : selectedCrop === "onion"
+                      : registerCrop === "onion"
                       ? t("View and manage your onion stock", "अपने प्याज स्टॉक को देखें और प्रबंधित करें")
-                      : t("View and manage your garlic stock", "अपने लहसुन स्टॉक को देखें और प्रबंधित करें")
+                      : registerCrop === "garlic"
+                      ? t("View and manage your garlic stock", "अपने लहसुन स्टॉक को देखें और प्रबंधित करें")
+                      : t("View and manage all stock", "सभी स्टॉक देखें और प्रबंधित करें")
                     }
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CropToggle value={selectedCrop} onChange={setSelectedCrop} />
+                  <CropToggle value={registerCrop} onChange={(v) => setRegisterCrop(v as "all" | "potato" | "onion" | "garlic")} showAll />
                   <Button
                     variant="ghost"
                     size="icon"
@@ -545,7 +556,7 @@ export default function HomePage() {
               <StockRegisterCard 
                 downloadDialogOpen={rawDownloadDialogOpen}
                 onDownloadDialogClose={() => setRawDownloadDialogOpen(false)}
-                selectedCrop={selectedCrop}
+                selectedCrop={registerCrop}
               />
             </div>
           </div>
