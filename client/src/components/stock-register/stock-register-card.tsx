@@ -221,6 +221,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [serialPopoverOpen, setSerialPopoverOpen] = useState(false);
   const [filterFarmer, setFilterFarmer] = useState<string>("");
   const [filterFarmerId, setFilterFarmerId] = useState<number | null>(null);
+  const [filterAadhat, setFilterAadhat] = useState<string>("");
+  const [filterAadhatId, setFilterAadhatId] = useState<number | null>(null);
+  const [aadhatPopoverOpen, setAadhatPopoverOpen] = useState(false);
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>("");
   const [filterQuality, setFilterQuality] = useState<string>("");
   const [filterUnsold, setFilterUnsold] = useState<boolean>(false);
@@ -312,6 +315,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     return farmerOptions.map(f => f.name);
   }, [farmerOptions]);
 
+  const aadhatOptions = useMemo(() => {
+    if (!entries) return [];
+    const aadhatMap = new Map<number, { id: number; name: string }>();
+    entries.forEach(entry => {
+      if (entry.aadhatDbId && entry.aadhatName && !aadhatMap.has(entry.aadhatDbId)) {
+        aadhatMap.set(entry.aadhatDbId, { id: entry.aadhatDbId, name: entry.aadhatName });
+      }
+    });
+    return Array.from(aadhatMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [entries]);
+
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     
@@ -345,6 +359,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         return false;
       }
 
+      if (filterAadhatId != null && entry.aadhatDbId !== filterAadhatId) {
+        return false;
+      }
+
       if (filterPaymentStatus && entry.paymentStatus !== filterPaymentStatus) {
         return false;
       }
@@ -370,7 +388,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
       return true;
     });
-  }, [entries, selectedCrop, filterYear, filterMonths, filterDay, filterSerial, filterFarmerId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
+  }, [entries, selectedCrop, filterYear, filterMonths, filterDay, filterSerial, filterFarmerId, filterAadhatId, filterPaymentStatus, filterQuality, filterUnsold, filterColdStore]);
 
   const currentMonth = new Date().getMonth();
   const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
@@ -382,13 +400,15 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     setFilterSerial("");
     setFilterFarmer("");
     setFilterFarmerId(null);
+    setFilterAadhat("");
+    setFilterAadhatId(null);
     setFilterPaymentStatus("");
     setFilterQuality("");
     setFilterUnsold(false);
     setFilterColdStore("");
   };
 
-  const hasActiveFilters = filterSerial || filterFarmer || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString()) || !isDefaultMonths || filterDay !== null;
+  const hasActiveFilters = filterSerial || filterFarmer || filterAadhat || filterPaymentStatus || filterQuality || filterUnsold || filterColdStore || (filterYear && filterYear !== currentYear.toString()) || !isDefaultMonths || filterDay !== null;
 
   const lotMetricsMap = useMemo(() => {
     const map = new Map<number, ReturnType<typeof computeLotMetrics>>();
@@ -874,6 +894,73 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                 </Command>
               </PopoverContent>
             </Popover>
+
+            {aadhatOptions.length > 0 && (
+            <Popover open={aadhatPopoverOpen} onOpenChange={setAadhatPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={aadhatPopoverOpen}
+                  className={cn(
+                    "justify-between font-normal text-sm sm:w-[140px]",
+                    !filterAadhat && "text-muted-foreground"
+                  )}
+                  data-testid="filter-aadhat"
+                >
+                  <span className="truncate">
+                    {filterAadhat || t("Aadhat", "आढ़त")}
+                  </span>
+                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0">
+                <Command>
+                  <CommandInput placeholder={t("Search aadhat...", "आढ़त खोजें...")} />
+                  <CommandList>
+                    <CommandEmpty>{t("No aadhat found.", "कोई आढ़त नहीं मिली।")}</CommandEmpty>
+                    <CommandGroup>
+                      {filterAadhat && (
+                        <CommandItem
+                          value="__clear__"
+                          onSelect={() => {
+                            setFilterAadhat("");
+                            setFilterAadhatId(null);
+                            setAadhatPopoverOpen(false);
+                          }}
+                          className="text-muted-foreground"
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          {t("Clear", "हटाएं")}
+                        </CommandItem>
+                      )}
+                      {aadhatOptions.map((aadhat) => (
+                        <CommandItem
+                          key={aadhat.id}
+                          value={aadhat.name}
+                          onSelect={() => {
+                            if (filterAadhatId === aadhat.id) {
+                              setFilterAadhat("");
+                              setFilterAadhatId(null);
+                            } else {
+                              setFilterAadhat(aadhat.name);
+                              setFilterAadhatId(aadhat.id);
+                            }
+                            setAadhatPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${filterAadhatId === aadhat.id ? "opacity-100" : "opacity-0"}`}
+                          />
+                          <span className="font-medium">{aadhat.name}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            )}
 
             <Select value={filterPaymentStatus} onValueChange={setFilterPaymentStatus}>
               <SelectTrigger className="text-sm sm:w-[110px]" data-testid="filter-payment-status">
