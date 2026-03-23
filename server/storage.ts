@@ -4234,17 +4234,39 @@ export class DatabaseStorage implements IStorage {
         } else {
           // Legacy fallback: reverse old FIFO-era cash_entry_allocations for pre-manual-allocation entries
           const legacyAllocs = entryAllocations.filter(a => a.transactionId !== null);
+          let totalLegacyAllocated = 0;
           for (const alloc of legacyAllocs) {
             if (alloc.transactionId) {
+              const allocAmt = parseFloat(alloc.appliedAmount || "0");
+              totalLegacyAllocated += allocAmt;
               const [txn] = await tx.select().from(transactions)
                 .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
               if (txn) {
                 const currentReceived = parseFloat(txn.amountReceived || "0");
-                const allocAmt = parseFloat(alloc.appliedAmount || "0");
                 const newReceived = Math.max(0, currentReceived - allocAmt);
                 await tx.update(transactions)
                   .set({ amountReceived: newReceived.toString() })
                   .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
+              }
+            }
+          }
+          // Restore buyer receivableBalance for portion applied to PY (unallocated remainder)
+          const totalPayment = parseFloat(entry.amount || "0");
+          const receivableReduction = totalPayment - totalLegacyAllocated;
+          if (receivableReduction > 0) {
+            let buyerIdToRestore = entry.buyerId;
+            if (!buyerIdToRestore && entry.partyName) {
+              const allBuyers = await tx.select().from(buyers).where(eq(buyers.merchantId, merchantId));
+              const matchedBuyer = allBuyers.find(b => normalizeName(b.name) === normalizeName(entry.partyName!));
+              buyerIdToRestore = matchedBuyer?.id || null;
+            }
+            if (buyerIdToRestore) {
+              const [buyer] = await tx.select().from(buyers).where(eq(buyers.id, buyerIdToRestore));
+              if (buyer) {
+                const currentReceivable = parseFloat(buyer.receivableBalance || "0");
+                await tx.update(buyers)
+                  .set({ receivableBalance: (currentReceivable + receivableReduction).toFixed(2), updatedAt: new Date() })
+                  .where(eq(buyers.id, buyerIdToRestore));
               }
             }
           }
