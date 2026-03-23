@@ -92,7 +92,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 },
   ]);
 
-  const [salesCommission, setSalesCommission] = useState(0);
+  const [salesCommissionPct, setSalesCommissionPct] = useState(0);
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
 
@@ -110,9 +110,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   });
   const [visibleCharges, setVisibleCharges] = useState<ChargeKey[]>([]);
 
-  const [editMandiCommission, setEditMandiCommission] = useState(0);
-  const [editAadhatCommission, setEditAadhatCommission] = useState(0);
-  const [editHammali, setEditHammali] = useState(0);
+  const [mandiCommissionPct, setMandiCommissionPct] = useState(0);
+  const [aadhatCommissionPct, setAadhatCommissionPct] = useState(0);
+  const [hammaliPerBagRate, setHammaliPerBagRate] = useState(0);
   const [editExtraCharges, setEditExtraCharges] = useState(0);
 
   const { data: inventory = [], isLoading: loadingInventory } = useQuery<UnsoldInventoryItem[]>({
@@ -213,16 +213,31 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     };
   }, [items, findInventoryByKey]);
 
+  const totalItemAmount = useMemo(() => {
+    return items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  }, [items]);
+
+  const totalItemBags = useMemo(() => {
+    return items.reduce((sum, item) => sum + (Number(item.bagsMoved) || 0), 0);
+  }, [items]);
+
   useEffect(() => {
-    setEditMandiCommission(mandiChargesAggregated.totalMandiCommission);
-    setEditAadhatCommission(mandiChargesAggregated.totalAadhatCommission);
-    setEditHammali(mandiChargesAggregated.totalHammali);
+    const amtBase = totalItemAmount > 0 ? totalItemAmount : 1;
+    const bagBase = totalItemBags > 0 ? totalItemBags : 1;
+    setMandiCommissionPct(Math.round((mandiChargesAggregated.totalMandiCommission / amtBase) * 10000) / 100);
+    setAadhatCommissionPct(Math.round((mandiChargesAggregated.totalAadhatCommission / amtBase) * 10000) / 100);
+    setHammaliPerBagRate(Math.round((mandiChargesAggregated.totalHammali / bagBase) * 100) / 100);
     setEditExtraCharges(mandiChargesAggregated.totalMandiExtraCharges);
-  }, [mandiChargesAggregated]);
+  }, [mandiChargesAggregated, totalItemAmount, totalItemBags]);
+
+  const computedMandiComm = useMemo(() => Math.round(totalItemAmount * mandiCommissionPct / 100 * 100) / 100, [totalItemAmount, mandiCommissionPct]);
+  const computedAadhatComm = useMemo(() => Math.round(totalItemAmount * aadhatCommissionPct / 100 * 100) / 100, [totalItemAmount, aadhatCommissionPct]);
+  const computedHammali = useMemo(() => Math.round(totalItemBags * hammaliPerBagRate * 100) / 100, [totalItemBags, hammaliPerBagRate]);
+  const computedSalesComm = useMemo(() => Math.round(totalItemAmount * salesCommissionPct / 100 * 100) / 100, [totalItemAmount, salesCommissionPct]);
 
   const totalMandiCharges = useMemo(() => {
-    return editMandiCommission + editAadhatCommission + editHammali + editExtraCharges;
-  }, [editMandiCommission, editAadhatCommission, editHammali, editExtraCharges]);
+    return computedMandiComm + computedAadhatComm + computedHammali + editExtraCharges;
+  }, [computedMandiComm, computedAadhatComm, computedHammali, editExtraCharges]);
 
   const totals = useMemo(() => {
     let totalBags = 0;
@@ -241,8 +256,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     });
 
     const totalAdditionalCharges = Object.values(additionalCharges).reduce((sum, v) => sum + v, 0);
-    const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges + driverAdvance - advanceAmount;
-    const totalPL = (totalAmount - totalCostOfGoods) + salesCommission;
+    const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount;
+    const totalPL = (totalAmount - totalCostOfGoods) + computedSalesComm;
 
     return {
       totalBags,
@@ -252,7 +267,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       grandTotal,
       totalPL,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, salesCommission, driverAdvance, advanceAmount, additionalCharges]);
+  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, driverAdvance, advanceAmount, additionalCharges]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -300,10 +315,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         advancePayment: driverAdvance,
         items: validItems,
         revenue: totals.totalAmount,
-        salesCommission,
-        totalMandiCommission: editMandiCommission,
-        totalAadhatCommission: editAadhatCommission,
-        totalHammali: editHammali,
+        salesCommission: computedSalesComm,
+        totalMandiCommission: computedMandiComm,
+        totalAadhatCommission: computedAadhatComm,
+        totalHammali: computedHammali,
         totalMandiExtraCharges: editExtraCharges,
         transportationCharges: 0,
         otherCharges: advanceAmount,
@@ -351,14 +366,14 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setPartyName("");
     setPartyAddress("");
     setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 }]);
-    setSalesCommission(0);
+    setSalesCommissionPct(0);
     setDriverAdvance(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
     setVisibleCharges([]);
-    setEditMandiCommission(0);
-    setEditAadhatCommission(0);
-    setEditHammali(0);
+    setMandiCommissionPct(0);
+    setAadhatCommissionPct(0);
+    setHammaliPerBagRate(0);
     setEditExtraCharges(0);
   };
 
@@ -762,49 +777,51 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 <Label className="text-xs font-semibold">{t("Mandi Charges", "मंडी शुल्क")}</Label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">{t("Mandi Commission", "मंडी कमीशन")}</Label>
+                    <Label className="text-[10px] text-muted-foreground">{t("Mandi Comm. %", "मंडी कमीशन %")}</Label>
                     <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                       <Input
                         type="number"
                         step="any"
-                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        value={editMandiCommission || ""}
+                        className="h-9 pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={mandiCommissionPct || ""}
                         placeholder="0"
-                        onChange={(e) => setEditMandiCommission(Number(e.target.value) || 0)}
+                        onChange={(e) => setMandiCommissionPct(Number(e.target.value) || 0)}
                         data-testid="input-loading-mandi-commission"
                       />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{computedMandiComm.toLocaleString('en-IN')}</p>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">{t("Aadhat Commission", "आढ़त कमीशन")}</Label>
+                    <Label className="text-[10px] text-muted-foreground">{t("Aadhat Comm. %", "आढ़त कमीशन %")}</Label>
                     <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                       <Input
                         type="number"
                         step="any"
-                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        value={editAadhatCommission || ""}
+                        className="h-9 pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={aadhatCommissionPct || ""}
                         placeholder="0"
-                        onChange={(e) => setEditAadhatCommission(Number(e.target.value) || 0)}
+                        onChange={(e) => setAadhatCommissionPct(Number(e.target.value) || 0)}
                         data-testid="input-loading-aadhat-commission"
                       />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{computedAadhatComm.toLocaleString('en-IN')}</p>
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">{t("Hammali", "हम्माली")}</Label>
+                    <Label className="text-[10px] text-muted-foreground">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
                     <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
                       <Input
                         type="number"
                         step="any"
-                        className="h-9 pl-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        value={editHammali || ""}
+                        className="h-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={hammaliPerBagRate || ""}
                         placeholder="0"
-                        onChange={(e) => setEditHammali(Number(e.target.value) || 0)}
+                        onChange={(e) => setHammaliPerBagRate(Number(e.target.value) || 0)}
                         data-testid="input-loading-hammali"
                       />
                     </div>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{computedHammali.toLocaleString('en-IN')}</p>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Extra Charges", "अतिरिक्त शुल्क")}</Label>
@@ -891,15 +908,20 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label className="text-xs">{t("Sales Commission", "बिक्री कमीशन")}</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={salesCommission || ""}
-                    onChange={(e) => setSalesCommission(Number(e.target.value) || 0)}
-                    placeholder="0"
-                    data-testid="input-loading-sales-commission"
-                  />
+                  <Label className="text-xs">{t("Sales Comm. %", "बिक्री कमीशन %")}</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="any"
+                      className="pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={salesCommissionPct || ""}
+                      onChange={(e) => setSalesCommissionPct(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      data-testid="input-loading-sales-commission"
+                    />
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">₹{computedSalesComm.toLocaleString('en-IN')}</p>
                 </div>
                 <div>
                   <Label className="text-xs">{t("Driver Advance", "ड्राइवर अग्रिम")}</Label>
