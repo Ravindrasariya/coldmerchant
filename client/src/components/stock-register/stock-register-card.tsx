@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, Check, ChevronsUpDown, Share2, ChevronDown, Paperclip } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, FileDown, Check, ChevronsUpDown, Share2, ChevronDown, Paperclip } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +33,7 @@ import { MonthFilter } from "@/components/ui/month-filter";
 import { DateFilter } from "@/components/ui/date-filter";
 import { StockEntryEditDialog } from "./stock-entry-edit-dialog";
 import { BillPrintDialog } from "./bill-print-dialog";
+import { LoadingNakalDialog } from "./loading-nakal";
 import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryWithLots {
@@ -234,6 +235,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
   const [imageViewEntryId, setImageViewEntryId] = useState<number | null>(null);
   const [imageViewEntryLabel, setImageViewEntryLabel] = useState<string>("");
+  const [showNakal, setShowNakal] = useState(false);
   
   // Download dialog state (simplified - now uses filtered entries directly)
   const [internalDownloadDialogOpen, setInternalDownloadDialogOpen] = useState(false);
@@ -760,6 +762,15 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         </DialogContent>
       </Dialog>
 
+      <LoadingNakalDialog
+        entries={filteredEntries}
+        open={showNakal}
+        onOpenChange={setShowNakal}
+        filterDay={filterDay}
+        filterMonths={filterMonths}
+        filterYear={filterYear}
+      />
+
       <Card className="border-green-300 dark:border-green-700">
         <CardContent className="py-3 px-3 sm:px-4 space-y-3">
           <div className="flex items-start gap-2">
@@ -1005,6 +1016,16 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               data-testid="filter-unsold"
             >
               {t("Unsold Only", "केवल बिना बिके")}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowNakal(true)}
+              data-testid="button-loading-nakal"
+              title={t("Loading Nakal", "लोडिंग नकल")}
+            >
+              <FileDown className="h-4 w-4" />
             </Button>
 
             {hasActiveFilters && (
