@@ -3944,6 +3944,177 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/aadhats/:id/ledger - Get aadhat ledger for current FY
+  app.get("/api/aadhats/:id/ledger", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const aadhatId = parseInt(req.params.id);
+      if (isNaN(aadhatId)) return res.status(400).json({ message: "Invalid aadhat ID" });
+
+      const aadhat = await storage.getAadhatById(aadhatId, merchantId);
+      if (!aadhat) {
+        return res.status(404).json({ message: "Aadhat not found" });
+      }
+
+      const todayStr = getISTDateString();
+      const todayDate = new Date(todayStr + "T00:00:00+05:30");
+      const currentMonth = todayDate.getMonth();
+      const currentYear = todayDate.getFullYear();
+      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const fyStart = `${fyStartYear}-04-01`;
+      const fyEnd = `${fyStartYear + 1}-03-31`;
+
+      const allStockEntries = await storage.getStockEntriesByMerchant(merchantId);
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      const allCashEntries = await storage.getCashEntriesByMerchant(merchantId);
+
+      const aadhatStockEntries = allStockEntries.filter((se: any) => se.aadhatDbId === aadhatId);
+      const aadhatCashEntries = allCashEntries.filter(entry =>
+        entry.aadhatDbId === aadhatId &&
+        entry.direction === "outflow" &&
+        entry.expenseType === "aadhtiya" &&
+        !entry.isReversed
+      );
+
+      const lotsByEntryId = new Map<number, any[]>();
+      for (const lot of allLots) {
+        const arr = lotsByEntryId.get(lot.stockEntryId) || [];
+        arr.push(lot);
+        lotsByEntryId.set(lot.stockEntryId, arr);
+      }
+
+      const fyStockEntries = aadhatStockEntries.filter((se: any) =>
+        se.purchaseDate && se.purchaseDate >= fyStart && se.purchaseDate <= fyEnd
+      );
+      const fyCashEntries = aadhatCashEntries.filter(entry =>
+        entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
+      );
+
+      let pyAllocPaid = 0;
+      for (const entry of fyCashEntries) {
+        if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
+          for (const alloc of entry.aadhatAllocations) {
+            if (alloc.isPyPayable) {
+              pyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.discountAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            }
+          }
+        }
+      }
+
+      const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+      const openingPyPayable = currentPyPayable + pyAllocPaid;
+
+      const preFyStockEntryIds = new Set<number>();
+      let preFyStockDueCurrent = 0;
+      for (const se of aadhatStockEntries) {
+        if (se.purchaseDate && se.purchaseDate < fyStart) {
+          preFyStockEntryIds.add(se.id);
+          const entryLots = lotsByEntryId.get(se.id) || [];
+          let netPayable = 0;
+          for (const lot of entryLots) {
+            netPayable += parseFloat(lot.netPayable || "0");
+          }
+          const paid = parseFloat(se.amountPaid || "0");
+          preFyStockDueCurrent += Math.max(0, netPayable - paid);
+        }
+      }
+
+      let fyAllocsToPreFyStock = 0;
+      for (const entry of fyCashEntries) {
+        if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
+          for (const alloc of entry.aadhatAllocations) {
+            if (!alloc.isPyPayable && alloc.stockEntryId && preFyStockEntryIds.has(alloc.stockEntryId)) {
+              fyAllocsToPreFyStock += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.discountAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            }
+          }
+        }
+      }
+
+      const preFyStockDueAtFyStart = preFyStockDueCurrent + fyAllocsToPreFyStock;
+      const totalOpening = openingPyPayable + preFyStockDueAtFyStart;
+
+      interface LedgerEntry {
+        date: string;
+        tnxCode: string;
+        particulars: string;
+        dr: number;
+        cr: number;
+        sourceType: "stock_entry" | "payment";
+        sourceId: number;
+      }
+
+      const entries: LedgerEntry[] = [];
+
+      for (const se of fyStockEntries) {
+        const entryLots = lotsByEntryId.get(se.id) || [];
+        let netPayable = 0;
+        for (const lot of entryLots) {
+          netPayable += parseFloat(lot.netPayable || "0");
+        }
+        if (netPayable > 0) {
+          entries.push({
+            date: se.purchaseDate || "",
+            tnxCode: se.uniqueId || `SE #${se.serialNumber}`,
+            particulars: "Harvest Purchase",
+            dr: 0,
+            cr: netPayable,
+            sourceType: "stock_entry",
+            sourceId: se.id,
+          });
+        }
+      }
+
+      for (const entry of fyCashEntries) {
+        let totalApplied = 0;
+        let totalDiscount = 0;
+        let totalPetty = 0;
+        if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
+          for (const alloc of entry.aadhatAllocations) {
+            totalApplied += parseFloat(alloc.appliedAmount || "0");
+            totalDiscount += parseFloat(alloc.discountAmount || "0");
+            totalPetty += parseFloat(alloc.pettyAdjustment || "0");
+          }
+        }
+        const totalDr = totalApplied + totalDiscount + totalPetty;
+        if (totalDr > 0) {
+          const hasPy = entry.aadhatAllocations?.some((a: { isPyPayable?: boolean }) => a.isPyPayable);
+          entries.push({
+            date: entry.entryDate || "",
+            tnxCode: entry.transactionCode || "",
+            particulars: hasPy ? "Payment (incl. PY)" : "Payment",
+            dr: totalDr,
+            cr: 0,
+            sourceType: "payment",
+            sourceId: entry.id,
+          });
+        }
+      }
+
+      entries.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.sourceType !== b.sourceType) return a.sourceType === "stock_entry" ? -1 : 1;
+        return a.sourceId - b.sourceId;
+      });
+
+      const merchant = await storage.getMerchant(merchantId);
+      res.json({
+        aadhatId: aadhatId,
+        aadhatName: aadhat.name,
+        aadhatAddress: aadhat.address,
+        merchantName: merchant?.name || "",
+        merchantAddress: merchant?.address || "",
+        merchantContact: merchant?.contactNumber || "",
+        openingBalance: totalOpening,
+        fyStart,
+        fyEnd,
+        entries,
+      });
+    } catch (error) {
+      console.error("Error fetching aadhat ledger:", error);
+      res.status(500).json({ message: "Failed to fetch aadhat ledger" });
+    }
+  });
+
   // GET /api/buyers/:id/history - Get edit history for a buyer
   app.get("/api/buyers/:id/history", requireMerchant, async (req, res) => {
     try {

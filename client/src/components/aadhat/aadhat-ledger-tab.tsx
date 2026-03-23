@@ -19,13 +19,255 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Search,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { type Aadhat, type AadhatEditHistory } from "@shared/schema";
+
+interface LedgerEntry {
+  date: string;
+  tnxCode: string;
+  particulars: string;
+  dr: number;
+  cr: number;
+  sourceType: "stock_entry" | "payment";
+  sourceId: number;
+}
+
+interface AadhatLedgerData {
+  aadhatId: number;
+  aadhatName: string;
+  aadhatAddress: string;
+  merchantName: string;
+  merchantAddress: string;
+  merchantContact: string;
+  openingBalance: number;
+  fyStart: string;
+  fyEnd: string;
+  entries: LedgerEntry[];
+}
+
+function AadhatLedgerSection({ aadhatId, aadhatName, t, formatLedgerAmount, formatDate }: {
+  aadhatId: number;
+  aadhatName: string;
+  t: (en: string, hi: string) => string;
+  formatLedgerAmount: (v: number) => string;
+  formatDate: (d: string) => string;
+}) {
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const { data: ledgerData, isLoading } = useQuery<AadhatLedgerData>({
+    queryKey: ["/api/aadhats", aadhatId, "ledger"],
+    queryFn: async () => {
+      const res = await fetch(`/api/aadhats/${aadhatId}/ledger`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger");
+      return res.json();
+    },
+    enabled: !!aadhatId,
+  });
+
+  const ledgerRows = useMemo(() => {
+    if (!ledgerData) return [];
+    const rows: { kramank: number; date: string; tnxCode: string; particulars: string; dr: number; cr: number; balance: number }[] = [];
+    let balance = ledgerData.openingBalance;
+    rows.push({ kramank: 0, date: ledgerData.fyStart, tnxCode: "", particulars: "Opening Balance", dr: 0, cr: ledgerData.openingBalance, balance });
+    ledgerData.entries.forEach((entry, idx) => {
+      balance = balance + entry.cr - entry.dr;
+      rows.push({ kramank: idx + 1, date: entry.date, tnxCode: entry.tnxCode, particulars: entry.particulars, dr: entry.dr, cr: entry.cr, balance });
+    });
+    return rows;
+  }, [ledgerData]);
+
+  const handlePdfExport = async () => {
+    if (!ledgerData) return;
+    setPdfLoading(true);
+    try {
+      const fyLabel = `${ledgerData.fyStart.substring(0, 4)}-${ledgerData.fyEnd.substring(2, 4)}`;
+      const printDiv = document.createElement("div");
+      printDiv.style.cssText = "width:780px;padding:20px;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000;";
+
+      const merchantHeader = document.createElement("div");
+      merchantHeader.style.cssText = "text-align:center;margin-bottom:12px;";
+      const merchantH1 = document.createElement("h1");
+      merchantH1.style.cssText = "font-size:18px;margin:0;font-weight:700;";
+      merchantH1.textContent = ledgerData.merchantName;
+      merchantHeader.appendChild(merchantH1);
+      if (ledgerData.merchantAddress) {
+        const merchantAddr = document.createElement("p");
+        merchantAddr.style.cssText = "font-size:12px;color:#555;margin:2px 0;";
+        merchantAddr.textContent = ledgerData.merchantAddress;
+        merchantHeader.appendChild(merchantAddr);
+      }
+      if (ledgerData.merchantContact) {
+        const merchantPhone = document.createElement("p");
+        merchantPhone.style.cssText = "font-size:12px;color:#555;margin:2px 0;";
+        merchantPhone.textContent = ledgerData.merchantContact;
+        merchantHeader.appendChild(merchantPhone);
+      }
+
+      const header = document.createElement("div");
+      header.style.cssText = "text-align:center;border-top:1px solid #999;border-bottom:2px solid #000;padding:10px 0 12px;margin-bottom:16px;";
+      const h1 = document.createElement("h1");
+      h1.style.cssText = "font-size:20px;margin:0;";
+      h1.textContent = aadhatName;
+      const addrP = document.createElement("p");
+      addrP.style.cssText = "font-size:13px;color:#555;margin:4px 0;";
+      addrP.textContent = ledgerData.aadhatAddress || "";
+      const fyP = document.createElement("p");
+      fyP.style.cssText = "font-size:14px;font-weight:600;margin:6px 0 0 0;";
+      fyP.textContent = `${t("Aadhat Ledger", "आढ़त खाता")} — FY ${fyLabel}`;
+      header.append(h1, addrP, fyP);
+
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12px;";
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      headerRow.style.background = "#f0f0f0";
+      const headers = [
+        { text: t("Sr", "क्र."), align: "center", width: "40px" },
+        { text: t("Date", "तारीख"), align: "left" },
+        { text: t("Ref #", "Ref #"), align: "left" },
+        { text: t("Particulars", "विवरण"), align: "left" },
+        { text: t("Dr", "डेबिट"), align: "right" },
+        { text: t("Cr", "क्रेडिट"), align: "right" },
+        { text: t("Balance", "शेष"), align: "right" },
+      ];
+      for (const h of headers) {
+        const th = document.createElement("th");
+        th.style.cssText = `border:1px solid #999;padding:5px 6px;text-align:${h.align};${h.width ? `width:${h.width}` : ""}`;
+        th.textContent = h.text;
+        headerRow.appendChild(th);
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (let i = 0; i < ledgerRows.length; i++) {
+        const row = ledgerRows[i];
+        const tr = document.createElement("tr");
+        if (i === 0) tr.style.cssText = "background:#f9f9f9;font-weight:600;";
+        const cellData: { text: string; align: string; bold?: boolean }[] = [
+          { text: String(row.kramank), align: "center" },
+          { text: formatDate(row.date), align: "left" },
+          { text: row.tnxCode || "—", align: "left" },
+          { text: row.particulars, align: "left" },
+          { text: row.dr > 0 ? `₹${row.dr.toLocaleString("en-IN")}` : "—", align: "right" },
+          { text: row.cr > 0 ? `₹${row.cr.toLocaleString("en-IN")}` : "—", align: "right" },
+          { text: `₹${row.balance.toLocaleString("en-IN")}`, align: "right", bold: true },
+        ];
+        for (const cell of cellData) {
+          const td = document.createElement("td");
+          td.style.cssText = `border:1px solid #ccc;padding:4px 6px;text-align:${cell.align};${cell.bold ? "font-weight:600;" : ""}`;
+          td.textContent = cell.text;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+
+      printDiv.append(merchantHeader, header, table);
+      document.body.appendChild(printDiv);
+      await shareReceiptAsPdf(printDiv, `${aadhatName}_Ledger_FY${fyLabel}`);
+      document.body.removeChild(printDiv);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-6 bg-muted/20 border-b">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!ledgerData || ledgerRows.length === 0) {
+    return (
+      <div className="text-center py-4 text-sm text-muted-foreground bg-muted/20 border-b">
+        {t("No ledger entries found", "कोई खाता प्रविष्टि नहीं मिली")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-muted/10 border-b" data-testid={`aadhat-ledger-${aadhatId}`}>
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+        <span className="text-xs font-semibold text-muted-foreground">
+          {t("Ledger", "खाता")} — {aadhatName} (FY {ledgerData.fyStart.substring(0, 4)}-{ledgerData.fyEnd.substring(2, 4)})
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handlePdfExport}
+          disabled={pdfLoading}
+          data-testid={`button-pdf-ledger-aadhat-${aadhatId}`}
+        >
+          {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+          <span className="ml-1 text-xs">{t("PDF", "PDF")}</span>
+        </Button>
+      </div>
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-xs border-collapse min-w-[600px]">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="border px-2 py-1.5 text-center w-10">{t("Sr", "क्र.")}</th>
+              <th className="border px-2 py-1.5 text-left w-24">{t("Date", "तारीख")}</th>
+              <th className="border px-2 py-1.5 text-left w-20">{t("Ref #", "Ref #")}</th>
+              <th className="border px-2 py-1.5 text-left">{t("Particulars", "विवरण")}</th>
+              <th className="border px-2 py-1.5 text-right w-24">{t("Dr", "डेबिट")}</th>
+              <th className="border px-2 py-1.5 text-right w-24">{t("Cr", "क्रेडिट")}</th>
+              <th className="border px-2 py-1.5 text-right w-28">{t("Balance", "शेष")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ledgerRows.map((row, i) => (
+              <tr key={i} className={i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : ""} data-testid={`aadhat-ledger-row-${aadhatId}-${i}`}>
+                <td className="border px-2 py-1.5 text-center text-muted-foreground">{row.kramank}</td>
+                <td className="border px-2 py-1.5">{formatDate(row.date)}</td>
+                <td className="border px-2 py-1.5 font-mono">{row.tnxCode || "—"}</td>
+                <td className="border px-2 py-1.5">{row.particulars}</td>
+                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{formatLedgerAmount(row.dr)}</td>
+                <td className="border px-2 py-1.5 text-right">{formatLedgerAmount(row.cr)}</td>
+                <td className="border px-2 py-1.5 text-right font-semibold">{formatLedgerAmount(row.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="md:hidden space-y-2 px-3 py-2">
+        {ledgerRows.map((row, i) => (
+          <div
+            key={i}
+            className={`rounded-md border p-3 text-xs ${i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : "bg-card"}`}
+            data-testid={`aadhat-ledger-card-${aadhatId}-${i}`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-muted-foreground">#{row.kramank} · {formatDate(row.date)}</span>
+              {row.tnxCode && <span className="font-mono text-muted-foreground">{row.tnxCode}</span>}
+            </div>
+            <div className="mb-1.5">{row.particulars}</div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-3">
+                {row.dr > 0 && <span className="text-green-700 dark:text-green-400">{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
+                {row.cr > 0 && <span>{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
+              </div>
+              <span className="font-semibold">{t("Bal", "शेष")}: {formatLedgerAmount(row.balance)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface AadhatWithDues extends Aadhat {
   stockDue: number;
@@ -56,6 +298,7 @@ export default function AadhatLedgerTab() {
   
   const [sortColumn, setSortColumn] = useState<'aadhatId' | 'totalDue' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [expandedAadhatId, setExpandedAadhatId] = useState<number | null>(null);
 
   const { data: aadhatList = [], isLoading } = useQuery<AadhatWithDues[]>({
     queryKey: ["/api/aadhats"],
@@ -306,6 +549,18 @@ export default function AadhatLedgerTab() {
     }).format(value);
   };
 
+  const formatLedgerAmount = (v: number) => {
+    if (v === 0) return "—";
+    return `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+  };
+
+  const formatDate = (d: string) => {
+    if (!d) return "—";
+    const parts = d.split("-");
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return d;
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
@@ -416,99 +671,125 @@ export default function AadhatLedgerTab() {
                 </div>
                 
                 {filteredAadhats.map((aadhat, index) => (
-                  <div 
-                    key={aadhat.id} 
-                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[800px]"
-                    style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}
-                    data-testid={`aadhat-row-${index}`}
-                  >
-                    <div className="flex items-center justify-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(aadhat)}
-                        data-testid={`button-edit-aadhat-${index}`}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                  <div key={aadhat.id}>
+                    <div 
+                      className="grid items-center gap-2 px-3 py-2 border-b min-w-[800px] cursor-pointer hover:bg-muted/30 transition-colors"
+                      style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}
+                      data-testid={`aadhat-row-${index}`}
+                      onClick={() => setExpandedAadhatId(expandedAadhatId === aadhat.id ? null : aadhat.id)}
+                    >
+                      <div className="flex items-center justify-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); handleEditClick(aadhat); }}
+                          data-testid={`button-edit-aadhat-${index}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="text-xs font-mono text-muted-foreground truncate flex items-center gap-1" data-testid={`text-aadhat-code-${index}`}>
+                        {expandedAadhatId === aadhat.id ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
+                        {aadhat.aadhatId || '-'}
+                      </div>
+                      <div className="text-xs truncate" data-testid={`text-aadhat-name-${index}`}>
+                        {aadhat.name}
+                      </div>
+                      <div className="text-xs truncate" data-testid={`text-aadhat-address-${index}`}>
+                        {aadhat.address}
+                      </div>
+                      <div className="text-xs truncate" data-testid={`text-aadhat-contact-${index}`}>
+                        {aadhat.contact || '-'}
+                      </div>
+                      <div className="flex items-center">
+                        {aadhat.redFlag ? (
+                          <Badge variant="destructive" className="text-xs">{t("Yes", "हाँ")}</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">{t("No", "नहीं")}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          checked={aadhat.isActive ?? true}
+                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: aadhat.id, isActive: checked })}
+                          data-testid={`switch-aadhat-active-${index}`}
+                        />
+                      </div>
+                      <div className="text-xs font-mono text-orange-600 dark:text-orange-400">
+                        ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                      </div>
+                      <div className="text-xs font-mono text-blue-600 dark:text-blue-400" data-testid={`text-aadhat-stock-due-${index}`}>
+                        ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                      </div>
+                      <div className="text-xs font-mono text-green-600 dark:text-green-400 font-semibold">
+                        ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                      </div>
                     </div>
-                    <div className="text-xs font-mono text-muted-foreground truncate" data-testid={`text-aadhat-code-${index}`}>
-                      {aadhat.aadhatId || '-'}
-                    </div>
-                    <div className="text-xs truncate" data-testid={`text-aadhat-name-${index}`}>
-                      {aadhat.name}
-                    </div>
-                    <div className="text-xs truncate" data-testid={`text-aadhat-address-${index}`}>
-                      {aadhat.address}
-                    </div>
-                    <div className="text-xs truncate" data-testid={`text-aadhat-contact-${index}`}>
-                      {aadhat.contact || '-'}
-                    </div>
-                    <div className="flex items-center">
-                      {aadhat.redFlag ? (
-                        <Badge variant="destructive" className="text-xs">{t("Yes", "हाँ")}</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">{t("No", "नहीं")}</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center">
-                      <Switch
-                        checked={aadhat.isActive ?? true}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: aadhat.id, isActive: checked })}
-                        data-testid={`switch-aadhat-active-${index}`}
+                    {expandedAadhatId === aadhat.id && (
+                      <AadhatLedgerSection
+                        aadhatId={aadhat.id}
+                        aadhatName={aadhat.name}
+                        t={t}
+                        formatLedgerAmount={formatLedgerAmount}
+                        formatDate={formatDate}
                       />
-                    </div>
-                    <div className="text-xs font-mono text-orange-600 dark:text-orange-400">
-                      ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                    </div>
-                    <div className="text-xs font-mono text-blue-600 dark:text-blue-400" data-testid={`text-aadhat-stock-due-${index}`}>
-                      ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                    </div>
-                    <div className="text-xs font-mono text-green-600 dark:text-green-400 font-semibold">
-                      ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
               
               {filteredAadhats.map((aadhat, index) => (
-                <div 
-                  key={`mobile-${aadhat.id}`} 
-                  className="md:hidden p-4 border rounded-lg bg-card space-y-3"
-                  data-testid={`aadhat-card-${index}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-muted-foreground">{aadhat.aadhatId || '-'}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(aadhat)}
-                      data-testid={`button-edit-aadhat-mobile-${index}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="font-medium">{aadhat.name}</div>
-                  <div className="text-sm text-muted-foreground">{aadhat.address}</div>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {aadhat.contact && <span>{t("Contact", "संपर्क")}: {aadhat.contact}</span>}
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      {aadhat.redFlag ? (
-                        <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
-                      ) : null}
-                      <Switch
-                        checked={aadhat.isActive ?? true}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: aadhat.id, isActive: checked })}
-                      />
+                <div key={`mobile-${aadhat.id}`} className="md:hidden">
+                  <div 
+                    className="p-4 border rounded-lg bg-card space-y-3 cursor-pointer"
+                    data-testid={`aadhat-card-${index}`}
+                    onClick={() => setExpandedAadhatId(expandedAadhatId === aadhat.id ? null : aadhat.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                        {expandedAadhatId === aadhat.id ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        {aadhat.aadhatId || '-'}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(aadhat); }}
+                        data-testid={`button-edit-aadhat-mobile-${index}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-orange-600 dark:text-orange-400">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-xs text-blue-600 dark:text-blue-400">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-sm font-mono text-green-600 dark:text-green-400 font-semibold">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                    <div className="font-medium">{aadhat.name}</div>
+                    <div className="text-sm text-muted-foreground">{aadhat.address}</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {aadhat.contact && <span>{t("Contact", "संपर्क")}: {aadhat.contact}</span>}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {aadhat.redFlag ? (
+                          <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
+                        ) : null}
+                        <Switch
+                          checked={aadhat.isActive ?? true}
+                          onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: aadhat.id, isActive: checked })}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-orange-600 dark:text-orange-400">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        <div className="text-sm font-mono text-green-600 dark:text-green-400 font-semibold">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      </div>
                     </div>
                   </div>
+                  {expandedAadhatId === aadhat.id && (
+                    <AadhatLedgerSection
+                      aadhatId={aadhat.id}
+                      aadhatName={aadhat.name}
+                      t={t}
+                      formatLedgerAmount={formatLedgerAmount}
+                      formatDate={formatDate}
+                    />
+                  )}
                 </div>
               ))}
             </div>

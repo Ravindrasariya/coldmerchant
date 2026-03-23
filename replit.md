@@ -147,6 +147,14 @@ When paying a supplier:
 - **Receivables Column**: Displays receivables from buyer.receivableBalance (ledger field, not Cash Settings)
 - **Party-Buyer Linking**: When creating managed parties in Cash Management, buyers are auto-created/linked using lookupOrCreateBuyer function (case-insensitive name matching, auto-generates BYYYYYMMDD# codes for new buyers)
 - **Accessible via**: User dropdown menu > "Buyers" link
+- **Buyer Ledger**: Expandable per-buyer ledger within Buyers tab. Clicking a row expands to show chronological FY ledger (Opening Balance as Dr, Harvest Sales as Dr, Cash Payments as Cr, running balance). PDF export with merchant header. Opening balance = receivableBalance + PY allocations paid + pre-FY transaction dues at FY start. Final running balance reconciles with buyer's overallDue.
+  - Backend: `GET /api/buyers/:id/ledger`
+  - Frontend: `BuyerLedgerSection` in `client/src/components/buyers/buyers-tab.tsx`
+
+### Aadhat Ledger
+- **Aadhat Ledger**: Expandable per-aadhat ledger within Aadhats tab. Clicking a row expands to show chronological FY ledger (Opening Balance as Cr, Harvest Purchases as Cr, Payments to Aadhat as Dr, running balance). Running balance = Opening + Cr - Dr (creditor account). PDF export with merchant header. Opening balance = pyPayable + PY allocations paid + pre-FY stock entry dues at FY start. Final running balance reconciles with aadhat's totalDue.
+  - Backend: `GET /api/aadhats/:id/ledger`
+  - Frontend: `AadhatLedgerSection` in `client/src/components/aadhat/aadhat-ledger-tab.tsx`
 
 ### Farmer Ledger System
 - **Farmers Table**: Stores farmer records with unique ID (FMYYYYMMDD#), composite key (name + contact + village), PY balances, flags
