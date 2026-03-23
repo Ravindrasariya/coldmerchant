@@ -790,7 +790,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{computedMandiComm.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-orange-500 font-mono mt-0.5">₹{computedMandiComm.toLocaleString('en-IN')}</p>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Aadhat Comm. %", "आढ़त कमीशन %")}</Label>
@@ -806,7 +806,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{computedAadhatComm.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-orange-500 font-mono mt-0.5">₹{computedAadhatComm.toLocaleString('en-IN')}</p>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
@@ -821,7 +821,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                         data-testid="input-loading-hammali"
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{computedHammali.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-orange-500 font-mono mt-0.5">₹{computedHammali.toLocaleString('en-IN')}</p>
                   </div>
                   <div>
                     <Label className="text-[10px] text-muted-foreground">{t("Extra Charges", "अतिरिक्त शुल्क")}</Label>
@@ -921,7 +921,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     />
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                   </div>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">₹{computedSalesComm.toLocaleString('en-IN')}</p>
+                  <p className="text-xs text-orange-500 font-mono mt-0.5">₹{computedSalesComm.toLocaleString('en-IN')}</p>
                 </div>
                 <div>
                   <Label className="text-xs">{t("Driver Advance", "ड्राइवर अग्रिम")}</Label>

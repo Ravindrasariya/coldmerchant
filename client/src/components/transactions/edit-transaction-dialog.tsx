@@ -1257,7 +1257,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{(Math.round(totalLotAmount * mandiPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalLotAmount * mandiPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
                       </div>
                       <div>
                         <Label className="text-xs">{t("Aadhat Comm. %", "आढ़त कमीशन %")}</Label>
@@ -1277,7 +1277,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{(Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
                       </div>
                       <div>
                         <Label className="text-xs">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
@@ -1296,7 +1296,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             data-testid="input-edit-hammali"
                           />
                         </div>
-                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">₹{(Math.round(totalEditBags * hammaliRate * 100) / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalEditBags * hammaliRate * 100) / 100).toLocaleString('en-IN')}</p>
                       </div>
                       <FormField
                         control={form.control}
@@ -1331,7 +1331,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">₹{(Math.round(totalLotAmount * salesCommPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalLotAmount * salesCommPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
