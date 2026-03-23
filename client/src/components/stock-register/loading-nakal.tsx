@@ -39,6 +39,16 @@ interface LoadingNakalDialogProps {
   dateLabel: string;
 }
 
+function escHtml(str: string | null | undefined): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getCropLabel(crop: string | undefined): string {
   if (crop === "onion") return "ONION";
   if (crop === "garlic") return "GARLIC";
@@ -47,6 +57,10 @@ function getCropLabel(crop: string | undefined): string {
 
 function fmt(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getEntryPlace(entry: EntryData): string {
+  return entry.place || entry.lots[0]?.place || "";
 }
 
 function computeLotAmount(lot: LotData): number {
@@ -86,10 +100,10 @@ function buildPrintHtml(
   let bodyRows = "";
 
   sorted.forEach((entry) => {
-    const isMandi = entry.place === "mandi";
+    const isMandi = getEntryPlace(entry) === "mandi";
     const particulars = isMandi
-      ? `${entry.aadhatName || "-"} (Sr #${entry.serialNumber})`
-      : `${entry.farmerName} (Sr #${entry.serialNumber})`;
+      ? `${escHtml(entry.aadhatName || "-")} (Sr #${entry.serialNumber})`
+      : `${escHtml(entry.farmerName)} (Sr #${entry.serialNumber})`;
 
     const lotAmounts = entry.lots.map(computeLotAmount);
     const purDami = isMandi ? computePurDami(entry.lots) : 0;
@@ -110,20 +124,20 @@ function buildPrintHtml(
       const w = parseFloat(lot.totalWeight || "0");
       const p = parseFloat(lot.pricePerKg || "0");
       const amount = lotAmounts[idx];
-      const remark = `${crop} - ${lot.originalBags} Bags x ${w.toFixed(1)} Kg x ₹${p.toFixed(2)}`;
+      const remark = `${escHtml(crop)} - ${lot.originalBags} Bags x ${w.toFixed(1)} Kg x &#8377;${p.toFixed(2)}`;
 
       if (idx === 0) {
         bodyRows += `
           <tr>
             <td rowspan="${rowspan}" style="vertical-align:top;padding:5px 8px;border:1px solid #ccc;font-size:13px;">${particulars}</td>
             <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;">${remark}</td>
-            <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;white-space:nowrap;">₹${fmt(amount)}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;white-space:nowrap;">&#8377;${escHtml(fmt(amount))}</td>
           </tr>`;
       } else {
         bodyRows += `
           <tr>
             <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;">${remark}</td>
-            <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;white-space:nowrap;">₹${fmt(amount)}</td>
+            <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;white-space:nowrap;">&#8377;${escHtml(fmt(amount))}</td>
           </tr>`;
       }
     });
@@ -132,7 +146,7 @@ function buildPrintHtml(
       bodyRows += `
         <tr>
           <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;">Add: Pur. Dami</td>
-          <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;white-space:nowrap;">₹${fmt(purDami)}</td>
+          <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;white-space:nowrap;">&#8377;${escHtml(fmt(purDami))}</td>
         </tr>`;
     }
 
@@ -142,7 +156,7 @@ function buildPrintHtml(
           Qty: ${entryBags} Bags &nbsp;&nbsp; Weight: ${entryWeight.toFixed(1)} Kg
         </td>
         <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;font-weight:600;">Total</td>
-        <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;">₹${fmt(entryTotal)}</td>
+        <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;">&#8377;${escHtml(fmt(entryTotal))}</td>
       </tr>`;
   });
 
@@ -168,10 +182,10 @@ function buildPrintHtml(
   </style>
 </head>
 <body>
-  <div class="merchant-name">${merchantName}</div>
-  ${merchantAddress ? `<div class="merchant-address">${merchantAddress}</div>` : ""}
+  <div class="merchant-name">${escHtml(merchantName)}</div>
+  ${merchantAddress ? `<div class="merchant-address">${escHtml(merchantAddress)}</div>` : ""}
   <div class="header-row">
-    <span class="header-date">Date : ${dateLabel}</span>
+    <span class="header-date">Date : ${escHtml(dateLabel)}</span>
     <span class="header-title">LOADING NAKAL</span>
     <span class="header-page">Page 1 of 1</span>
   </div>
@@ -190,7 +204,7 @@ function buildPrintHtml(
       <tr class="grand-row">
         <td>Debit Total</td>
         <td>Total Qty: ${grandBags} Bags &nbsp;&nbsp; Total Weight: ${grandWeight.toFixed(1)} Kg</td>
-        <td style="text-align:right;white-space:nowrap;">₹${fmt(grandAmount)}</td>
+        <td style="text-align:right;white-space:nowrap;">&#8377;${escHtml(fmt(grandAmount))}</td>
       </tr>
     </tfoot>
   </table>
@@ -242,7 +256,7 @@ export function LoadingNakalDialog({
   let grandAmount = 0;
 
   const entryBlocks = sorted.map((entry) => {
-    const isMandi = entry.place === "mandi";
+    const isMandi = getEntryPlace(entry) === "mandi";
     const particulars = isMandi
       ? `${entry.aadhatName || "-"} (Sr #${entry.serialNumber})`
       : `${entry.farmerName} (Sr #${entry.serialNumber})`;

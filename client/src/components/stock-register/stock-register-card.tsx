@@ -212,10 +212,22 @@ interface StockRegisterCardProps {
   selectedCrop?: "potato" | "onion" | "garlic";
 }
 
+interface MerchantInfo {
+  id: number;
+  name: string;
+  address: string | null;
+  contactNumber: string | null;
+}
+
 export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialogClose, selectedCrop = "potato" }: StockRegisterCardProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  const { data: merchantInfo } = useQuery<MerchantInfo>({
+    queryKey: ["/api/merchants", user?.merchantId],
+    enabled: !!user?.merchantId,
+  });
   const currentYear = new Date().getFullYear();
   const [filterYear, setFilterYear] = useState<string>(currentYear.toString());
   const [filterMonths, setFilterMonths] = useState<number[]>([new Date().getMonth()]);
@@ -784,8 +796,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         entries={filteredEntries}
         open={showNakal}
         onOpenChange={setShowNakal}
-        merchantName={user?.merchantName || ""}
-        merchantAddress={user?.merchantAddress}
+        merchantName={merchantInfo?.name || user?.merchantName || ""}
+        merchantAddress={merchantInfo?.address ?? user?.merchantAddress}
         dateLabel={nakalDateLabel}
       />
 
