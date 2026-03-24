@@ -263,8 +263,8 @@ function ColdStoreLedgerSection({ coldStoreId, coldStoreName, t, formatLedgerAmo
                 <td className="border px-2 py-1.5">{formatDate(row.date)}</td>
                 <td className="border px-2 py-1.5 font-mono">{row.refCode || "—"}</td>
                 <td className="border px-2 py-1.5">{row.particulars}</td>
-                <td className="border px-2 py-1.5 text-right">{formatLedgerAmount(row.dr)}</td>
-                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{formatLedgerAmount(row.cr)}</td>
+                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{formatLedgerAmount(row.dr)}</td>
+                <td className="border px-2 py-1.5 text-right">{formatLedgerAmount(row.cr)}</td>
                 <td className="border px-2 py-1.5 text-right font-semibold">{formatLedgerAmount(row.balance)}</td>
               </tr>
             ))}
@@ -285,8 +285,8 @@ function ColdStoreLedgerSection({ coldStoreId, coldStoreName, t, formatLedgerAmo
             <div className="mb-1.5">{row.particulars}</div>
             <div className="flex items-center justify-between">
               <div className="flex gap-3">
-                {row.dr > 0 && <span>{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
-                {row.cr > 0 && <span className="text-green-700 dark:text-green-400">{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
+                {row.dr > 0 && <span className="text-green-700 dark:text-green-400">{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
+                {row.cr > 0 && <span>{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
               </div>
               <span className="font-semibold">{t("Bal", "शेष")}: {formatLedgerAmount(row.balance)}</span>
             </div>
