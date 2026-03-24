@@ -6534,7 +6534,7 @@ export async function registerRoutes(
 
         const seInfo = seMap.get(lot.stockEntryId);
         const srLabel = seInfo ? `SR #${seInfo.serialNumber}` : "";
-        const lotLabel = lot.lotNumber ? ` Lot #${lot.lotNumber}` : "";
+        const lotLabel = lot.coldStoreLotNumber ? ` Lot #${lot.coldStoreLotNumber}` : "";
 
         entries.push({
           date: lotDate,
@@ -6558,11 +6558,10 @@ export async function registerRoutes(
 
         const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
         const srLabel = seedSeInfo ? `SR #${seedSeInfo.serialNumber}` : "";
-        const lotLabel = sLot.lotNumber ? ` Lot #${sLot.lotNumber}` : "";
 
         entries.push({
           date: lotDate,
-          refCode: `${srLabel}${lotLabel}`,
+          refCode: srLabel,
           particulars: "Seed Cold Store Charges",
           dr: 0,
           cr: Math.round(totalCharges * 100) / 100,
