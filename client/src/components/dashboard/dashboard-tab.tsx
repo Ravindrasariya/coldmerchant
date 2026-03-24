@@ -85,7 +85,7 @@ interface StockEntryWithLots {
     totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
     hammaliGradingCharges: string | null;
-    charges: Array<{ type: string; amount: number | string }> | null;
+    charges: Array<{ type: string; amount: number | string; coldStoreName?: string; coldStoreDbId?: number | null }> | null;
     coldStorageChargesPaid: string | null;
     adjustedAmount: string | null;
     adjustedAmountType: string | null;
@@ -627,16 +627,23 @@ export function DashboardTab() {
     const totalMap = new Map<string, number>();
     const remainingMap = new Map<string, number>();
     if (!stockEntries) return { total: [], remaining: [] };
+    const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
     stockEntries.forEach(entry => {
       if (!matchesFilter(entry.purchaseDate, entry.crop || "potato")) return;
       (entry.lots || []).forEach(lot => {
         if (cropFilter !== "all" && (lot.crop || "potato") !== cropFilter) return;
-        if (lot.place !== "cold_store" || !lot.coldStoreName) return;
-        const name = lot.coldStoreName.trim();
+        let csName: string | null = null;
+        if (lot.place === "cold_store" && lot.coldStoreName) {
+          csName = lot.coldStoreName.trim();
+        } else if (lot.place === "farm_gate") {
+          const csCharge = (lot.charges || []).find(c => c && coldStoreChargeTypes.includes(c.type) && c.coldStoreName);
+          if (csCharge?.coldStoreName) csName = csCharge.coldStoreName.trim();
+        }
+        if (!csName) return;
         const totalBags = (lot.bagBreakdowns || []).reduce((s: number, b: any) => s + (b.numberOfBags || 0), 0);
         const remBags = (lot.bagBreakdowns || []).reduce((s: number, b: any) => s + (b.remainingBags || 0), 0);
-        totalMap.set(name, (totalMap.get(name) || 0) + totalBags);
-        remainingMap.set(name, (remainingMap.get(name) || 0) + remBags);
+        totalMap.set(csName, (totalMap.get(csName) || 0) + totalBags);
+        remainingMap.set(csName, (remainingMap.get(csName) || 0) + remBags);
       });
     });
     const total = Array.from(totalMap.entries()).map(([name, value]) => ({ name, value })).filter(d => d.value > 0);

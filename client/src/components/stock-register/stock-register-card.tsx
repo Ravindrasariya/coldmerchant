@@ -102,6 +102,12 @@ interface StockEntryWithLots {
   }>;
 }
 
+function getColdStoreNameFromCharges(charges: StockEntryWithLots['lots'][0]['charges']): string | null {
+  const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
+  const csCharge = (charges || []).find(c => c && coldStoreTypes.includes(c.type) && c.coldStoreName);
+  return csCharge?.coldStoreName || null;
+}
+
 function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const wastageBags = lot.bagBreakdowns
     .filter(bd => bd.size === "Wastage")
@@ -296,6 +302,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       entry.lots.forEach(lot => {
         if (lot.place === "farm_gate") {
           stores.add("Farm Gate");
+          const csName = getColdStoreNameFromCharges(lot.charges);
+          if (csName) stores.add(csName);
         } else if (lot.place === "mandi") {
           stores.add("Mandi");
         } else if (lot.coldStoreName) {
@@ -399,7 +407,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const hasColdStore = entry.lots.some(lot => {
           if (filterColdStore === "Farm Gate") return lot.place === "farm_gate";
           if (filterColdStore === "Mandi") return lot.place === "mandi";
-          return lot.coldStoreName === filterColdStore;
+          if (lot.coldStoreName === filterColdStore) return true;
+          if (lot.place === "farm_gate") {
+            const csName = getColdStoreNameFromCharges(lot.charges);
+            if (csName === filterColdStore) return true;
+          }
+          return false;
         });
         if (!hasColdStore) return false;
       }
@@ -1362,7 +1375,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                               <span className="font-semibold text-foreground">{t("Lot", "लॉट")} #{lotIndex + 1}</span>
                               <div className="flex items-center gap-1.5">
                                 <Snowflake className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="font-medium">{lot.place === "farm_gate" ? t("Farm Gate", "फार्म गेट") : lot.coldStoreName}</span>
+                                <span className="font-medium">
+                                  {lot.place === "farm_gate" ? (() => {
+                                    const csName = getColdStoreNameFromCharges(lot.charges);
+                                    return csName ? `${t("Farm Gate", "फार्म गेट")} · ${csName}` : t("Farm Gate", "फार्म गेट");
+                                  })() : lot.coldStoreName}
+                                </span>
                               </div>
                               {lot.potatoType && (
                                 <Badge className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0">
