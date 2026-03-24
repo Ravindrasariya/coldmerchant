@@ -6446,6 +6446,192 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/cold-store-ledger/:id/ledger", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const coldStoreDbId = parseInt(req.params.id);
+      if (isNaN(coldStoreDbId)) return res.status(400).json({ message: "Invalid cold store ID" });
+
+      const [allColdStoreRecords, allHarvestLots, allSeedLots, allStockEntries, allSeedEntries, allCashEntries, allAllocations] = await Promise.all([
+        storage.getColdStoresByMerchant(merchantId),
+        storage.getAllLotsByMerchant(merchantId),
+        storage.getAllSeedLotsByMerchant(merchantId),
+        storage.getStockEntriesByMerchant(merchantId),
+        storage.getSeedEntriesByMerchant(merchantId),
+        storage.getCashEntriesByMerchant(merchantId),
+        storage.getColdStoreChargeAllocationsByMerchant(merchantId),
+      ]);
+
+      const csRecord = allColdStoreRecords.find(cs => cs.id === coldStoreDbId);
+      if (!csRecord) return res.status(404).json({ message: "Cold store not found" });
+
+      const todayStr = getISTDateString();
+      const todayDate = new Date(todayStr + "T00:00:00+05:30");
+      const currentMonth = todayDate.getMonth();
+      const currentYear = todayDate.getFullYear();
+      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const fyStart = `${fyStartYear}-04-01`;
+      const fyEnd = `${fyStartYear + 1}-03-31`;
+
+      const openingBalance = parseFloat(csRecord.pyPayable || "0");
+
+      const seMap = new Map<number, { serialNumber: number; purchaseDate: string }>();
+      for (const se of allStockEntries) {
+        seMap.set(se.id, { serialNumber: se.serialNumber, purchaseDate: se.purchaseDate || "" });
+      }
+      const seedSeMap = new Map<number, { serialNumber: number; purchaseDate: string }>();
+      for (const se of allSeedEntries) {
+        seedSeMap.set(se.id, { serialNumber: se.serialNumber || 0, purchaseDate: se.purchaseDate || "" });
+      }
+
+      interface CsLedgerEntry {
+        date: string;
+        refCode: string;
+        particulars: string;
+        dr: number;
+        cr: number;
+        sourceType: "harvest_charge" | "seed_charge" | "payment";
+        sourceId: number;
+      }
+
+      const entries: CsLedgerEntry[] = [];
+
+      const getColdStoreChargesFromArray = (charges: unknown): number => {
+        if (!Array.isArray(charges)) return 0;
+        const types = ["Cold Charges", "Ware House Charges"];
+        return charges.filter((c: any) => c && types.includes(c.type)).reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+      };
+      const getColdStoreChargesForCS = (charges: unknown, csId: number): number => {
+        if (!Array.isArray(charges)) return 0;
+        const types = ["Cold Charges", "Ware House Charges"];
+        return charges.filter((c: any) => c && types.includes(c.type) && c.coldStoreDbId === csId).reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+      };
+
+      for (const lot of allHarvestLots) {
+        let totalCharges = 0;
+        if (lot.coldStoreDbId === coldStoreDbId) {
+          totalCharges = getColdStoreChargesFromArray(lot.charges);
+        } else if (lot.place === "farm_gate") {
+          totalCharges = getColdStoreChargesForCS(lot.charges, coldStoreDbId);
+        }
+        if (totalCharges <= 0) continue;
+
+        const seInfo = seMap.get(lot.stockEntryId);
+        const entryDate = seInfo?.purchaseDate || "";
+        if (!entryDate || entryDate < fyStart || entryDate > fyEnd) continue;
+
+        const srLabel = seInfo ? `SR #${seInfo.serialNumber}` : "";
+        const lotLabel = lot.lotNumber ? ` Lot #${lot.lotNumber}` : "";
+
+        entries.push({
+          date: entryDate,
+          refCode: `${srLabel}${lotLabel}`,
+          particulars: "Harvest Cold Store Charges",
+          dr: 0,
+          cr: Math.round(totalCharges * 100) / 100,
+          sourceType: "harvest_charge",
+          sourceId: lot.id,
+        });
+      }
+
+      for (const sLot of allSeedLots) {
+        if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== coldStoreDbId) continue;
+        const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+        const totalCharges = chargesPerBag * (sLot.originalBags || 0);
+        if (totalCharges <= 0) continue;
+
+        const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
+        const entryDate = seedSeInfo?.purchaseDate || "";
+        if (!entryDate || entryDate < fyStart || entryDate > fyEnd) continue;
+
+        const srLabel = seedSeInfo ? `SR #${seedSeInfo.serialNumber}` : "";
+        const lotLabel = sLot.lotNumber ? ` Lot #${sLot.lotNumber}` : "";
+
+        entries.push({
+          date: entryDate,
+          refCode: `${srLabel}${lotLabel}`,
+          particulars: "Seed Cold Store Charges",
+          dr: 0,
+          cr: Math.round(totalCharges * 100) / 100,
+          sourceType: "seed_charge",
+          sourceId: sLot.id,
+        });
+      }
+
+      const allocsByEntryId = new Map<number, typeof allAllocations>();
+      for (const alloc of allAllocations) {
+        const arr = allocsByEntryId.get(alloc.cashEntryId) || [];
+        arr.push(alloc);
+        allocsByEntryId.set(alloc.cashEntryId, arr);
+      }
+
+      const csCashEntries = allCashEntries.filter(entry =>
+        entry.coldStoreDbId === coldStoreDbId &&
+        entry.direction === "outflow" &&
+        entry.expenseType === "cold_store_charge" &&
+        !entry.isReversed
+      );
+
+      const fyCashEntries = csCashEntries.filter(entry =>
+        entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
+      );
+
+      for (const entry of fyCashEntries) {
+        const entryAllocs = allocsByEntryId.get(entry.id) || [];
+        let totalDr = 0;
+        let hasPy = false;
+
+        if (entryAllocs.length > 0) {
+          for (const alloc of entryAllocs) {
+            totalDr += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            if (alloc.isPyPayable) hasPy = true;
+          }
+        } else {
+          totalDr = parseFloat(entry.amount || "0");
+        }
+
+        if (totalDr <= 0) continue;
+
+        const modeLabel = entry.paymentMode === "account" ? "Account" : "Cash";
+        const pyLabel = hasPy ? " (incl. PY)" : "";
+
+        entries.push({
+          date: entry.entryDate || "",
+          refCode: entry.transactionCode || "",
+          particulars: `Payment (${modeLabel})${pyLabel}`,
+          dr: Math.round(totalDr * 100) / 100,
+          cr: 0,
+          sourceType: "payment",
+          sourceId: entry.id,
+        });
+      }
+
+      entries.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.sourceType === "payment" && b.sourceType !== "payment") return 1;
+        if (a.sourceType !== "payment" && b.sourceType === "payment") return -1;
+        return a.sourceId - b.sourceId;
+      });
+
+      const merchant = await storage.getMerchant(merchantId);
+      res.json({
+        coldStoreId: coldStoreDbId,
+        coldStoreName: csRecord.name,
+        coldStoreAddress: csRecord.address || "",
+        merchantName: merchant?.name || "",
+        merchantAddress: merchant?.address || "",
+        merchantContact: merchant?.contactNumber || "",
+        openingBalance,
+        fyStart,
+        fyEnd,
+        entries,
+      });
+    } catch (error) {
+      console.error("Error fetching cold store ledger:", error);
+      res.status(500).json({ message: "Failed to fetch cold store ledger" });
+    }
+  });
+
   // ==================== Demo Videos ====================
 
   app.post("/api/admin/demo-videos", requireSystemAdmin, (req, res) => {

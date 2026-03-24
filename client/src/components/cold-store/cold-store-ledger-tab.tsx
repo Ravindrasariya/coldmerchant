@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +19,17 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Search,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  RefreshCw
+  RefreshCw,
+  FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { type ColdStore, type ColdStoreEditHistory } from "@shared/schema";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
 
 interface ColdStoreWithDues extends ColdStore {
   coldStoreDue: number;
@@ -54,6 +57,245 @@ const emptyForm: ColdStoreFormFields = {
   bankAccountNumber: "",
   ifscCode: "",
 };
+
+interface CsLedgerEntry {
+  date: string;
+  refCode: string;
+  particulars: string;
+  dr: number;
+  cr: number;
+  sourceType: "harvest_charge" | "seed_charge" | "payment";
+  sourceId: number;
+}
+
+interface ColdStoreLedgerData {
+  coldStoreId: number;
+  coldStoreName: string;
+  coldStoreAddress: string;
+  merchantName: string;
+  merchantAddress: string;
+  merchantContact: string;
+  openingBalance: number;
+  fyStart: string;
+  fyEnd: string;
+  entries: CsLedgerEntry[];
+}
+
+function ColdStoreLedgerSection({ coldStoreId, coldStoreName, t, formatLedgerAmount, formatDate }: {
+  coldStoreId: number;
+  coldStoreName: string;
+  t: (en: string, hi: string) => string;
+  formatLedgerAmount: (v: number) => string;
+  formatDate: (d: string) => string;
+}) {
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const { data: ledgerData, isLoading } = useQuery<ColdStoreLedgerData>({
+    queryKey: ["/api/cold-store-ledger", coldStoreId, "ledger"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cold-store-ledger/${coldStoreId}/ledger`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger");
+      return res.json();
+    },
+    enabled: !!coldStoreId,
+  });
+
+  const ledgerRows = useMemo(() => {
+    if (!ledgerData) return [];
+    const rows: { kramank: number; date: string; refCode: string; particulars: string; dr: number; cr: number; balance: number }[] = [];
+    let balance = ledgerData.openingBalance;
+    rows.push({ kramank: 0, date: ledgerData.fyStart, refCode: "", particulars: "Opening Balance", dr: 0, cr: ledgerData.openingBalance, balance });
+    ledgerData.entries.forEach((entry, idx) => {
+      balance = balance + entry.cr - entry.dr;
+      rows.push({ kramank: idx + 1, date: entry.date, refCode: entry.refCode, particulars: entry.particulars, dr: entry.dr, cr: entry.cr, balance });
+    });
+    return rows;
+  }, [ledgerData]);
+
+  const handlePdfExport = async () => {
+    if (!ledgerData) return;
+    setPdfLoading(true);
+    try {
+      const fyLabel = `${ledgerData.fyStart.substring(0, 4)}-${ledgerData.fyEnd.substring(2, 4)}`;
+      const printDiv = document.createElement("div");
+      printDiv.style.cssText = "width:780px;padding:20px;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#000;";
+
+      const merchantHeader = document.createElement("div");
+      merchantHeader.style.cssText = "text-align:center;margin-bottom:12px;";
+      const merchantH1 = document.createElement("h1");
+      merchantH1.style.cssText = "font-size:18px;margin:0;font-weight:700;";
+      merchantH1.textContent = ledgerData.merchantName;
+      merchantHeader.appendChild(merchantH1);
+      if (ledgerData.merchantAddress) {
+        const merchantAddr = document.createElement("p");
+        merchantAddr.style.cssText = "font-size:12px;color:#555;margin:2px 0;";
+        merchantAddr.textContent = ledgerData.merchantAddress;
+        merchantHeader.appendChild(merchantAddr);
+      }
+      if (ledgerData.merchantContact) {
+        const merchantPhone = document.createElement("p");
+        merchantPhone.style.cssText = "font-size:12px;color:#555;margin:2px 0;";
+        merchantPhone.textContent = ledgerData.merchantContact;
+        merchantHeader.appendChild(merchantPhone);
+      }
+
+      const header = document.createElement("div");
+      header.style.cssText = "text-align:center;border-top:1px solid #999;border-bottom:2px solid #000;padding:10px 0 12px;margin-bottom:16px;";
+      const h1 = document.createElement("h1");
+      h1.style.cssText = "font-size:20px;margin:0;";
+      h1.textContent = coldStoreName;
+      const addrP = document.createElement("p");
+      addrP.style.cssText = "font-size:13px;color:#555;margin:4px 0;";
+      addrP.textContent = ledgerData.coldStoreAddress || "";
+      const fyP = document.createElement("p");
+      fyP.style.cssText = "font-size:14px;font-weight:600;margin:6px 0 0 0;";
+      fyP.textContent = `${t("Cold Store Ledger", "कोल्ड स्टोर खाता")} — FY ${fyLabel}`;
+      header.append(h1, addrP, fyP);
+
+      const table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:12px;";
+      const thead = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      headerRow.style.background = "#f0f0f0";
+      const headers = [
+        { text: t("Sr", "क्र."), align: "center", width: "40px" },
+        { text: t("Date", "तारीख"), align: "left" },
+        { text: t("Ref #", "Ref #"), align: "left" },
+        { text: t("Particulars", "विवरण"), align: "left" },
+        { text: t("Dr", "डेबिट"), align: "right" },
+        { text: t("Cr", "क्रेडिट"), align: "right" },
+        { text: t("Balance", "शेष"), align: "right" },
+      ];
+      for (const h of headers) {
+        const th = document.createElement("th");
+        th.style.cssText = `border:1px solid #999;padding:5px 6px;text-align:${h.align};${h.width ? `width:${h.width}` : ""}`;
+        th.textContent = h.text;
+        headerRow.appendChild(th);
+      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (let i = 0; i < ledgerRows.length; i++) {
+        const row = ledgerRows[i];
+        const tr = document.createElement("tr");
+        if (i === 0) tr.style.cssText = "background:#f9f9f9;font-weight:600;";
+        const cellData: { text: string; align: string; bold?: boolean }[] = [
+          { text: String(row.kramank), align: "center" },
+          { text: formatDate(row.date), align: "left" },
+          { text: row.refCode || "—", align: "left" },
+          { text: row.particulars, align: "left" },
+          { text: row.dr > 0 ? `₹${row.dr.toLocaleString("en-IN")}` : "—", align: "right" },
+          { text: row.cr > 0 ? `₹${row.cr.toLocaleString("en-IN")}` : "—", align: "right" },
+          { text: `₹${row.balance.toLocaleString("en-IN")}`, align: "right", bold: true },
+        ];
+        for (const cell of cellData) {
+          const td = document.createElement("td");
+          td.style.cssText = `border:1px solid #ccc;padding:4px 6px;text-align:${cell.align};${cell.bold ? "font-weight:600;" : ""}`;
+          td.textContent = cell.text;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+
+      printDiv.append(merchantHeader, header, table);
+      document.body.appendChild(printDiv);
+      await shareReceiptAsPdf(printDiv, `${coldStoreName}_Ledger_FY${fyLabel}`);
+      document.body.removeChild(printDiv);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-6 bg-muted/20 border-b">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!ledgerData || ledgerRows.length === 0) {
+    return (
+      <div className="text-center py-4 text-sm text-muted-foreground bg-muted/20 border-b">
+        {t("No ledger entries found", "कोई खाता प्रविष्टि नहीं मिली")}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-muted/10 border-b" data-testid={`cs-ledger-${coldStoreId}`}>
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+        <span className="text-xs font-semibold text-muted-foreground">
+          {t("Ledger", "खाता")} — {coldStoreName} (FY {ledgerData.fyStart.substring(0, 4)}-{ledgerData.fyEnd.substring(2, 4)})
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handlePdfExport}
+          disabled={pdfLoading}
+          data-testid={`button-pdf-cs-ledger-${coldStoreId}`}
+        >
+          {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+          <span className="ml-1 text-xs">{t("PDF", "PDF")}</span>
+        </Button>
+      </div>
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-xs border-collapse min-w-[600px]">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="border px-2 py-1.5 text-center w-10">{t("Sr", "क्र.")}</th>
+              <th className="border px-2 py-1.5 text-left w-24">{t("Date", "तारीख")}</th>
+              <th className="border px-2 py-1.5 text-left w-28">{t("Ref #", "Ref #")}</th>
+              <th className="border px-2 py-1.5 text-left">{t("Particulars", "विवरण")}</th>
+              <th className="border px-2 py-1.5 text-right w-24">{t("Dr", "डेबिट")}</th>
+              <th className="border px-2 py-1.5 text-right w-24">{t("Cr", "क्रेडिट")}</th>
+              <th className="border px-2 py-1.5 text-right w-28">{t("Balance", "शेष")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ledgerRows.map((row, i) => (
+              <tr key={i} className={i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : ""} data-testid={`cs-ledger-row-${coldStoreId}-${i}`}>
+                <td className="border px-2 py-1.5 text-center text-muted-foreground">{row.kramank}</td>
+                <td className="border px-2 py-1.5">{formatDate(row.date)}</td>
+                <td className="border px-2 py-1.5 font-mono">{row.refCode || "—"}</td>
+                <td className="border px-2 py-1.5">{row.particulars}</td>
+                <td className="border px-2 py-1.5 text-right">{formatLedgerAmount(row.dr)}</td>
+                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{formatLedgerAmount(row.cr)}</td>
+                <td className="border px-2 py-1.5 text-right font-semibold">{formatLedgerAmount(row.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="md:hidden space-y-2 px-3 py-2">
+        {ledgerRows.map((row, i) => (
+          <div
+            key={i}
+            className={`rounded-md border p-3 text-xs ${i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : "bg-card"}`}
+            data-testid={`cs-ledger-card-${coldStoreId}-${i}`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-muted-foreground">#{row.kramank} · {formatDate(row.date)}</span>
+              {row.refCode && <span className="font-mono text-muted-foreground">{row.refCode}</span>}
+            </div>
+            <div className="mb-1.5">{row.particulars}</div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-3">
+                {row.dr > 0 && <span>{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
+                {row.cr > 0 && <span className="text-green-700 dark:text-green-400">{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
+              </div>
+              <span className="font-semibold">{t("Bal", "शेष")}: {formatLedgerAmount(row.balance)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function invalidateAllColdStoreCaches() {
   queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
@@ -86,6 +328,7 @@ export default function ColdStoreLedgerTab() {
   
   const [sortColumn, setSortColumn] = useState<'coldStoreId' | 'totalDue' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [expandedColdStoreId, setExpandedColdStoreId] = useState<number | null>(null);
 
   const { data: coldStoreList = [], isLoading } = useQuery<ColdStoreWithDues[]>({
     queryKey: ["/api/cold-store-ledger"],
@@ -318,6 +561,23 @@ export default function ColdStoreLedgerTab() {
     }
   };
 
+  const toggleExpand = (csId: number) => {
+    setExpandedColdStoreId(prev => prev === csId ? null : csId);
+  };
+
+  const formatLedgerAmount = (value: number) => {
+    if (value === 0) return "—";
+    return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr + "T00:00:00");
+      return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" });
+    } catch { return dateStr; }
+  };
+
   const filteredColdStores = coldStoreList
     .filter(cs => {
       if (yearFilter !== "all") {
@@ -486,23 +746,25 @@ export default function ColdStoreLedgerTab() {
                 </div>
                 
                 {filteredColdStores.map((cs, index) => (
+                  <div key={cs.id}>
                   <div 
-                    key={cs.id} 
-                    className="grid items-center gap-2 px-3 py-2 border-b last:border-b-0 min-w-[800px]"
+                    className="grid items-center gap-2 px-3 py-2 border-b min-w-[800px] cursor-pointer hover:bg-muted/30 transition-colors"
                     style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(120px, 1.3fr) minmax(90px, 1fr) minmax(80px, 0.8fr) 55px 48px minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr)' }}
                     data-testid={`coldstore-row-${index}`}
+                    onClick={() => toggleExpand(cs.id)}
                   >
                     <div className="flex items-center justify-center">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleEditClick(cs)}
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(cs); }}
                         data-testid={`button-edit-coldstore-${index}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="text-xs font-mono text-muted-foreground truncate" data-testid={`text-coldstore-code-${index}`}>
+                    <div className="text-xs font-mono text-muted-foreground truncate flex items-center gap-1" data-testid={`text-coldstore-code-${index}`}>
+                      {expandedColdStoreId === cs.id ? <ChevronDown className="h-3 w-3 flex-shrink-0" /> : <ChevronRight className="h-3 w-3 flex-shrink-0" />}
                       {cs.coldStoreId || '-'}
                     </div>
                     <div className="text-xs truncate" data-testid={`text-coldstore-name-${index}`}>
@@ -525,6 +787,7 @@ export default function ColdStoreLedgerTab() {
                       <Switch
                         checked={cs.isActive ?? true}
                         onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: cs.id, isActive: checked })}
+                        onClick={(e) => e.stopPropagation()}
                         data-testid={`switch-coldstore-active-${index}`}
                       />
                     </div>
@@ -538,49 +801,64 @@ export default function ColdStoreLedgerTab() {
                       ₹{cs.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
                   </div>
+                  {expandedColdStoreId === cs.id && (
+                    <ColdStoreLedgerSection coldStoreId={cs.id} coldStoreName={cs.name} t={t} formatLedgerAmount={formatLedgerAmount} formatDate={formatDate} />
+                  )}
+                  </div>
                 ))}
               </div>
               
               {filteredColdStores.map((cs, index) => (
                 <div 
                   key={`mobile-${cs.id}`} 
-                  className="md:hidden p-4 border rounded-lg bg-card space-y-3"
+                  className="md:hidden border rounded-lg bg-card"
                   data-testid={`coldstore-card-${index}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono text-muted-foreground">{cs.coldStoreId || '-'}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditClick(cs)}
-                      data-testid={`button-edit-coldstore-mobile-${index}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="font-medium">{cs.name}</div>
-                  <div className="text-sm text-muted-foreground">{cs.address}</div>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    {cs.contact && <span>{t("Contact", "संपर्क")}: {cs.contact}</span>}
-                    {cs.bankName && <span>{t("Bank", "बैंक")}: {cs.bankName}</span>}
-                    {cs.ifscCode && <span>IFSC: {cs.ifscCode}</span>}
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      {cs.redFlag ? (
-                        <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
-                      ) : null}
-                      <Switch
-                        checked={cs.isActive ?? true}
-                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: cs.id, isActive: checked })}
-                      />
+                  <div className="p-4 space-y-3 cursor-pointer" onClick={() => toggleExpand(cs.id)}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+                        {expandedColdStoreId === cs.id ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        {cs.coldStoreId || '-'}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleEditClick(cs); }}
+                        data-testid={`button-edit-coldstore-mobile-${index}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-muted-foreground">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(cs.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-xs text-muted-foreground">{t("CS Due", "CS बकाया")}: ₹{(cs.coldStoreDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                      <div className="text-sm font-mono">{t("Total Due", "कुल बकाया")}: ₹{cs.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                    <div className="font-medium">{cs.name}</div>
+                    <div className="text-sm text-muted-foreground">{cs.address}</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {cs.contact && <span>{t("Contact", "संपर्क")}: {cs.contact}</span>}
+                      {cs.bankName && <span>{t("Bank", "बैंक")}: {cs.bankName}</span>}
+                      {cs.ifscCode && <span>IFSC: {cs.ifscCode}</span>}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t">
+                      <div className="flex items-center gap-2">
+                        {cs.redFlag ? (
+                          <Badge variant="destructive">{t("Red Flag", "रेड फ्लैग")}</Badge>
+                        ) : null}
+                        <Switch
+                          checked={cs.isActive ?? true}
+                          onCheckedChange={(checked) => { toggleActiveMutation.mutate({ id: cs.id, isActive: checked }); }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-muted-foreground">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(cs.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        <div className="text-xs text-muted-foreground">{t("CS Due", "CS बकाया")}: ₹{(cs.coldStoreDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        <div className="text-sm font-mono">{t("Total Due", "कुल बकाया")}: ₹{cs.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      </div>
                     </div>
                   </div>
+                  {expandedColdStoreId === cs.id && (
+                    <div className="border-t">
+                      <ColdStoreLedgerSection coldStoreId={cs.id} coldStoreName={cs.name} t={t} formatLedgerAmount={formatLedgerAmount} formatDate={formatDate} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
