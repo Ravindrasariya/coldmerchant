@@ -6473,7 +6473,14 @@ export async function registerRoutes(
       const fyStart = `${fyStartYear}-04-01`;
       const fyEnd = `${fyStartYear + 1}-03-31`;
 
-      const openingBalance = parseFloat(csRecord.pyPayable || "0");
+      const currentPyPayable = parseFloat(csRecord.pyPayable || "0");
+      let pyAllocPaid = 0;
+      for (const alloc of allAllocations) {
+        if (alloc.isPyPayable) {
+          pyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+        }
+      }
+      const openingBalance = currentPyPayable + pyAllocPaid;
 
       const seMap = new Map<number, { serialNumber: number }>();
       for (const se of allStockEntries) {
