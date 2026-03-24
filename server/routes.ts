@@ -6475,13 +6475,13 @@ export async function registerRoutes(
 
       const openingBalance = parseFloat(csRecord.pyPayable || "0");
 
-      const seMap = new Map<number, { serialNumber: number; purchaseDate: string }>();
+      const seMap = new Map<number, { serialNumber: number }>();
       for (const se of allStockEntries) {
-        seMap.set(se.id, { serialNumber: se.serialNumber, purchaseDate: se.purchaseDate || "" });
+        seMap.set(se.id, { serialNumber: se.serialNumber });
       }
-      const seedSeMap = new Map<number, { serialNumber: number; purchaseDate: string }>();
+      const seedSeMap = new Map<number, { serialNumber: number }>();
       for (const se of allSeedEntries) {
-        seedSeMap.set(se.id, { serialNumber: se.serialNumber || 0, purchaseDate: se.purchaseDate || "" });
+        seedSeMap.set(se.id, { serialNumber: se.serialNumber || 0 });
       }
 
       interface CsLedgerEntry {
@@ -6516,15 +6516,15 @@ export async function registerRoutes(
         }
         if (totalCharges <= 0) continue;
 
-        const seInfo = seMap.get(lot.stockEntryId);
-        const entryDate = seInfo?.purchaseDate || "";
-        if (!entryDate || entryDate < fyStart || entryDate > fyEnd) continue;
+        const lotDate = lot.createdAt ? new Date(lot.createdAt).toISOString().split("T")[0] : "";
+        if (!lotDate || lotDate < fyStart || lotDate > fyEnd) continue;
 
+        const seInfo = seMap.get(lot.stockEntryId);
         const srLabel = seInfo ? `SR #${seInfo.serialNumber}` : "";
         const lotLabel = lot.lotNumber ? ` Lot #${lot.lotNumber}` : "";
 
         entries.push({
-          date: entryDate,
+          date: lotDate,
           refCode: `${srLabel}${lotLabel}`,
           particulars: "Harvest Cold Store Charges",
           dr: 0,
@@ -6540,15 +6540,15 @@ export async function registerRoutes(
         const totalCharges = chargesPerBag * (sLot.originalBags || 0);
         if (totalCharges <= 0) continue;
 
-        const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
-        const entryDate = seedSeInfo?.purchaseDate || "";
-        if (!entryDate || entryDate < fyStart || entryDate > fyEnd) continue;
+        const lotDate = sLot.createdAt ? new Date(sLot.createdAt).toISOString().split("T")[0] : "";
+        if (!lotDate || lotDate < fyStart || lotDate > fyEnd) continue;
 
+        const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
         const srLabel = seedSeInfo ? `SR #${seedSeInfo.serialNumber}` : "";
         const lotLabel = sLot.lotNumber ? ` Lot #${sLot.lotNumber}` : "";
 
         entries.push({
-          date: entryDate,
+          date: lotDate,
           refCode: `${srLabel}${lotLabel}`,
           particulars: "Seed Cold Store Charges",
           dr: 0,
@@ -6592,7 +6592,7 @@ export async function registerRoutes(
 
         if (totalDr <= 0) continue;
 
-        const modeLabel = entry.paymentMode === "account" ? "Account" : "Cash";
+        const modeLabel = entry.paymentMode === "account_transfer" ? "Account" : "Cash";
         const pyLabel = hasPy ? " (incl. PY)" : "";
 
         entries.push({
