@@ -678,7 +678,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                 key={itemIndex}
                                 className="grid grid-cols-12 gap-1 items-center"
                               >
-                                <div className="col-span-12 md:col-span-4">
+                                <div className="col-span-12 md:col-span-4 min-w-0 overflow-hidden">
                                   <Popover
                                     open={lotPopoverOpen[`${section.id}-${itemIndex}`] || false}
                                     onOpenChange={(isOpen) => setLotPopoverOpen(prev => ({ ...prev, [`${section.id}-${itemIndex}`]: isOpen }))}
