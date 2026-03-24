@@ -1200,7 +1200,7 @@ export const PAYMENT_STATUS = ["due", "paid"] as const;
 
 // Cash Management Options
 export const RECEIPT_TYPES = ["cash_received", "account_received", "cheque_received"] as const;
-export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "capital_expense", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "pesticide_charges", "salary", "sundry_pay", "supplier", "transport_freight", "warehouse_charges"] as const;
+export const EXPENSE_TYPES = ["aadhtiya", "bag_charges", "capital_expense", "cold_store_charge", "farmer", "farmer_advance", "farmer_freight", "farmer_others", "general_expense", "grading", "hammali", "kata_charges", "mandi_commission", "pesticide_charges", "salary", "sundry_pay", "supplier", "transport_freight", "warehouse_charges"] as const;
 export const PAYMENT_MODES = ["cash", "account_transfer", "cheque"] as const;
 export const CASH_DIRECTIONS = ["inward", "outflow"] as const;
 

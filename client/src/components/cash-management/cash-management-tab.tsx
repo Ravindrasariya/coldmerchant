@@ -1747,6 +1747,7 @@ export function CashManagementTab() {
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
       case "kata_charges": return t("Kata Charges", "काटा शुल्क");
+      case "mandi_commission": return t("Mandi Commission", "मण्डी कमीशन");
       case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
       case "sundry_pay": return t("Sundry Pay", "सन्ड्री पे");
@@ -4339,6 +4340,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       case "grading": return t("Grading", "ग्रेडिंग");
       case "hammali": return t("Hammali", "हम्माली");
       case "kata_charges": return t("Kata Charges", "काटा शुल्क");
+      case "mandi_commission": return t("Mandi Commission", "मण्डी कमीशन");
       case "pesticide_charges": return t("Pesticide Charges", "कीटनाशक शुल्क");
       case "salary": return t("Salary", "वेतन");
       case "supplier": return t("Supplier", "आपूर्तिकर्ता");
