@@ -638,17 +638,17 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                               variant="outline"
                               role="combobox"
                               data-testid={`select-loading-lot-${itemIndex}`}
-                              className={cn("w-full justify-between h-auto min-h-9 text-left", !item.inventoryKey && "text-muted-foreground")}
+                              className={cn("w-full justify-between h-auto min-h-9 text-left overflow-hidden", !item.inventoryKey && "text-muted-foreground")}
                             >
                               {item.inventoryKey ? (() => {
                                 const inv = findInventoryByKey(item.inventoryKey);
                                 if (!inv) return item.inventoryKey;
                                 return (
-                                  <div className="flex flex-col">
-                                    <span className="text-sm font-medium">
+                                  <div className="flex flex-col min-w-0 overflow-hidden">
+                                    <span className="text-sm font-medium truncate">
                                       S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-xs text-muted-foreground truncate">
                                       {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("bags available", "बोरी उपलब्ध")}
                                       {inv.pricePerKg ? ` | ₹${inv.pricePerKg}/kg` : ""}
                                     </span>
