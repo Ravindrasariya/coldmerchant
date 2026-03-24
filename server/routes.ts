@@ -6496,15 +6496,28 @@ export async function registerRoutes(
 
       const entries: CsLedgerEntry[] = [];
 
+      interface LotCharge {
+        type?: string;
+        amount?: string | number;
+        coldStoreDbId?: number;
+      }
+
+      const isLotCharge = (c: unknown): c is LotCharge =>
+        typeof c === "object" && c !== null && "type" in c;
+
       const getColdStoreChargesFromArray = (charges: unknown): number => {
         if (!Array.isArray(charges)) return 0;
         const types = ["Cold Charges", "Ware House Charges"];
-        return charges.filter((c: any) => c && types.includes(c.type)).reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+        return charges
+          .filter((c): c is LotCharge => isLotCharge(c) && typeof c.type === "string" && types.includes(c.type))
+          .reduce((sum: number, c: LotCharge) => sum + (parseFloat(String(c.amount)) || 0), 0);
       };
       const getColdStoreChargesForCS = (charges: unknown, csId: number): number => {
         if (!Array.isArray(charges)) return 0;
         const types = ["Cold Charges", "Ware House Charges"];
-        return charges.filter((c: any) => c && types.includes(c.type) && c.coldStoreDbId === csId).reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+        return charges
+          .filter((c): c is LotCharge => isLotCharge(c) && typeof c.type === "string" && types.includes(c.type) && c.coldStoreDbId === csId)
+          .reduce((sum: number, c: LotCharge) => sum + (parseFloat(String(c.amount)) || 0), 0);
       };
 
       for (const lot of allHarvestLots) {
