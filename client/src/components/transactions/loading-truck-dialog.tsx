@@ -87,6 +87,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const [partyName, setPartyName] = useState("");
   const [partyAddress, setPartyAddress] = useState("");
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
+  const [lotPopoverOpen, setLotPopoverOpen] = useState<Record<string, boolean>>({});
 
   const [items, setItems] = useState<LoadingLotItem[]>([
     { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 },
@@ -628,68 +629,105 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                   return (
                     <div key={itemIndex} className="grid grid-cols-12 gap-1 items-center">
                       <div className="col-span-12 md:col-span-3">
-                        <Select
-                          value={item.inventoryKey}
-                          onValueChange={(value) => {
-                            const inv = findInventoryByKey(value);
-                            if (inv) {
-                              const availableBags = getAvailableBags(value, itemIndex);
-                              const bags = availableBags || 0;
-                              const netWeight = calculateNetWeight(inv, bags);
-                              const pricePerKg = inv.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
-                              const amount = Math.round(pricePerKg * netWeight * 100) / 100;
-                              updateItem(itemIndex, {
-                                inventoryKey: value,
-                                bagsMoved: bags,
-                                totalWeight: Math.round(netWeight * 10) / 10,
-                                netWeight: Math.round(netWeight * 10) / 10,
-                                pricePerKg,
-                                amount,
-                              });
-                            } else {
-                              updateItem(itemIndex, {
-                                inventoryKey: value,
-                                bagsMoved: 0,
-                                totalWeight: 0,
-                                netWeight: 0,
-                                pricePerKg: 0,
-                                amount: 0,
-                              });
-                            }
-                          }}
+                        <Popover
+                          open={lotPopoverOpen[`${itemIndex}`] || false}
+                          onOpenChange={(isOpen) => setLotPopoverOpen(prev => ({ ...prev, [`${itemIndex}`]: isOpen }))}
                         >
-                          <SelectTrigger data-testid={`select-loading-lot-${itemIndex}`} className="h-auto min-h-9">
-                            <SelectValue placeholder={t("Select lot...", "लॉट चुनें...")} />
-                          </SelectTrigger>
-                          <SelectContent className="max-w-[400px]">
-                            {inventory
-                              .filter((inv) => {
-                                if (selectedCrop && inv.crop !== selectedCrop) return false;
-                                const key = getInventoryKey(inv);
-                                const available = getAvailableBags(key, itemIndex);
-                                return key === item.inventoryKey || available > 0;
-                              })
-                              .map((inv) => {
-                                const key = getInventoryKey(inv);
-                                const displayBags = key === item.inventoryKey
-                                  ? inv.remainingBags
-                                  : getAvailableBags(key, itemIndex);
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              data-testid={`select-loading-lot-${itemIndex}`}
+                              className={cn("w-full justify-between h-auto min-h-9 text-left", !item.inventoryKey && "text-muted-foreground")}
+                            >
+                              {item.inventoryKey ? (() => {
+                                const inv = findInventoryByKey(item.inventoryKey);
+                                if (!inv) return item.inventoryKey;
                                 return (
-                                  <SelectItem key={key} value={key} className="py-2">
-                                    <div className="flex flex-col">
-                                      <span className="text-sm font-medium">
-                                        S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
-                                      </span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {displayBags} {t("bags available", "बोरी उपलब्ध")}
-                                        {inv.pricePerKg ? ` | ₹${inv.pricePerKg}/kg` : ""}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">
+                                      S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("bags available", "बोरी उपलब्ध")}
+                                      {inv.pricePerKg ? ` | ₹${inv.pricePerKg}/kg` : ""}
+                                    </span>
+                                  </div>
                                 );
-                              })}
-                          </SelectContent>
-                        </Select>
+                              })() : t("Select lot...", "लॉट चुनें...")}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[400px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t("Search lot...", "लॉट खोजें...")} />
+                              <CommandList>
+                                <CommandEmpty>{t("No lot found.", "कोई लॉट नहीं मिला।")}</CommandEmpty>
+                                <CommandGroup>
+                                  {inventory
+                                    .filter((inv) => {
+                                      if (selectedCrop && inv.crop !== selectedCrop) return false;
+                                      const key = getInventoryKey(inv);
+                                      const available = getAvailableBags(key, itemIndex);
+                                      return key === item.inventoryKey || available > 0;
+                                    })
+                                    .map((inv) => {
+                                      const key = getInventoryKey(inv);
+                                      const displayBags = key === item.inventoryKey
+                                        ? inv.remainingBags
+                                        : getAvailableBags(key, itemIndex);
+                                      const placeLabel = inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName;
+                                      return (
+                                        <CommandItem
+                                          key={key}
+                                          value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""}`}
+                                          onSelect={() => {
+                                            const selectedInvItem = findInventoryByKey(key);
+                                            if (selectedInvItem) {
+                                              const availableBags = getAvailableBags(key, itemIndex);
+                                              const bags = availableBags || 0;
+                                              const netWeight = calculateNetWeight(selectedInvItem, bags);
+                                              const pricePerKg = selectedInvItem.pricePerKg ? parseFloat(selectedInvItem.pricePerKg) : 0;
+                                              const amount = Math.round(pricePerKg * netWeight * 100) / 100;
+                                              updateItem(itemIndex, {
+                                                inventoryKey: key,
+                                                bagsMoved: bags,
+                                                totalWeight: Math.round(netWeight * 10) / 10,
+                                                netWeight: Math.round(netWeight * 10) / 10,
+                                                pricePerKg,
+                                                amount,
+                                              });
+                                            } else {
+                                              updateItem(itemIndex, {
+                                                inventoryKey: key,
+                                                bagsMoved: 0,
+                                                totalWeight: 0,
+                                                netWeight: 0,
+                                                pricePerKg: 0,
+                                                amount: 0,
+                                              });
+                                            }
+                                            setLotPopoverOpen(prev => ({ ...prev, [`${itemIndex}`]: false }));
+                                          }}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4", item.inventoryKey === key ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex flex-col">
+                                            <span className="text-sm font-medium">
+                                              S#{inv.serialNumber} - {placeLabel} - {inv.potatoType} - {inv.size || "Mixed"}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {displayBags} {t("bags available", "बोरी उपलब्ध")}
+                                              {inv.pricePerKg ? ` | ₹${inv.pricePerKg}/kg` : ""}
+                                            </span>
+                                          </div>
+                                        </CommandItem>
+                                      );
+                                    })}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div className="col-span-3 md:col-span-1">

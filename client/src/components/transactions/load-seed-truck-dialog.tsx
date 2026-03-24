@@ -9,7 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2, Package, IndianRupee, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Plus, Trash2, Loader2, Package, IndianRupee, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -75,6 +78,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [adjustmentReason, setAdjustmentReason] = useState("");
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
+  const [lotPopoverOpen, setLotPopoverOpen] = useState<Record<string, boolean>>({});
   
   const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
   const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
@@ -689,21 +693,69 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                   <div className="flex flex-wrap gap-4 items-end">
                     <div className="flex-1 min-w-[200px] space-y-2">
                       <Label>{t("Seed Lot", "बीज लॉट")}</Label>
-                      <Select
-                        value={selection.seedLotId ? selection.seedLotId.toString() : ""}
-                        onValueChange={(val) => updateLotSelection(index, "seedLotId", parseInt(val))}
+                      <Popover
+                        open={lotPopoverOpen[`${index}`] || false}
+                        onOpenChange={(isOpen) => setLotPopoverOpen(prev => ({ ...prev, [`${index}`]: isOpen }))}
                       >
-                        <SelectTrigger data-testid={`select-seed-lot-${index}`}>
-                          <SelectValue placeholder={t("Select lot", "लॉट चुनें")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {unsoldInventory?.map((lot) => (
-                            <SelectItem key={lot.id} value={lot.id.toString()}>
-                              S#{lot.serialNumber} - {lot.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : lot.place === "mandi" ? t("Mandi", "मंडी") : lot.coldStoreName} - {lot.potatoType} - {lot.size} ({lot.remainingBags} bags)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            data-testid={`select-seed-lot-${index}`}
+                            className={cn("w-full justify-between h-auto min-h-9 text-left", !selection.seedLotId && "text-muted-foreground")}
+                          >
+                            {selection.seedLotId ? (() => {
+                              const lot = unsoldInventory?.find(l => l.id === selection.seedLotId);
+                              if (!lot) return `Lot #${selection.seedLotId}`;
+                              const placeLabel = lot.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : lot.place === "mandi" ? t("Mandi", "मंडी") : lot.coldStoreName;
+                              return (
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">
+                                    S#{lot.serialNumber} - {placeLabel} - {lot.potatoType} - {lot.size}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {lot.supplierName} | {lot.remainingBags} bags
+                                  </span>
+                                </div>
+                              );
+                            })() : t("Select lot", "लॉट चुनें")}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder={t("Search lot...", "लॉट खोजें...")} />
+                            <CommandList>
+                              <CommandEmpty>{t("No lot found.", "कोई लॉट नहीं मिला।")}</CommandEmpty>
+                              <CommandGroup>
+                                {unsoldInventory?.map((lot) => {
+                                  const placeLabel = lot.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : lot.place === "mandi" ? t("Mandi", "मंडी") : lot.coldStoreName;
+                                  return (
+                                    <CommandItem
+                                      key={lot.id}
+                                      value={`S#${lot.serialNumber} ${placeLabel} ${lot.potatoType} ${lot.size} ${lot.supplierName}`}
+                                      onSelect={() => {
+                                        updateLotSelection(index, "seedLotId", lot.id);
+                                        setLotPopoverOpen(prev => ({ ...prev, [`${index}`]: false }));
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", selection.seedLotId === lot.id ? "opacity-100" : "opacity-0")} />
+                                      <div className="flex flex-col">
+                                        <span className="text-sm font-medium">
+                                          S#{lot.serialNumber} - {placeLabel} - {lot.potatoType} - {lot.size}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {lot.supplierName} | {lot.remainingBags} bags
+                                        </span>
+                                      </div>
+                                    </CommandItem>
+                                  );
+                                })}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
                     <div className="w-24 space-y-2">

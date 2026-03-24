@@ -247,6 +247,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [selectedInventory, setSelectedInventory] = useState<string>("");
+  const [lotPopoverOpen, setLotPopoverOpen] = useState(false);
   const [newItemBags, setNewItemBags] = useState<number>(0);
   const [newItemWeight, setNewItemWeight] = useState<number>(0);
   const [newItemRevenue, setNewItemRevenue] = useState<number>(0);
@@ -921,21 +922,66 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
-                  <Select value={selectedInventory} onValueChange={handleInventorySelect}>
-                    <SelectTrigger data-testid="select-inventory">
-                      <SelectValue placeholder={t("Choose lot", "लॉट चुनें")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unsoldInventory?.map((inv) => (
-                        <SelectItem 
-                          key={`${inv.lotId}-${inv.breakdownId || 'lot'}`} 
-                          value={`${inv.lotId}-${inv.breakdownId || 'lot'}`}
-                        >
-                          S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)} - {inv.potatoType} - {inv.size || "Mixed"} ({inv.remainingBags} {t("available", "उपलब्ध")})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={lotPopoverOpen} onOpenChange={setLotPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        data-testid="select-inventory"
+                        className={cn("w-full justify-between h-auto min-h-9 text-left", !selectedInventory && "text-muted-foreground")}
+                      >
+                        {selectedInventory ? (() => {
+                          const inv = unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory);
+                          if (!inv) return selectedInventory;
+                          return (
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">
+                                S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)} - {inv.potatoType} - {inv.size || "Mixed"}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
+                              </span>
+                            </div>
+                          );
+                        })() : t("Choose lot", "लॉट चुनें")}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder={t("Search lot...", "लॉट खोजें...")} />
+                        <CommandList>
+                          <CommandEmpty>{t("No lot found.", "कोई लॉट नहीं मिला।")}</CommandEmpty>
+                          <CommandGroup>
+                            {unsoldInventory?.map((inv) => {
+                              const key = `${inv.lotId}-${inv.breakdownId || 'lot'}`;
+                              const placeLabel = lotPlaceLabel(inv.place, inv.coldStoreName);
+                              return (
+                                <CommandItem
+                                  key={key}
+                                  value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""}`}
+                                  onSelect={() => {
+                                    handleInventorySelect(key);
+                                    setLotPopoverOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", selectedInventory === key ? "opacity-100" : "opacity-0")} />
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">
+                                      S#{inv.serialNumber} - {placeLabel} - {inv.potatoType} - {inv.size || "Mixed"}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {selectedInventory && (
                     <div className="text-xs text-muted-foreground">
                       {isLoadingType

@@ -9,7 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Loader2, Package, IndianRupee, History, ChevronDown, ChevronUp } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Plus, Trash2, Loader2, Package, IndianRupee, History, ChevronDown, ChevronUp, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -120,6 +123,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
   const [adjustmentReason, setAdjustmentReason] = useState("");
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([]);
+  const [lotPopoverOpen, setLotPopoverOpen] = useState<Record<string, boolean>>({});
 
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -462,24 +466,68 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                         <div className="md:col-span-2 space-y-2">
                           <Label>{t("Select Seed Lot", "बीज लॉट चुनें")}</Label>
-                          <Select
-                            value={selection.seedLotId ? selection.seedLotId.toString() : ""}
-                            onValueChange={(val) => updateLotSelection(index, "seedLotId", parseInt(val))}
+                          <Popover
+                            open={lotPopoverOpen[`${index}`] || false}
+                            onOpenChange={(isOpen) => setLotPopoverOpen(prev => ({ ...prev, [`${index}`]: isOpen }))}
                           >
-                            <SelectTrigger data-testid={`select-edit-seed-lot-${index}`}>
-                              <SelectValue placeholder={t("Choose a lot", "एक लॉट चुनें")} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableLots?.filter(lot => 
-                                lot.remainingBags > 0 || 
-                                selectedLots.some(s => s.seedLotId === lot.id)
-                              ).map(lot => (
-                                <SelectItem key={lot.id} value={lot.id.toString()}>
-                                  S#{lot.serialNumber} - {lot.coldStoreName} - {lot.potatoType} ({lot.size}) - {lot.remainingBags} bags @ ₹{lot.pricePerBag}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                data-testid={`select-edit-seed-lot-${index}`}
+                                className={cn("w-full justify-between h-auto min-h-9 text-left", !selection.seedLotId && "text-muted-foreground")}
+                              >
+                                {selection.seedLotId ? (() => {
+                                  const lot = availableLots?.find(l => l.id === selection.seedLotId);
+                                  if (!lot) return `Lot #${selection.seedLotId}`;
+                                  return (
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">
+                                        S#{lot.serialNumber} - {lot.coldStoreName} - {lot.potatoType} ({lot.size})
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {lot.supplierName} | {lot.remainingBags} bags @ ₹{lot.pricePerBag}
+                                      </span>
+                                    </div>
+                                  );
+                                })() : t("Choose a lot", "एक लॉट चुनें")}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder={t("Search lot...", "लॉट खोजें...")} />
+                                <CommandList>
+                                  <CommandEmpty>{t("No lot found.", "कोई लॉट नहीं मिला।")}</CommandEmpty>
+                                  <CommandGroup>
+                                    {availableLots?.filter(lot => 
+                                      lot.remainingBags > 0 || 
+                                      selectedLots.some(s => s.seedLotId === lot.id)
+                                    ).map(lot => (
+                                      <CommandItem
+                                        key={lot.id}
+                                        value={`S#${lot.serialNumber} ${lot.coldStoreName} ${lot.potatoType} ${lot.size} ${lot.supplierName}`}
+                                        onSelect={() => {
+                                          updateLotSelection(index, "seedLotId", lot.id);
+                                          setLotPopoverOpen(prev => ({ ...prev, [`${index}`]: false }));
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", selection.seedLotId === lot.id ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-medium">
+                                            S#{lot.serialNumber} - {lot.coldStoreName} - {lot.potatoType} ({lot.size})
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {lot.supplierName} | {lot.remainingBags} bags @ ₹{lot.pricePerBag}
+                                          </span>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div className="space-y-2">
                           <Label>{t("Bags", "बैग")}</Label>
