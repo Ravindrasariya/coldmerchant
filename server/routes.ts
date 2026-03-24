@@ -2665,14 +2665,14 @@ export async function registerRoutes(
       const coldStoreDbId = parseInt(req.params.coldStoreDbId);
       if (isNaN(coldStoreDbId)) return res.status(400).json({ message: "Invalid cold store ID" });
 
-      const [allHarvestLots, allSeedLots, allColdStoreRecords, allAllocations, allCashEntries, allStockEntries, allSeedTransactions] = await Promise.all([
+      const [allHarvestLots, allSeedLots, allColdStoreRecords, allAllocations, allCashEntries, allStockEntries, allSeedEntries] = await Promise.all([
         storage.getAllLotsByMerchant(merchantId),
         storage.getAllSeedLotsByMerchant(merchantId),
         storage.getColdStoresByMerchant(merchantId),
         storage.getColdStoreChargeAllocationsByMerchant(merchantId),
         storage.getCashEntriesByMerchant(merchantId),
         storage.getStockEntriesByMerchant(merchantId),
-        storage.getSeedTransactionsByMerchant(merchantId),
+        storage.getSeedEntriesByMerchant(merchantId),
       ]);
 
       const reversedEntryIds = new Set(allCashEntries.filter(e => e.isReversed).map(e => e.id));
@@ -2701,9 +2701,9 @@ export async function registerRoutes(
       for (const se of allStockEntries) {
         seMap.set(se.id, { serialNumber: se.serialNumber, uniqueId: se.uniqueId || null });
       }
-      const stMap = new Map<number, { serialNumber: number }>();
-      for (const st of allSeedTransactions) {
-        stMap.set(st.id, { serialNumber: st.serialNumber || 0 });
+      const seedSeMap = new Map<number, { serialNumber: number }>();
+      for (const se of allSeedEntries) {
+        seedSeMap.set(se.id, { serialNumber: se.serialNumber || 0 });
       }
 
       const pendingCharges: Array<{ lotId?: number; seedLotId?: number; sourceType: string; serialNumber: number; dueAmount: number; lotNumber?: string }> = [];
@@ -2744,11 +2744,11 @@ export async function registerRoutes(
         const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
         const due = totalCharges - paidAmount;
         if (due <= 0.01) continue;
-        const stInfo = stMap.get(sLot.seedTransactionId);
+        const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
         pendingCharges.push({
           seedLotId: sLot.id,
           sourceType: "Seed",
-          serialNumber: stInfo?.serialNumber || 0,
+          serialNumber: seedSeInfo?.serialNumber || 0,
           dueAmount: Math.round(due * 100) / 100,
           lotNumber: sLot.lotNumber ? `Lot #${sLot.lotNumber}` : undefined,
         });
