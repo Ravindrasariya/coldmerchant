@@ -125,6 +125,8 @@ export interface IStorage {
   getLotsByStockEntry(stockEntryId: number, merchantId: number): Promise<Lot[]>;
   getLotById(id: number, merchantId: number): Promise<Lot | undefined>;
   getAllLotsByMerchant(merchantId: number): Promise<Lot[]>;
+  getAllSeedLotsByMerchant(merchantId: number): Promise<SeedLot[]>;
+  getColdStoreChargeAllocationsByMerchant(merchantId: number): Promise<ColdStoreChargeAllocation[]>;
   
   // Bag Breakdown operations
   createBagBreakdown(breakdown: InsertBagBreakdown): Promise<BagBreakdown>;
@@ -286,7 +288,7 @@ export interface IStorage {
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
   
-  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number, aadhatAllocations?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>, buyerAllocations?: Array<{ transactionId?: number; isPyBalance?: boolean; amount: number; pettyAdjustment: number; transactionCode?: string }>): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
+  createCashEntry(entry: InsertCashEntry, applyFIFO: boolean, userId?: number, aadhatAllocations?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>, buyerAllocations?: Array<{ transactionId?: number; isPyBalance?: boolean; amount: number; pettyAdjustment: number; transactionCode?: string }>, coldStoreAllocationsInput?: Array<{ lotId?: number; seedLotId?: number; isPyPayable?: boolean; amount: number; pettyAdjustment: number }>): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
   // Season Reset operations
   checkRemainingBags(merchantId: number): Promise<{ hasRemaining: boolean; count: number; totalBags: number }>;
@@ -653,6 +655,14 @@ export class DatabaseStorage implements IStorage {
 
   async getAllLotsByMerchant(merchantId: number): Promise<Lot[]> {
     return await db.select().from(lots).where(eq(lots.merchantId, merchantId));
+  }
+
+  async getAllSeedLotsByMerchant(merchantId: number): Promise<SeedLot[]> {
+    return await db.select().from(seedLots).where(eq(seedLots.merchantId, merchantId));
+  }
+
+  async getColdStoreChargeAllocationsByMerchant(merchantId: number): Promise<ColdStoreChargeAllocation[]> {
+    return await db.select().from(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, merchantId));
   }
 
   // Bag Breakdown operations
@@ -1162,7 +1172,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Cash Entry operations
-  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[]; aadhatAllocations: any[]; buyerAllocations: any[] })[]> {
+  async getCashEntriesByMerchant(merchantId: number): Promise<(CashEntry & { allocations: CashEntryAllocation[]; aadhatAllocations: any[]; buyerAllocations: any[]; coldStoreAllocations: any[] })[]> {
     const entries = await db.select().from(cashEntries)
       .where(eq(cashEntries.merchantId, merchantId))
       .orderBy(desc(cashEntries.createdAt));
@@ -1189,6 +1199,21 @@ export class DatabaseStorage implements IStorage {
           .where(eq(buyerPaymentAllocations.merchantId, merchantId))
       : [];
 
+    const allColdStoreAllocs = entries.length > 0
+      ? await db.select({
+          id: coldStoreChargeAllocations.id,
+          cashEntryId: coldStoreChargeAllocations.cashEntryId,
+          lotId: coldStoreChargeAllocations.lotId,
+          seedLotId: coldStoreChargeAllocations.seedLotId,
+          coldStoreId: coldStoreChargeAllocations.coldStoreId,
+          appliedAmount: coldStoreChargeAllocations.appliedAmount,
+          pettyAdjustment: coldStoreChargeAllocations.pettyAdjustment,
+          isPyPayable: coldStoreChargeAllocations.isPyPayable,
+        })
+        .from(coldStoreChargeAllocations)
+        .where(eq(coldStoreChargeAllocations.merchantId, merchantId))
+      : [];
+
     const aadhatAllocsByEntry = new Map<number, any[]>();
     for (const alloc of allAadhatAllocs) {
       const list = aadhatAllocsByEntry.get(alloc.cashEntryId) || [];
@@ -1203,12 +1228,20 @@ export class DatabaseStorage implements IStorage {
       buyerAllocsByEntry.set(alloc.cashEntryId, list);
     }
 
+    const coldStoreAllocsByEntry = new Map<number, any[]>();
+    for (const alloc of allColdStoreAllocs) {
+      const list = coldStoreAllocsByEntry.get(alloc.cashEntryId) || [];
+      list.push(alloc);
+      coldStoreAllocsByEntry.set(alloc.cashEntryId, list);
+    }
+
     const result = await Promise.all(entries.map(async (entry) => {
       const allocations = await db.select().from(cashEntryAllocations)
         .where(eq(cashEntryAllocations.cashEntryId, entry.id));
       const aadhatAllocations = aadhatAllocsByEntry.get(entry.id) || [];
       const buyerAllocations = buyerAllocsByEntry.get(entry.id) || [];
-      return { ...entry, allocations, aadhatAllocations, buyerAllocations };
+      const coldStoreAllocations = coldStoreAllocsByEntry.get(entry.id) || [];
+      return { ...entry, allocations, aadhatAllocations, buyerAllocations, coldStoreAllocations };
     }));
     
     return result;
@@ -3503,7 +3536,8 @@ export class DatabaseStorage implements IStorage {
     applyFIFO: boolean, 
     userId?: number,
     aadhatAllocationsInput?: Array<{ stockEntryId?: number; isPyPayable?: boolean; amount: number; discountPercent: number; discountAmount: number; pettyAdjustment: number }>,
-    buyerAllocationsInput?: Array<{ transactionId?: number; isPyBalance?: boolean; amount: number; pettyAdjustment: number; transactionCode?: string }>
+    buyerAllocationsInput?: Array<{ transactionId?: number; isPyBalance?: boolean; amount: number; pettyAdjustment: number; transactionCode?: string }>,
+    coldStoreAllocationsInput?: Array<{ lotId?: number; seedLotId?: number; isPyPayable?: boolean; amount: number; pettyAdjustment: number }>
   ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     
     return await db.transaction(async (tx) => {
@@ -3734,169 +3768,105 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Cold store charge FIFO (priority: PY Payable → Harvest Lots → Seed Lots)
-      if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && (entry.coldStoreDbId || entry.coldStoreName)) {
-        let remainingAmount = parseFloat(entry.amount);
-        
-        if (remainingAmount > 0 && entry.coldStoreDbId) {
-          const [coldStoreRecord] = await tx.select().from(coldStores)
-            .where(and(eq(coldStores.id, entry.coldStoreDbId), eq(coldStores.merchantId, entry.merchantId)));
-          
-          if (coldStoreRecord) {
-            const currentPyPayable = parseFloat(coldStoreRecord.pyPayable || "0");
-            if (currentPyPayable > 0) {
-              const toApplyPy = Math.min(remainingAmount, currentPyPayable);
-              
-              const [pyAllocation] = await tx.insert(coldStoreChargeAllocations).values({
-                cashEntryId: createdEntry.id,
-                coldStoreId: coldStoreRecord.id,
-                merchantId: entry.merchantId,
-                appliedAmount: toApplyPy.toString(),
-              }).returning();
-              
-              coldStoreAllocations.push(pyAllocation);
-              
-              const newPyPayable = currentPyPayable - toApplyPy;
+      if (entry.direction === "outflow" && entry.expenseType === "cold_store_charge" && entry.coldStoreDbId && coldStoreAllocationsInput && coldStoreAllocationsInput.length > 0) {
+        for (const alloc of coldStoreAllocationsInput) {
+          const totalSettled = (alloc.amount || 0) + (alloc.pettyAdjustment || 0);
+
+          if (alloc.isPyPayable) {
+            const [csRecord] = await tx.select().from(coldStores)
+              .where(and(eq(coldStores.id, entry.coldStoreDbId!), eq(coldStores.merchantId, entry.merchantId)));
+
+            if (csRecord) {
+              const currentPyPayable = parseFloat(csRecord.pyPayable || "0");
+              if (totalSettled > currentPyPayable + 0.01) {
+                throw new Error(`PY Payable allocation ₹${totalSettled.toFixed(2)} exceeds current PY payable ₹${currentPyPayable.toFixed(2)}`);
+              }
+              const newPyPayable = Math.max(0, currentPyPayable - totalSettled);
               await tx.update(coldStores)
                 .set({ pyPayable: newPyPayable.toFixed(2), updatedAt: new Date() })
-                .where(eq(coldStores.id, coldStoreRecord.id));
-              
-              remainingAmount -= toApplyPy;
+                .where(eq(coldStores.id, csRecord.id));
             }
-          }
-        }
-        
-        const allLots = await tx.select().from(lots)
-          .where(eq(lots.merchantId, entry.merchantId))
-          .orderBy(asc(lots.createdAt));
-        
-        const getColdStoreChargesFromArray = (charges: unknown): number => {
-          if (!Array.isArray(charges)) return 0;
-          const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
-          return charges
-            .filter((c: any) => c && coldStoreTypes.includes(c.type))
-            .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
-        };
-        
-        const getColdStoreChargesForCS = (charges: unknown, coldStoreDbId: number | null): number => {
-          if (!Array.isArray(charges)) return 0;
-          const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
-          return charges
-            .filter((c: any) => c && coldStoreTypes.includes(c.type) && c.coldStoreDbId === coldStoreDbId)
-            .reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
-        };
 
-        const existingAllocations = await tx.select().from(coldStoreChargeAllocations)
-          .where(eq(coldStoreChargeAllocations.merchantId, entry.merchantId));
-        const existingCashEntries = await tx.select({ id: cashEntries.id, isReversed: cashEntries.isReversed })
-          .from(cashEntries).where(eq(cashEntries.merchantId, entry.merchantId));
-        const reversedIds = new Set(existingCashEntries.filter(e => e.isReversed).map(e => e.id));
-        const farmGatePaidMap = new Map<string, number>();
-        for (const alloc of existingAllocations) {
-          if (reversedIds.has(alloc.cashEntryId)) continue;
-          if (alloc.lotId && alloc.coldStoreId) {
-            const key = `${alloc.lotId}-${alloc.coldStoreId}`;
-            farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0"));
-          }
-        }
+            const [pyAllocation] = await tx.insert(coldStoreChargeAllocations).values({
+              cashEntryId: createdEntry.id,
+              coldStoreId: entry.coldStoreDbId,
+              merchantId: entry.merchantId,
+              appliedAmount: (alloc.amount || 0).toFixed(2),
+              pettyAdjustment: (alloc.pettyAdjustment || 0).toFixed(2),
+              isPyPayable: true,
+            }).returning();
+            coldStoreAllocations.push(pyAllocation);
 
-        const lotsWithDue = allLots.filter(lot => {
-          if (lot.coldStoreDbId) {
-            if (lot.coldStoreDbId !== entry.coldStoreDbId) return false;
-            const totalCharges = getColdStoreChargesFromArray(lot.charges);
-            if (totalCharges <= 0) return false;
-            const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
-            return totalCharges > paidAmount;
-          } else if (lot.place === "farm_gate" && entry.coldStoreDbId) {
-            const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId);
-            if (csCharges <= 0) return false;
-            const paidKey = `${lot.id}-${entry.coldStoreDbId}`;
-            const paid = farmGatePaidMap.get(paidKey) || 0;
-            return csCharges > paid;
-          }
-          return false;
-        });
-        
-        for (const lot of lotsWithDue) {
-          if (remainingAmount <= 0) break;
-          
-          let due: number;
-          if (lot.coldStoreDbId) {
-            const totalCharges = getColdStoreChargesFromArray(lot.charges);
+          } else if (alloc.lotId) {
+            const [lot] = await tx.select().from(lots)
+              .where(and(eq(lots.id, alloc.lotId), eq(lots.merchantId, entry.merchantId)));
+            if (!lot) throw new Error(`Lot ${alloc.lotId} not found`);
+
+            const getColdStoreCharges = (charges: unknown, csId?: number): number => {
+              if (!Array.isArray(charges)) return 0;
+              const types = ["Cold Charges", "Ware House Charges"];
+              return charges
+                .filter((c: Record<string, unknown>) => c && types.includes(c.type as string) && (!csId || c.coldStoreDbId === csId))
+                .reduce((sum: number, c: Record<string, unknown>) => sum + (parseFloat(String(c.amount)) || 0), 0);
+            };
+
+            let totalCharges: number;
+            if (lot.coldStoreDbId) {
+              totalCharges = getColdStoreCharges(lot.charges);
+            } else {
+              totalCharges = getColdStoreCharges(lot.charges, entry.coldStoreDbId!);
+            }
             const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-            due = totalCharges - currentPaid;
-          } else {
-            const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId || null);
-            const paidKey = `${lot.id}-${entry.coldStoreDbId}`;
-            const paid = farmGatePaidMap.get(paidKey) || 0;
-            due = csCharges - paid;
-          }
-          
-          if (due <= 0) continue;
-          
-          const toApply = Math.min(remainingAmount, due);
-          
-          const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
-            cashEntryId: createdEntry.id,
-            lotId: lot.id,
-            coldStoreId: lot.coldStoreDbId ? undefined : (entry.coldStoreDbId || undefined),
-            merchantId: entry.merchantId,
-            appliedAmount: toApply.toString(),
-          }).returning();
-          
-          coldStoreAllocations.push(allocation);
-          
-          if (lot.coldStoreDbId) {
-            const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-            const newPaid = currentPaid + toApply;
-            await tx.update(lots)
-              .set({ coldStorageChargesPaid: newPaid.toString() })
-              .where(eq(lots.id, lot.id));
-          }
-          
-          remainingAmount -= toApply;
-        }
+            const due = totalCharges - currentPaid;
+            if (totalSettled > due + 0.01) {
+              throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for lot ${alloc.lotId}`);
+            }
 
-        if (remainingAmount > 0) {
-          const allSeedLotsForCS = await tx.select().from(seedLots)
-            .where(eq(seedLots.merchantId, entry.merchantId))
-            .orderBy(asc(seedLots.createdAt));
+            const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
+              cashEntryId: createdEntry.id,
+              lotId: alloc.lotId,
+              coldStoreId: lot.coldStoreDbId ? undefined : (entry.coldStoreDbId || undefined),
+              merchantId: entry.merchantId,
+              appliedAmount: (alloc.amount || 0).toFixed(2),
+              pettyAdjustment: (alloc.pettyAdjustment || 0).toFixed(2),
+              isPyPayable: false,
+            }).returning();
+            coldStoreAllocations.push(allocation);
 
-          const seedLotsWithDue = allSeedLotsForCS.filter(sLot => {
-            if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== entry.coldStoreDbId) return false;
-            const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
-            const totalCharges = chargesPerBag * (sLot.originalBags || 0);
-            if (totalCharges <= 0) return false;
-            const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
-            return totalCharges > paidAmount;
-          });
+            if (lot.coldStoreDbId) {
+              const newPaid = currentPaid + totalSettled;
+              await tx.update(lots)
+                .set({ coldStorageChargesPaid: newPaid.toFixed(2) })
+                .where(eq(lots.id, lot.id));
+            }
 
-          for (const sLot of seedLotsWithDue) {
-            if (remainingAmount <= 0) break;
+          } else if (alloc.seedLotId) {
+            const [sLot] = await tx.select().from(seedLots)
+              .where(and(eq(seedLots.id, alloc.seedLotId), eq(seedLots.merchantId, entry.merchantId)));
+            if (!sLot) throw new Error(`Seed lot ${alloc.seedLotId} not found`);
 
             const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
             const totalCharges = chargesPerBag * (sLot.originalBags || 0);
             const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
             const due = totalCharges - currentPaid;
-
-            if (due <= 0) continue;
-
-            const toApply = Math.min(remainingAmount, due);
+            if (totalSettled > due + 0.01) {
+              throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for seed lot ${alloc.seedLotId}`);
+            }
 
             const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
               cashEntryId: createdEntry.id,
-              seedLotId: sLot.id,
+              seedLotId: alloc.seedLotId,
               merchantId: entry.merchantId,
-              appliedAmount: toApply.toString(),
+              appliedAmount: (alloc.amount || 0).toFixed(2),
+              pettyAdjustment: (alloc.pettyAdjustment || 0).toFixed(2),
+              isPyPayable: false,
             }).returning();
-
             coldStoreAllocations.push(allocation);
 
-            const newPaid = currentPaid + toApply;
+            const newPaid = currentPaid + totalSettled;
             await tx.update(seedLots)
-              .set({ coldStoreChargesPaid: newPaid.toString() })
+              .set({ coldStoreChargesPaid: newPaid.toFixed(2) })
               .where(eq(seedLots.id, sLot.id));
-
-            remainingAmount -= toApply;
           }
         }
       }

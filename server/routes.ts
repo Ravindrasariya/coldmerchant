@@ -2658,6 +2658,114 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/cash/cold-store-pending-charges/:coldStoreDbId - Get pending lot charges for a cold store (for manual allocation)
+  app.get("/api/cash/cold-store-pending-charges/:coldStoreDbId", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const coldStoreDbId = parseInt(req.params.coldStoreDbId);
+      if (isNaN(coldStoreDbId)) return res.status(400).json({ message: "Invalid cold store ID" });
+
+      const [allHarvestLots, allSeedLots, allColdStoreRecords, allAllocations, allCashEntries, allStockEntries, allSeedTransactions] = await Promise.all([
+        storage.getAllLotsByMerchant(merchantId),
+        storage.getAllSeedLotsByMerchant(merchantId),
+        storage.getColdStoresByMerchant(merchantId),
+        storage.getColdStoreChargeAllocationsByMerchant(merchantId),
+        storage.getCashEntriesByMerchant(merchantId),
+        storage.getStockEntriesByMerchant(merchantId),
+        storage.getSeedTransactionsByMerchant(merchantId),
+      ]);
+
+      const reversedEntryIds = new Set(allCashEntries.filter(e => e.isReversed).map(e => e.id));
+
+      const farmGatePaidMap = new Map<string, number>();
+      for (const alloc of allAllocations) {
+        if (reversedEntryIds.has(alloc.cashEntryId)) continue;
+        if (alloc.lotId && alloc.coldStoreId) {
+          const key = `${alloc.lotId}-${alloc.coldStoreId}`;
+          farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0"));
+        }
+      }
+
+      const getColdStoreChargesFromArray = (charges: unknown): number => {
+        if (!Array.isArray(charges)) return 0;
+        const types = ["Cold Charges", "Ware House Charges"];
+        return charges.filter((c: any) => c && types.includes(c.type)).reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+      };
+      const getColdStoreChargesForCS = (charges: unknown, csId: number): number => {
+        if (!Array.isArray(charges)) return 0;
+        const types = ["Cold Charges", "Ware House Charges"];
+        return charges.filter((c: any) => c && types.includes(c.type) && c.coldStoreDbId === csId).reduce((sum: number, c: any) => sum + (parseFloat(c.amount) || 0), 0);
+      };
+
+      const seMap = new Map<number, { serialNumber: number; uniqueId: string | null }>();
+      for (const se of allStockEntries) {
+        seMap.set(se.id, { serialNumber: se.serialNumber, uniqueId: se.uniqueId || null });
+      }
+      const stMap = new Map<number, { serialNumber: number }>();
+      for (const st of allSeedTransactions) {
+        stMap.set(st.id, { serialNumber: st.serialNumber || 0 });
+      }
+
+      const pendingCharges: Array<{ lotId?: number; seedLotId?: number; sourceType: string; serialNumber: number; dueAmount: number; lotNumber?: string }> = [];
+
+      for (const lot of allHarvestLots) {
+        let totalCharges = 0;
+        let due = 0;
+        if (lot.coldStoreDbId === coldStoreDbId) {
+          totalCharges = getColdStoreChargesFromArray(lot.charges);
+          if (totalCharges <= 0) continue;
+          const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
+          due = totalCharges - paidAmount;
+        } else if (lot.place === "farm_gate") {
+          totalCharges = getColdStoreChargesForCS(lot.charges, coldStoreDbId);
+          if (totalCharges <= 0) continue;
+          const paidKey = `${lot.id}-${coldStoreDbId}`;
+          const paid = farmGatePaidMap.get(paidKey) || 0;
+          due = totalCharges - paid;
+        } else {
+          continue;
+        }
+        if (due <= 0.01) continue;
+        const seInfo = seMap.get(lot.stockEntryId);
+        pendingCharges.push({
+          lotId: lot.id,
+          sourceType: "Harvest",
+          serialNumber: seInfo?.serialNumber || 0,
+          dueAmount: Math.round(due * 100) / 100,
+          lotNumber: lot.lotNumber ? `Lot #${lot.lotNumber}` : undefined,
+        });
+      }
+
+      for (const sLot of allSeedLots) {
+        if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== coldStoreDbId) continue;
+        const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+        const totalCharges = chargesPerBag * (sLot.originalBags || 0);
+        if (totalCharges <= 0) continue;
+        const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
+        const due = totalCharges - paidAmount;
+        if (due <= 0.01) continue;
+        const stInfo = stMap.get(sLot.seedTransactionId);
+        pendingCharges.push({
+          seedLotId: sLot.id,
+          sourceType: "Seed",
+          serialNumber: stInfo?.serialNumber || 0,
+          dueAmount: Math.round(due * 100) / 100,
+          lotNumber: sLot.lotNumber ? `Lot #${sLot.lotNumber}` : undefined,
+        });
+      }
+
+      pendingCharges.sort((a, b) => a.serialNumber - b.serialNumber);
+
+      const csRecord = allColdStoreRecords.find(cs => cs.id === coldStoreDbId);
+      const pyPayable = parseFloat(csRecord?.pyPayable || "0");
+
+      res.json({ pendingCharges, pyPayable });
+    } catch (error) {
+      console.error("Error fetching cold store pending charges:", error);
+      res.status(500).json({ message: "Failed to fetch cold store pending charges" });
+    }
+  });
+
   // GET /api/cash/aadhat-pending-entries/:aadhatDbId - Get pending stock entries for an aadhat (for manual allocation)
   app.get("/api/cash/aadhat-pending-entries/:aadhatDbId", requireMerchant, async (req, res) => {
     try {
@@ -2833,7 +2941,7 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, buyerAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, buyerAllocations, coldStoreAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -2947,6 +3055,29 @@ export async function registerRoutes(
             return res.status(400).json({ message: "Total cash amount must be greater than 0" });
           }
         }
+        if (expenseType === "cold_store_charge" && Array.isArray(coldStoreAllocations)) {
+          if (coldStoreAllocations.length === 0) {
+            return res.status(400).json({ message: "At least one allocation is required for cold store payments" });
+          }
+          for (const alloc of coldStoreAllocations) {
+            const allocAmount = parseFloat(alloc.amount) || 0;
+            const allocPetty = parseFloat(alloc.pettyAdjustment) || 0;
+            if (allocAmount < 0 || allocPetty < 0) {
+              return res.status(400).json({ message: "Allocation amounts must be non-negative" });
+            }
+            const totalSettled = allocAmount + allocPetty;
+            if (totalSettled <= 0) {
+              return res.status(400).json({ message: "Each allocation must have a positive total settled amount" });
+            }
+            if (!alloc.isPyPayable && !alloc.lotId && !alloc.seedLotId) {
+              return res.status(400).json({ message: "Each allocation must reference a lot, seed lot, or PY payable" });
+            }
+          }
+          const totalColdStoreCash = coldStoreAllocations.reduce((sum: number, a: any) => sum + (parseFloat(a.amount) || 0), 0);
+          if (totalColdStoreCash <= 0) {
+            return res.status(400).json({ message: "Total cash amount must be greater than 0" });
+          }
+        }
       } else if (direction === "transfer") {
         if (!fromAccountType || !["cash_in_hand", "bank_account"].includes(fromAccountType)) {
           return res.status(400).json({ message: "Valid from account type is required for transfers" });
@@ -3053,10 +3184,9 @@ export async function registerRoutes(
         }
       }
 
-      // Determine if FIFO should be applied (raw_potato is now manual allocation, excluded here)
+      // Determine if FIFO should be applied (raw_potato and cold_store_charge are now manual allocation, excluded here)
       const applyFIFO = (direction === "inward" && revenueType === "seed_sale" && !!farmerName) ||
                         (direction === "outflow" && expenseType === "farmer" && !!farmerName) ||
-                        (direction === "outflow" && expenseType === "cold_store_charge" && !!coldStoreName) ||
                         (direction === "outflow" && expenseType === "supplier" && !!supplierName) ||
                         (direction === "outflow" && expenseType === "aadhtiya" && !!aadhatName);
 
@@ -3107,7 +3237,7 @@ export async function registerRoutes(
             amount: amount.toString(),
             entryDate,
             remarks: remarks || null,
-          }, applyFIFO, userId, expenseType === "aadhtiya" && Array.isArray(aadhatAllocations) ? aadhatAllocations : undefined, revenueType === "raw_potato" && Array.isArray(buyerAllocations) ? buyerAllocations : undefined);
+          }, applyFIFO, userId, expenseType === "aadhtiya" && Array.isArray(aadhatAllocations) ? aadhatAllocations : undefined, revenueType === "raw_potato" && Array.isArray(buyerAllocations) ? buyerAllocations : undefined, expenseType === "cold_store_charge" && Array.isArray(coldStoreAllocations) ? coldStoreAllocations : undefined);
           break;
         } catch (error: any) {
           if (error?.code === '23505' && error?.constraint?.includes('transaction_code') && attempt < maxRetries - 1) {

@@ -302,7 +302,7 @@ export const buyerPaymentAllocations = pgTable("buyer_payment_allocations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Cold Store Charge Allocations - tracks which lots a cold store payment was applied to (FIFO)
+// Cold Store Charge Allocations - tracks which lots a cold store payment was applied to
 export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations", {
   id: serial("id").primaryKey(),
   cashEntryId: integer("cash_entry_id").notNull().references(() => cashEntries.id, { onDelete: "cascade" }),
@@ -311,6 +311,8 @@ export const coldStoreChargeAllocations = pgTable("cold_store_charge_allocations
   coldStoreId: integer("cold_store_id").references(() => coldStores.id),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   appliedAmount: decimal("applied_amount", { precision: 12, scale: 2 }).notNull(),
+  pettyAdjustment: decimal("petty_adjustment", { precision: 12, scale: 2 }).default("0"),
+  isPyPayable: boolean("is_py_payable").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

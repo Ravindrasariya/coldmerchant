@@ -79,6 +79,7 @@ interface CashEntry {
   allocations: CashEntryAllocation[];
   aadhatAllocations: AadhatPaymentAllocationDetail[];
   buyerAllocations: BuyerPaymentAllocationDetail[];
+  coldStoreAllocations: ColdStorePaymentAllocationDetail[];
 }
 
 interface CashEntryAllocation {
@@ -99,6 +100,42 @@ interface AadhatPaymentAllocationDetail {
   pettyAdjustment: string;
   isPyPayable: boolean;
   serialNumber: number | null;
+}
+
+interface ColdStorePaymentAllocationDetail {
+  id: number;
+  cashEntryId: number;
+  lotId: number | null;
+  seedLotId: number | null;
+  coldStoreId: number | null;
+  appliedAmount: string;
+  pettyAdjustment: string;
+  isPyPayable: boolean;
+}
+
+interface ColdStorePendingCharge {
+  lotId?: number;
+  seedLotId?: number;
+  sourceType: string;
+  serialNumber: number;
+  dueAmount: number;
+  lotNumber?: string;
+}
+
+interface ColdStorePendingResponse {
+  pendingCharges: ColdStorePendingCharge[];
+  pyPayable: number;
+}
+
+interface ColdStoreAllocationRow {
+  lotId?: number;
+  seedLotId?: number;
+  isPyPayable?: boolean;
+  label: string;
+  sourceType: string;
+  dueAmount: number;
+  amount: number;
+  pettyAdjustment: number;
 }
 
 interface PartyWithDue {
@@ -680,6 +717,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-store-pending-charges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
@@ -701,6 +739,7 @@ export function CashManagementTab() {
       });
       setAadhatAllocations([]);
       setBuyerAllocations([]);
+      setColdStoreAllocations([]);
       if (activeTab === "inward") {
         inwardForm.reset({
           receiptType: "cash_received",
@@ -735,6 +774,7 @@ export function CashManagementTab() {
           remarks: "",
         });
         setAadhatAllocations([]);
+        setColdStoreAllocations([]);
       } else if (activeTab === "transfer") {
         transferForm.reset({
           fromAccountType: "cash_in_hand",
@@ -790,6 +830,89 @@ export function CashManagementTab() {
   }, [selectedAadhatDbId]);
 
   const aadhatGrandTotalCash = aadhatAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const [coldStoreAllocations, setColdStoreAllocations] = useState<ColdStoreAllocationRow[]>([]);
+  const [coldStoreEntryPickerOpen, setColdStoreEntryPickerOpen] = useState(false);
+
+  const selectedColdStoreDbId = useMemo(() => {
+    if (!selectedOutflowColdStore) return null;
+    const store = coldStores.find(cs => cs.coldStoreName === selectedOutflowColdStore);
+    return store?.coldStoreDbId || null;
+  }, [selectedOutflowColdStore, coldStores]);
+
+  const { data: coldStorePendingData } = useQuery<ColdStorePendingResponse>({
+    queryKey: ["/api/cash/cold-store-pending-charges", selectedColdStoreDbId],
+    queryFn: async () => {
+      if (!selectedColdStoreDbId) return { pendingCharges: [], pyPayable: 0 };
+      const res = await fetch(`/api/cash/cold-store-pending-charges/${selectedColdStoreDbId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending charges");
+      return res.json();
+    },
+    enabled: !!selectedColdStoreDbId && expenseType === "cold_store_charge",
+  });
+
+  useEffect(() => {
+    setColdStoreAllocations([]);
+  }, [selectedColdStoreDbId]);
+
+  const coldStoreGrandTotalCash = coldStoreAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const toggleColdStoreEntry = (entry: ColdStorePendingCharge | { isPyPayable: true; dueAmount: number }) => {
+    if ('isPyPayable' in entry && entry.isPyPayable) {
+      const exists = coldStoreAllocations.find(a => a.isPyPayable);
+      if (exists) {
+        setColdStoreAllocations(prev => prev.filter(a => !a.isPyPayable));
+      } else {
+        setColdStoreAllocations(prev => [...prev, {
+          isPyPayable: true,
+          label: t("PY Payable (Previous Year)", "पीवाई देय (पिछला वर्ष)"),
+          sourceType: "PY",
+          dueAmount: entry.dueAmount,
+          amount: 0,
+          pettyAdjustment: 0,
+        }]);
+      }
+    } else if ('lotId' in entry || 'seedLotId' in entry) {
+      const csEntry = entry as ColdStorePendingCharge;
+      const exists = coldStoreAllocations.find(a =>
+        (csEntry.lotId && a.lotId === csEntry.lotId) ||
+        (csEntry.seedLotId && a.seedLotId === csEntry.seedLotId)
+      );
+      if (exists) {
+        setColdStoreAllocations(prev => prev.filter(a =>
+          !(csEntry.lotId && a.lotId === csEntry.lotId) &&
+          !(csEntry.seedLotId && a.seedLotId === csEntry.seedLotId)
+        ));
+      } else {
+        const lotLabel = csEntry.lotNumber ? ` | ${csEntry.lotNumber}` : "";
+        setColdStoreAllocations(prev => [...prev, {
+          lotId: csEntry.lotId,
+          seedLotId: csEntry.seedLotId,
+          label: `SR #${csEntry.serialNumber} | ${csEntry.sourceType}${lotLabel}`,
+          sourceType: csEntry.sourceType,
+          dueAmount: csEntry.dueAmount,
+          amount: 0,
+          pettyAdjustment: 0,
+        }]);
+      }
+    }
+  };
+
+  const updateColdStoreAllocation = (index: number, field: 'amount' | 'pettyAdjustment', value: number) => {
+    setColdStoreAllocations(prev => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      if (field === 'amount') {
+        row.amount = value;
+        const remainder = Math.round((row.dueAmount - value) * 100) / 100;
+        row.pettyAdjustment = Math.min(Math.max(remainder, 0), 100);
+      } else if (field === 'pettyAdjustment') {
+        row.pettyAdjustment = value;
+      }
+      updated[index] = row;
+      return updated;
+    });
+  };
 
   const selectedBuyerDbId = useMemo(() => {
     if (!selectedPartyName) return null;
@@ -1286,6 +1409,7 @@ export function CashManagementTab() {
       : null;
     
     const isAadhtiya = !isCapital && effectiveExpenseType === "aadhtiya";
+    const isColdStoreCharge = !isCapital && effectiveExpenseType === "cold_store_charge";
 
     if (isAadhtiya) {
       if (aadhatAllocations.length === 0) {
@@ -1324,6 +1448,42 @@ export function CashManagementTab() {
         });
         return;
       }
+    } else if (isColdStoreCharge) {
+      if (coldStoreAllocations.length === 0) {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: t("Please select at least one lot to allocate payment", "कृपया भुगतान आवंटित करने के लिए कम से कम एक लॉट चुनें"),
+          variant: "destructive",
+        });
+        return;
+      }
+      for (const alloc of coldStoreAllocations) {
+        const totalSettled = (alloc.amount || 0) + (alloc.pettyAdjustment || 0);
+        if (totalSettled <= 0) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Each selected lot must have some amount allocated", "प्रत्येक चयनित लॉट में कुछ राशि आवंटित होनी चाहिए"),
+            variant: "destructive",
+          });
+          return;
+        }
+        if (totalSettled > alloc.dueAmount + 0.01) {
+          toast({
+            title: t("Error", "त्रुटि"),
+            description: t("Total settled cannot exceed due amount for a lot", "कुल निपटान एक लॉट की बकाया राशि से अधिक नहीं हो सकता"),
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      if (coldStoreGrandTotalCash <= 0) {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: t("Total cash amount must be greater than 0", "कुल नकद राशि 0 से अधिक होनी चाहिए"),
+          variant: "destructive",
+        });
+        return;
+      }
     } else {
       if (!values.amount || values.amount <= 0) {
         outflowForm.setError("amount", { 
@@ -1334,7 +1494,6 @@ export function CashManagementTab() {
       }
       const dueLimitMap: Record<string, number> = {
         farmer: outflowFarmerDue,
-        cold_store_charge: outflowColdStoreDue,
         supplier: outflowSupplierDue,
       };
       const dueLimit = dueLimitMap[effectiveExpenseType] || 0;
@@ -1371,7 +1530,7 @@ export function CashManagementTab() {
       sundryPayDbId: effectiveExpenseType === "sundry_pay" ? (values.sundryPayDbId || null) : null,
       capitalAssetName: isCapital ? values.capitalAssetName : null,
       capitalAssetCategory: isCapital ? values.capitalAssetCategory : null,
-      amount: isAadhtiya ? aadhatGrandTotalCash : values.amount,
+      amount: isAadhtiya ? aadhatGrandTotalCash : isColdStoreCharge ? coldStoreGrandTotalCash : values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
     };
@@ -1383,6 +1542,16 @@ export function CashManagementTab() {
         amount: a.amount || 0,
         discountPercent: a.discountPercent || 0,
         discountAmount: a.discountAmount || 0,
+        pettyAdjustment: a.pettyAdjustment || 0,
+      }));
+    }
+
+    if (isColdStoreCharge) {
+      outflowData.coldStoreAllocations = coldStoreAllocations.map(a => ({
+        lotId: a.lotId || null,
+        seedLotId: a.seedLotId || null,
+        isPyPayable: a.isPyPayable || false,
+        amount: a.amount || 0,
         pettyAdjustment: a.pettyAdjustment || 0,
       }));
     }
@@ -1669,6 +1838,7 @@ export function CashManagementTab() {
       t("Supplier Name", "आपूर्तिकर्ता का नाम"),
       t("Aadhtiya Name", "आढ़तिया का नाम"),
       t("Aadhtiya Payment Details", "आढ़तिया भुगतान विवरण"),
+      t("Cold Store Payment Details", "शीत भंडार भुगतान विवरण"),
       t("Expense Category", "व्यय श्रेणी"),
       t("Asset Name", "संपत्ति का नाम"),
       t("Asset Category", "संपत्ति श्रेणी"),
@@ -1715,6 +1885,22 @@ export function CashManagementTab() {
           return `${label}: ₹${amt.toLocaleString("en-IN")}`;
         });
         if (entryRefs.length > 0) parts.unshift(`Entries - (${entryRefs.join(", ")})`);
+        return parts.join(". ");
+      })(),
+      (() => {
+        if (!entry.coldStoreAllocations || entry.coldStoreAllocations.length === 0) return "";
+        const parts: string[] = [];
+        const allocLabel = (a: ColdStorePaymentAllocationDetail) => a.isPyPayable ? "PY" : (a.lotId ? `Lot#${a.lotId}` : `SeedLot#${a.seedLotId}`);
+        const pettyParts = entry.coldStoreAllocations
+          .filter(a => parseFloat(a.pettyAdjustment || "0") !== 0)
+          .map(a => `${allocLabel(a)} - ₹${parseFloat(a.pettyAdjustment).toLocaleString("en-IN")}`);
+        if (pettyParts.length > 0) parts.push(`Petty Adj - (${pettyParts.join(", ")})`);
+        const entryRefs = entry.coldStoreAllocations.map(a => {
+          const label = allocLabel(a);
+          const amt = parseFloat(a.appliedAmount || "0");
+          return `${label}: ₹${amt.toLocaleString("en-IN")}`;
+        });
+        if (entryRefs.length > 0) parts.unshift(`Lots - (${entryRefs.join(", ")})`);
         return parts.join(". ");
       })(),
       entry.expenseCategory === "capital" ? t("Capital", "पूंजीगत") : entry.expenseCategory === "revenue" ? t("Revenue", "राजस्व") : "",
@@ -3553,6 +3739,146 @@ export function CashManagementTab() {
                     />
                   )}
 
+                  {expenseType === "cold_store_charge" && selectedColdStoreDbId && coldStorePendingData && (
+                    <div className="space-y-3" data-testid="cold-store-allocation-section">
+                      <div>
+                        <Label className="text-sm font-medium">{t("Select Lots to Allocate", "आवंटित करने के लिए लॉट चुनें")}</Label>
+                        <Popover open={coldStoreEntryPickerOpen} onOpenChange={setColdStoreEntryPickerOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn("w-full justify-between mt-1", coldStoreAllocations.length === 0 && "text-muted-foreground")}
+                              data-testid="button-pick-cold-store-entries"
+                            >
+                              {coldStoreAllocations.length > 0
+                                ? `${coldStoreAllocations.length} ${t("lots selected", "लॉट चयनित")}`
+                                : t("Select pending lots...", "बकाया लॉट चुनें...")}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder={t("Search lots...", "लॉट खोजें...")} />
+                              <CommandList>
+                                <CommandEmpty>{t("No pending lots found", "कोई बकाया लॉट नहीं मिला")}</CommandEmpty>
+                                <CommandGroup>
+                                  {coldStorePendingData.pyPayable > 0 && (
+                                    <CommandItem
+                                      value="py-payable"
+                                      onSelect={() => toggleColdStoreEntry({ isPyPayable: true, dueAmount: coldStorePendingData.pyPayable })}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", coldStoreAllocations.some(a => a.isPyPayable) ? "opacity-100" : "opacity-0")} />
+                                      <div className="flex items-center justify-between gap-2 w-full">
+                                        <span className="font-medium">{t("PY Payable", "पीवाई देय")}</span>
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
+                                          ₹{coldStorePendingData.pyPayable.toLocaleString('en-IN')}
+                                        </Badge>
+                                      </div>
+                                    </CommandItem>
+                                  )}
+                                  {coldStorePendingData.pendingCharges.map((charge) => {
+                                    const isSelected = coldStoreAllocations.some(a =>
+                                      (charge.lotId && a.lotId === charge.lotId) ||
+                                      (charge.seedLotId && a.seedLotId === charge.seedLotId)
+                                    );
+                                    return (
+                                      <CommandItem
+                                        key={charge.lotId ? `lot-${charge.lotId}` : `seed-${charge.seedLotId}`}
+                                        value={`SR ${charge.serialNumber} ${charge.sourceType} ${charge.lotNumber || ""}`}
+                                        onSelect={() => toggleColdStoreEntry(charge)}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex items-center justify-between gap-2 w-full text-xs">
+                                          <span className="font-medium">SR #{charge.serialNumber}</span>
+                                          <Badge variant={charge.sourceType === "Harvest" ? "default" : "secondary"} className="text-[10px] px-1 py-0">
+                                            {charge.sourceType}
+                                          </Badge>
+                                          {charge.lotNumber && <span className="text-muted-foreground">{charge.lotNumber}</span>}
+                                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
+                                            ₹{charge.dueAmount.toLocaleString('en-IN')}
+                                          </Badge>
+                                        </div>
+                                      </CommandItem>
+                                    );
+                                  })}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {coldStoreAllocations.length > 0 && (
+                        <div className="space-y-3">
+                          {coldStoreAllocations.map((alloc, idx) => {
+                            const totalSettled = (alloc.amount || 0) + (alloc.pettyAdjustment || 0);
+                            const overLimit = totalSettled > alloc.dueAmount + 0.01;
+                            return (
+                              <Card key={alloc.lotId || alloc.seedLotId || 'py'} className={cn(overLimit && "border-red-400")} data-testid={`card-cold-store-alloc-${idx}`}>
+                                <CardContent className="p-3 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-medium truncate">{alloc.label}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400">
+                                        {t("Due", "बकाया")}: ₹{alloc.dueAmount.toLocaleString('en-IN')}
+                                      </Badge>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setColdStoreAllocations(prev => prev.filter((_, i) => i !== idx))}
+                                        data-testid={`button-remove-cs-alloc-${idx}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")} (₹)</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        value={alloc.amount || ""}
+                                        onChange={(e) => updateColdStoreAllocation(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                        data-testid={`input-cs-alloc-amount-${idx}`}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 50 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 1 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
+                                      <Input
+                                        type="number"
+                                        step="any"
+                                        value={alloc.pettyAdjustment || ""}
+                                        onChange={(e) => updateColdStoreAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                        className={cn((alloc.pettyAdjustment || 0) > 50 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 1 ? "border-orange-400 text-orange-600" : "")}
+                                        data-testid={`input-cs-alloc-petty-${idx}`}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">{t("Total Settled", "कुल निपटान")}</span>
+                                    <span className={cn("font-semibold", overLimit ? "text-red-600" : "text-foreground")}>
+                                      ₹{totalSettled.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      {overLimit && ` (${t("exceeds due", "बकाया से अधिक")})`}
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+
+                          <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="cold-store-grand-total">
+                            <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                            <span className="font-bold text-lg">₹{coldStoreGrandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {expenseType === "supplier" && (
                     <FormField
                       control={outflowForm.control}
@@ -3681,13 +4007,12 @@ export function CashManagementTab() {
                     />
                   )}
 
-                  {expenseType !== "aadhtiya" && (
+                  {expenseType !== "aadhtiya" && expenseType !== "cold_store_charge" && (
                     <FormField
                       control={outflowForm.control}
                       name="amount"
                       render={({ field }) => {
                         const maxDue = expenseType === "farmer" ? outflowFarmerDue
-                          : expenseType === "cold_store_charge" ? outflowColdStoreDue
                           : expenseType === "supplier" ? outflowSupplierDue
                           : 0;
                         return (
@@ -3967,6 +4292,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-store-pending-charges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
