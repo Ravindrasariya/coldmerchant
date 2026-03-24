@@ -733,7 +733,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                                   return (
                                     <CommandItem
                                       key={lot.id}
-                                      value={`S#${lot.serialNumber} ${placeLabel} ${lot.potatoType} ${lot.size} ${lot.supplierName} ${lot.remainingBags} bags`}
+                                      value={`S#${lot.serialNumber} ${placeLabel} ${lot.potatoType} ${lot.size} ${lot.supplierName} ${lot.remainingBags} bags available`}
                                       onSelect={() => {
                                         updateLotSelection(index, "seedLotId", lot.id);
                                         setLotPopoverOpen(prev => ({ ...prev, [`${index}`]: false }));
