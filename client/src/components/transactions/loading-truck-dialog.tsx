@@ -680,7 +680,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                       return (
                                         <CommandItem
                                           key={key}
-                                          value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""}`}
+                                          value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""} ${displayBags} bags ${inv.pricePerKg ? `₹${inv.pricePerKg}/kg` : ""}`}
                                           onSelect={() => {
                                             const selectedInvItem = findInventoryByKey(key);
                                             if (selectedInvItem) {

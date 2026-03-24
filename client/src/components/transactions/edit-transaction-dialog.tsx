@@ -959,7 +959,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                               return (
                                 <CommandItem
                                   key={key}
-                                  value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""}`}
+                                  value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""} ${inv.remainingBags} available`}
                                   onSelect={() => {
                                     handleInventorySelect(key);
                                     setLotPopoverOpen(false);

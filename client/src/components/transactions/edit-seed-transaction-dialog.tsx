@@ -506,7 +506,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                                     ).map(lot => (
                                       <CommandItem
                                         key={lot.id}
-                                        value={`S#${lot.serialNumber} ${lot.coldStoreName} ${lot.potatoType} ${lot.size} ${lot.supplierName}`}
+                                        value={`S#${lot.serialNumber} ${lot.coldStoreName} ${lot.potatoType} ${lot.size} ${lot.supplierName} ${lot.remainingBags} bags ₹${lot.pricePerBag}`}
                                         onSelect={() => {
                                           updateLotSelection(index, "seedLotId", lot.id);
                                           setLotPopoverOpen(prev => ({ ...prev, [`${index}`]: false }));
