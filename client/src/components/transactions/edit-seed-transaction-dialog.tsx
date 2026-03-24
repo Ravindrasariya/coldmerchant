@@ -481,11 +481,11 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                                   const lot = availableLots?.find(l => l.id === selection.seedLotId);
                                   if (!lot) return `Lot #${selection.seedLotId}`;
                                   return (
-                                    <div className="flex flex-col">
-                                      <span className="text-sm font-medium">
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="text-sm font-medium break-words">
                                         S#{lot.serialNumber} - {lot.coldStoreName} - {lot.potatoType} ({lot.size})
                                       </span>
-                                      <span className="text-xs text-muted-foreground">
+                                      <span className="text-xs text-muted-foreground break-words">
                                         {lot.supplierName} | {lot.remainingBags} bags @ ₹{lot.pricePerBag}
                                       </span>
                                     </div>

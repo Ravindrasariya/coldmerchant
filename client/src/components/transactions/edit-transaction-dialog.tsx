@@ -934,11 +934,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           const inv = unsoldInventory?.find(i => `${i.lotId}-${i.breakdownId || 'lot'}` === selectedInventory);
                           if (!inv) return selectedInventory;
                           return (
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-medium break-words">
                                 S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)} - {inv.potatoType} - {inv.size || "Mixed"}
                               </span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground break-words">
                                 {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
                               </span>
                             </div>

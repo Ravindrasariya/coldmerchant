@@ -709,11 +709,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                               if (!lot) return `Lot #${selection.seedLotId}`;
                               const placeLabel = lot.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : lot.place === "mandi" ? t("Mandi", "मंडी") : lot.coldStoreName;
                               return (
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-medium">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-medium break-words">
                                     S#{lot.serialNumber} - {placeLabel} - {lot.potatoType} - {lot.size}
                                   </span>
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs text-muted-foreground break-words">
                                     {lot.supplierName} | {lot.remainingBags} bags
                                   </span>
                                 </div>
