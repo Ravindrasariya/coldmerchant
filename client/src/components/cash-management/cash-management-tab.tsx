@@ -639,6 +639,7 @@ export function CashManagementTab() {
 
   // State for seed farmer searchable popover
   const [seedFarmerPopoverOpen, setSeedFarmerPopoverOpen] = useState(false);
+  const [expenseFarmerPopoverOpen, setExpenseFarmerPopoverOpen] = useState(false);
   
   // Watch revenue type and receipt type for conditional rendering
   const revenueType = inwardForm.watch("revenueType");
@@ -3617,44 +3618,65 @@ export function CashManagementTab() {
                         control={outflowForm.control}
                         name="farmerName"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="flex flex-col">
                             <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
-                            <Select 
-                              onValueChange={field.onChange} 
-                              value={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-farmer-name">
-                                  {field.value ? (() => {
-                                    const f = ledgerFarmers.find(f => f.name === field.value);
-                                    const due = f?.netDue > 0 ? f.netDue : 0;
-                                    return <span>{f?.name || field.value}{due > 0 ? ` — ${t("Due", "बकाया")}: ₹${due.toLocaleString('en-IN')}` : ""}</span>;
-                                  })() : <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />}
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {ledgerFarmers
-                                  .filter(f => !f.isArchived)
-                                  .filter(f => f.netDue > 0)
-                                  .map((farmer) => (
-                                      <SelectItem key={farmer.name} value={farmer.name}>
-                                        <div className="flex flex-col flex-1">
-                                          <div className="flex items-center justify-between">
-                                            <span className="font-medium">{farmer.name}</span>
+                            <Popover open={expenseFarmerPopoverOpen} onOpenChange={setExpenseFarmerPopoverOpen}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                    data-testid="select-farmer-name"
+                                  >
+                                    {field.value ? (() => {
+                                      const f = ledgerFarmers.find(f => f.name === field.value);
+                                      const due = f?.netDue > 0 ? f.netDue : 0;
+                                      return due > 0
+                                        ? `${f?.name || field.value} — ${t("Due", "बकाया")}: ₹${due.toLocaleString('en-IN')}`
+                                        : f?.name || field.value;
+                                    })() : t("Select Farmer", "किसान चुनें")}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[350px] p-0" align="start">
+                                <Command>
+                                  <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
+                                  <CommandList>
+                                    <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
+                                    <CommandGroup>
+                                      {ledgerFarmers
+                                        .filter(f => !f.isArchived)
+                                        .filter(f => f.netDue > 0)
+                                        .map((farmer) => (
+                                          <CommandItem
+                                            key={farmer.id}
+                                            value={`${farmer.name} ${farmer.village || ""} ${farmer.contact || ""}`}
+                                            onSelect={() => {
+                                              field.onChange(farmer.name);
+                                              setExpenseFarmerPopoverOpen(false);
+                                            }}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4", field.value === farmer.name ? "opacity-100" : "opacity-0")} />
+                                            <div className="flex flex-col flex-1">
+                                              <span className="font-medium">{farmer.name}</span>
+                                              <span className="text-xs text-muted-foreground">
+                                                {farmer.contact || ""}
+                                                {farmer.contact && farmer.village && " • "}
+                                                {farmer.village || ""}
+                                              </span>
+                                            </div>
                                             <Badge variant="secondary" className="ml-2">
                                               {t("Due", "बकाया")}: ₹{parseFloat(farmer.netDue.toFixed(1)).toLocaleString('en-IN')}
                                             </Badge>
-                                          </div>
-                                          <span className="text-xs text-muted-foreground">
-                                            {farmer.contact || ""}
-                                            {farmer.contact && farmer.village && " • "}
-                                            {farmer.village || ""}
-                                          </span>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                              </SelectContent>
-                            </Select>
+                                          </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -3668,34 +3690,57 @@ export function CashManagementTab() {
                       control={outflowForm.control}
                       name="farmerName"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex flex-col">
                           <FormLabel>{t("Farmer Name", "किसान का नाम")} *</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-farmer-name-expense">
-                                <SelectValue placeholder={t("Select Farmer", "किसान चुनें")} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {ledgerFarmers
-                                .filter(f => !f.isArchived)
-                                .map((farmer) => (
-                                  <SelectItem key={farmer.name} value={farmer.name}>
-                                    <div className="flex flex-col flex-1">
-                                      <span className="font-medium">{farmer.name}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {farmer.contact || ""}
-                                        {farmer.contact && farmer.village && " • "}
-                                        {farmer.village || ""}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                          <Popover open={expenseFarmerPopoverOpen} onOpenChange={setExpenseFarmerPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn("w-full justify-between", !field.value && "text-muted-foreground")}
+                                  data-testid="select-farmer-name-expense"
+                                >
+                                  {field.value
+                                    ? ledgerFarmers.find(f => f.name === field.value)?.name || field.value
+                                    : t("Select Farmer", "किसान चुनें")}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[350px] p-0" align="start">
+                              <Command>
+                                <CommandInput placeholder={t("Search farmer...", "किसान खोजें...")} />
+                                <CommandList>
+                                  <CommandEmpty>{t("No farmer found.", "कोई किसान नहीं मिला।")}</CommandEmpty>
+                                  <CommandGroup>
+                                    {ledgerFarmers
+                                      .filter(f => !f.isArchived)
+                                      .map((farmer) => (
+                                        <CommandItem
+                                          key={farmer.id}
+                                          value={`${farmer.name} ${farmer.village || ""} ${farmer.contact || ""}`}
+                                          onSelect={() => {
+                                            field.onChange(farmer.name);
+                                            setExpenseFarmerPopoverOpen(false);
+                                          }}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4", field.value === farmer.name ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex flex-col flex-1">
+                                            <span className="font-medium">{farmer.name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {farmer.contact || ""}
+                                              {farmer.contact && farmer.village && " • "}
+                                              {farmer.village || ""}
+                                            </span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
                         </FormItem>
                       )}
