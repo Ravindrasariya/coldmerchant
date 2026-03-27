@@ -1493,6 +1493,57 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/merchants/:id/receipt-template", requireSystemAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { htmlContent } = req.body;
+      if (!htmlContent || typeof htmlContent !== "string") {
+        return res.status(400).json({ message: "HTML content is required" });
+      }
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      const updated = await storage.updateMerchant(id, { receiptHtmlTemplate: htmlContent });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error uploading receipt template:", error);
+      res.status(500).json({ message: "Failed to upload receipt template" });
+    }
+  });
+
+  app.get("/api/merchants/:id/receipt-template", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.user!.isSystemAdmin && id !== req.user!.merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant || !merchant.receiptHtmlTemplate) {
+        return res.status(404).json({ message: "No receipt template" });
+      }
+      res.json({ htmlContent: merchant.receiptHtmlTemplate });
+    } catch (error) {
+      console.error("Error serving receipt template:", error);
+      res.status(500).json({ message: "Failed to serve receipt template" });
+    }
+  });
+
+  app.delete("/api/admin/merchants/:id/receipt-template", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      const updated = await storage.updateMerchant(id, { receiptHtmlTemplate: null });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error deleting receipt template:", error);
+      res.status(500).json({ message: "Failed to delete receipt template" });
+    }
+  });
+
   // DELETE /api/admin/merchants/:id - Delete a merchant (admin only)
   app.delete("/api/admin/merchants/:id", requireSystemAdmin, async (req, res) => {
     try {

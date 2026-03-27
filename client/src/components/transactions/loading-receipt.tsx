@@ -66,6 +66,7 @@ interface Merchant {
   contactNumber: string | null;
   address: string | null;
   receiptHeaderImage: string | null;
+  receiptHtmlTemplate: string | null;
 }
 
 interface LoadingReceiptDialogProps {
@@ -171,6 +172,70 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   if (!open) return null;
 
   const totalAmount = transaction?.items.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0) || 0;
+
+  const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const buildCustomHtml = () => {
+    if (!merchant?.receiptHtmlTemplate || !transaction) return null;
+    let html = merchant.receiptHtmlTemplate;
+    const cropLabel = cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
+    const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const itemsRows = transaction.items.map((item, idx) =>
+      `<tr><td>${idx + 1}</td><td>${escHtml(item.potatoType || "")}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td>₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
+    ).join("");
+    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th><th>₹/Kg</th><th>Amount</th></tr></thead><tbody>${itemsRows}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td></td><td>₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr></tfoot></table>`;
+
+    const mandiComm = parseFloat(transaction.totalMandiCommission || "0");
+    const aadhatComm = parseFloat(transaction.totalAadhatCommission || "0");
+    const hamm = parseFloat(transaction.totalHammali || "0");
+    const extra = parseFloat(transaction.totalMandiExtraCharges || "0");
+    const salesComm = parseFloat(transaction.salesCommission || "0");
+    const drvAdv = parseFloat(transaction.advancePayment || "0");
+    const advAmt = parseFloat(transaction.otherCharges || "0");
+    const tl = parseFloat(transaction.tulai || "0");
+    const mj = parseFloat(transaction.majduri || "0");
+    const tb = parseFloat(transaction.thelaBhada || "0");
+    const pk = parseFloat(transaction.palaKarai || "0");
+    const bd = parseFloat(transaction.bardan || "0");
+    const addlCharges = tl + mj + tb + pk + bd;
+    const gt = totalAmount + mandiComm + aadhatComm + hamm + extra + salesComm + addlCharges + drvAdv - advAmt;
+
+    const replacements: Record<string, string> = {
+      "{{merchantName}}": escHtml(merchant.name || ""),
+      "{{merchantAddress}}": escHtml(merchant.address || ""),
+      "{{merchantContact}}": escHtml(merchant.contactNumber || ""),
+      "{{receiptNumber}}": String(transaction.transactionNumber),
+      "{{date}}": dateStr,
+      "{{buyerName}}": escHtml(transaction.partyName || buyer?.name || ""),
+      "{{buyerAddress}}": escHtml(buyer?.address || transaction.partyAddress || ""),
+      "{{driverContact}}": escHtml(transaction.driverContact || ""),
+      "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),
+      "{{cropName}}": cropLabel,
+      "{{itemsTableHtml}}": itemsTableHtml,
+      "{{totalBags}}": String(transaction.totalBags),
+      "{{totalWeight}}": parseFloat(transaction.totalNetWeight || "0").toFixed(1),
+      "{{totalAmount}}": `₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{mandiCommission}}": `₹${parseFloat(mandiComm.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{aadhatCommission}}": `₹${parseFloat(aadhatComm.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{salesCommission}}": `₹${parseFloat(salesComm.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{hammali}}": `₹${parseFloat(hamm.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{extraCharges}}": `₹${parseFloat(extra.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{tulai}}": `₹${parseFloat(tl.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{majduri}}": `₹${parseFloat(mj.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{thelaBhada}}": `₹${parseFloat(tb.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{palaKarai}}": `₹${parseFloat(pk.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{bardan}}": `₹${parseFloat(bd.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{driverAdvance}}": `₹${parseFloat(drvAdv.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{advanceAmount}}": `₹${parseFloat(advAmt.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{grandTotal}}": `₹${parseFloat(gt.toFixed(1)).toLocaleString("en-IN")}`,
+    };
+    for (const [key, val] of Object.entries(replacements)) {
+      html = html.split(key).join(val);
+    }
+    return html;
+  };
+
+  const customHtml = buildCustomHtml();
   const mandiCommission = parseFloat(transaction?.totalMandiCommission || "0");
   const aadhatCommission = parseFloat(transaction?.totalAadhatCommission || "0");
   const hammali = parseFloat(transaction?.totalHammali || "0");
@@ -221,6 +286,9 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
           </div>
         ) : transaction && merchant ? (
           <div className="overflow-x-auto -mx-4 px-4">
+          {customHtml ? (
+            <div ref={printRef} className="p-4 bg-white text-black min-w-[650px]" dangerouslySetInnerHTML={{ __html: customHtml }} />
+          ) : (
           <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
               {merchant.receiptHeaderImage ? (
@@ -394,6 +462,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
               </div>
             </div>
           </div>
+          )}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">

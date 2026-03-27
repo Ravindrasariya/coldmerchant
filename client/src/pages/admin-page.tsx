@@ -59,6 +59,7 @@ export default function AdminPage() {
   const [editingVideoId, setEditingVideoId] = useState<number | null>(null);
   const [editingVideoCaption, setEditingVideoCaption] = useState("");
   const [headerImageUploading, setHeaderImageUploading] = useState(false);
+  const [templateUploading, setTemplateUploading] = useState(false);
 
   useEffect(() => {
     if (!user?.isSystemAdmin) {
@@ -353,6 +354,42 @@ export default function AdminPage() {
       toast({ title: "Failed to remove", variant: "destructive" });
     } finally {
       setHeaderImageUploading(false);
+    }
+  };
+
+  const handleTemplateUpload = async (merchantId: number, file: File) => {
+    setTemplateUploading(true);
+    try {
+      const text = await file.text();
+      const res = await apiRequest("POST", `/api/admin/merchants/${merchantId}/receipt-template`, { htmlContent: text });
+      if (!res.ok) throw new Error("Upload failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      if (editingMerchant && editingMerchant.id === merchantId) {
+        setEditingMerchant({ ...editingMerchant, receiptHtmlTemplate: text });
+      }
+      toast({ title: "Receipt template uploaded" });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setTemplateUploading(false);
+    }
+  };
+
+  const handleTemplateDelete = async (merchantId: number) => {
+    setTemplateUploading(true);
+    try {
+      await apiRequest("DELETE", `/api/admin/merchants/${merchantId}/receipt-template`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      if (editingMerchant && editingMerchant.id === merchantId) {
+        setEditingMerchant({ ...editingMerchant, receiptHtmlTemplate: null });
+      }
+      toast({ title: "Receipt template removed" });
+    } catch {
+      toast({ title: "Failed to remove", variant: "destructive" });
+    } finally {
+      setTemplateUploading(false);
     }
   };
 
@@ -1055,6 +1092,79 @@ export default function AdminPage() {
                 data-testid="input-merchant-address"
               />
             </div>
+            {editingMerchant && (
+              <div className="space-y-2">
+                <Label>Custom Receipt Template (HTML)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload a custom HTML file to fully replace the default receipt layout. If provided, this takes priority over the header image.
+                </p>
+                {editingMerchant.receiptHtmlTemplate ? (
+                  <div className="space-y-2">
+                    <div className="relative border rounded-lg p-3 bg-green-50 dark:bg-green-950">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-700 dark:text-green-400">Custom template uploaded</span>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => handleTemplateDelete(editingMerchant.id)}
+                        disabled={templateUploading}
+                        data-testid="button-remove-receipt-template"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <label className="cursor-pointer inline-block">
+                      <Button variant="outline" size="sm" disabled={templateUploading} asChild data-testid="button-replace-receipt-template">
+                        <span>
+                          {templateUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Replace Template
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".html,.htm"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleTemplateUpload(editingMerchant.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">Upload an HTML file for a fully custom receipt</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Available placeholders: {"{{merchantName}}"}, {"{{receiptNumber}}"}, {"{{date}}"}, {"{{buyerName}}"}, {"{{buyerAddress}}"}, {"{{itemsTableHtml}}"}, {"{{totalBags}}"}, {"{{totalWeight}}"}, {"{{totalAmount}}"}, {"{{grandTotal}}"}, {"{{cropName}}"}
+                    </p>
+                    <label className="cursor-pointer">
+                      <Button variant="outline" size="sm" disabled={templateUploading} asChild data-testid="button-upload-receipt-template">
+                        <span>
+                          {templateUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Choose HTML File
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".html,.htm"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleTemplateUpload(editingMerchant.id, file);
+                          e.target.value = "";
+                        }}
+                        data-testid="input-receipt-template-file"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
             {editingMerchant && (
               <div className="space-y-2">
                 <Label>Receipt Header Image</Label>

@@ -40,6 +40,7 @@ interface Merchant {
   contactNumber: string | null;
   address: string | null;
   receiptHeaderImage: string | null;
+  receiptHtmlTemplate: string | null;
 }
 
 interface SalesReceiptDialogProps {
@@ -219,6 +220,43 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     }
   }, [open]);
 
+  const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const buildCustomHtml = () => {
+    if (!merchant?.receiptHtmlTemplate || !transaction) return null;
+    let html = merchant.receiptHtmlTemplate;
+    const cropLabel = cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
+    const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const itemsRows = transaction.items.map((item, idx) =>
+      `<tr><td>${idx + 1}</td><td>${escHtml(item.potatoType || "")}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td></tr>`
+    ).join("");
+    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th></tr></thead><tbody>${itemsRows}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td></tr></tfoot></table>`;
+    const drvAdv = parseFloat(transaction.advancePayment || "0");
+
+    const replacements: Record<string, string> = {
+      "{{merchantName}}": escHtml(merchant.name || ""),
+      "{{merchantAddress}}": escHtml(merchant.address || ""),
+      "{{merchantContact}}": escHtml(merchant.contactNumber || ""),
+      "{{receiptNumber}}": String(transaction.transactionNumber),
+      "{{date}}": dateStr,
+      "{{buyerName}}": escHtml(transaction.partyName || ""),
+      "{{buyerAddress}}": escHtml(transaction.partyAddress || ""),
+      "{{driverContact}}": escHtml(transaction.driverContact || ""),
+      "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),
+      "{{cropName}}": cropLabel,
+      "{{itemsTableHtml}}": itemsTableHtml,
+      "{{totalBags}}": String(transaction.totalBags),
+      "{{totalWeight}}": parseFloat(transaction.totalNetWeight || "0").toFixed(1),
+      "{{driverAdvance}}": `₹${parseFloat(drvAdv.toFixed(1)).toLocaleString("en-IN")}`,
+    };
+    for (const [key, val] of Object.entries(replacements)) {
+      html = html.split(key).join(val);
+    }
+    return html;
+  };
+
+  const customHtml = buildCustomHtml();
+
   if (!open) return null;
 
   if (autoAction === "print") {
@@ -265,6 +303,9 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
           </div>
         ) : transaction && merchant ? (
           <div className="overflow-x-auto -mx-4 px-4">
+          {customHtml ? (
+            <div ref={printRef} className="p-4 bg-white text-black min-w-[650px]" dangerouslySetInnerHTML={{ __html: customHtml }} />
+          ) : (
           <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
               {merchant.receiptHeaderImage ? (
@@ -275,7 +316,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                   {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
                   {merchant.contactNumber && (
                     <p className="text-sm text-gray-600">
-                      Phone / फोन: {merchant.contactNumber}
+                      Phone / फোन: {merchant.contactNumber}
                     </p>
                   )}
                 </>
@@ -347,6 +388,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
               </div>
             </div>
           </div>
+          )}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">
