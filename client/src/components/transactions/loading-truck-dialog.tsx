@@ -234,11 +234,18 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const computedMandiComm = useMemo(() => Math.round(totalItemAmount * mandiCommissionPct / 100 * 100) / 100, [totalItemAmount, mandiCommissionPct]);
   const computedAadhatComm = useMemo(() => Math.round(totalItemAmount * aadhatCommissionPct / 100 * 100) / 100, [totalItemAmount, aadhatCommissionPct]);
   const computedHammali = useMemo(() => Math.round(totalItemBags * hammaliPerBagRate * 100) / 100, [totalItemBags, hammaliPerBagRate]);
-  const computedSalesComm = useMemo(() => Math.round(totalItemAmount * salesCommissionPct / 100 * 100) / 100, [totalItemAmount, salesCommissionPct]);
-
   const totalMandiCharges = useMemo(() => {
     return computedMandiComm + computedAadhatComm + computedHammali + editExtraCharges;
   }, [computedMandiComm, computedAadhatComm, computedHammali, editExtraCharges]);
+
+  const totalAdditionalCharges = useMemo(() => {
+    return Object.values(additionalCharges).reduce((sum, v) => sum + v, 0);
+  }, [additionalCharges]);
+
+  const computedSalesComm = useMemo(() => {
+    const base = totalItemAmount + totalMandiCharges + totalAdditionalCharges;
+    return Math.round(base * salesCommissionPct / 100 * 100) / 100;
+  }, [totalItemAmount, totalMandiCharges, totalAdditionalCharges, salesCommissionPct]);
 
   const totals = useMemo(() => {
     let totalBags = 0;
@@ -256,7 +263,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalCostOfGoods += breakdownPricePerKg * (Number(item.netWeight) || 0);
     });
 
-    const totalAdditionalCharges = Object.values(additionalCharges).reduce((sum, v) => sum + v, 0);
     const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount;
     const totalPL = (totalAmount - totalCostOfGoods) + computedSalesComm;
 
@@ -268,7 +274,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       grandTotal,
       totalPL,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, driverAdvance, advanceAmount, additionalCharges]);
+  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
