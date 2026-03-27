@@ -907,8 +907,6 @@ export function CashManagementTab() {
       const row = { ...updated[index] };
       if (field === 'amount') {
         row.amount = value;
-        const remainder = Math.round((row.dueAmount - value) * 100) / 100;
-        row.pettyAdjustment = Math.min(Math.max(remainder, 0), 100);
       } else if (field === 'pettyAdjustment') {
         row.pettyAdjustment = value;
       }
@@ -1188,12 +1186,6 @@ export function CashManagementTab() {
         row.discountAmount = Math.round((value / 100) * row.dueAmount * 100) / 100;
       } else if (field === 'pettyAdjustment') {
         row.pettyAdjustment = value;
-      }
-      if (field === 'amount' || field === 'discountPercent') {
-        if (row.amount > 0) {
-          const remainder = Math.round((row.dueAmount - row.amount - row.discountAmount) * 100) / 100;
-          row.pettyAdjustment = Math.min(Math.max(remainder, 0), 100);
-        }
       }
       updated[index] = row;
       return updated;
