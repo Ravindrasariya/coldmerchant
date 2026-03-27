@@ -43,6 +43,7 @@ interface Merchant {
   address: string | null;
   receiptHeaderImage: string | null;
   receiptHtmlTemplate: string | null;
+  salesReceiptHtmlTemplate: string | null;
 }
 
 interface SalesReceiptDialogProps {
@@ -62,11 +63,22 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const autoActionDone = useRef(false);
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+  const receiptFilename = () => {
+    if (!transaction) return "Sales-Receipt";
+    const buyerName = transaction.partyName || "Receipt";
+    const date = new Date(transaction.createdAt);
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    const cleanName = buyerName.replace(/[^a-zA-Z0-9\u0900-\u097F ]/g, "").replace(/\s+/g, "_");
+    return `${cleanName}_${dd}-${mm}-${yyyy}`;
+  };
+
   const handleShare = async () => {
     if (!printRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(printRef.current, `Sales-Receipt-${transaction?.transactionNumber || ""}`);
+      await shareReceiptAsPdf(printRef.current, receiptFilename(), customHtml);
     } catch (err: any) {
       if (err?.name !== "AbortError") {
         toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
@@ -90,16 +102,20 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
 
   const handlePrint = () => {
     if (!printRef.current) return;
-    
-    const printContent = printRef.current.innerHTML;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
-    
+
+    const printTitle = receiptFilename();
+    if (customHtml) {
+      const htmlWithTitle = customHtml.replace(/<head>/i, `<head><title>${printTitle}</title>`);
+      printWindow.document.write(htmlWithTitle);
+    } else {
+    const printContent = printRef.current.innerHTML;
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Sales Receipt / बिक्री रसीद #${transaction?.transactionNumber}</title>
+          <title>${printTitle}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -183,6 +199,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
         </body>
       </html>
     `);
+    }
     printWindow.document.close();
     const imgs = printWindow.document.querySelectorAll('img');
     if (imgs.length > 0) {
@@ -225,8 +242,8 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const buildCustomHtml = () => {
-    if (!merchant?.receiptHtmlTemplate || !transaction) return null;
-    let html = merchant.receiptHtmlTemplate;
+    if (!merchant?.salesReceiptHtmlTemplate || !transaction) return null;
+    let html = merchant.salesReceiptHtmlTemplate;
     const txnCrop = transaction.crop || cropType || "potato";
     const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });

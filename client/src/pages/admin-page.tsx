@@ -393,6 +393,42 @@ export default function AdminPage() {
     }
   };
 
+  const handleSalesTemplateUpload = async (merchantId: number, file: File) => {
+    setTemplateUploading(true);
+    try {
+      const text = await file.text();
+      const res = await apiRequest("POST", `/api/admin/merchants/${merchantId}/sales-receipt-template`, { htmlContent: text });
+      if (!res.ok) throw new Error("Upload failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      if (editingMerchant && editingMerchant.id === merchantId) {
+        setEditingMerchant({ ...editingMerchant, salesReceiptHtmlTemplate: text });
+      }
+      toast({ title: "Bikri receipt template uploaded" });
+    } catch {
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setTemplateUploading(false);
+    }
+  };
+
+  const handleSalesTemplateDelete = async (merchantId: number) => {
+    setTemplateUploading(true);
+    try {
+      await apiRequest("DELETE", `/api/admin/merchants/${merchantId}/sales-receipt-template`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchants", merchantId] });
+      if (editingMerchant && editingMerchant.id === merchantId) {
+        setEditingMerchant({ ...editingMerchant, salesReceiptHtmlTemplate: null });
+      }
+      toast({ title: "Bikri receipt template removed" });
+    } catch {
+      toast({ title: "Failed to remove", variant: "destructive" });
+    } finally {
+      setTemplateUploading(false);
+    }
+  };
+
   const handleUserSubmit = () => {
     if (editingUser) {
       updateUserMutation.mutate({
@@ -1094,9 +1130,9 @@ export default function AdminPage() {
             </div>
             {editingMerchant && (
               <div className="space-y-2">
-                <Label>Custom Receipt Template (HTML)</Label>
+                <Label>Loading Receipt Template (HTML)</Label>
                 <p className="text-xs text-muted-foreground">
-                  Upload a custom HTML file to fully replace the default receipt layout. If provided, this takes priority over the header image.
+                  Upload a custom HTML file for Loading receipts. If provided, this takes priority over the header image.
                 </p>
                 {editingMerchant.receiptHtmlTemplate ? (
                   <div className="space-y-2">
@@ -1162,6 +1198,76 @@ export default function AdminPage() {
                           e.target.value = "";
                         }}
                         data-testid="input-receipt-template-file"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+            {editingMerchant && (
+              <div className="space-y-2">
+                <Label>Bikri Receipt Template (HTML)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload a custom HTML file for Bikri (Sales) receipts. If not provided, the default layout is used.
+                </p>
+                {editingMerchant.salesReceiptHtmlTemplate ? (
+                  <div className="space-y-2">
+                    <div className="relative border rounded-lg p-3 bg-green-50 dark:bg-green-950">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-700 dark:text-green-400">Bikri template uploaded</span>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => handleSalesTemplateDelete(editingMerchant.id)}
+                        disabled={templateUploading}
+                        data-testid="button-remove-sales-receipt-template"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <label className="cursor-pointer inline-block">
+                      <Button variant="outline" size="sm" disabled={templateUploading} asChild data-testid="button-replace-sales-receipt-template">
+                        <span>
+                          {templateUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Replace Template
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".html,.htm"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSalesTemplateUpload(editingMerchant.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">Upload an HTML file for a custom Bikri receipt</p>
+                    <label className="cursor-pointer">
+                      <Button variant="outline" size="sm" disabled={templateUploading} asChild data-testid="button-upload-sales-receipt-template">
+                        <span>
+                          {templateUploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                          Choose HTML File
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".html,.htm"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSalesTemplateUpload(editingMerchant.id, file);
+                          e.target.value = "";
+                        }}
+                        data-testid="input-sales-receipt-template-file"
                       />
                     </label>
                   </div>

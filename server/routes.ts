@@ -1544,6 +1544,57 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/merchants/:id/sales-receipt-template", requireSystemAdmin, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { htmlContent } = req.body;
+      if (!htmlContent || typeof htmlContent !== "string") {
+        return res.status(400).json({ message: "HTML content is required" });
+      }
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      const updated = await storage.updateMerchant(id, { salesReceiptHtmlTemplate: htmlContent });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error uploading sales receipt template:", error);
+      res.status(500).json({ message: "Failed to upload sales receipt template" });
+    }
+  });
+
+  app.get("/api/merchants/:id/sales-receipt-template", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!req.user!.isSystemAdmin && id !== req.user!.merchantId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant || !merchant.salesReceiptHtmlTemplate) {
+        return res.status(404).json({ message: "No sales receipt template" });
+      }
+      res.json({ htmlContent: merchant.salesReceiptHtmlTemplate });
+    } catch (error) {
+      console.error("Error serving sales receipt template:", error);
+      res.status(500).json({ message: "Failed to serve sales receipt template" });
+    }
+  });
+
+  app.delete("/api/admin/merchants/:id/sales-receipt-template", requireSystemAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const merchant = await storage.getMerchantById(id);
+      if (!merchant) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+      const updated = await storage.updateMerchant(id, { salesReceiptHtmlTemplate: null });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error deleting sales receipt template:", error);
+      res.status(500).json({ message: "Failed to delete sales receipt template" });
+    }
+  });
+
   // DELETE /api/admin/merchants/:id - Delete a merchant (admin only)
   app.delete("/api/admin/merchants/:id", requireSystemAdmin, async (req, res) => {
     try {
