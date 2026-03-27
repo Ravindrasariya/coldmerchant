@@ -358,7 +358,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       setMandiPct(Math.round((storedMC / amtBase) * 10000) / 100);
       setAadhatPct(Math.round((storedAC / amtBase) * 10000) / 100);
       setHammaliRate(Math.round((storedHM / bagBase) * 100) / 100);
-      setSalesCommPct(Math.round((storedSC / amtBase) * 10000) / 100);
+      const scBase = txnRevenue + storedMC + storedAC;
+      setSalesCommPct(scBase > 0 ? Math.round((storedSC / scBase) * 10000) / 100 : 0);
 
       setEditableItems(transaction.items.map(item => ({
         id: item.id,
