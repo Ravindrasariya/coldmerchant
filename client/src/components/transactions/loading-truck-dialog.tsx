@@ -652,9 +652,17 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                 if (!inv) return item.inventoryKey;
                                 return (
                                   <div className="flex flex-col min-w-0 overflow-hidden">
-                                    <span className="text-sm font-medium truncate" title={`S#${inv.serialNumber} - ${inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName}${inv.potatoType ? ` - ${inv.potatoType}` : ""}${inv.size ? ` - ${inv.size}` : ""}`}>
-                                      S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 overflow-hidden">
+                                      <span className="text-sm font-medium truncate min-w-0" title={`S#${inv.serialNumber} - ${inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName}${inv.potatoType ? ` - ${inv.potatoType}` : ""}${inv.size ? ` - ${inv.size}` : ""}`}>
+                                        S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
+                                      </span>
+                                      {(() => {
+                                        const c = inv.crop || "potato";
+                                        const cls = c === "onion" ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400" : c === "garlic" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+                                        const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
+                                        return <Badge className={`text-[10px] px-1.5 py-0 font-medium border-0 shrink-0 ${cls}`}>{label}</Badge>;
+                                      })()}
+                                    </div>
                                     <span className="text-xs text-muted-foreground truncate">
                                       {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("bags available", "बोरी उपलब्ध")}
                                       {inv.pricePerKg ? ` | ₹${inv.pricePerKg}/kg` : ""}
