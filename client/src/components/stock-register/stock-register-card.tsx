@@ -687,7 +687,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             }
             return lot.coldStoreDbId ? (coldStoreIdMap.get(lot.coldStoreDbId) || "-") : "-";
           })(),
-          lot.potatoType || "-",
+          lot.potatoType || "",
           lot.quality,
           cutTypeDisplay,
           metrics.originalBags.toString(),
@@ -1186,7 +1186,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             }));
             
             const entryStatus = computeEntryStatusFromMetrics(lotsWithMetrics);
-            const potatoTypes = Array.from(new Set(entry.lots.map(lot => lot.potatoType)));
+            const potatoTypes = Array.from(new Set(entry.lots.map(lot => lot.potatoType).filter(Boolean)));
             
             let totalOriginal = 0;
             let totalWastage = 0;

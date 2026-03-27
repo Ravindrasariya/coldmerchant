@@ -266,7 +266,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       const dueAmount = Math.max(revenue - amountReceived, 0);
       
       const itemsDetail = txn.items.map(item => 
-        `S#${item.serialNumber} (${item.bagsMoved} - ${item.size || "-"})${item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}`
+        `S#${item.serialNumber} (${item.bagsMoved}${item.size ? ` - ${item.size}` : ""})${item.farmerName ? ` - ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : ""}`
       ).join(", ");
 
       const mandiComm = parseFloat(txn.totalMandiCommission || "0");

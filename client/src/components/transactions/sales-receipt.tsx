@@ -325,7 +325,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
                     <td className="border p-2">{idx + 1}</td>
-                    <td className="border p-2">{item.potatoType || "-"}</td>
+                    <td className="border p-2">{item.potatoType || ""}</td>
                     <td className="border p-2 text-right">{item.bagsMoved}</td>
                     <td className="border p-2 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
                   </tr>

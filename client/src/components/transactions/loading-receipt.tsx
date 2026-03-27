@@ -283,7 +283,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
                     <td className="border px-2 py-1 text-center">{idx + 1}</td>
-                    <td className="border px-2 py-1 text-center">{item.potatoType || "-"}</td>
+                    <td className="border px-2 py-1 text-center">{item.potatoType || ""}</td>
                     <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
                     <td className="border px-2 py-1 text-center">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
                     <td className="border px-2 py-1 text-center">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
