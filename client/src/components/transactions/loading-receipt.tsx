@@ -315,6 +315,12 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                   <span>₹{parseFloat(aadhatCommission.toFixed(1)).toLocaleString('en-IN')}</span>
                 </div>
               )}
+              {salesCommission > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                  <span>Sales Commission / बिक्री कमीशन</span>
+                  <span>₹{parseFloat(salesCommission.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
               {hammali > 0 && (
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
                   <span>Hammali / हम्माली</span>
@@ -325,13 +331,6 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
                   <span>Extra Charges / अतिरिक्त शुल्क</span>
                   <span>₹{parseFloat(extraCharges.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
-              {salesCommission > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px" }}>
-                  <span>Sales Commission / बिक्री कमीशन</span>
-                  <span>₹{parseFloat(salesCommission.toFixed(1)).toLocaleString('en-IN')}</span>
                 </div>
               )}
 
