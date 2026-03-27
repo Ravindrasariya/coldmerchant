@@ -247,7 +247,7 @@ function ColdStoreLedgerSection({ coldStoreId, coldStoreName, t, formatLedgerAmo
           {t("Ledger", "खाता")} — {coldStoreName}
         </span>
         <div className="flex items-center gap-2">
-          {ledgerData.availableFYs && ledgerData.availableFYs.length > 1 && (
+          {ledgerData.availableFYs && ledgerData.availableFYs.length >= 1 && (
             <Select value={selectedFy || activeFyLabel} onValueChange={setSelectedFy} data-testid={`select-fy-cs-${coldStoreId}`}>
               <SelectTrigger className="h-7 text-xs w-[110px]" data-testid={`select-fy-trigger-cs-${coldStoreId}`}>
                 <SelectValue />

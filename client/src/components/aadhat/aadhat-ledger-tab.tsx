@@ -219,7 +219,7 @@ function AadhatLedgerSection({ aadhatId, aadhatName, t, formatLedgerAmount, form
           {t("Ledger", "खाता")} — {aadhatName}
         </span>
         <div className="flex items-center gap-2">
-          {ledgerData.availableFYs && ledgerData.availableFYs.length > 1 && (
+          {ledgerData.availableFYs && ledgerData.availableFYs.length >= 1 && (
             <Select value={selectedFy || activeFyLabel} onValueChange={setSelectedFy} data-testid={`select-fy-aadhat-${aadhatId}`}>
               <SelectTrigger className="h-7 text-xs w-[110px]" data-testid={`select-fy-trigger-aadhat-${aadhatId}`}>
                 <SelectValue />

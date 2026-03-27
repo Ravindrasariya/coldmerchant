@@ -4069,17 +4069,16 @@ export async function registerRoutes(
       const allDates: string[] = [];
       for (const txn of buyerTxns) { if (txn.dateOfLoading) allDates.push(txn.dateOfLoading); }
       for (const entry of buyerCashEntries) { if (entry.entryDate) allDates.push(entry.entryDate); }
-      const availableFYs: string[] = [];
-      const fyYearsSet = new Set<number>();
-      fyYearsSet.add(currentFyStartYear);
+      let minFyYear = currentFyStartYear;
       for (const d of allDates) {
         const dt = new Date(d + "T00:00:00+05:30");
         const m = dt.getMonth();
         const y = dt.getFullYear();
-        fyYearsSet.add(m >= 3 ? y : y - 1);
+        const fy = m >= 3 ? y : y - 1;
+        if (fy < minFyYear) minFyYear = fy;
       }
-      const sortedFyYears = Array.from(fyYearsSet).sort((a, b) => b - a);
-      for (const y of sortedFyYears) {
+      const availableFYs: string[] = [];
+      for (let y = currentFyStartYear; y >= minFyYear; y--) {
         const short = String(y + 1).slice(2);
         availableFYs.push(`${y}-${short}`);
       }
@@ -4270,16 +4269,15 @@ export async function registerRoutes(
       for (const se of aadhatStockEntries) { if (se.purchaseDate) allDates.push(se.purchaseDate); }
       for (const entry of aadhatCashEntries) { if (entry.entryDate) allDates.push(entry.entryDate); }
       const availableFYs: string[] = [];
-      const fyYearsSet = new Set<number>();
-      fyYearsSet.add(currentFyStartYear);
+      let minFyYear = currentFyStartYear;
       for (const d of allDates) {
         const dt = new Date(d + "T00:00:00+05:30");
         const m = dt.getMonth();
         const y = dt.getFullYear();
-        fyYearsSet.add(m >= 3 ? y : y - 1);
+        const fy = m >= 3 ? y : y - 1;
+        if (fy < minFyYear) minFyYear = fy;
       }
-      const sortedFyYears = Array.from(fyYearsSet).sort((a, b) => b - a);
-      for (const y of sortedFyYears) {
+      for (let y = currentFyStartYear; y >= minFyYear; y--) {
         const short = String(y + 1).slice(2);
         availableFYs.push(`${y}-${short}`);
       }
@@ -6734,16 +6732,15 @@ export async function registerRoutes(
       }
       for (const entry of csCashEntries) { if (entry.entryDate) allDates.push(entry.entryDate); }
       const availableFYs: string[] = [];
-      const fyYearsSet = new Set<number>();
-      fyYearsSet.add(currentFyStartYear);
+      let minFyYear = currentFyStartYear;
       for (const d of allDates) {
         const dt = new Date(d + "T00:00:00+05:30");
         const m = dt.getMonth();
         const y = dt.getFullYear();
-        fyYearsSet.add(m >= 3 ? y : y - 1);
+        const fy = m >= 3 ? y : y - 1;
+        if (fy < minFyYear) minFyYear = fy;
       }
-      const sortedFyYears = Array.from(fyYearsSet).sort((a, b) => b - a);
-      for (const y of sortedFyYears) {
+      for (let y = currentFyStartYear; y >= minFyYear; y--) {
         const short = String(y + 1).slice(2);
         availableFYs.push(`${y}-${short}`);
       }

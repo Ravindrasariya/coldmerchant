@@ -230,7 +230,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
           {t("Ledger", "खाता")} — {buyerName}
         </span>
         <div className="flex items-center gap-2">
-          {ledgerData.availableFYs && ledgerData.availableFYs.length > 1 && (
+          {ledgerData.availableFYs && ledgerData.availableFYs.length >= 1 && (
             <Select value={selectedFy || activeFyLabel} onValueChange={setSelectedFy} data-testid={`select-fy-buyer-${buyerId}`}>
               <SelectTrigger className="h-7 text-xs w-[110px]" data-testid={`select-fy-trigger-buyer-${buyerId}`}>
                 <SelectValue />
