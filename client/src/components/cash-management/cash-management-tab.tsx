@@ -30,6 +30,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { MultiDayFilter } from "@/components/ui/multi-day-filter";
 import { CashSettingsDialog } from "./cash-settings-dialog";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
@@ -505,6 +506,7 @@ export function CashManagementTab() {
   const [filterSupplierName, setFilterSupplierName] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filterYear, setFilterYear] = useState<string>("");
+  const [filterDays, setFilterDays] = useState<number[]>([]);
   const [filterRemarks, setFilterRemarks] = useState<string>("");
 
   // Calculate current financial year
@@ -1667,9 +1669,10 @@ export function CashManagementTab() {
     if (filterSupplierName && filterSupplierName !== "all" && entry.supplierName !== filterSupplierName) return false;
     if (filterMonth && filterMonth !== "all" && entryMonth !== filterMonth) return false;
     if (filterYear && filterYear !== "all" && entryYear !== filterYear) return false;
+    if (filterDays.length > 0 && !filterDays.includes(entryDate.getDate())) return false;
     if (filterRemarks && !(entry.remarks || "").toLowerCase().includes(filterRemarks.toLowerCase())) return false;
     return true;
-  }), [entries, filterDirection, filterExpenseCategory, filterPartyName, filterExpenseType, filterFarmerId, filterSupplierName, filterMonth, filterYear, filterRemarks]);
+  }), [entries, filterDirection, filterExpenseCategory, filterPartyName, filterExpenseType, filterFarmerId, filterSupplierName, filterMonth, filterYear, filterDays, filterRemarks]);
 
   // Filtered summary (exclude reversed entries)
   const { filteredInflow, filteredOutflow } = useMemo(() => ({
@@ -1711,6 +1714,7 @@ export function CashManagementTab() {
     (filterSupplierName && filterSupplierName !== "all") ||
     (filterMonth && filterMonth !== "all") || 
     (filterYear && filterYear !== "all") ||
+    filterDays.length > 0 ||
     !!filterRemarks;
 
   const clearFilters = () => {
@@ -1723,6 +1727,7 @@ export function CashManagementTab() {
     setFilterSupplierName("");
     setFilterMonth("");
     setFilterYear("");
+    setFilterDays([]);
     setFilterRemarks("");
   };
 
@@ -2443,7 +2448,7 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_auto_auto_1fr] gap-3 mt-3">
+          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-3 mt-3">
             <Popover open={farmerFilterPopoverOpen} onOpenChange={setFarmerFilterPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -2535,6 +2540,8 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
 
+            <MultiDayFilter selectedDays={filterDays} onSelectedDaysChange={setFilterDays} />
+
             <Select value={filterYear} onValueChange={setFilterYear}>
               <SelectTrigger data-testid="filter-year" className="h-9 w-[90px]">
                 <SelectValue placeholder={t("Year", "वर्ष")} />
@@ -2559,7 +2566,7 @@ export function CashManagementTab() {
               placeholder={t("Remarks", "टिप्पणी")}
               value={filterRemarks}
               onChange={(e) => setFilterRemarks(e.target.value)}
-              className="h-9"
+              className="h-9 w-[100px]"
               data-testid="filter-remarks"
             />
           </div>
