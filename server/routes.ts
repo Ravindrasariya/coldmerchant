@@ -2448,14 +2448,28 @@ export async function registerRoutes(
       // Recalculate profit/loss and revenue
       let newProfitLoss: number;
       let finalRevenue = newTotalRevenue;
+      let recalcSalesComm: number | null = null;
       if (existingTxn.transactionType === "loading") {
-        const salesCommission = parseFloat(existingTxn.salesCommission || "0");
         const totalMandiCommission = parseFloat(existingTxn.totalMandiCommission || "0");
         const totalAadhatCommission = parseFloat(existingTxn.totalAadhatCommission || "0");
         const totalHammali = parseFloat(existingTxn.totalHammali || "0");
         const totalMandiExtraCharges = parseFloat(existingTxn.totalMandiExtraCharges || "0");
         const mandiTotal = totalMandiCommission + totalAadhatCommission + totalHammali + totalMandiExtraCharges;
-        finalRevenue = newTotalRevenue + mandiTotal + salesCommission;
+        const tulaiVal = parseFloat(existingTxn.tulai || "0");
+        const majduriVal = parseFloat(existingTxn.majduri || "0");
+        const thelaBhadaVal = parseFloat(existingTxn.thelaBhada || "0");
+        const palaKaraiVal = parseFloat(existingTxn.palaKarai || "0");
+        const bardanVal = parseFloat(existingTxn.bardan || "0");
+        const additionalTotal = tulaiVal + majduriVal + thelaBhadaVal + palaKaraiVal + bardanVal;
+        const oldSalesComm = parseFloat(existingTxn.salesCommission || "0");
+        const oldLotAmounts = (existingTxn.items || []).reduce((sum: number, item: any) => sum + parseFloat(item.amount || item.revenue || "0"), 0);
+        const oldBase = oldLotAmounts + mandiTotal + additionalTotal;
+        const commPct = oldBase > 0 ? (oldSalesComm / oldBase) * 100 : 0;
+        const newBase = newTotalRevenue + mandiTotal + additionalTotal;
+        const salesCommission = Math.round(newBase * commPct / 100 * 100) / 100;
+        recalcSalesComm = salesCommission;
+        const advancePaymentNum = parseFloat(existingTxn.advancePayment || "0");
+        finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal + advancePaymentNum;
         newProfitLoss = (newTotalRevenue - newTotalCostOfGoods) + salesCommission;
       } else {
         const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
@@ -2464,13 +2478,17 @@ export async function registerRoutes(
       }
       
       // Update transaction totals with aggregated revenue
-      await storage.updateTransaction(transactionId, merchantId, {
+      const txnUpdateFields: Record<string, string | number> = {
         totalBags: newTotalBags,
         totalNetWeight: newTotalNetWeight.toString(),
         totalCostOfGoods: newTotalCostOfGoods.toString(),
         revenue: finalRevenue.toString(),
-        profitLoss: newProfitLoss.toString()
-      });
+        profitLoss: newProfitLoss.toString(),
+      };
+      if (recalcSalesComm !== null) {
+        txnUpdateFields.salesCommission = recalcSalesComm.toString();
+      }
+      await storage.updateTransaction(transactionId, merchantId, txnUpdateFields);
       
       // Record edit history
       if (changes.length > 0) {
