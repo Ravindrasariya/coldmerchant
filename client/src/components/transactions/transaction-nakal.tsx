@@ -27,6 +27,7 @@ interface TxnData {
   partyName: string | null;
   vehicleNumber: string | null;
   revenue: string | null;
+  crop?: string | null;
   items: TxnItem[];
 }
 
@@ -58,8 +59,8 @@ function fmt(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function computeItemRemark(item: TxnItem, isLoading: boolean): string {
-  const crop = getCropLabel(item.crop);
+function computeItemRemark(item: TxnItem, isLoading: boolean, txnCrop?: string | null): string {
+  const crop = getCropLabel(txnCrop || item.crop);
   const bags = item.bagsMoved;
   const weight = parseFloat(item.netWeight || "0");
   const sr = `(Sr#${item.serialNumber})`;
@@ -120,7 +121,7 @@ function buildPrintHtml(
     }
 
     txn.items.forEach((item, idx) => {
-      const remark = escHtml(computeItemRemark(item, isLoading));
+      const remark = escHtml(computeItemRemark(item, isLoading, txn.crop));
       const itemAmt = isLoading ? "" : `&#8377;${escHtml(fmt(computeItemAmount(item, false)))}`;
 
       if (idx === 0) {
@@ -318,7 +319,7 @@ export function TransactionNakalDialog({
                           </tr>
                         )}
                         {txn.items.map((item, idx) => {
-                          const remark = computeItemRemark(item, isLoading);
+                          const remark = computeItemRemark(item, isLoading, txn.crop);
                           const itemAmt = isLoading ? "" : `₹${fmt(computeItemAmount(item, false))}`;
 
                           if (idx === 0) {
