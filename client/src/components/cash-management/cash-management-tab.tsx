@@ -2448,7 +2448,7 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-3 mt-3">
+          <div className="grid grid-cols-2 md:grid-cols-[160px_160px_auto_auto_auto_1fr] gap-3 mt-3">
             <Popover open={farmerFilterPopoverOpen} onOpenChange={setFarmerFilterPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -2519,54 +2519,58 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
 
-            <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger data-testid="filter-month" className="h-9 w-[110px]">
-                <SelectValue placeholder={t("Month", "महीना")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("All Months", "सभी महीने")}</SelectItem>
-                <SelectItem value="1">{t("January", "जनवरी")}</SelectItem>
-                <SelectItem value="2">{t("February", "फरवरी")}</SelectItem>
-                <SelectItem value="3">{t("March", "मार्च")}</SelectItem>
-                <SelectItem value="4">{t("April", "अप्रैल")}</SelectItem>
-                <SelectItem value="5">{t("May", "मई")}</SelectItem>
-                <SelectItem value="6">{t("June", "जून")}</SelectItem>
-                <SelectItem value="7">{t("July", "जुलाई")}</SelectItem>
-                <SelectItem value="8">{t("August", "अगस्त")}</SelectItem>
-                <SelectItem value="9">{t("September", "सितम्बर")}</SelectItem>
-                <SelectItem value="10">{t("October", "अक्टूबर")}</SelectItem>
-                <SelectItem value="11">{t("November", "नवम्बर")}</SelectItem>
-                <SelectItem value="12">{t("December", "दिसम्बर")}</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="col-span-2 md:col-span-1">
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger data-testid="filter-year" className="h-9 w-full md:w-[90px]">
+                  <SelectValue placeholder={t("Year", "वर्ष")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All Years", "सभी वर्ष")}</SelectItem>
+                  {uniqueYears.length > 0 ? (
+                    uniqueYears.map((year) => (
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="2026">2026</SelectItem>
+                      <SelectItem value="2025">2025</SelectItem>
+                      <SelectItem value="2024">2024</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <MultiDayFilter selectedDays={filterDays} onSelectedDaysChange={setFilterDays} />
+            <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-3 md:flex md:gap-3">
+              <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <SelectTrigger data-testid="filter-month" className="h-9 md:w-[110px]">
+                  <SelectValue placeholder={t("Month", "महीना")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All Months", "सभी महीने")}</SelectItem>
+                  <SelectItem value="1">{t("January", "जनवरी")}</SelectItem>
+                  <SelectItem value="2">{t("February", "फरवरी")}</SelectItem>
+                  <SelectItem value="3">{t("March", "मार्च")}</SelectItem>
+                  <SelectItem value="4">{t("April", "अप्रैल")}</SelectItem>
+                  <SelectItem value="5">{t("May", "मई")}</SelectItem>
+                  <SelectItem value="6">{t("June", "जून")}</SelectItem>
+                  <SelectItem value="7">{t("July", "जुलाई")}</SelectItem>
+                  <SelectItem value="8">{t("August", "अगस्त")}</SelectItem>
+                  <SelectItem value="9">{t("September", "सितम्बर")}</SelectItem>
+                  <SelectItem value="10">{t("October", "अक्टूबर")}</SelectItem>
+                  <SelectItem value="11">{t("November", "नवम्बर")}</SelectItem>
+                  <SelectItem value="12">{t("December", "दिसम्बर")}</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={filterYear} onValueChange={setFilterYear}>
-              <SelectTrigger data-testid="filter-year" className="h-9 w-[90px]">
-                <SelectValue placeholder={t("Year", "वर्ष")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("All Years", "सभी वर्ष")}</SelectItem>
-                {uniqueYears.length > 0 ? (
-                  uniqueYears.map((year) => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
-                  ))
-                ) : (
-                  <>
-                    <SelectItem value="2026">2026</SelectItem>
-                    <SelectItem value="2025">2025</SelectItem>
-                    <SelectItem value="2024">2024</SelectItem>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+              <MultiDayFilter selectedDays={filterDays} onSelectedDaysChange={setFilterDays} />
+            </div>
 
             <Input
               placeholder={t("Remarks", "टिप्पणी")}
               value={filterRemarks}
               onChange={(e) => setFilterRemarks(e.target.value)}
-              className="h-9 w-[100px]"
+              className="h-9 col-span-2 md:col-span-1"
               data-testid="filter-remarks"
             />
           </div>
