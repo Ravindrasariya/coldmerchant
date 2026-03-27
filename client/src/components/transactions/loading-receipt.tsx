@@ -50,6 +50,7 @@ interface LoadingTransaction {
   thelaBhada: string | null;
   palaKarai: string | null;
   bardan: string | null;
+  crop: string | null;
   createdAt: string;
   items: TransactionItem[];
 }
@@ -179,7 +180,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const buildCustomHtml = () => {
     if (!merchant?.receiptHtmlTemplate || !transaction) return null;
     let html = merchant.receiptHtmlTemplate;
-    const cropLabel = cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
+    const txnCrop = transaction.crop || cropType || "potato";
+    const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
     const minRows = 18;
@@ -220,16 +222,17 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Bardan", bd],
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
+    const totalChargeRows = nonZeroCharges.length + 1;
     let chargesRowsHtml: string;
     if (nonZeroCharges.length > 0) {
       chargesRowsHtml = nonZeroCharges
         .map(([name, v], i) => {
-          const labelCell = i === 0 ? `<td style="font-weight:bold;vertical-align:top" rowspan="${nonZeroCharges.length + 1}">SALES BILL</td>` : "";
-          return `<tr>${labelCell}<td>${name}</td><td style="text-align:right">${fmtInr(v)}</td></tr>`;
+          const labelCell = i === 0 ? `<td colspan="3" rowspan="${totalChargeRows}" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td>` : "";
+          return `<tr>${labelCell}<td colspan="2" style="border:1px solid #000">${name}</td><td style="text-align:right;border:1px solid #000">${fmtInr(v)}</td></tr>`;
         })
         .join("");
     } else {
-      chargesRowsHtml = `<tr><td style="font-weight:bold;vertical-align:top" rowspan="2">SALES BILL</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+      chargesRowsHtml = `<tr><td colspan="3" rowspan="2" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
     }
 
     const replacements: Record<string, string> = {
