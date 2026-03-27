@@ -387,13 +387,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
               </span>
             </div>
 
-            <div className="border-t pt-4 text-center text-sm text-gray-500">
-              <p>Thank you for your business! / आपके व्यापार के लिए धन्यवाद!</p>
-            </div>
-
-            <div className="disclaimer border border-dashed border-gray-400 p-3 text-center text-sm text-gray-600 mt-6">
-              <p>No need to sign/stamp the online generated receipt</p>
-              <p className="hindi">ऑनलाइन जनरेट रसीद पर हस्ताक्षर/मुहर की आवश्यकता नहीं है</p>
+            <div className="border-t pt-6 mt-6 flex justify-end">
+              <div className="text-center" style={{ minWidth: "150px" }}>
+                <div className="border-b border-gray-400 mb-1" style={{ height: "40px" }}></div>
+                <p className="text-sm text-gray-600">Signature / हस्ताक्षर</p>
+              </div>
             </div>
           </div>
           </div>
