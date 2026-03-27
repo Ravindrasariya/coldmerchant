@@ -73,9 +73,11 @@ interface Transaction {
   items: TransactionItem[];
 }
 
+type CropValue = "potato" | "onion" | "garlic";
+
 interface TransactionsTabProps {
-  selectedCrop?: "potato" | "onion" | "garlic";
-  onCropChange?: (crop: "potato" | "onion" | "garlic") => void;
+  selectedCrop?: CropValue;
+  onCropChange?: (crop: CropValue) => void;
 }
 
 export function TransactionsTab({ selectedCrop = "potato", onCropChange }: TransactionsTabProps) {
@@ -89,7 +91,19 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
   const [printLoadingTransactionId, setPrintLoadingTransactionId] = useState<number | null>(null);
   
-  // Download dialog state (uses filtered transactions directly)
+  const [txnCropFilter, setTxnCropFilterState] = useState<CropValue | "all">(() => {
+    const saved = localStorage.getItem("vyapar_txn_crop_filter");
+    if (saved === "all" || saved === "potato" || saved === "onion" || saved === "garlic") return saved;
+    return selectedCrop;
+  });
+  const setTxnCropFilter = (crop: CropValue | "all") => {
+    setTxnCropFilterState(crop);
+    localStorage.setItem("vyapar_txn_crop_filter", crop);
+    if (crop !== "all" && onCropChange) {
+      onCropChange(crop);
+    }
+  };
+
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [showNakal, setShowNakal] = useState(false);
   
@@ -130,8 +144,10 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     
     return transactions.filter(txn => {
       // Filter by crop - check if transaction or any item has matching crop
-      const txnCrop = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
-      if (txnCrop !== selectedCrop) return false;
+      if (txnCropFilter !== "all") {
+        const txnCrop = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
+        if (txnCrop !== txnCropFilter) return false;
+      }
 
       // Filter by year
       const txnDate = new Date(txn.createdAt);
@@ -189,7 +205,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       
       return true;
     });
-  }, [transactions, selectedCrop, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterTxnType, filterParty, filterPaymentDue]);
+  }, [transactions, txnCropFilter, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterTxnType, filterParty, filterPaymentDue]);
 
   const currentYear = new Date().getFullYear().toString();
   const currentMonth = new Date().getMonth();
@@ -308,7 +324,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     link.href = URL.createObjectURL(blob);
     
     // Generate descriptive filename based on applied filters
-    const parts = [selectedCrop, "transactions"];
+    const parts = [txnCropFilter, "transactions"];
     if (filterYear) parts.push(filterYear);
     if (filterTxnNumber) parts.push(`txn${filterTxnNumber}`);
     if (filterSerialNumber) parts.push(`sr${filterSerialNumber}`);
@@ -356,7 +372,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               {t("Download will include transactions based on current filters:", "डाउनलोड में वर्तमान फ़िल्टर के आधार पर लेनदेन शामिल होंगे:")}
             </p>
             <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-              <p><strong>{t("Crop:", "फसल:")}</strong> {selectedCrop === "potato" ? t("Potato", "आलू") : selectedCrop === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन")}</p>
+              <p><strong>{t("Crop:", "फसल:")}</strong> {txnCropFilter === "all" ? t("All", "सभी") : txnCropFilter === "potato" ? t("Potato", "आलू") : txnCropFilter === "onion" ? t("Onion", "प्याज") : t("Garlic", "लहसुन")}</p>
               <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
               {filterTxnNumber && <p><strong>{t("Txn #:", "लेनदेन #:")}</strong> {filterTxnNumber}</p>}
               {filterSerialNumber && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerialNumber}</p>}
@@ -382,18 +398,18 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         <div>
           <h1 className="text-2xl font-semibold">{t("Transactions", "लेनदेन")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {selectedCrop === "potato"
+            {txnCropFilter === "all"
+              ? t("Manage all crop transactions", "सभी फसल लेनदेन प्रबंधित करें")
+              : txnCropFilter === "potato"
               ? t("Manage truck loading and sales transactions", "ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
-              : selectedCrop === "onion"
+              : txnCropFilter === "onion"
               ? t("Manage onion truck loading and sales transactions", "प्याज ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
               : t("Manage garlic truck loading and sales transactions", "लहसुन ट्रक लोडिंग और बिक्री लेनदेन प्रबंधित करें")
             }
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {onCropChange && (
-            <CropToggle value={selectedCrop} onChange={onCropChange} />
-          )}
+          <CropToggle value={txnCropFilter} onChange={setTxnCropFilter} showAll />
           <Button
             variant="ghost"
             size="icon"
