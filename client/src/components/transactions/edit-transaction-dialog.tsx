@@ -1092,7 +1092,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   <div key={item.id || `new-${index}`}>
                     {/* Desktop row */}
                     <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
-                      <span className="truncate text-xs">
+                      <span className="truncate text-xs" title={`S#${item.serialNumber} - ${lotPlaceLabel(item.place, item.coldStoreName)}${item.potatoType ? ` - ${item.potatoType}` : ""}${item.size ? ` - ${item.size}` : ""}`}>
                         S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
                       </span>
                       <Input
@@ -1168,7 +1168,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     {/* Mobile card */}
                     <div className="md:hidden border rounded-md p-3 space-y-2 mb-2">
                       <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs font-medium flex-1">
+                        <span className="text-xs font-medium flex-1 truncate" title={`S#${item.serialNumber} - ${lotPlaceLabel(item.place, item.coldStoreName)}${item.potatoType ? ` - ${item.potatoType}` : ""}${item.size ? ` - ${item.size}` : ""}`}>
                           S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
                         </span>
                         <Button 
