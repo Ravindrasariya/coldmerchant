@@ -238,6 +238,10 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     const itemRowsHtml = itemsRows + blankRows;
     const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td></tr></tfoot></table>`;
     const drvAdv = parseFloat(transaction.advancePayment || "0");
+    const totalWeight = parseFloat(transaction.totalNetWeight || "0");
+
+    const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
+    const chargesRowsHtml = `<tr><td style="font-weight:bold;vertical-align:top" rowspan="2">SALES BILL</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
 
     const replacements: Record<string, string> = {
       "{{merchantName}}": escHtml(merchant.name || ""),
@@ -252,10 +256,11 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       "{{cropName}}": cropLabel,
       "{{itemsTableHtml}}": itemsTableHtml,
       "{{itemRowsHtml}}": itemRowsHtml,
+      "{{chargesRowsHtml}}": chargesRowsHtml,
       "{{totalBags}}": String(transaction.totalBags),
-      "{{totalWeight}}": parseFloat(transaction.totalNetWeight || "0").toFixed(1),
-      "{{driverAdvance}}": `₹${parseFloat(drvAdv.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{amountInWords}}": numberToIndianWords(drvAdv),
+      "{{totalWeight}}": totalWeight.toFixed(1),
+      "{{driverAdvance}}": fmtInr(drvAdv),
+      "{{amountInWords}}": numberToIndianWords(drvAdv > 0 ? drvAdv : 0),
     };
     for (const [key, val] of Object.entries(replacements)) {
       html = html.split(key).join(val);
