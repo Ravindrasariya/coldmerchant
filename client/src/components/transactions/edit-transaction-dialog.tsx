@@ -340,8 +340,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const activeCharges = chargeKeys.filter(k => transaction[k] && parseFloat(transaction[k] as string) !== 0);
       setVisibleEditCharges(activeCharges);
       setSelectedBuyerId(transaction.buyerId || null);
-      setRevenueOverridden(false);
       setPrevItemRevenueFingerprint("");
+
+      const lotRevenueSum = transaction.items.reduce((sum, i) => sum + parseFloat(i.revenue || "0"), 0);
+      const storedRevenue = parseFloat(transaction.revenue || "0");
+      const isOverride = transaction.transactionType !== "loading" && Math.abs(storedRevenue - lotRevenueSum) >= 0.5;
+      setRevenueOverridden(isOverride);
 
       const txnRevenue = transaction.items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
       const txnBags = transaction.items.reduce((sum, i) => sum + i.bagsMoved, 0);
