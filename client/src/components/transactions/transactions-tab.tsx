@@ -99,9 +99,6 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const setTxnCropFilter = (crop: CropValue | "all") => {
     setTxnCropFilterState(crop);
     localStorage.setItem("vyapar_txn_crop_filter", crop);
-    if (crop !== "all" && onCropChange) {
-      onCropChange(crop);
-    }
   };
 
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
