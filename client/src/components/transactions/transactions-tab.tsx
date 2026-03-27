@@ -95,6 +95,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const [filterDay, setFilterDay] = useState<number | null>(null);
   const [filterTxnNumber, setFilterTxnNumber] = useState("");
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
+  const [filterTxnType, setFilterTxnType] = useState("all");
   const [filterParty, setFilterParty] = useState("all");
   const [filterPaymentDue, setFilterPaymentDue] = useState("all");
 
@@ -157,6 +158,13 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         if (!hasMatchingSerial) return false;
       }
       
+      // Filter by transaction type
+      if (filterTxnType !== "all") {
+        const txnType = txn.transactionType || "sale";
+        if (filterTxnType === "loading" && txnType !== "loading") return false;
+        if (filterTxnType === "bikri" && txnType === "loading") return false;
+      }
+
       // Filter by party
       if (filterParty !== "all" && txn.partyName !== filterParty) {
         return false;
@@ -177,12 +185,12 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       
       return true;
     });
-  }, [transactions, selectedCrop, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterParty, filterPaymentDue]);
+  }, [transactions, selectedCrop, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterTxnType, filterParty, filterPaymentDue]);
 
   const currentYear = new Date().getFullYear().toString();
   const currentMonth = new Date().getMonth();
   const isDefaultMonths = filterMonths.length === 1 && filterMonths[0] === currentMonth;
-  const hasActiveFilters = filterYear !== currentYear || !isDefaultMonths || filterDay !== null || filterTxnNumber || filterSerialNumber || filterParty !== "all" || filterPaymentDue !== "all";
+  const hasActiveFilters = filterYear !== currentYear || !isDefaultMonths || filterDay !== null || filterTxnNumber || filterSerialNumber || filterTxnType !== "all" || filterParty !== "all" || filterPaymentDue !== "all";
 
   const clearFilters = () => {
     setFilterYear(new Date().getFullYear().toString());
@@ -190,6 +198,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     setFilterDay(null);
     setFilterTxnNumber("");
     setFilterSerialNumber("");
+    setFilterTxnType("all");
     setFilterParty("all");
     setFilterPaymentDue("all");
   };
@@ -299,6 +308,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     if (filterYear) parts.push(filterYear);
     if (filterTxnNumber) parts.push(`txn${filterTxnNumber}`);
     if (filterSerialNumber) parts.push(`sr${filterSerialNumber}`);
+    if (filterTxnType !== "all") parts.push(filterTxnType);
     if (filterParty !== "all") parts.push(filterParty.replace(/\s+/g, "_"));
     if (filterPaymentDue !== "all") parts.push(filterPaymentDue);
     parts.push(format(new Date(), "yyyyMMdd"));
@@ -346,6 +356,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               <p><strong>{t("Year:", "वर्ष:")}</strong> {filterYear || t("All Years", "सभी वर्ष")}</p>
               {filterTxnNumber && <p><strong>{t("Txn #:", "लेनदेन #:")}</strong> {filterTxnNumber}</p>}
               {filterSerialNumber && <p><strong>{t("Serial #:", "क्रमांक:")}</strong> {filterSerialNumber}</p>}
+              {filterTxnType !== "all" && <p><strong>{t("Type:", "प्रकार:")}</strong> {filterTxnType === "loading" ? t("Loading", "लोडिंग") : t("Bikri", "बिक्री")}</p>}
               {filterParty !== "all" && <p><strong>{t("Party:", "पार्टी:")}</strong> {filterParty}</p>}
               {filterPaymentDue !== "all" && <p><strong>{t("Status:", "स्थिति:")}</strong> {filterPaymentDue === "due" ? t("Due", "बकाया") : t("Paid", "भुगतान किया")}</p>}
               <p className="pt-2 font-medium">{t("Total transactions:", "कुल लेनदेन:")} {filteredTransactions.length}</p>
@@ -433,6 +444,17 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                   className="text-sm sm:w-[100px]"
                   data-testid="filter-serial-number"
                 />
+
+                <Select value={filterTxnType} onValueChange={setFilterTxnType}>
+                  <SelectTrigger className="text-sm sm:w-[110px]" data-testid="filter-txn-type">
+                    <SelectValue placeholder={t("All Types", "सभी प्रकार")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("All Types", "सभी प्रकार")}</SelectItem>
+                    <SelectItem value="loading">{t("Loading", "लोडिंग")}</SelectItem>
+                    <SelectItem value="bikri">{t("Bikri", "बिक्री")}</SelectItem>
+                  </SelectContent>
+                </Select>
                 
                 <Select value={filterParty} onValueChange={setFilterParty}>
                   <SelectTrigger className="text-sm sm:w-[140px]" data-testid="filter-party">
