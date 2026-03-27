@@ -2448,7 +2448,7 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-[160px_160px_auto_auto_auto_1fr] gap-3 mt-3">
+          <div className="grid grid-cols-2 gap-3 mt-3 md:flex md:flex-wrap md:items-center">
             <Popover open={farmerFilterPopoverOpen} onOpenChange={setFarmerFilterPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -2456,7 +2456,7 @@ export function CashManagementTab() {
                   role="combobox"
                   aria-expanded={farmerFilterPopoverOpen}
                   className={cn(
-                    "justify-between font-normal text-sm h-9",
+                    "justify-between font-normal text-sm h-9 md:w-[160px]",
                     !filterFarmerName && "text-muted-foreground"
                   )}
                   data-testid="filter-farmer-name"
@@ -2508,7 +2508,7 @@ export function CashManagementTab() {
             </Popover>
 
             <Select value={filterSupplierName} onValueChange={setFilterSupplierName}>
-              <SelectTrigger data-testid="filter-supplier-name" className="h-9">
+              <SelectTrigger data-testid="filter-supplier-name" className="h-9 md:w-[160px]">
                 <SelectValue placeholder={t("Supplier Name", "आपूर्तिकर्ता का नाम")} />
               </SelectTrigger>
               <SelectContent>
@@ -2519,9 +2519,9 @@ export function CashManagementTab() {
               </SelectContent>
             </Select>
 
-            <div className="col-span-2 md:col-span-1">
+            <div className="col-span-2 grid grid-cols-3 gap-3 md:contents">
               <Select value={filterYear} onValueChange={setFilterYear}>
-                <SelectTrigger data-testid="filter-year" className="h-9 w-full md:w-[90px]">
+                <SelectTrigger data-testid="filter-year" className="h-9 md:w-[90px]">
                   <SelectValue placeholder={t("Year", "वर्ष")} />
                 </SelectTrigger>
                 <SelectContent>
@@ -2539,9 +2539,7 @@ export function CashManagementTab() {
                   )}
                 </SelectContent>
               </Select>
-            </div>
 
-            <div className="col-span-2 md:col-span-1 grid grid-cols-2 gap-3 md:flex md:gap-3">
               <Select value={filterMonth} onValueChange={setFilterMonth}>
                 <SelectTrigger data-testid="filter-month" className="h-9 md:w-[110px]">
                   <SelectValue placeholder={t("Month", "महीना")} />
@@ -2570,7 +2568,7 @@ export function CashManagementTab() {
               placeholder={t("Remarks", "टिप्पणी")}
               value={filterRemarks}
               onChange={(e) => setFilterRemarks(e.target.value)}
-              className="h-9 col-span-2 md:col-span-1"
+              className="h-9 col-span-2 md:flex-1"
               data-testid="filter-remarks"
             />
           </div>
