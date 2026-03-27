@@ -224,6 +224,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Khadi Karai", tb],
       ["Pala Karai", pk],
       ["Bardan", bd],
+      ["Driver Advance", drvAdv],
+      ["Advance Amount", advAmt],
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
     let chargesRowsHtml: string;
