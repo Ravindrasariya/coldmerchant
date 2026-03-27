@@ -422,7 +422,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       {/* Filters Row */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         {/* Mobile: Button at top, full width */}
-        <Button onClick={() => setShowChooser(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile">
+        <Button onClick={() => setShowChooser(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile" disabled={txnCropFilter === "all"}>
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
@@ -518,7 +518,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         </Card>
 
         {/* Desktop: Button on right */}
-        <Button onClick={() => setShowChooser(true)} className="hidden md:flex" data-testid="button-load-truck">
+        <Button onClick={() => setShowChooser(true)} className="hidden md:flex" data-testid="button-load-truck" disabled={txnCropFilter === "all"}>
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
@@ -695,13 +695,13 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       <LoadTruckDialog 
         open={showLoadDialog} 
         onOpenChange={setShowLoadDialog}
-        selectedCrop={selectedCrop}
+        selectedCrop={txnCropFilter === "all" ? selectedCrop : txnCropFilter}
       />
 
       <LoadingTruckDialog
         open={showLoadingDialog}
         onOpenChange={setShowLoadingDialog}
-        selectedCrop={selectedCrop}
+        selectedCrop={txnCropFilter === "all" ? selectedCrop : txnCropFilter}
       />
 
       <EditTransactionDialog
