@@ -1027,8 +1027,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       <p className="text-[10px] text-muted-foreground">{t("Total Amount", "कुल राशि")}</p>
                     </div>
                     <div>
-                      <p className="text-base font-bold">₹{parseFloat(totalMandiCharges.toFixed(1)).toLocaleString('en-IN')}</p>
-                      <p className="text-[10px] text-muted-foreground">{t("Mandi Charges", "मंडी शुल्क")}</p>
+                      <p className="text-base font-bold">₹{parseFloat((totalMandiCharges + totalAdditionalCharges).toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-[10px] text-muted-foreground">{t("Mandi & Other Charges", "मंडी व अन्य शुल्क")}</p>
                     </div>
                     <div>
                       <p className={`text-base font-bold ${totals.totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
