@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, FileDown } from "lucide-react";
 import { CropToggle } from "@/components/crop-toggle";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -397,15 +397,6 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setShowNakal(true)}
-            title={t("Transaction Nakal", "लेनदेन नकल")}
-            data-testid="button-txn-nakal"
-          >
-            <Receipt className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
             onClick={() => setDownloadDialogOpen(true)}
             title={t("Download", "डाउनलोड")}
             data-testid="button-txn-download"
@@ -491,6 +482,16 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                     <SelectItem value="paid">{t("Paid", "भुगतान किया")}</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowNakal(true)}
+                  data-testid="button-txn-nakal"
+                  title={t("Transaction Nakal", "लेनदेन नकल")}
+                >
+                  <FileDown className="h-4 w-4" />
+                </Button>
                 
                 {hasActiveFilters && (
                   <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
