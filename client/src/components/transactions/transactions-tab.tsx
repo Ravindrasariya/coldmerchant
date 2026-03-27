@@ -19,6 +19,7 @@ import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
 import { SalesReceiptDialog } from "./sales-receipt";
 import { LoadingReceiptDialog } from "./loading-receipt";
+import { TransactionNakalDialog } from "./transaction-nakal";
 import { MonthFilter } from "@/components/ui/month-filter";
 import { DateFilter } from "@/components/ui/date-filter";
 
@@ -33,6 +34,8 @@ interface TransactionItem {
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
   revenue: string | null;
+  pricePerKg: string | null;
+  amount: string | null;
   crop?: string;
   farmerName?: string;
   farmerVillage?: string;
@@ -88,6 +91,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   
   // Download dialog state (uses filtered transactions directly)
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [showNakal, setShowNakal] = useState(false);
   
   // Filter states
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
@@ -390,6 +394,15 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
           {onCropChange && (
             <CropToggle value={selectedCrop} onChange={onCropChange} />
           )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowNakal(true)}
+            title={t("Transaction Nakal", "लेनदेन नकल")}
+            data-testid="button-txn-nakal"
+          >
+            <Receipt className="h-5 w-5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -697,6 +710,22 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         open={printLoadingTransactionId !== null}
         onOpenChange={(open) => !open && setPrintLoadingTransactionId(null)}
         cropType={selectedCrop}
+      />
+
+      <TransactionNakalDialog
+        transactions={filteredTransactions}
+        open={showNakal}
+        onOpenChange={setShowNakal}
+        merchantName={user?.merchantName || ""}
+        dateLabel={(() => {
+          const now = new Date();
+          const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+          const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+          const d = now.getDate();
+          const m = now.getMonth();
+          const y = now.getFullYear();
+          return `${dayNames[now.getDay()]}, ${d} ${monthNames[m]}, ${y} (${d}-${m + 1}-${y})`;
+        })()}
       />
 
     </div>
