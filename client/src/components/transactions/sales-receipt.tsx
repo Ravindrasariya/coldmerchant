@@ -241,7 +241,22 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     const totalWeight = parseFloat(transaction.totalNetWeight || "0");
 
     const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
-    const chargesRowsHtml = `<tr><td style="font-weight:bold;vertical-align:top" rowspan="2">SALES BILL</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+
+    const chargesList: [string, number][] = [
+      ["Driver Advance", drvAdv],
+    ];
+    const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
+    let chargesRowsHtml: string;
+    if (nonZeroCharges.length > 0) {
+      chargesRowsHtml = nonZeroCharges
+        .map(([name, v], i) => {
+          const labelCell = i === 0 ? `<td style="font-weight:bold;vertical-align:top" rowspan="${nonZeroCharges.length + 1}">SALES BILL</td>` : "";
+          return `<tr>${labelCell}<td>${name}</td><td style="text-align:right">${fmtInr(v)}</td></tr>`;
+        })
+        .join("");
+    } else {
+      chargesRowsHtml = `<tr><td style="font-weight:bold;vertical-align:top" rowspan="2">SALES BILL</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+    }
 
     const replacements: Record<string, string> = {
       "{{merchantName}}": escHtml(merchant.name || ""),
@@ -260,7 +275,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       "{{totalBags}}": String(transaction.totalBags),
       "{{totalWeight}}": totalWeight.toFixed(1),
       "{{driverAdvance}}": fmtInr(drvAdv),
-      "{{amountInWords}}": numberToIndianWords(drvAdv > 0 ? drvAdv : 0),
+      "{{amountInWords}}": numberToIndianWords(drvAdv),
     };
     for (const [key, val] of Object.entries(replacements)) {
       html = html.split(key).join(val);

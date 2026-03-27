@@ -189,7 +189,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const blankCount = Math.max(0, minRows - transaction.items.length);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
     const itemRowsHtml = itemsDataRows + blankRows;
-    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th><th>₹/Kg</th><th>Amount</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td></td><td>₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr></tfoot></table>`;
+    const itemsTableHtml = `<table><thead><tr><th>Item Name</th><th>Marka</th><th>Quantity</th><th>Weight</th><th>Rate</th><th style="text-align:right">Value</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr><td>Total</td><td></td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td></td><td style="text-align:right">₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr></tfoot></table>`;
 
     const mandiComm = parseFloat(transaction.totalMandiCommission || "0");
     const aadhatComm = parseFloat(transaction.totalAadhatCommission || "0");

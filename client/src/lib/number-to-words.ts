@@ -18,7 +18,7 @@ function convertChunk(n: number): string {
 }
 
 export function numberToIndianWords(amount: number): string {
-  if (amount === 0) return "Zero Only";
+  if (amount === 0) return "Rupees Zero Only";
 
   const isNegative = amount < 0;
   amount = Math.abs(amount);
@@ -58,7 +58,7 @@ export function numberToIndianWords(amount: number): string {
       parts.push(convertChunk(rupees));
     }
 
-    words = (isNegative ? "Minus " : "") + parts.join(" ");
+    words = (isNegative ? "Minus " : "") + "Rupees " + parts.join(" ");
   }
 
   if (paise > 0) {
