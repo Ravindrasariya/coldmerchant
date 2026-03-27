@@ -710,11 +710,11 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                               const placeLabel = lot.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : lot.place === "mandi" ? t("Mandi", "मंडी") : lot.coldStoreName;
                               return (
                                 <div className="flex flex-col min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-sm font-medium break-words">
+                                  <div className="flex items-center justify-between gap-1.5">
+                                    <span className="text-sm font-medium break-words min-w-0">
                                       S#{lot.serialNumber} - {placeLabel} - {lot.potatoType} - {lot.size}
                                     </span>
-                                    <Badge className="text-[10px] px-1.5 py-0 font-medium border-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">{t("Potato", "आलू")}</Badge>
+                                    <Badge className="text-[10px] px-1.5 py-0 font-medium border-0 shrink-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">{t("Potato", "आलू")}</Badge>
                                   </div>
                                   <span className="text-xs text-muted-foreground break-words">
                                     {lot.supplierName} | {lot.remainingBags} bags
