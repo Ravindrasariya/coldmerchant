@@ -85,11 +85,17 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const printRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
 
+  const receiptFilename = () => {
+    const buyerName = (transaction?.partyName || buyer?.name || "Receipt").replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
+    const dateStr = transaction?.createdAt ? new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
+    return `${buyerName}_${dateStr}`;
+  };
+
   const handleShare = async () => {
     if (!printRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(printRef.current, `Loading-Receipt-${transaction?.transactionNumber || ""}`, customHtml);
+      await shareReceiptAsPdf(printRef.current, receiptFilename(), customHtml);
     } catch (err: any) {
       if (err?.name !== "AbortError") {
         toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
@@ -122,15 +128,17 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
+    const printTitle = receiptFilename();
     if (customHtml) {
-      printWindow.document.write(customHtml);
+      const htmlWithTitle = customHtml.replace(/<head>/i, `<head><title>${printTitle}</title>`);
+      printWindow.document.write(htmlWithTitle);
     } else {
       const printContent = printRef.current.innerHTML;
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
-            <title>Loading Receipt / लोडिंग रसीद #${transaction?.transactionNumber}</title>
+            <title>${printTitle}</title>
             <style>
               body {
                 font-family: Arial, sans-serif;
