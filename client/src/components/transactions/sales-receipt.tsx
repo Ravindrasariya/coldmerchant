@@ -31,6 +31,7 @@ interface Transaction {
   advancePayment: string | null;
   totalBags: number;
   totalNetWeight: string | null;
+  crop: string | null;
   createdAt: string;
   items: TransactionItem[];
 }
@@ -226,7 +227,8 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const buildCustomHtml = () => {
     if (!merchant?.receiptHtmlTemplate || !transaction) return null;
     let html = merchant.receiptHtmlTemplate;
-    const cropLabel = cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
+    const txnCrop = transaction.crop || cropType || "potato";
+    const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 4;
     const minRows = 12;
@@ -368,7 +370,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                 {transaction.vehicleNumber && (
                   <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
                 )}
-                <p><strong>Crop / फसल:</strong> {cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
+                <p><strong>Crop / फसल:</strong> {(transaction.crop || cropType) === "potato" ? "Potato / आलू" : (transaction.crop || cropType) === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
               </div>
               <div className="text-right right">
                 {transaction.partyName && (
