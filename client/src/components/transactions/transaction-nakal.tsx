@@ -66,7 +66,7 @@ function computeItemRemark(item: TxnItem, isLoading: boolean): string {
 
   if (isLoading) {
     const sellingPrice = parseFloat(item.pricePerKg || "0");
-    return `${crop} - ${bags} Bags x ${weight.toFixed(1)} Kg x ₹${sellingPrice.toFixed(2)} ${sr}`;
+    return `${crop} - ${bags} Bags x ${weight.toFixed(1)} Kg x ₹${sellingPrice.toFixed(2)}/kg ${sr}`;
   } else {
     const costPerBag = bags > 0 ? parseFloat(item.costOfGoods || "0") / bags : 0;
     return `${crop} - ${bags} Bags x ${weight.toFixed(1)} Kg x ₹${costPerBag.toFixed(2)}/Bag ${sr}`;
@@ -121,7 +121,7 @@ function buildPrintHtml(
 
     txn.items.forEach((item, idx) => {
       const remark = escHtml(computeItemRemark(item, isLoading));
-      const itemAmt = `&#8377;${escHtml(fmt(computeItemAmount(item, isLoading)))}`;
+      const itemAmt = isLoading ? "" : `&#8377;${escHtml(fmt(computeItemAmount(item, false)))}`;
 
       if (idx === 0) {
         bodyRows += `
@@ -319,7 +319,7 @@ export function TransactionNakalDialog({
                         )}
                         {txn.items.map((item, idx) => {
                           const remark = computeItemRemark(item, isLoading);
-                          const itemAmt = `₹${fmt(computeItemAmount(item, isLoading))}`;
+                          const itemAmt = isLoading ? "" : `₹${fmt(computeItemAmount(item, false))}`;
 
                           if (idx === 0) {
                             return (
