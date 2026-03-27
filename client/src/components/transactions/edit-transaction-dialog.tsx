@@ -972,7 +972,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           return (
                             <div className="flex flex-col min-w-0">
                               <span className="text-sm font-medium break-words">
-                                S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)} - {inv.potatoType} - {inv.size || "Mixed"}
+                                S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
                               </span>
                               <span className="text-xs text-muted-foreground break-words">
                                 {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
@@ -995,7 +995,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                               return (
                                 <CommandItem
                                   key={key}
-                                  value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""} ${inv.remainingBags} available`}
+                                  value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType || ""} ${inv.size || ""} ${inv.farmerName} ${inv.farmerVillage || ""} ${inv.remainingBags} available`}
                                   onSelect={() => {
                                     handleInventorySelect(key);
                                     setLotPopoverOpen(false);
@@ -1004,7 +1004,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                                   <Check className={cn("mr-2 h-4 w-4", selectedInventory === key ? "opacity-100" : "opacity-0")} />
                                   <div className="flex flex-col">
                                     <span className="text-sm font-medium">
-                                      S#{inv.serialNumber} - {placeLabel} - {inv.potatoType} - {inv.size || "Mixed"}
+                                      S#{inv.serialNumber} - {placeLabel}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
                                       {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
@@ -1093,7 +1093,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     {/* Desktop row */}
                     <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
                       <span className="truncate text-xs">
-                        S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)} - {item.potatoType} - {item.size || "Mixed"}
+                        S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
                       </span>
                       <Input
                         type="number"
@@ -1169,7 +1169,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <div className="md:hidden border rounded-md p-3 space-y-2 mb-2">
                       <div className="flex justify-between items-start gap-2">
                         <span className="text-xs font-medium flex-1">
-                          S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)} - {item.potatoType} - {item.size || "Mixed"}
+                          S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
                         </span>
                         <Button 
                           type="button" 
@@ -1712,7 +1712,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               {deleteConfirmIndex !== null && editableItems[deleteConfirmIndex] && (
                 <>
                   {t("Are you sure you want to remove", "क्या आप इसे हटाना चाहते हैं")}{" "}
-                  <strong>S#{editableItems[deleteConfirmIndex].serialNumber} - {lotPlaceLabel(editableItems[deleteConfirmIndex].place, editableItems[deleteConfirmIndex].coldStoreName)} - {editableItems[deleteConfirmIndex].size || "Mixed"}</strong>
+                  <strong>S#{editableItems[deleteConfirmIndex].serialNumber} - {lotPlaceLabel(editableItems[deleteConfirmIndex].place, editableItems[deleteConfirmIndex].coldStoreName)}{editableItems[deleteConfirmIndex].size ? ` - ${editableItems[deleteConfirmIndex].size}` : ""}</strong>
                   {" "}({editableItems[deleteConfirmIndex].bagsMoved} {t("bags", "बोरी")})?
                 </>
               )}

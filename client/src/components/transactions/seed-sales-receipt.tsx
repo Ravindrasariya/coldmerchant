@@ -368,7 +368,7 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
                     <td className="border border-gray-400 px-1 py-0.5">{idx + 1}</td>
                     <td className="border border-gray-400 px-1 py-0.5">S#{item.serialNumber} - {item.coldStoreName}</td>
                     <td className="border border-gray-400 px-1 py-0.5">{item.potatoType}</td>
-                    <td className="border border-gray-400 px-1 py-0.5">{item.size || "Mixed"}</td>
+                    <td className="border border-gray-400 px-1 py-0.5">{item.size || ""}</td>
                     <td className="border border-gray-400 px-1 py-0.5 text-right">{item.bagsMoved}</td>
                     <td className="border border-gray-400 px-1 py-0.5 text-right">{formatCurrency(item.pricePerBag)}</td>
                     <td className="border border-gray-400 px-1 py-0.5 text-right">{formatCurrency(item.totalAmount)}</td>

@@ -699,7 +699,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                             <div className="flex flex-col min-w-0">
                                               <div className="flex items-center justify-between gap-1.5">
                                                 <span className="text-sm font-medium break-words min-w-0">
-                                                  S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName} - {inv.potatoType} - {inv.size || "Mixed"}
+                                                  S#{inv.serialNumber} - {inv.place === "farm_gate" ? t("Farm Gate", "खेत गेट") : inv.place === "mandi" ? t("Mandi", "मंडी") : inv.coldStoreName}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
                                                 </span>
                                                 {(() => {
                                                   const c = inv.crop || "potato";
@@ -739,7 +739,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                                 return (
                                                   <CommandItem
                                                     key={key}
-                                                    value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType} ${inv.size || "Mixed"} ${inv.farmerName} ${inv.farmerVillage || ""} ${displayBags} bags available`}
+                                                    value={`S#${inv.serialNumber} ${placeLabel} ${inv.potatoType || ""} ${inv.size || ""} ${inv.farmerName} ${inv.farmerVillage || ""} ${displayBags} bags available`}
                                                     onSelect={() => {
                                                       const selectedInvItem = findInventoryByKey(key);
                                                       if (selectedInvItem) {
@@ -767,7 +767,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                                     <div className="flex flex-col flex-1">
                                                       <div className="flex items-center justify-between gap-1.5">
                                                         <span className="text-sm font-medium">
-                                                          S#{inv.serialNumber} - {placeLabel} - {inv.potatoType} - {inv.size || "Mixed"}
+                                                          S#{inv.serialNumber} - {placeLabel}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
                                                         </span>
                                                         {(() => {
                                                           const c = inv.crop || "potato";
