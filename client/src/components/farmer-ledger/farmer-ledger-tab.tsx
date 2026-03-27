@@ -170,7 +170,9 @@ export function FarmerLedgerTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers/villages"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers/tehsils"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setEditDialogOpen(false);
@@ -216,7 +218,9 @@ export function FarmerLedgerTab() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       setMergeDialogOpen(false);

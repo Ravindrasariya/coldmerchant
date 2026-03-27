@@ -208,6 +208,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
         variant: imageError ? "destructive" : "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
