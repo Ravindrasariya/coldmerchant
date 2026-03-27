@@ -1237,10 +1237,17 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                       <div className="flex flex-wrap items-center gap-1.5 mb-2">
                         <div className="flex items-center gap-1" data-testid={`text-serial-${entry.id}`}>
                           <Package className="h-4 w-4" style={{ color: '#52a7ff' }} />
-                          <span className="font-semibold text-base">{t("Sr No:", "क्र.:")} {entry.serialNumber} -</span>
+                          <span className="font-semibold text-base">{t("Sr No:", "क्र.:")} {entry.serialNumber}</span>
                         </div>
+                        <span className="text-muted-foreground text-xs">
+                          {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
                         <span className="font-semibold text-base" data-testid={`text-farmer-${entry.id}`}>
-                          {entry.farmerName}
+                          - {entry.farmerName}
                         </span>
                         
                         {(() => {
@@ -1253,6 +1260,21 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                               : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
                           return (
                             <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${cls}`} data-testid={`badge-place-${entry.id}`}>
+                              {label}
+                            </Badge>
+                          );
+                        })()}
+
+                        {(() => {
+                          const c = (entry.crop || entry.lots[0]?.crop || "potato") as string;
+                          const cls = c === "onion"
+                            ? "bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300"
+                            : c === "garlic"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                              : "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+                          const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
+                          return (
+                            <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${cls}`} data-testid={`badge-crop-${entry.id}`}>
                               {label}
                             </Badge>
                           );

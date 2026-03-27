@@ -799,6 +799,20 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                     {t("Bikri", "बिक्री")}
                   </Badge>
                 )}
+                {(() => {
+                  const c = transaction.crop || (transaction.items.length > 0 ? (transaction.items[0].crop || "potato") : "potato");
+                  const cls = c === "onion"
+                    ? "bg-pink-100 text-pink-700 border-pink-300 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-600"
+                    : c === "garlic"
+                      ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
+                      : "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600";
+                  const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
+                  return (
+                    <Badge variant="outline" className={`text-[10px] h-5 ${cls}`} data-testid={`badge-crop-${transaction.id}`}>
+                      {label}
+                    </Badge>
+                  );
+                })()}
               </div>
               {transaction.partyName && (
                 <span className="font-semibold text-sm leading-tight">
