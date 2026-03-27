@@ -1139,8 +1139,11 @@ export default function AdminPage() {
                   <div className="border-2 border-dashed rounded-lg p-4 text-center">
                     <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                     <p className="text-sm text-muted-foreground mb-2">Upload an HTML file for a fully custom receipt</p>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Available placeholders: {"{{merchantName}}"}, {"{{receiptNumber}}"}, {"{{date}}"}, {"{{buyerName}}"}, {"{{buyerAddress}}"}, {"{{itemsTableHtml}}"}, {"{{totalBags}}"}, {"{{totalWeight}}"}, {"{{totalAmount}}"}, {"{{grandTotal}}"}, {"{{cropName}}"}
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Available placeholders: {"{{merchantName}}"}, {"{{merchantAddress}}"}, {"{{merchantContact}}"}, {"{{receiptNumber}}"}, {"{{date}}"}, {"{{buyerName}}"}, {"{{buyerAddress}}"}, {"{{vehicleNumber}}"}, {"{{cropName}}"}, {"{{itemsTableHtml}}"}, {"{{itemRowsHtml}}"}, {"{{totalBags}}"}, {"{{totalWeight}}"}, {"{{totalAmount}}"}, {"{{chargesRowsHtml}}"}, {"{{grandTotal}}"}, {"{{amountInWords}}"}
+                    </p>
+                    <p className="text-xs mb-3">
+                      <a href="/loading-receipt-template.html" download className="text-blue-600 underline" data-testid="link-download-sample-template">Download sample template</a>
                     </p>
                     <label className="cursor-pointer">
                       <Button variant="outline" size="sm" disabled={templateUploading} asChild data-testid="button-upload-receipt-template">

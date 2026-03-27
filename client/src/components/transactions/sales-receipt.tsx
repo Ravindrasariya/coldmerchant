@@ -7,6 +7,7 @@ import { Printer, Share2 } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
+import { numberToIndianWords } from "@/lib/number-to-words";
 
 interface TransactionItem {
   id: number;
@@ -227,10 +228,15 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     let html = merchant.receiptHtmlTemplate;
     const cropLabel = cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const numCols = 4;
+    const minRows = 12;
     const itemsRows = transaction.items.map((item, idx) =>
       `<tr><td>${idx + 1}</td><td>${escHtml(item.potatoType || "")}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td></tr>`
     ).join("");
-    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th></tr></thead><tbody>${itemsRows}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td></tr></tfoot></table>`;
+    const blankCount = Math.max(0, minRows - transaction.items.length);
+    const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
+    const itemRowsHtml = itemsRows + blankRows;
+    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td></tr></tfoot></table>`;
     const drvAdv = parseFloat(transaction.advancePayment || "0");
 
     const replacements: Record<string, string> = {
@@ -245,9 +251,11 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),
       "{{cropName}}": cropLabel,
       "{{itemsTableHtml}}": itemsTableHtml,
+      "{{itemRowsHtml}}": itemRowsHtml,
       "{{totalBags}}": String(transaction.totalBags),
       "{{totalWeight}}": parseFloat(transaction.totalNetWeight || "0").toFixed(1),
       "{{driverAdvance}}": `₹${parseFloat(drvAdv.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{amountInWords}}": numberToIndianWords(drvAdv),
     };
     for (const [key, val] of Object.entries(replacements)) {
       html = html.split(key).join(val);

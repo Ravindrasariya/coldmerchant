@@ -7,6 +7,7 @@ import { Printer, Share2 } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
+import { numberToIndianWords } from "@/lib/number-to-words";
 
 interface TransactionItem {
   id: number;
@@ -180,10 +181,15 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     let html = merchant.receiptHtmlTemplate;
     const cropLabel = cropType === "potato" ? "Potato / आलू" : cropType === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-    const itemsRows = transaction.items.map((item, idx) =>
+    const numCols = 6;
+    const minRows = 12;
+    const itemsDataRows = transaction.items.map((item, idx) =>
       `<tr><td>${idx + 1}</td><td>${escHtml(item.potatoType || "")}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td>₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
     ).join("");
-    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th><th>₹/Kg</th><th>Amount</th></tr></thead><tbody>${itemsRows}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td></td><td>₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr></tfoot></table>`;
+    const blankCount = Math.max(0, minRows - transaction.items.length);
+    const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
+    const itemRowsHtml = itemsDataRows + blankRows;
+    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th><th>₹/Kg</th><th>Amount</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td></td><td>₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr></tfoot></table>`;
 
     const mandiComm = parseFloat(transaction.totalMandiCommission || "0");
     const aadhatComm = parseFloat(transaction.totalAadhatCommission || "0");
@@ -200,6 +206,32 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const addlCharges = tl + mj + tb + pk + bd;
     const gt = totalAmount + mandiComm + aadhatComm + hamm + extra + salesComm + addlCharges + drvAdv - advAmt;
 
+    const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
+
+    const chargesList: [string, number][] = [
+      ["Hammali", hamm],
+      ["Pur. Comm.", salesComm],
+      ["Mandi Tax", mandiComm],
+      ["Aadhat Comm.", aadhatComm],
+      ["Tulai", tl],
+      ["Bharai", mj],
+      ["Khadi Karai", tb],
+      ["Pala Karai", pk],
+      ["Bardan", bd],
+    ];
+    const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
+    let chargesRowsHtml: string;
+    if (nonZeroCharges.length > 0) {
+      chargesRowsHtml = nonZeroCharges
+        .map(([name, v], i) => {
+          const labelCell = i === 0 ? `<td style="font-weight:bold;vertical-align:top" rowspan="${nonZeroCharges.length + 1}">SALES BILL</td>` : "";
+          return `<tr>${labelCell}<td>${name}</td><td style="text-align:right">${fmtInr(v)}</td></tr>`;
+        })
+        .join("");
+    } else {
+      chargesRowsHtml = `<tr><td style="font-weight:bold;vertical-align:top" rowspan="2">SALES BILL</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
+    }
+
     const replacements: Record<string, string> = {
       "{{merchantName}}": escHtml(merchant.name || ""),
       "{{merchantAddress}}": escHtml(merchant.address || ""),
@@ -212,22 +244,26 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),
       "{{cropName}}": cropLabel,
       "{{itemsTableHtml}}": itemsTableHtml,
+      "{{itemRowsHtml}}": itemRowsHtml,
+      "{{chargesRowsHtml}}": chargesRowsHtml,
       "{{totalBags}}": String(transaction.totalBags),
       "{{totalWeight}}": parseFloat(transaction.totalNetWeight || "0").toFixed(1),
-      "{{totalAmount}}": `₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{mandiCommission}}": `₹${parseFloat(mandiComm.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{aadhatCommission}}": `₹${parseFloat(aadhatComm.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{salesCommission}}": `₹${parseFloat(salesComm.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{hammali}}": `₹${parseFloat(hamm.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{extraCharges}}": `₹${parseFloat(extra.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{tulai}}": `₹${parseFloat(tl.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{majduri}}": `₹${parseFloat(mj.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{thelaBhada}}": `₹${parseFloat(tb.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{palaKarai}}": `₹${parseFloat(pk.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{bardan}}": `₹${parseFloat(bd.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{driverAdvance}}": `₹${parseFloat(drvAdv.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{advanceAmount}}": `₹${parseFloat(advAmt.toFixed(1)).toLocaleString("en-IN")}`,
-      "{{grandTotal}}": `₹${parseFloat(gt.toFixed(1)).toLocaleString("en-IN")}`,
+      "{{totalAmount}}": fmtInr(totalAmount),
+      "{{mandiCommission}}": fmtInr(mandiComm),
+      "{{aadhatCommission}}": fmtInr(aadhatComm),
+      "{{salesCommission}}": fmtInr(salesComm),
+      "{{hammali}}": fmtInr(hamm),
+      "{{extraCharges}}": fmtInr(extra),
+      "{{tulai}}": fmtInr(tl),
+      "{{majduri}}": fmtInr(mj),
+      "{{thelaBhada}}": fmtInr(tb),
+      "{{palaKarai}}": fmtInr(pk),
+      "{{bardan}}": fmtInr(bd),
+      "{{driverAdvance}}": fmtInr(drvAdv),
+      "{{advanceAmount}}": fmtInr(advAmt),
+      "{{grandTotal}}": fmtInr(gt),
+      "{{grandTotalRaw}}": gt.toFixed(1),
+      "{{amountInWords}}": numberToIndianWords(gt),
     };
     for (const [key, val] of Object.entries(replacements)) {
       html = html.split(key).join(val);
