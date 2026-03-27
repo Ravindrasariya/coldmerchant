@@ -89,7 +89,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     if (!printRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(printRef.current, `Loading-Receipt-${transaction?.transactionNumber || ""}`);
+      await shareReceiptAsPdf(printRef.current, `Loading-Receipt-${transaction?.transactionNumber || ""}`, customHtml);
     } catch (err: any) {
       if (err?.name !== "AbortError") {
         toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });

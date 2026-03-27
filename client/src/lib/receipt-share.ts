@@ -192,16 +192,20 @@ function loadScript(doc: Document, src: string): Promise<void> {
 
 export async function shareReceiptAsPdf(
   contentElement: HTMLElement,
-  filename: string
+  filename: string,
+  customHtml?: string | null
 ): Promise<void> {
   const receiptHTML = contentElement.outerHTML;
+  const isCustomTemplate = !!customHtml;
+  const captureWidth = isCustomTemplate ? 794 : 800;
+  const iframeWidth = isCustomTemplate ? 814 : 820;
 
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
   iframe.style.left = "-9999px";
   iframe.style.top = "0";
-  iframe.style.width = "820px";
-  iframe.style.height = "1200px";
+  iframe.style.width = `${iframeWidth}px`;
+  iframe.style.height = "1123px";
   iframe.style.border = "none";
   iframe.style.opacity = "0";
   document.body.appendChild(iframe);
@@ -213,18 +217,29 @@ export async function shareReceiptAsPdf(
   }
 
   iframeDoc.open();
-  iframeDoc.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <style>${RECEIPT_BASE_STYLES}</style>
-      </head>
-      <body>
-        <div id="receipt-root" style="width:800px;">${receiptHTML}</div>
-      </body>
-    </html>
-  `);
+  if (isCustomTemplate) {
+    const templateWithId = customHtml!.replace(
+      /<body[^>]*>/i,
+      '$&<div id="receipt-root">'
+    ).replace(
+      /<\/body>/i,
+      '</div></body>'
+    );
+    iframeDoc.write(templateWithId);
+  } else {
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>${RECEIPT_BASE_STYLES}</style>
+        </head>
+        <body>
+          <div id="receipt-root" style="width:800px;">${receiptHTML}</div>
+        </body>
+      </html>
+    `);
+  }
   iframeDoc.close();
 
   await new Promise((r) => setTimeout(r, 300));
@@ -255,8 +270,8 @@ export async function shareReceiptAsPdf(
       useCORS: true,
       backgroundColor: "#ffffff",
       logging: false,
-      width: 800,
-      windowWidth: 820,
+      width: captureWidth,
+      windowWidth: iframeWidth,
       scrollX: 0,
       scrollY: 0,
     });
@@ -311,20 +326,24 @@ export async function shareReceiptAsPdf(
     console.warn("PDF generation failed, falling back to print:", cdnError);
     const printWindow = window.open("", "_blank");
     if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <title>${filename}</title>
-            <style>
-              ${RECEIPT_BASE_STYLES}
-              @media print { body { padding: 10px; } }
-            </style>
-          </head>
-          <body>${receiptHTML}</body>
-        </html>
-      `);
+      if (isCustomTemplate) {
+        printWindow.document.write(customHtml!);
+      } else {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>${filename}</title>
+              <style>
+                ${RECEIPT_BASE_STYLES}
+                @media print { body { padding: 10px; } }
+              </style>
+            </head>
+            <body>${receiptHTML}</body>
+          </html>
+        `);
+      }
       printWindow.document.close();
       printWindow.print();
     }
