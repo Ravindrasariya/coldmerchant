@@ -119,44 +119,48 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
 
   const handlePrint = () => {
     if (!printRef.current) return;
-    const printContent = printRef.current.innerHTML;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Loading Receipt / लोडिंग रसीद #${transaction?.transactionNumber}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
-            .header h1 { margin: 0; font-size: 24px; }
-            .header p { margin: 5px 0; color: #555; }
-            .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; line-height: 1.4; }
-            .receipt-info > div { text-align: left; }
-            .receipt-info .right { text-align: right; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; }
-            th:last-child, td:last-child { text-align: right; }
-            th { background-color: #f5f5f5; }
-            .charges-section { margin-top: 20px; }
-            .charges-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
-            .charge-item { display: flex; justify-content: space-between; padding: 4px 0; }
-            .grand-total { font-size: 20px; font-weight: bold; text-align: right; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
-            .hindi { font-size: 0.9em; color: #666; }
-            .disclaimer { margin-top: 30px; padding: 10px; border: 1px dashed #999; text-align: center; font-size: 12px; color: #666; }
-            @media print { body { padding: 0; } button { display: none; } }
-          </style>
-        </head>
-        <body>${printContent}</body>
-      </html>
-    `);
+    if (customHtml) {
+      printWindow.document.write(customHtml);
+    } else {
+      const printContent = printRef.current.innerHTML;
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Loading Receipt / लोडिंग रसीद #${transaction?.transactionNumber}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                max-width: 800px;
+                margin: 0 auto;
+              }
+              .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+              .header h1 { margin: 0; font-size: 24px; }
+              .header p { margin: 5px 0; color: #555; }
+              .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; line-height: 1.4; }
+              .receipt-info > div { text-align: left; }
+              .receipt-info .right { text-align: right; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; }
+              th:last-child, td:last-child { text-align: right; }
+              th { background-color: #f5f5f5; }
+              .charges-section { margin-top: 20px; }
+              .charges-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+              .charge-item { display: flex; justify-content: space-between; padding: 4px 0; }
+              .grand-total { font-size: 20px; font-weight: bold; text-align: right; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
+              .hindi { font-size: 0.9em; color: #666; }
+              .disclaimer { margin-top: 30px; padding: 10px; border: 1px dashed #999; text-align: center; font-size: 12px; color: #666; }
+              @media print { body { padding: 0; } button { display: none; } }
+            </style>
+          </head>
+          <body>${printContent}</body>
+        </html>
+      `);
+    }
     printWindow.document.close();
     const imgs = printWindow.document.querySelectorAll('img');
     if (imgs.length > 0) {
