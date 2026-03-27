@@ -222,17 +222,16 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Bardan", bd],
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
-    const totalChargeRows = nonZeroCharges.length + 1;
     let chargesRowsHtml: string;
     if (nonZeroCharges.length > 0) {
       chargesRowsHtml = nonZeroCharges
         .map(([name, v], i) => {
-          const labelCell = i === 0 ? `<td colspan="3" rowspan="${totalChargeRows}" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td>` : "";
+          const labelCell = i === 0 ? `<td colspan="3" rowspan="${nonZeroCharges.length}" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td>` : "";
           return `<tr>${labelCell}<td colspan="2" style="border:1px solid #000">${name}</td><td style="text-align:right;border:1px solid #000">${fmtInr(v)}</td></tr>`;
         })
         .join("");
     } else {
-      chargesRowsHtml = `<tr><td colspan="3" rowspan="2" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
+      chargesRowsHtml = `<tr><td colspan="3" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
     }
 
     const replacements: Record<string, string> = {
