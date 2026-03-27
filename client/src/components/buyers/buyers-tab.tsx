@@ -100,11 +100,12 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
     let balance = ledgerData.openingBalance;
     rows.push({ kramank: 0, date: ledgerData.fyStart, tnxCode: "", particulars: "Opening Balance", dr: ledgerData.openingBalance, cr: 0, balance });
     ledgerData.entries.forEach((entry, idx) => {
-      balance = balance + entry.dr - entry.cr;
-      rows.push({ kramank: idx + 1, date: entry.date, tnxCode: entry.tnxCode, particulars: entry.particulars, dr: entry.dr, cr: entry.cr, balance });
+      const isClosing = entry.particulars === "Closing Balance";
+      if (!isClosing) {
+        balance = balance + entry.dr - entry.cr;
+      }
+      rows.push({ kramank: isClosing ? 0 : idx + 1, date: entry.date, tnxCode: entry.tnxCode, particulars: entry.particulars, dr: entry.dr, cr: entry.cr, balance: isClosing ? (ledgerData.closingBalance ?? balance) : balance, isClosing });
     });
-    const closingBal = ledgerData.closingBalance ?? balance;
-    rows.push({ kramank: ledgerData.entries.length + 1, date: ledgerData.fyEnd, tnxCode: "", particulars: "Closing Balance", dr: 0, cr: 0, balance: closingBal, isClosing: true });
     return rows;
   }, [ledgerData]);
 
@@ -275,7 +276,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
                 <td className="border px-2 py-1.5">{row.particulars}</td>
                 <td className="border px-2 py-1.5 text-right">{row.isClosing ? "" : formatLedgerAmount(row.dr)}</td>
                 <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{row.isClosing ? "" : formatLedgerAmount(row.cr)}</td>
-                <td className="border px-2 py-1.5 text-right font-semibold">{formatLedgerAmount(row.balance)}</td>
+                <td className="border px-2 py-1.5 text-right font-semibold">{row.isClosing ? `${formatLedgerAmount(Math.abs(row.balance))} ${row.balance >= 0 ? "Dr" : "Cr"}` : formatLedgerAmount(row.balance)}</td>
               </tr>
             ))}
           </tbody>
@@ -298,7 +299,7 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
                 {!row.isClosing && row.dr > 0 && <span>{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
                 {!row.isClosing && row.cr > 0 && <span className="text-green-700 dark:text-green-400">{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
               </div>
-              <span className="font-semibold">{t("Bal", "शेष")}: {formatLedgerAmount(row.balance)}</span>
+              <span className="font-semibold">{t("Bal", "शेष")}: {row.isClosing ? `${formatLedgerAmount(Math.abs(row.balance))} ${row.balance >= 0 ? "Dr" : "Cr"}` : formatLedgerAmount(row.balance)}</span>
             </div>
           </div>
         ))}

@@ -4055,6 +4055,16 @@ export async function registerRoutes(
 
       let closingBalance = openingBalance;
       for (const e of entries) closingBalance += e.dr - e.cr;
+      const roundedClosing = Math.round(closingBalance * 100) / 100;
+      entries.push({
+        date: fyEnd,
+        tnxCode: "",
+        particulars: "Closing Balance",
+        dr: roundedClosing > 0 ? roundedClosing : 0,
+        cr: roundedClosing < 0 ? Math.abs(roundedClosing) : 0,
+        sourceType: "payment",
+        sourceId: 0,
+      });
 
       const allDates: string[] = [];
       for (const txn of buyerTxns) { if (txn.dateOfLoading) allDates.push(txn.dateOfLoading); }
@@ -4245,6 +4255,16 @@ export async function registerRoutes(
 
       let closingBalance = openingBalance;
       for (const e of entries) closingBalance += e.cr - e.dr;
+      const roundedClosing = Math.round(closingBalance * 100) / 100;
+      entries.push({
+        date: fyEnd,
+        tnxCode: "",
+        particulars: "Closing Balance",
+        dr: roundedClosing < 0 ? Math.abs(roundedClosing) : 0,
+        cr: roundedClosing > 0 ? roundedClosing : 0,
+        sourceType: "payment",
+        sourceId: 0,
+      });
 
       const allDates: string[] = [];
       for (const se of aadhatStockEntries) { if (se.purchaseDate) allDates.push(se.purchaseDate); }
@@ -6692,6 +6712,16 @@ export async function registerRoutes(
 
       let closingBalance = openingBalance;
       for (const e of entries) closingBalance += e.cr - e.dr;
+      const roundedClosing = Math.round(closingBalance * 100) / 100;
+      entries.push({
+        date: fyEnd,
+        refCode: "",
+        particulars: "Closing Balance",
+        dr: roundedClosing < 0 ? Math.abs(roundedClosing) : 0,
+        cr: roundedClosing > 0 ? roundedClosing : 0,
+        sourceType: "payment",
+        sourceId: 0,
+      });
 
       const allDates: string[] = [];
       for (const lot of allHarvestLots) {
