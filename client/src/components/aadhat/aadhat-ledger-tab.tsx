@@ -48,8 +48,10 @@ interface AadhatLedgerData {
   merchantAddress: string;
   merchantContact: string;
   openingBalance: number;
+  closingBalance: number;
   fyStart: string;
   fyEnd: string;
+  availableFYs: string[];
   entries: LedgerEntry[];
 }
 
@@ -61,26 +63,37 @@ function AadhatLedgerSection({ aadhatId, aadhatName, t, formatLedgerAmount, form
   formatDate: (d: string) => string;
 }) {
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [selectedFy, setSelectedFy] = useState<string>("");
 
   const { data: ledgerData, isLoading } = useQuery<AadhatLedgerData>({
-    queryKey: ["/api/aadhats", aadhatId, "ledger"],
+    queryKey: ["/api/aadhats", aadhatId, "ledger", selectedFy],
     queryFn: async () => {
-      const res = await fetch(`/api/aadhats/${aadhatId}/ledger`, { credentials: "include" });
+      const fyParam = selectedFy ? `?fy=${selectedFy}` : "";
+      const res = await fetch(`/api/aadhats/${aadhatId}/ledger${fyParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch ledger");
       return res.json();
     },
     enabled: !!aadhatId,
   });
 
+  const activeFyLabel = useMemo(() => {
+    if (!ledgerData) return "";
+    const startYear = ledgerData.fyStart.substring(0, 4);
+    const endShort = String(parseInt(startYear) + 1).slice(2);
+    return `${startYear}-${endShort}`;
+  }, [ledgerData]);
+
   const ledgerRows = useMemo(() => {
     if (!ledgerData) return [];
-    const rows: { kramank: number; date: string; tnxCode: string; particulars: string; dr: number; cr: number; balance: number }[] = [];
+    const rows: { kramank: number; date: string; tnxCode: string; particulars: string; dr: number; cr: number; balance: number; isClosing?: boolean }[] = [];
     let balance = ledgerData.openingBalance;
     rows.push({ kramank: 0, date: ledgerData.fyStart, tnxCode: "", particulars: "Opening Balance", dr: 0, cr: ledgerData.openingBalance, balance });
     ledgerData.entries.forEach((entry, idx) => {
       balance = balance + entry.cr - entry.dr;
       rows.push({ kramank: idx + 1, date: entry.date, tnxCode: entry.tnxCode, particulars: entry.particulars, dr: entry.dr, cr: entry.cr, balance });
     });
+    const closingBal = ledgerData.closingBalance ?? balance;
+    rows.push({ kramank: ledgerData.entries.length + 1, date: ledgerData.fyEnd, tnxCode: "", particulars: "Closing Balance", dr: 0, cr: 0, balance: closingBal, isClosing: true });
     return rows;
   }, [ledgerData]);
 
@@ -200,20 +213,34 @@ function AadhatLedgerSection({ aadhatId, aadhatName, t, formatLedgerAmount, form
 
   return (
     <div className="bg-muted/10 border-b" data-testid={`aadhat-ledger-${aadhatId}`}>
-      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b gap-2">
         <span className="text-xs font-semibold text-muted-foreground">
-          {t("Ledger", "खाता")} — {aadhatName} (FY {ledgerData.fyStart.substring(0, 4)}-{ledgerData.fyEnd.substring(2, 4)})
+          {t("Ledger", "खाता")} — {aadhatName}
         </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handlePdfExport}
-          disabled={pdfLoading}
-          data-testid={`button-pdf-ledger-aadhat-${aadhatId}`}
-        >
-          {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-          <span className="ml-1 text-xs">{t("PDF", "PDF")}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {ledgerData.availableFYs && ledgerData.availableFYs.length > 1 && (
+            <Select value={selectedFy || activeFyLabel} onValueChange={setSelectedFy} data-testid={`select-fy-aadhat-${aadhatId}`}>
+              <SelectTrigger className="h-7 text-xs w-[110px]" data-testid={`select-fy-trigger-aadhat-${aadhatId}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ledgerData.availableFYs.map(fy => (
+                  <SelectItem key={fy} value={fy} data-testid={`select-fy-option-${fy}`}>FY {fy}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handlePdfExport}
+            disabled={pdfLoading}
+            data-testid={`button-pdf-ledger-aadhat-${aadhatId}`}
+          >
+            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            <span className="ml-1 text-xs">{t("PDF", "PDF")}</span>
+          </Button>
+        </div>
       </div>
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-xs border-collapse min-w-[600px]">
@@ -230,13 +257,13 @@ function AadhatLedgerSection({ aadhatId, aadhatName, t, formatLedgerAmount, form
           </thead>
           <tbody>
             {ledgerRows.map((row, i) => (
-              <tr key={i} className={i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : ""} data-testid={`aadhat-ledger-row-${aadhatId}-${i}`}>
-                <td className="border px-2 py-1.5 text-center text-muted-foreground">{row.kramank}</td>
+              <tr key={i} className={row.isClosing ? "bg-amber-50/50 dark:bg-amber-950/20 font-semibold border-t-2" : i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : ""} data-testid={`aadhat-ledger-row-${aadhatId}-${i}`}>
+                <td className="border px-2 py-1.5 text-center text-muted-foreground">{row.isClosing ? "" : row.kramank}</td>
                 <td className="border px-2 py-1.5">{formatDate(row.date)}</td>
                 <td className="border px-2 py-1.5 font-mono">{row.tnxCode || "—"}</td>
                 <td className="border px-2 py-1.5">{row.particulars}</td>
-                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{formatLedgerAmount(row.dr)}</td>
-                <td className="border px-2 py-1.5 text-right">{formatLedgerAmount(row.cr)}</td>
+                <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{row.isClosing ? "" : formatLedgerAmount(row.dr)}</td>
+                <td className="border px-2 py-1.5 text-right">{row.isClosing ? "" : formatLedgerAmount(row.cr)}</td>
                 <td className="border px-2 py-1.5 text-right font-semibold">{formatLedgerAmount(row.balance)}</td>
               </tr>
             ))}
@@ -247,18 +274,18 @@ function AadhatLedgerSection({ aadhatId, aadhatName, t, formatLedgerAmount, form
         {ledgerRows.map((row, i) => (
           <div
             key={i}
-            className={`rounded-md border p-3 text-xs ${i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : "bg-card"}`}
+            className={`rounded-md border p-3 text-xs ${row.isClosing ? "bg-amber-50/50 dark:bg-amber-950/20 font-semibold border-t-2" : i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.dr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : "bg-card"}`}
             data-testid={`aadhat-ledger-card-${aadhatId}-${i}`}
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-muted-foreground">#{row.kramank} · {formatDate(row.date)}</span>
+              <span className="text-muted-foreground">{row.isClosing ? "" : `#${row.kramank} · `}{formatDate(row.date)}</span>
               {row.tnxCode && <span className="font-mono text-muted-foreground">{row.tnxCode}</span>}
             </div>
             <div className="mb-1.5">{row.particulars}</div>
             <div className="flex items-center justify-between">
               <div className="flex gap-3">
-                {row.dr > 0 && <span className="text-green-700 dark:text-green-400">{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
-                {row.cr > 0 && <span>{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
+                {!row.isClosing && row.dr > 0 && <span className="text-green-700 dark:text-green-400">{t("Dr", "डे.")}: {formatLedgerAmount(row.dr)}</span>}
+                {!row.isClosing && row.cr > 0 && <span>{t("Cr", "क्रे.")}: {formatLedgerAmount(row.cr)}</span>}
               </div>
               <span className="font-semibold">{t("Bal", "शेष")}: {formatLedgerAmount(row.balance)}</span>
             </div>

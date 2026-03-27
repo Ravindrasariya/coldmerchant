@@ -3922,7 +3922,7 @@ export async function registerRoutes(
     }
   });
 
-  // GET /api/buyers/:id/ledger - Get buyer ledger entries for current FY
+  // GET /api/buyers/:id/ledger - Get buyer ledger entries for selected FY
   app.get("/api/buyers/:id/ledger", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
@@ -3938,7 +3938,13 @@ export async function registerRoutes(
       const todayDate = new Date(todayStr + "T00:00:00+05:30");
       const currentMonth = todayDate.getMonth();
       const currentYear = todayDate.getFullYear();
-      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const currentFyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+
+      const fyParam = req.query.fy as string | undefined;
+      let fyStartYear = currentFyStartYear;
+      if (fyParam && /^\d{4}-\d{2}$/.test(fyParam)) {
+        fyStartYear = parseInt(fyParam.split("-")[0]);
+      }
       const fyStart = `${fyStartYear}-04-01`;
       const fyEnd = `${fyStartYear + 1}-03-31`;
 
@@ -3953,52 +3959,6 @@ export async function registerRoutes(
         !entry.isReversed
       );
 
-      const fyTxns = buyerTxns.filter(txn =>
-        txn.dateOfLoading && txn.dateOfLoading >= fyStart && txn.dateOfLoading <= fyEnd
-      );
-      const fyCashEntries = buyerCashEntries.filter(entry =>
-        entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
-      );
-
-      let pyAllocPaid = 0;
-      for (const entry of fyCashEntries) {
-        if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
-          for (const alloc of entry.buyerAllocations) {
-            if (alloc.isPyBalance) {
-              pyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
-            }
-          }
-        }
-      }
-
-      const currentReceivable = parseFloat(buyer.receivableBalance || "0");
-      const openingBalance = currentReceivable + pyAllocPaid;
-
-      const preFyTxnIds = new Set<number>();
-      let preFyTxnDueCurrent = 0;
-      for (const txn of buyerTxns) {
-        if (txn.dateOfLoading && txn.dateOfLoading < fyStart) {
-          preFyTxnIds.add(txn.id);
-          const revenue = parseFloat(txn.revenue || "0");
-          const received = parseFloat(txn.amountReceived || "0");
-          preFyTxnDueCurrent += Math.max(0, revenue - received);
-        }
-      }
-
-      let fyAllocsToPreFyTxns = 0;
-      for (const entry of fyCashEntries) {
-        if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
-          for (const alloc of entry.buyerAllocations) {
-            if (!alloc.isPyBalance && alloc.transactionId && preFyTxnIds.has(alloc.transactionId)) {
-              fyAllocsToPreFyTxns += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
-            }
-          }
-        }
-      }
-
-      const preFyTxnDueAtFyStart = preFyTxnDueCurrent + fyAllocsToPreFyTxns;
-      const totalOpening = openingBalance + preFyTxnDueAtFyStart;
-
       interface LedgerEntry {
         date: string;
         tnxCode: string;
@@ -4009,24 +3969,21 @@ export async function registerRoutes(
         sourceId: number;
       }
 
-      const entries: LedgerEntry[] = [];
-
-      for (const txn of fyTxns) {
+      const buildBuyerEntry = (txn: typeof buyerTxns[number]): LedgerEntry | null => {
         const revenue = parseFloat(txn.revenue || "0");
-        if (revenue > 0) {
-          entries.push({
-            date: txn.dateOfLoading || "",
-            tnxCode: `Tnx #${txn.transactionNumber}`,
-            particulars: "Harvest Sale",
-            dr: revenue,
-            cr: 0,
-            sourceType: "transaction",
-            sourceId: txn.id,
-          });
-        }
-      }
+        if (revenue <= 0) return null;
+        return {
+          date: txn.dateOfLoading || "",
+          tnxCode: `Tnx #${txn.transactionNumber}`,
+          particulars: "Harvest Sale",
+          dr: revenue,
+          cr: 0,
+          sourceType: "transaction",
+          sourceId: txn.id,
+        };
+      };
 
-      for (const entry of fyCashEntries) {
+      const buildBuyerPayment = (entry: typeof buyerCashEntries[number]): LedgerEntry | null => {
         let totalApplied = 0;
         let totalPetty = 0;
         if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
@@ -4036,17 +3993,57 @@ export async function registerRoutes(
           }
         }
         const totalCr = totalApplied + totalPetty;
-        if (totalCr > 0) {
-          const hasPy = entry.buyerAllocations?.some((a: { isPyBalance?: boolean }) => a.isPyBalance);
-          entries.push({
-            date: entry.entryDate || "",
-            tnxCode: entry.transactionCode || "",
-            particulars: hasPy ? "Payment (incl. PY)" : "Payment (Cash)",
-            dr: 0,
-            cr: totalCr,
-            sourceType: "payment",
-            sourceId: entry.id,
-          });
+        if (totalCr <= 0) return null;
+        const hasPy = entry.buyerAllocations?.some((a: { isPyBalance?: boolean }) => a.isPyBalance);
+        return {
+          date: entry.entryDate || "",
+          tnxCode: entry.transactionCode || "",
+          particulars: hasPy ? "Payment (incl. PY)" : "Payment (Cash)",
+          dr: 0,
+          cr: totalCr,
+          sourceType: "payment",
+          sourceId: entry.id,
+        };
+      };
+
+      const baseReceivable = parseFloat(buyer.receivableBalance || "0");
+      let allTimePyAllocPaid = 0;
+      for (const entry of buyerCashEntries) {
+        if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
+          for (const alloc of entry.buyerAllocations) {
+            if (alloc.isPyBalance) {
+              allTimePyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            }
+          }
+        }
+      }
+      const originalPyReceivable = baseReceivable + allTimePyAllocPaid;
+
+      let openingBalance = originalPyReceivable;
+      for (const txn of buyerTxns) {
+        if (txn.dateOfLoading && txn.dateOfLoading < fyStart) {
+          const e = buildBuyerEntry(txn);
+          if (e) openingBalance += e.dr - e.cr;
+        }
+      }
+      for (const entry of buyerCashEntries) {
+        if (entry.entryDate && entry.entryDate < fyStart) {
+          const e = buildBuyerPayment(entry);
+          if (e) openingBalance += e.dr - e.cr;
+        }
+      }
+
+      const entries: LedgerEntry[] = [];
+      for (const txn of buyerTxns) {
+        if (txn.dateOfLoading && txn.dateOfLoading >= fyStart && txn.dateOfLoading <= fyEnd) {
+          const e = buildBuyerEntry(txn);
+          if (e) entries.push(e);
+        }
+      }
+      for (const entry of buyerCashEntries) {
+        if (entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd) {
+          const e = buildBuyerPayment(entry);
+          if (e) entries.push(e);
         }
       }
 
@@ -4056,6 +4053,27 @@ export async function registerRoutes(
         return a.sourceId - b.sourceId;
       });
 
+      let closingBalance = openingBalance;
+      for (const e of entries) closingBalance += e.dr - e.cr;
+
+      const allDates: string[] = [];
+      for (const txn of buyerTxns) { if (txn.dateOfLoading) allDates.push(txn.dateOfLoading); }
+      for (const entry of buyerCashEntries) { if (entry.entryDate) allDates.push(entry.entryDate); }
+      const availableFYs: string[] = [];
+      const fyYearsSet = new Set<number>();
+      fyYearsSet.add(currentFyStartYear);
+      for (const d of allDates) {
+        const dt = new Date(d + "T00:00:00+05:30");
+        const m = dt.getMonth();
+        const y = dt.getFullYear();
+        fyYearsSet.add(m >= 3 ? y : y - 1);
+      }
+      const sortedFyYears = Array.from(fyYearsSet).sort((a, b) => b - a);
+      for (const y of sortedFyYears) {
+        const short = String(y + 1).slice(2);
+        availableFYs.push(`${y}-${short}`);
+      }
+
       const merchant = await storage.getMerchant(merchantId);
       res.json({
         buyerId,
@@ -4064,9 +4082,11 @@ export async function registerRoutes(
         merchantName: merchant?.name || "",
         merchantAddress: merchant?.address || "",
         merchantContact: merchant?.contactNumber || "",
-        openingBalance: totalOpening,
+        openingBalance: Math.round(openingBalance * 100) / 100,
+        closingBalance: Math.round(closingBalance * 100) / 100,
         fyStart,
         fyEnd,
+        availableFYs,
         entries,
       });
     } catch (error) {
@@ -4091,7 +4111,13 @@ export async function registerRoutes(
       const todayDate = new Date(todayStr + "T00:00:00+05:30");
       const currentMonth = todayDate.getMonth();
       const currentYear = todayDate.getFullYear();
-      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const currentFyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+
+      const fyParam = req.query.fy as string | undefined;
+      let fyStartYear = currentFyStartYear;
+      if (fyParam && /^\d{4}-\d{2}$/.test(fyParam)) {
+        fyStartYear = parseInt(fyParam.split("-")[0]);
+      }
       const fyStart = `${fyStartYear}-04-01`;
       const fyEnd = `${fyStartYear + 1}-03-31`;
 
@@ -4117,56 +4143,6 @@ export async function registerRoutes(
         lotsByEntryId.set(lot.stockEntryId, arr);
       }
 
-      const fyStockEntries = aadhatStockEntries.filter(se =>
-        se.purchaseDate && se.purchaseDate >= fyStart && se.purchaseDate <= fyEnd
-      );
-      const fyCashEntries = aadhatCashEntries.filter(entry =>
-        entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
-      );
-
-      let pyAllocPaid = 0;
-      for (const entry of fyCashEntries) {
-        if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
-          for (const alloc of entry.aadhatAllocations) {
-            if (alloc.isPyPayable) {
-              pyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.discountAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
-            }
-          }
-        }
-      }
-
-      const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
-      const openingPyPayable = currentPyPayable + pyAllocPaid;
-
-      const preFyStockEntryIds = new Set<number>();
-      let preFyStockDueCurrent = 0;
-      for (const se of aadhatStockEntries) {
-        if (se.purchaseDate && se.purchaseDate < fyStart) {
-          preFyStockEntryIds.add(se.id);
-          const entryLots = lotsByEntryId.get(se.id) || [];
-          let netPayable = 0;
-          for (const lot of entryLots) {
-            netPayable += parseFloat(lot.netPayable || "0");
-          }
-          const paid = parseFloat(se.amountPaid || "0");
-          preFyStockDueCurrent += Math.max(0, netPayable - paid);
-        }
-      }
-
-      let fyAllocsToPreFyStock = 0;
-      for (const entry of fyCashEntries) {
-        if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
-          for (const alloc of entry.aadhatAllocations) {
-            if (!alloc.isPyPayable && alloc.stockEntryId && preFyStockEntryIds.has(alloc.stockEntryId)) {
-              fyAllocsToPreFyStock += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.discountAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
-            }
-          }
-        }
-      }
-
-      const preFyStockDueAtFyStart = preFyStockDueCurrent + fyAllocsToPreFyStock;
-      const totalOpening = openingPyPayable + preFyStockDueAtFyStart;
-
       interface LedgerEntry {
         date: string;
         tnxCode: string;
@@ -4177,28 +4153,25 @@ export async function registerRoutes(
         sourceId: number;
       }
 
-      const entries: LedgerEntry[] = [];
-
-      for (const se of fyStockEntries) {
+      const buildAadhatStockEntry = (se: StockEntryRecord): LedgerEntry | null => {
         const entryLots = lotsByEntryId.get(se.id) || [];
         let netPayable = 0;
         for (const lot of entryLots) {
           netPayable += parseFloat(lot.netPayable || "0");
         }
-        if (netPayable > 0) {
-          entries.push({
-            date: se.purchaseDate || "",
-            tnxCode: se.uniqueId || `SE #${se.serialNumber}`,
-            particulars: "Harvest Purchase",
-            dr: 0,
-            cr: netPayable,
-            sourceType: "stock_entry",
-            sourceId: se.id,
-          });
-        }
-      }
+        if (netPayable <= 0) return null;
+        return {
+          date: se.purchaseDate || "",
+          tnxCode: se.uniqueId || `SE #${se.serialNumber}`,
+          particulars: "Harvest Purchase",
+          dr: 0,
+          cr: netPayable,
+          sourceType: "stock_entry",
+          sourceId: se.id,
+        };
+      };
 
-      for (const entry of fyCashEntries) {
+      const buildAadhatPayment = (entry: typeof aadhatCashEntries[number]): LedgerEntry | null => {
         let totalApplied = 0;
         let totalDiscount = 0;
         let totalPetty = 0;
@@ -4210,17 +4183,57 @@ export async function registerRoutes(
           }
         }
         const totalDr = totalApplied + totalDiscount + totalPetty;
-        if (totalDr > 0) {
-          const hasPy = entry.aadhatAllocations?.some((a: Record<string, unknown>) => a.isPyPayable);
-          entries.push({
-            date: entry.entryDate || "",
-            tnxCode: entry.transactionCode || "",
-            particulars: hasPy ? "Payment (incl. PY)" : "Payment",
-            dr: totalDr,
-            cr: 0,
-            sourceType: "payment",
-            sourceId: entry.id,
-          });
+        if (totalDr <= 0) return null;
+        const hasPy = entry.aadhatAllocations?.some((a: Record<string, unknown>) => a.isPyPayable);
+        return {
+          date: entry.entryDate || "",
+          tnxCode: entry.transactionCode || "",
+          particulars: hasPy ? "Payment (incl. PY)" : "Payment",
+          dr: totalDr,
+          cr: 0,
+          sourceType: "payment",
+          sourceId: entry.id,
+        };
+      };
+
+      const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
+      let allTimePyAllocPaid = 0;
+      for (const entry of aadhatCashEntries) {
+        if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
+          for (const alloc of entry.aadhatAllocations) {
+            if (alloc.isPyPayable) {
+              allTimePyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.discountAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+            }
+          }
+        }
+      }
+      const originalPyPayable = currentPyPayable + allTimePyAllocPaid;
+
+      let openingBalance = originalPyPayable;
+      for (const se of aadhatStockEntries) {
+        if (se.purchaseDate && se.purchaseDate < fyStart) {
+          const e = buildAadhatStockEntry(se);
+          if (e) openingBalance += e.cr - e.dr;
+        }
+      }
+      for (const entry of aadhatCashEntries) {
+        if (entry.entryDate && entry.entryDate < fyStart) {
+          const e = buildAadhatPayment(entry);
+          if (e) openingBalance += e.cr - e.dr;
+        }
+      }
+
+      const entries: LedgerEntry[] = [];
+      for (const se of aadhatStockEntries) {
+        if (se.purchaseDate && se.purchaseDate >= fyStart && se.purchaseDate <= fyEnd) {
+          const e = buildAadhatStockEntry(se);
+          if (e) entries.push(e);
+        }
+      }
+      for (const entry of aadhatCashEntries) {
+        if (entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd) {
+          const e = buildAadhatPayment(entry);
+          if (e) entries.push(e);
         }
       }
 
@@ -4230,6 +4243,27 @@ export async function registerRoutes(
         return a.sourceId - b.sourceId;
       });
 
+      let closingBalance = openingBalance;
+      for (const e of entries) closingBalance += e.cr - e.dr;
+
+      const allDates: string[] = [];
+      for (const se of aadhatStockEntries) { if (se.purchaseDate) allDates.push(se.purchaseDate); }
+      for (const entry of aadhatCashEntries) { if (entry.entryDate) allDates.push(entry.entryDate); }
+      const availableFYs: string[] = [];
+      const fyYearsSet = new Set<number>();
+      fyYearsSet.add(currentFyStartYear);
+      for (const d of allDates) {
+        const dt = new Date(d + "T00:00:00+05:30");
+        const m = dt.getMonth();
+        const y = dt.getFullYear();
+        fyYearsSet.add(m >= 3 ? y : y - 1);
+      }
+      const sortedFyYears = Array.from(fyYearsSet).sort((a, b) => b - a);
+      for (const y of sortedFyYears) {
+        const short = String(y + 1).slice(2);
+        availableFYs.push(`${y}-${short}`);
+      }
+
       const merchant = await storage.getMerchant(merchantId);
       res.json({
         aadhatId: aadhatId,
@@ -4238,9 +4272,11 @@ export async function registerRoutes(
         merchantName: merchant?.name || "",
         merchantAddress: merchant?.address || "",
         merchantContact: merchant?.contactNumber || "",
-        openingBalance: totalOpening,
+        openingBalance: Math.round(openingBalance * 100) / 100,
+        closingBalance: Math.round(closingBalance * 100) / 100,
         fyStart,
         fyEnd,
+        availableFYs,
         entries,
       });
     } catch (error) {
@@ -6469,18 +6505,15 @@ export async function registerRoutes(
       const todayDate = new Date(todayStr + "T00:00:00+05:30");
       const currentMonth = todayDate.getMonth();
       const currentYear = todayDate.getFullYear();
-      const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const currentFyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+
+      const fyParam = req.query.fy as string | undefined;
+      let fyStartYear = currentFyStartYear;
+      if (fyParam && /^\d{4}-\d{2}$/.test(fyParam)) {
+        fyStartYear = parseInt(fyParam.split("-")[0]);
+      }
       const fyStart = `${fyStartYear}-04-01`;
       const fyEnd = `${fyStartYear + 1}-03-31`;
-
-      const currentPyPayable = parseFloat(csRecord.pyPayable || "0");
-      let pyAllocPaid = 0;
-      for (const alloc of allAllocations) {
-        if (alloc.isPyPayable) {
-          pyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
-        }
-      }
-      const openingBalance = currentPyPayable + pyAllocPaid;
 
       const seMap = new Map<number, { serialNumber: number }>();
       for (const se of allStockEntries) {
@@ -6500,8 +6533,6 @@ export async function registerRoutes(
         sourceType: "harvest_charge" | "seed_charge" | "payment";
         sourceId: number;
       }
-
-      const entries: CsLedgerEntry[] = [];
 
       interface LotCharge {
         type?: string;
@@ -6527,56 +6558,6 @@ export async function registerRoutes(
           .reduce((sum: number, c: LotCharge) => sum + (parseFloat(String(c.amount)) || 0), 0);
       };
 
-      for (const lot of allHarvestLots) {
-        let totalCharges = 0;
-        if (lot.coldStoreDbId === coldStoreDbId) {
-          totalCharges = getColdStoreChargesFromArray(lot.charges);
-        } else if (lot.place === "farm_gate") {
-          totalCharges = getColdStoreChargesForCS(lot.charges, coldStoreDbId);
-        }
-        if (totalCharges <= 0) continue;
-
-        const lotDate = lot.createdAt ? new Date(lot.createdAt).toISOString().split("T")[0] : "";
-        if (!lotDate || lotDate < fyStart || lotDate > fyEnd) continue;
-
-        const seInfo = seMap.get(lot.stockEntryId);
-        const srLabel = seInfo ? `SR #${seInfo.serialNumber}` : "";
-        const lotLabel = lot.coldStoreLotNumber ? ` Lot #${lot.coldStoreLotNumber}` : "";
-
-        entries.push({
-          date: lotDate,
-          refCode: `${srLabel}${lotLabel}`,
-          particulars: "Harvest Cold Store Charges",
-          dr: 0,
-          cr: Math.round(totalCharges * 100) / 100,
-          sourceType: "harvest_charge",
-          sourceId: lot.id,
-        });
-      }
-
-      for (const sLot of allSeedLots) {
-        if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== coldStoreDbId) continue;
-        const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
-        const totalCharges = chargesPerBag * (sLot.originalBags || 0);
-        if (totalCharges <= 0) continue;
-
-        const lotDate = sLot.createdAt ? new Date(sLot.createdAt).toISOString().split("T")[0] : "";
-        if (!lotDate || lotDate < fyStart || lotDate > fyEnd) continue;
-
-        const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
-        const srLabel = seedSeInfo ? `SR #${seedSeInfo.serialNumber}` : "";
-
-        entries.push({
-          date: lotDate,
-          refCode: srLabel,
-          particulars: "Seed Cold Store Charges",
-          dr: 0,
-          cr: Math.round(totalCharges * 100) / 100,
-          sourceType: "seed_charge",
-          sourceId: sLot.id,
-        });
-      }
-
       const allocsByEntryId = new Map<number, typeof allAllocations>();
       for (const alloc of allAllocations) {
         const arr = allocsByEntryId.get(alloc.cashEntryId) || [];
@@ -6591,15 +6572,54 @@ export async function registerRoutes(
         !entry.isReversed
       );
 
-      const fyCashEntries = csCashEntries.filter(entry =>
-        entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd
-      );
+      const buildHarvestChargeEntry = (lot: typeof allHarvestLots[number]): CsLedgerEntry | null => {
+        let totalCharges = 0;
+        if (lot.coldStoreDbId === coldStoreDbId) {
+          totalCharges = getColdStoreChargesFromArray(lot.charges);
+        } else if (lot.place === "farm_gate") {
+          totalCharges = getColdStoreChargesForCS(lot.charges, coldStoreDbId);
+        }
+        if (totalCharges <= 0) return null;
+        const lotDate = lot.createdAt ? new Date(lot.createdAt).toISOString().split("T")[0] : "";
+        if (!lotDate) return null;
+        const seInfo = seMap.get(lot.stockEntryId);
+        const srLabel = seInfo ? `SR #${seInfo.serialNumber}` : "";
+        const lotLabel = lot.coldStoreLotNumber ? ` Lot #${lot.coldStoreLotNumber}` : "";
+        return {
+          date: lotDate,
+          refCode: `${srLabel}${lotLabel}`,
+          particulars: "Harvest Cold Store Charges",
+          dr: 0,
+          cr: Math.round(totalCharges * 100) / 100,
+          sourceType: "harvest_charge",
+          sourceId: lot.id,
+        };
+      };
 
-      for (const entry of fyCashEntries) {
+      const buildSeedChargeEntry = (sLot: typeof allSeedLots[number]): CsLedgerEntry | null => {
+        if (!sLot.coldStoreDbId || sLot.coldStoreDbId !== coldStoreDbId) return null;
+        const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
+        const totalCharges = chargesPerBag * (sLot.originalBags || 0);
+        if (totalCharges <= 0) return null;
+        const lotDate = sLot.createdAt ? new Date(sLot.createdAt).toISOString().split("T")[0] : "";
+        if (!lotDate) return null;
+        const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
+        const srLabel = seedSeInfo ? `SR #${seedSeInfo.serialNumber}` : "";
+        return {
+          date: lotDate,
+          refCode: srLabel,
+          particulars: "Seed Cold Store Charges",
+          dr: 0,
+          cr: Math.round(totalCharges * 100) / 100,
+          sourceType: "seed_charge",
+          sourceId: sLot.id,
+        };
+      };
+
+      const buildCsPaymentEntry = (entry: typeof csCashEntries[number]): CsLedgerEntry | null => {
         const entryAllocs = allocsByEntryId.get(entry.id) || [];
         let totalDr = 0;
         let hasPy = false;
-
         if (entryAllocs.length > 0) {
           for (const alloc of entryAllocs) {
             totalDr += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
@@ -6608,13 +6628,10 @@ export async function registerRoutes(
         } else {
           totalDr = parseFloat(entry.amount || "0");
         }
-
-        if (totalDr <= 0) continue;
-
+        if (totalDr <= 0) return null;
         const modeLabel = entry.paymentMode === "account_transfer" ? "Account" : "Cash";
         const pyLabel = hasPy ? " (incl. PY)" : "";
-
-        entries.push({
+        return {
           date: entry.entryDate || "",
           refCode: entry.transactionCode || "",
           particulars: `Payment (${modeLabel})${pyLabel}`,
@@ -6622,7 +6639,48 @@ export async function registerRoutes(
           cr: 0,
           sourceType: "payment",
           sourceId: entry.id,
-        });
+        };
+      };
+
+      const currentPyPayable = parseFloat(csRecord.pyPayable || "0");
+      let allTimePyAllocPaid = 0;
+      for (const alloc of allAllocations) {
+        if (alloc.isPyPayable && alloc.coldStoreId === coldStoreDbId) {
+          allTimePyAllocPaid += parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0");
+        }
+      }
+      const originalPyPayable = currentPyPayable + allTimePyAllocPaid;
+
+      let openingBalance = originalPyPayable;
+      for (const lot of allHarvestLots) {
+        const e = buildHarvestChargeEntry(lot);
+        if (e && e.date < fyStart) openingBalance += e.cr - e.dr;
+      }
+      for (const sLot of allSeedLots) {
+        const e = buildSeedChargeEntry(sLot);
+        if (e && e.date < fyStart) openingBalance += e.cr - e.dr;
+      }
+      for (const entry of csCashEntries) {
+        if (entry.entryDate && entry.entryDate < fyStart) {
+          const e = buildCsPaymentEntry(entry);
+          if (e) openingBalance += e.cr - e.dr;
+        }
+      }
+
+      const entries: CsLedgerEntry[] = [];
+      for (const lot of allHarvestLots) {
+        const e = buildHarvestChargeEntry(lot);
+        if (e && e.date >= fyStart && e.date <= fyEnd) entries.push(e);
+      }
+      for (const sLot of allSeedLots) {
+        const e = buildSeedChargeEntry(sLot);
+        if (e && e.date >= fyStart && e.date <= fyEnd) entries.push(e);
+      }
+      for (const entry of csCashEntries) {
+        if (entry.entryDate && entry.entryDate >= fyStart && entry.entryDate <= fyEnd) {
+          const e = buildCsPaymentEntry(entry);
+          if (e) entries.push(e);
+        }
       }
 
       entries.sort((a, b) => {
@@ -6632,6 +6690,34 @@ export async function registerRoutes(
         return a.sourceId - b.sourceId;
       });
 
+      let closingBalance = openingBalance;
+      for (const e of entries) closingBalance += e.cr - e.dr;
+
+      const allDates: string[] = [];
+      for (const lot of allHarvestLots) {
+        const e = buildHarvestChargeEntry(lot);
+        if (e) allDates.push(e.date);
+      }
+      for (const sLot of allSeedLots) {
+        const e = buildSeedChargeEntry(sLot);
+        if (e) allDates.push(e.date);
+      }
+      for (const entry of csCashEntries) { if (entry.entryDate) allDates.push(entry.entryDate); }
+      const availableFYs: string[] = [];
+      const fyYearsSet = new Set<number>();
+      fyYearsSet.add(currentFyStartYear);
+      for (const d of allDates) {
+        const dt = new Date(d + "T00:00:00+05:30");
+        const m = dt.getMonth();
+        const y = dt.getFullYear();
+        fyYearsSet.add(m >= 3 ? y : y - 1);
+      }
+      const sortedFyYears = Array.from(fyYearsSet).sort((a, b) => b - a);
+      for (const y of sortedFyYears) {
+        const short = String(y + 1).slice(2);
+        availableFYs.push(`${y}-${short}`);
+      }
+
       const merchant = await storage.getMerchant(merchantId);
       res.json({
         coldStoreId: coldStoreDbId,
@@ -6640,9 +6726,11 @@ export async function registerRoutes(
         merchantName: merchant?.name || "",
         merchantAddress: merchant?.address || "",
         merchantContact: merchant?.contactNumber || "",
-        openingBalance,
+        openingBalance: Math.round(openingBalance * 100) / 100,
+        closingBalance: Math.round(closingBalance * 100) / 100,
         fyStart,
         fyEnd,
+        availableFYs,
         entries,
       });
     } catch (error) {
