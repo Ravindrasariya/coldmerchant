@@ -2084,8 +2084,14 @@ export async function registerRoutes(
         newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum;
         newProfitLoss = (lotAmounts - totalCostOfGoods) + scNum;
       } else {
-        const existingRevenueNum = parseFloat(existingTxn.revenue || "0");
-        newProfitLoss = existingRevenueNum - totalCostOfGoods - transportNum - otherNum;
+        const saleRevenueNum = revenue !== undefined ? parseFloat(revenue) || 0 : parseFloat(existingTxn.revenue || "0");
+        if (revenue !== undefined) {
+          newRevenue = saleRevenueNum;
+          if (!decimalEqual(revenue, existingTxn.revenue)) {
+            changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: saleRevenueNum.toString() });
+          }
+        }
+        newProfitLoss = saleRevenueNum - totalCostOfGoods - transportNum - otherNum;
       }
       
       if (!decimalEqual(newProfitLoss, existingTxn.profitLoss)) {
@@ -2178,7 +2184,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { items } = req.body; // Array of { id?, inventoryKey?, bagsMoved, action: 'update'|'add'|'remove' }
+      const { items, overallRevenue } = req.body; // items: Array of { id?, inventoryKey?, bagsMoved, action: 'update'|'add'|'remove' }
       if (!items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Items array is required" });
       }
@@ -2474,7 +2480,10 @@ export async function registerRoutes(
       } else {
         const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
         const otherCharges = parseFloat(existingTxn.otherCharges || "0");
-        newProfitLoss = newTotalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges;
+        if (overallRevenue !== undefined && overallRevenue !== null) {
+          finalRevenue = parseFloat(overallRevenue) || 0;
+        }
+        newProfitLoss = finalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges;
       }
       
       // Update transaction totals with aggregated revenue

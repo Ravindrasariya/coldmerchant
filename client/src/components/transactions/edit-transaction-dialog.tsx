@@ -166,6 +166,7 @@ const editTransactionSchema = z.object({
   amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
+  revenue: z.coerce.number().optional(),
   remarks: z.string().optional(),
   salesCommission: z.coerce.number().optional(),
   totalMandiCommission: z.coerce.number().optional(),
@@ -269,6 +270,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [aadhatPct, setAadhatPct] = useState(0);
   const [hammaliRate, setHammaliRate] = useState(0);
   const [salesCommPct, setSalesCommPct] = useState(0);
+  const [revenueOverridden, setRevenueOverridden] = useState(false);
+  const [prevItemRevenueFingerprint, setPrevItemRevenueFingerprint] = useState("");
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers"],
@@ -295,6 +298,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       amountReceived: undefined,
       transportationCharges: undefined,
       otherCharges: undefined,
+      revenue: undefined,
       remarks: "",
       salesCommission: undefined,
       totalMandiCommission: undefined,
@@ -319,6 +323,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges && parseFloat(transaction.transportationCharges) !== 0 ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? parseFloat(transaction.otherCharges) : undefined,
+        revenue: transaction.revenue ? parseFloat(transaction.revenue) : undefined,
         remarks: transaction.remarks || "",
         salesCommission: transaction.salesCommission ? parseFloat(transaction.salesCommission) : undefined,
         totalMandiCommission: transaction.totalMandiCommission ? parseFloat(transaction.totalMandiCommission) : undefined,
@@ -335,6 +340,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const activeCharges = chargeKeys.filter(k => transaction[k] && parseFloat(transaction[k] as string) !== 0);
       setVisibleEditCharges(activeCharges);
       setSelectedBuyerId(transaction.buyerId || null);
+      setRevenueOverridden(false);
+      setPrevItemRevenueFingerprint("");
 
       const txnRevenue = transaction.items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
       const txnBags = transaction.items.reduce((sum, i) => sum + i.bagsMoved, 0);
@@ -380,6 +387,27 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       })));
     }
   }, [transaction, form]);
+
+  const computedLotRevenue = editableItems
+    .filter(i => i.action !== 'remove')
+    .reduce((sum, i) => sum + (i.revenue || 0), 0);
+  const itemRevenueFingerprint = editableItems
+    .filter(i => i.action !== 'remove')
+    .map(i => `${i.id}:${i.bagsMoved}:${i.netWeight}:${i.revenue}`)
+    .join("|");
+
+  useEffect(() => {
+    if (!transaction || transaction.transactionType === "loading") return;
+    if (prevItemRevenueFingerprint === "") {
+      setPrevItemRevenueFingerprint(itemRevenueFingerprint);
+      return;
+    }
+    if (itemRevenueFingerprint !== prevItemRevenueFingerprint) {
+      setPrevItemRevenueFingerprint(itemRevenueFingerprint);
+      setRevenueOverridden(false);
+      form.setValue("revenue", parseFloat(computedLotRevenue.toFixed(1)));
+    }
+  }, [itemRevenueFingerprint, prevItemRevenueFingerprint, transaction, form, computedLotRevenue]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: EditTransactionFormData & { buyerId?: number | null }) => {
@@ -494,7 +522,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         }
         return base;
       });
-      return apiRequest("PUT", `/api/transactions/${transactionId}/items`, { items: itemsToSend });
+      const payload: Record<string, unknown> = { items: itemsToSend };
+      if (!isLoadingType) {
+        payload.overallRevenue = form.getValues("revenue");
+      }
+      return apiRequest("PUT", `/api/transactions/${transactionId}/items`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -1499,13 +1531,34 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
-                        <div className="mt-2 h-9 px-3 py-2 rounded-md border bg-muted text-sm flex items-center" data-testid="display-revenue">
-                          ₹{parseFloat(editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0).toFixed(1)).toLocaleString('en-IN')}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">({t("sum of lot revenues", "लॉट राजस्व का योग")})</p>
-                      </div>
+                      <FormField
+                        control={form.control}
+                        name="revenue"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Revenue", "राजस्व")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="any"
+                                placeholder="0"
+                                {...field}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  setRevenueOverridden(true);
+                                }}
+                                data-testid="input-revenue"
+                              />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {revenueOverridden
+                                ? t("manually entered", "मैन्युअल रूप से दर्ज")
+                                : `(${t("sum of lot revenues", "लॉट राजस्व का योग")})`}
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={form.control}
                         name="amountReceived"
@@ -1553,7 +1606,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
                     <ProfitLossDisplay 
                       totalCostOfGoods={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.costOfGoods || 0), 0)}
-                      revenue={editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.revenue || 0), 0)}
+                      revenue={form.watch("revenue") || 0}
                       transportationCharges={form.watch("transportationCharges") || 0}
                       otherCharges={form.watch("otherCharges") || 0}
                       isLoadingType={false}
