@@ -94,7 +94,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 },
   ]);
 
-  const [salesCommissionPct, setSalesCommissionPct] = useState(0);
+  const [salesCommissionPct, setSalesCommissionPct] = useState(() => {
+    const stored = localStorage.getItem("vyapar_sales_comm_pct");
+    return stored ? Number(stored) || 0 : 0;
+  });
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
 
@@ -374,7 +377,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setPartyName("");
     setPartyAddress("");
     setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 }]);
-    setSalesCommissionPct(0);
+    setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
     setDriverAdvance(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
@@ -976,7 +979,11 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       step="any"
                       className="pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={salesCommissionPct || ""}
-                      onChange={(e) => setSalesCommissionPct(Number(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setSalesCommissionPct(val);
+                        localStorage.setItem("vyapar_sales_comm_pct", String(val));
+                      }}
                       placeholder="0"
                       data-testid="input-loading-sales-commission"
                     />
