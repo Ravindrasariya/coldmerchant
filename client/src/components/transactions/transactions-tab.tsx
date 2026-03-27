@@ -209,6 +209,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
 
     const headers = [
       t("Txn #", "लेनदेन #"),
+      t("Type", "प्रकार"),
       t("Date", "तिथि"),
       t("Buyer Name", "खरीदार का नाम"),
       t("Vehicle #", "वाहन #"),
@@ -260,6 +261,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
 
       return [
         txn.transactionNumber.toString(),
+        txn.transactionType === "loading" ? t("Loading", "लोडिंग") : t("Bikri", "बिक्री"),
         format(new Date(txn.createdAt), "dd/MM/yyyy"),
         txn.partyName || "-",
         txn.vehicleNumber || "-",
@@ -723,9 +725,13 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                     year: "numeric",
                   })}
                 </span>
-                {transaction.transactionType === "loading" && (
+                {transaction.transactionType === "loading" ? (
                   <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-600 h-5">
                     {t("Loading", "लोडिंग")}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-600 h-5" data-testid={`badge-bikri-${transaction.id}`}>
+                    {t("Bikri", "बिक्री")}
                   </Badge>
                 )}
               </div>
