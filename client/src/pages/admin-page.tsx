@@ -1093,7 +1093,7 @@ export default function AdminPage() {
       </Tabs>
 
       <Dialog open={merchantDialogOpen} onOpenChange={setMerchantDialogOpen}>
-        <DialogContent data-no-capitalize>
+        <DialogContent data-no-capitalize className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingMerchant ? "Edit Merchant" : "Add New Merchant"}</DialogTitle>
           </DialogHeader>
