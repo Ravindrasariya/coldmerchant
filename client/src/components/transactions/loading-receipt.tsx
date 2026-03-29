@@ -204,7 +204,28 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       return null;
     } else {
       html = defaultLoadingTemplate;
-      minRows = 22;
+      // Dynamic row count: A4 content height (~1047px) minus all fixed elements.
+      // Fixed px breakdown (estimates): header 91 + buyer-table 107 +
+      //   items-thead 28 + items-tfoot 28 + words-row 28 + signature 17
+      //   + safety buffer 41 = 340px. Each charge row ~26px.
+      // chargeRows = max(nonZeroCount, 1) + 1 (SALES BILL label + net-amount row).
+      const _nonZeroCount = [
+        parseFloat(transaction.totalHammali || "0"),
+        parseFloat(transaction.salesCommission || "0"),
+        parseFloat(transaction.totalMandiCommission || "0"),
+        parseFloat(transaction.totalAadhatCommission || "0"),
+        parseFloat(transaction.tulai || "0"),
+        parseFloat(transaction.majduri || "0"),
+        parseFloat(transaction.thelaBhada || "0"),
+        parseFloat(transaction.palaKarai || "0"),
+        parseFloat(transaction.bardan || "0"),
+        parseFloat(transaction.advancePayment || "0"),
+        parseFloat(transaction.otherCharges || "0"),
+      ].filter(v => v > 0).length;
+      const _chargeRows = Math.max(_nonZeroCount, 1) + 1;
+      const _fixedPx = 340 + _chargeRows * 26;
+      const _availPx = 1047 - _fixedPx;
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24));
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
