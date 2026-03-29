@@ -613,13 +613,12 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
   }
 
-  async getNextSerialNumber(merchantId: number, crop: string = "potato"): Promise<number> {
+  async getNextSerialNumber(merchantId: number, crop?: string): Promise<number> {
     const currentYear = getISTYear();
     const [result] = await db.select({ maxSerial: stockEntries.serialNumber })
       .from(stockEntries)
       .where(and(
         eq(stockEntries.merchantId, merchantId),
-        eq(stockEntries.crop, crop),
         sql`EXTRACT(YEAR FROM ${stockEntries.purchaseDate}) = ${currentYear}`
       ))
       .orderBy(desc(stockEntries.serialNumber))
@@ -823,13 +822,12 @@ export class DatabaseStorage implements IStorage {
     return { ...created, items: createdItems };
   }
 
-  async getNextTransactionNumber(merchantId: number, crop: string = "potato"): Promise<number> {
+  async getNextTransactionNumber(merchantId: number, crop?: string): Promise<number> {
     const currentYear = getISTYear();
     const [result] = await db.select()
       .from(transactions)
       .where(and(
         eq(transactions.merchantId, merchantId),
-        eq(transactions.crop, crop),
         sql`EXTRACT(YEAR FROM ${transactions.createdAt}) = ${currentYear}`
       ))
       .orderBy(desc(transactions.transactionNumber))
