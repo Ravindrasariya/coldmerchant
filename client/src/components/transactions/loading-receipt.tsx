@@ -191,7 +191,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const buildCustomHtml = () => {
-    if (!transaction) return null;
+    if (!transaction || !merchant) return null;
     // Priority 1: custom per-merchant HTML template
     // Priority 2: header image → return null so JSX layout handles it
     // Priority 3: built-in Indore default template
