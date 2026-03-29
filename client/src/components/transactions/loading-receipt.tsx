@@ -204,7 +204,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       return null;
     } else {
       html = defaultLoadingTemplate;
-      minRows = 6;
+      minRows = 22;
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
