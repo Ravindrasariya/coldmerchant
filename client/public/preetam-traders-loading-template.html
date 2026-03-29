@@ -24,14 +24,14 @@
     /* Items table overlaid on the pre-printed grid lines */
     .items-table {
       position: absolute;
-      top: 501px;
+      top: 462px;
       left: 8px;
       width: 774px;
       border-collapse: collapse;
       background: transparent;
     }
     .items-table td {
-      height: 58px;
+      height: 47px;
       border: none;
       background: transparent;
       padding: 2px 6px;
@@ -41,7 +41,7 @@
     }
     /* Column widths matching pre-printed columns */
     .items-table td:nth-child(1) { text-align: left; width: 28%; }
-    .items-table td:nth-child(2) { display: none; } /* Marka — hidden */
+    .items-table td:nth-child(2) { display: none; } /* Marka hidden */
     .items-table td:nth-child(3) { width: 12%; }
     .items-table td:nth-child(4) { width: 14%; }
     .items-table td:nth-child(5) { width: 14%; }
@@ -50,10 +50,10 @@
     /* Charges overlay — white wash over whited-out pre-printed labels */
     .charges-overlay {
       position: absolute;
-      top: 845px;
-      right: 10px;
-      width: 250px;
-      min-height: 175px;
+      top: 850px;
+      right: 8px;
+      width: 190px;
+      min-height: 200px;
       background: white;
       padding: 4px 6px;
     }
@@ -64,7 +64,7 @@
       color: #000;
     }
     .charges-table td {
-      padding: 3px 4px;
+      padding: 2px 4px;
       vertical-align: middle;
     }
     .charges-table td:last-child {
@@ -89,25 +89,25 @@
   <body>
   <div class="page">
 
-    <!-- ── Info Fields ── -->
-    <span class="field" style="top:305px; left:130px; max-width:260px; font-weight:bold;">{{buyerName}}</span>
-    <span class="field" style="top:305px; right:58px; max-width:160px;">{{date}}</span>
+    <!-- Info Fields -->
+    <span class="field" style="top:335px; left:130px; max-width:260px; font-weight:bold;">{{buyerName}}</span>
+    <span class="field" style="top:335px; right:60px; max-width:160px;">{{date}}</span>
 
-    <span class="field" style="top:362px; left:130px; max-width:260px;">{{buyerAddress}}</span>
-    <span class="field" style="top:362px; right:58px; max-width:160px;">{{vehicleNumber}}</span>
+    <span class="field" style="top:375px; left:130px; max-width:260px;">{{buyerAddress}}</span>
+    <span class="field" style="top:375px; right:60px; max-width:160px;">{{vehicleNumber}}</span>
 
-    <span class="field" style="top:420px; left:130px; max-width:160px;">{{receiptNumber}}</span>
-    <span class="field" style="top:420px; right:58px; max-width:160px;">{{driverContact}}</span>
+    <span class="field" style="top:415px; left:130px; max-width:160px;">{{receiptNumber}}</span>
+    <span class="field" style="top:415px; right:60px; max-width:160px;">{{driverContact}}</span>
 
-    <!-- ── Items Table (tbody rows only; thead/border lines from background) ── -->
+    <!-- Items Table (tbody rows only; header lines come from background image) -->
     <table class="items-table">
       <tbody>
         {{itemRowsHtml}}
       </tbody>
     </table>
 
-    <!-- ── Total row (below the 8 data rows) ── -->
-    <div class="field" style="top:969px; left:8px; width:520px; display:flex;">
+    <!-- Total row below items -->
+    <div class="field" style="top:840px; left:8px; width:530px; display:flex;">
       <span style="width:28%; padding-left:6px; font-weight:bold;">Total</span>
       <span style="width:12%; text-align:center; font-weight:bold;">{{totalBags}}</span>
       <span style="width:14%; text-align:center; font-weight:bold;">{{totalWeight}}</span>
@@ -115,7 +115,7 @@
       <span style="width:20%; text-align:right; padding-right:12px; font-weight:bold;">{{totalAmount}}</span>
     </div>
 
-    <!-- ── Charges overlay — white wash + dynamic non-zero charge rows ── -->
+    <!-- Charges overlay: white wash + dynamic non-zero charge rows -->
     <div class="charges-overlay">
       <table class="charges-table">
         <tbody>
@@ -135,8 +135,8 @@
       </table>
     </div>
 
-    <!-- ── Amount in words ── -->
-    <span class="field" style="top:1049px; left:78px; max-width:440px; font-size:12px;">
+    <!-- Amount in words -->
+    <span class="field" style="top:1042px; left:80px; max-width:440px; font-size:12px;">
       {{amountInWords}}
     </span>
 
@@ -144,8 +144,9 @@
 
   <script>
     document.querySelectorAll('tr.cr').forEach(function(r) {
-      var v = (r.getAttribute('data-v') || '').replace(/[₹,s]/g, '');
-      if (!v || v === '0' || v === '0.0' || v === '0.00') {
+      var raw = (r.getAttribute('data-v') || '');
+      var num = parseFloat(raw.replace(/[^0-9.]/g, ''));
+      if (isNaN(num) || num === 0) {
         r.style.display = 'none';
       }
     });
