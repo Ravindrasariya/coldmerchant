@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<title>प्रीतम ट्रेडर्स बिल</title>
+
+<style>
+body {
+    margin: 0;
+    background: #ccc;
+}
+
+.bill {
+    width: 794px;
+    height: 1123px;
+    margin: auto;
+    position: relative;
+    background: url('bill-bg.jpg') no-repeat center;
+    background-size: cover;
+    font-family: Arial, sans-serif;
+}
+
+/* Common input style */
+.field {
+    position: absolute;
+    border: none;
+    border-bottom: 1px solid #000;
+    background: transparent;
+    font-size: 14px;
+}
+
+/* Top fields */
+.name { top: 180px; left: 120px; width: 300px; }
+.date { top: 180px; right: 80px; width: 120px; }
+
+.address { top: 220px; left: 120px; width: 300px; }
+.vehicle { top: 220px; right: 80px; width: 120px; }
+
+.mobile { top: 260px; right: 80px; width: 120px; }
+.number { top: 260px; left: 120px; width: 80px; }
+
+/* Table rows */
+.row1 { top: 330px; }
+.row2 { top: 390px; }
+.row3 { top: 450px; }
+.row4 { top: 510px; }
+
+.desc { left: 40px; width: 250px; }
+.qty { left: 300px; width: 80px; }
+.weight { left: 400px; width: 100px; }
+.rate { left: 520px; width: 80px; }
+.amount { left: 620px; width: 120px; }
+
+/* Right summary */
+.box1 { top: 650px; right: 40px; width: 120px; }
+.box2 { top: 700px; right: 40px; width: 120px; }
+.box3 { top: 750px; right: 40px; width: 120px; }
+.box4 { top: 800px; right: 40px; width: 120px; }
+.box5 { top: 850px; right: 40px; width: 120px; }
+
+/* Amount in words */
+.words {
+    position: absolute;
+    bottom: 140px;
+    left: 40px;
+    width: 500px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="bill">
+
+    <!-- Header fields -->
+    <input class="field name" placeholder="">
+    <input class="field date" placeholder="">
+    <input class="field address">
+    <input class="field vehicle">
+    <input class="field mobile">
+    <input class="field number" value="384">
+
+    <!-- Table rows -->
+    <input class="field desc row1">
+    <input class="field qty row1">
+    <input class="field weight row1">
+    <input class="field rate row1">
+    <input class="field amount row1">
+
+    <input class="field desc row2">
+    <input class="field qty row2">
+    <input class="field weight row2">
+    <input class="field rate row2">
+    <input class="field amount row2">
+
+    <input class="field desc row3">
+    <input class="field qty row3">
+    <input class="field weight row3">
+    <input class="field rate row3">
+    <input class="field amount row3">
+
+    <input class="field desc row4">
+    <input class="field qty row4">
+    <input class="field weight row4">
+    <input class="field rate row4">
+    <input class="field amount row4">
+
+    <!-- Right boxes -->
+    <input class="field box1">
+    <input class="field box2">
+    <input class="field box3">
+    <input class="field box4">
+    <input class="field box5">
+
+    <!-- Amount in words -->
+    <input class="field words">
+
+</div>
+
+</body>
+</html>
