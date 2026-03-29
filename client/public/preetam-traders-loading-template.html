@@ -53,7 +53,7 @@
       top: 850px;
       right: 8px;
       width: 190px;
-      min-height: 200px;
+      height: 200px;
       background: white;
       padding: 4px 6px;
     }
@@ -80,9 +80,16 @@
 
     @page { margin: 0; size: A4; }
     @media print {
-      body { background: none; margin: 0; }
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
+      body {
+        background: none;
+        margin: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .page {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
   </style>
   </head>
@@ -137,7 +144,7 @@
 
     <!-- Amount in words -->
     <span class="field" style="top:1042px; left:80px; max-width:440px; font-size:12px;">
-      {{amountInWords}}
+      Rs. in words: {{amountInWords}}
     </span>
 
   </div>
