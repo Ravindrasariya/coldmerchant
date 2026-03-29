@@ -8,6 +8,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
+import { defaultLoadingTemplate } from "@/lib/default-loading-template";
 
 interface TransactionItem {
   id: number;
@@ -190,13 +191,25 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const buildCustomHtml = () => {
-    if (!merchant?.receiptHtmlTemplate || !transaction) return null;
-    let html = merchant.receiptHtmlTemplate;
+    if (!transaction) return null;
+    // Priority 1: custom per-merchant HTML template
+    // Priority 2: header image → return null so JSX layout handles it
+    // Priority 3: built-in Indore default template
+    let html: string;
+    let minRows: number;
+    if (merchant?.receiptHtmlTemplate) {
+      html = merchant.receiptHtmlTemplate;
+      minRows = 18;
+    } else if (merchant?.receiptHeaderImage) {
+      return null;
+    } else {
+      html = defaultLoadingTemplate;
+      minRows = 6;
+    }
     const txnCrop = transaction.crop || cropType || "potato";
     const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
-    const minRows = 18;
     const itemsDataRows = transaction.items.map((item) =>
       `<tr><td>${escHtml(cropLabel)}</td><td></td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
     ).join("");
@@ -343,19 +356,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
           ) : (
           <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
-              {merchant.receiptHeaderImage ? (
-                <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
-              ) : (
-                <>
-                  <h1 className="text-2xl font-bold">{merchant.name}</h1>
-                  {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
-                  {merchant.contactNumber && (
-                    <p className="text-sm text-gray-600">
-                      Phone / फोन: {merchant.contactNumber}
-                    </p>
-                  )}
-                </>
-              )}
+              <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
             </div>
 
             <div className="text-center">
