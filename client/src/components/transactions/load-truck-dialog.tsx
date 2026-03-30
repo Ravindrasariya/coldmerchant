@@ -229,6 +229,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
     let totalCostOfGoods = 0;
     let totalMandiComm = 0;
     let totalHammali = 0;
+    let totalTransport = 0;
+    let totalOther = 0;
 
     buyerSections.forEach((section) => {
       const summary = calculateBuyerSummary(section);
@@ -237,6 +239,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
       totalCostOfGoods += summary.totalCostOfGoods;
       totalMandiComm += summary.mandiCommAmount;
       totalHammali += summary.hammaliAmount;
+      totalTransport += Number(section.transportationCharges) || 0;
+      totalOther += Number(section.otherCharges) || 0;
     });
 
     return {
@@ -245,6 +249,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
       totalCostOfGoods,
       totalMandiComm,
       totalHammali,
+      totalTransport,
+      totalOther,
     };
   }, [buyerSections, calculateBuyerSummary]);
 
@@ -1042,7 +1048,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                       <p className="text-xs text-muted-foreground">{t("Total Weight (Kg)", "कुल वजन (किग्रा)")}</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">₹{parseFloat((grandTotals.totalCostOfGoods + grandTotals.totalMandiComm + grandTotals.totalHammali).toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-2xl font-bold">₹{parseFloat((grandTotals.totalCostOfGoods + grandTotals.totalMandiComm + grandTotals.totalHammali + grandTotals.totalTransport + grandTotals.totalOther).toFixed(1)).toLocaleString('en-IN')}</p>
                       <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                         <IndianRupee className="h-3 w-3" />
                         {t("Total Cost", "कुल लागत")}
