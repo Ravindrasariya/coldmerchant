@@ -68,6 +68,8 @@ interface BuyerSection {
   partyName: string;
   partyAddress: string;
   items: LotItem[];
+  mandiCommissionPct: number;
+  hammaliPerBag: number;
   advancePayment: number;
   transportationCharges: number;
   otherCharges: number;
@@ -86,6 +88,8 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   partyName: "",
   partyAddress: "",
   items: [{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0 }],
+  mandiCommissionPct: 0,
+  hammaliPerBag: 0,
   advancePayment: 0,
   transportationCharges: 0,
   otherCharges: 0,
@@ -175,6 +179,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
       let totalBags = 0;
       let totalNetWeight = 0;
       let totalCostOfGoods = 0;
+      let mandiCOGSBase = 0;
 
       section.items.forEach((item) => {
         const invItem = findInventoryByKey(item.inventoryKey);
@@ -186,12 +191,23 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
         totalBags += bags;
         totalNetWeight += netWeight;
         totalCostOfGoods += costOfGoods;
+
+        if (invItem?.place === "mandi") {
+          const pricePerKg = parseFloat(invItem.pricePerKg || "0");
+          mandiCOGSBase += pricePerKg * netWeight;
+        }
       });
+
+      const mandiCommAmount = Math.round(mandiCOGSBase * section.mandiCommissionPct / 100 * 100) / 100;
+      const hammaliAmount = Math.round(totalBags * section.hammaliPerBag * 100) / 100;
 
       return {
         totalBags: isNaN(totalBags) ? 0 : totalBags,
         totalNetWeight: isNaN(totalNetWeight) ? 0 : totalNetWeight,
         totalCostOfGoods: isNaN(totalCostOfGoods) ? 0 : totalCostOfGoods,
+        mandiCommAmount: isNaN(mandiCommAmount) ? 0 : mandiCommAmount,
+        hammaliAmount: isNaN(hammaliAmount) ? 0 : hammaliAmount,
+        mandiCOGSBase: isNaN(mandiCOGSBase) ? 0 : mandiCOGSBase,
       };
     },
     [findInventoryByKey]
@@ -211,18 +227,24 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
     let totalBags = 0;
     let totalNetWeight = 0;
     let totalCostOfGoods = 0;
+    let totalMandiComm = 0;
+    let totalHammali = 0;
 
     buyerSections.forEach((section) => {
       const summary = calculateBuyerSummary(section);
       totalBags += summary.totalBags;
       totalNetWeight += summary.totalNetWeight;
       totalCostOfGoods += summary.totalCostOfGoods;
+      totalMandiComm += summary.mandiCommAmount;
+      totalHammali += summary.hammaliAmount;
     });
 
     return {
       totalBags,
       totalNetWeight,
       totalCostOfGoods,
+      totalMandiComm,
+      totalHammali,
     };
   }, [buyerSections, calculateBuyerSummary]);
 
@@ -301,6 +323,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
         if (items.length === 0) return null;
 
+        const sectionSummary = calculateBuyerSummary(section);
         return apiRequest("POST", "/api/transactions", {
           transporterName,
           driverContact,
@@ -309,6 +332,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           buyerId: section.buyerId,
           partyName: section.partyName,
           partyAddress: section.partyAddress,
+          totalMandiCommission: sectionSummary.mandiCommAmount || undefined,
+          totalHammali: sectionSummary.hammaliAmount || undefined,
           advancePayment: section.advancePayment,
           transportationCharges: section.transportationCharges,
           otherCharges: section.otherCharges,
@@ -869,6 +894,39 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
                         <Separator />
 
+                        {/* Mandi Commission & Hammali */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs">{t("Mandi Comm. %", "मंडी कमीशन %")}</Label>
+                            <div className="relative mt-1">
+                              <Input
+                                type="number"
+                                step="any"
+                                placeholder="0"
+                                className="pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                value={section.mandiCommissionPct || ""}
+                                onChange={(e) => updateBuyerSection(section.id, { mandiCommissionPct: Number(e.target.value) || 0 })}
+                                data-testid={`input-mandi-comm-${sectionIndex}`}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                            </div>
+                            <p className="text-xs text-orange-500 font-mono mt-0.5">₹{summary.mandiCommAmount.toLocaleString('en-IN')}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              className="mt-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              value={section.hammaliPerBag || ""}
+                              onChange={(e) => updateBuyerSection(section.id, { hammaliPerBag: Number(e.target.value) || 0 })}
+                              data-testid={`input-hammali-${sectionIndex}`}
+                            />
+                            <p className="text-xs text-orange-500 font-mono mt-0.5">₹{summary.hammaliAmount.toLocaleString('en-IN')}</p>
+                          </div>
+                        </div>
+
                         {/* Charges */}
                         <div className="grid grid-cols-3 gap-3">
                           <div>
@@ -937,7 +995,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                               <p className="text-muted-foreground">{t("Net Weight (Kg)", "शुद्ध वजन (किग्रा)")}</p>
                             </div>
                             <div>
-                              <p className="text-lg font-bold">₹{parseFloat((summary.totalCostOfGoods + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0)).toFixed(1)).toLocaleString('en-IN')}</p>
+                              <p className="text-lg font-bold">₹{parseFloat((summary.totalCostOfGoods + summary.mandiCommAmount + summary.hammaliAmount + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0)).toFixed(1)).toLocaleString('en-IN')}</p>
                               <p className="text-muted-foreground flex items-center justify-center gap-1">
                                 <IndianRupee className="h-3 w-3" />
                                 {t("Total Cost", "कुल लागत")}
@@ -984,7 +1042,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                       <p className="text-xs text-muted-foreground">{t("Total Weight (Kg)", "कुल वजन (किग्रा)")}</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">₹{parseFloat(grandTotals.totalCostOfGoods.toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-2xl font-bold">₹{parseFloat((grandTotals.totalCostOfGoods + grandTotals.totalMandiComm + grandTotals.totalHammali).toFixed(1)).toLocaleString('en-IN')}</p>
                       <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                         <IndianRupee className="h-3 w-3" />
                         {t("Total Cost", "कुल लागत")}

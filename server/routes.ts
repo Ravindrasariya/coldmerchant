@@ -2021,6 +2021,11 @@ export async function registerRoutes(
       const transportNum = parseFloat(transportationCharges) || 0;
       const otherNum = parseFloat(otherCharges) || 0;
       let profitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
+      if (transactionType === "sale" || !transactionType) {
+        const mcNum = parseFloat(totalMandiCommission) || 0;
+        const hNum = parseFloat(totalHammali) || 0;
+        profitLoss -= (mcNum + hNum);
+      }
       if (transactionType === "loading") {
         const scNum = parseFloat(salesCommission) || 0;
         const mcNum = parseFloat(totalMandiCommission) || 0;
@@ -2193,7 +2198,9 @@ export async function registerRoutes(
             changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: saleRevenueNum.toString() });
           }
         }
-        newProfitLoss = saleRevenueNum - totalCostOfGoods - transportNum - otherNum;
+        const mcNum = parseFloat(totalMandiCommission !== undefined ? totalMandiCommission : existingTxn.totalMandiCommission) || 0;
+        const hNum = parseFloat(totalHammali !== undefined ? totalHammali : existingTxn.totalHammali) || 0;
+        newProfitLoss = saleRevenueNum - totalCostOfGoods - transportNum - otherNum - mcNum - hNum;
       }
       
       if (!decimalEqual(newProfitLoss, existingTxn.profitLoss)) {

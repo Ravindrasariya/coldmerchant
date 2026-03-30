@@ -221,7 +221,8 @@ function ProfitLossDisplay({
   } else {
     const safeTrans = Number(transportationCharges) || 0;
     const safeOther = Number(otherCharges) || 0;
-    chargesAmount = safeTrans + safeOther;
+    const safeMC = Number(mandiCharges) || 0;
+    chargesAmount = safeTrans + safeOther + safeMC;
     profitLoss = safeRevenue - safeCost - chargesAmount;
     chargesLabel = t("Charges", "शुल्क");
   }
@@ -355,8 +356,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const storedAC = parseFloat(transaction.totalAadhatCommission || "0");
       const storedHM = parseFloat(transaction.totalHammali || "0");
       const storedSC = parseFloat(transaction.salesCommission || "0");
-      setMandiPct(Math.round((storedMC / amtBase) * 10000) / 100);
-      setAadhatPct(Math.round((storedAC / amtBase) * 10000) / 100);
+      if (transaction.transactionType === "loading") {
+        setMandiPct(Math.round((storedMC / amtBase) * 10000) / 100);
+        setAadhatPct(Math.round((storedAC / amtBase) * 10000) / 100);
+      } else {
+        const mandiItemsCOGS = transaction.items
+          .filter(i => i.place === "mandi")
+          .reduce((sum, i) => sum + parseFloat(i.costOfGoods || "0"), 0);
+        const saleMandiBase = mandiItemsCOGS > 0 ? mandiItemsCOGS : 1;
+        setMandiPct(Math.round((storedMC / saleMandiBase) * 10000) / 100);
+        setAadhatPct(0);
+      }
       setHammaliRate(Math.round((storedHM / bagBase) * 100) / 100);
       const scBase = txnRevenue + storedMC + storedAC;
       setSalesCommPct(scBase > 0 ? Math.round((storedSC / scBase) * 10000) / 100 : 0);
@@ -474,14 +484,24 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     return editableItems.filter(i => i.action !== 'remove').reduce((sum, i) => sum + (i.bagsMoved || 0), 0);
   }, [editableItems]);
 
+  const totalMandiSaleCOGS = useMemo(() => {
+    if (isLoadingType) return 0;
+    return editableItems.filter(i => i.action !== 'remove' && i.place === "mandi")
+      .reduce((sum, i) => sum + (i.costOfGoods || 0), 0);
+  }, [editableItems, isLoadingType]);
+
   useEffect(() => {
-    if (!isLoadingType) return;
-    form.setValue("totalMandiCommission", Math.round(totalLotAmount * mandiPct / 100 * 100) / 100 || undefined);
-    form.setValue("totalAadhatCommission", Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100 || undefined);
-    form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || undefined);
-    const scBase = totalLotAmount + (Math.round(totalLotAmount * mandiPct / 100 * 100) / 100) + (Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100);
-    form.setValue("salesCommission", Math.round(scBase * salesCommPct / 100 * 100) / 100 || undefined);
-  }, [mandiPct, aadhatPct, hammaliRate, salesCommPct, totalLotAmount, totalEditBags, isLoadingType, form]);
+    if (isLoadingType) {
+      form.setValue("totalMandiCommission", Math.round(totalLotAmount * mandiPct / 100 * 100) / 100 || undefined);
+      form.setValue("totalAadhatCommission", Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100 || undefined);
+      form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || undefined);
+      const scBase = totalLotAmount + (Math.round(totalLotAmount * mandiPct / 100 * 100) / 100) + (Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100);
+      form.setValue("salesCommission", Math.round(scBase * salesCommPct / 100 * 100) / 100 || undefined);
+    } else {
+      form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * mandiPct / 100 * 100) / 100 || undefined);
+      form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || undefined);
+    }
+  }, [mandiPct, aadhatPct, hammaliRate, salesCommPct, totalLotAmount, totalEditBags, isLoadingType, form, totalMandiSaleCOGS]);
 
   const adjustMandiCharges = (delta: { mc: number; ac: number; hm: number; ec: number }, sign: 1 | -1, itemAmount: number = 0, itemBags: number = 0) => {
     const cur = {
@@ -1537,6 +1557,48 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   </>
                 ) : (
                   <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">{t("Mandi Comm. %", "मंडी कमीशन %")}</Label>
+                        <div className="relative mt-1.5">
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                            className="pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            value={mandiPct || ""}
+                            onChange={(e) => {
+                              const pct = Number(e.target.value) || 0;
+                              setMandiPct(pct);
+                              form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * pct / 100 * 100) / 100 || undefined);
+                            }}
+                            data-testid="input-edit-sale-mandi-commission"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                        </div>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalMandiSaleCOGS * mandiPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
+                        <div className="relative mt-1.5">
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            value={hammaliRate || ""}
+                            onChange={(e) => {
+                              const rate = Number(e.target.value) || 0;
+                              setHammaliRate(rate);
+                              form.setValue("totalHammali", Math.round(totalEditBags * rate * 100) / 100 || undefined);
+                            }}
+                            data-testid="input-edit-sale-hammali"
+                          />
+                        </div>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalEditBags * hammaliRate * 100) / 100).toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -1618,7 +1680,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       otherCharges={form.watch("otherCharges") || 0}
                       isLoadingType={false}
                       salesCommission={0}
-                      mandiCharges={0}
+                      mandiCharges={(Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalHammali")) || 0)}
                     />
                   </>
                 )}
