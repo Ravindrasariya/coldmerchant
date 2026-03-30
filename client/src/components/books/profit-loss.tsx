@@ -21,6 +21,7 @@ const REVENUE_LABELS: Record<string, [string, string]> = {
 
 const EXPENSE_LABELS: Record<string, [string, string]> = {
   cost_of_goods_sold: ["Cost of Goods Sold", "बिकी वस्तुओं की लागत"],
+  wastage_loss: ["Wastage Loss", "नुकसान (बर्बादी)"],
   bag_charges: ["Bag Charges", "बोरी खर्च"],
   cold_store_charge: ["Cold Store Charges", "शीतगृह खर्च"],
   farmer: ["Farmer Payments", "किसान भुगतान"],

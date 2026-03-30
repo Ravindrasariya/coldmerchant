@@ -7576,6 +7576,31 @@ export async function registerRoutes(
         expenseByType["cost_of_goods_sold"] = totalCOGS;
       }
 
+      const allLots = await storage.getAllLotsByMerchant(merchantId);
+      const fyLots = allLots.filter(lot => {
+        if (!lot.createdAt) return false;
+        const dt = new Date(lot.createdAt);
+        const createdDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+        return createdDate >= fyStartDate && createdDate <= fyEndDate;
+      });
+      let totalWastageLoss = 0;
+      for (const lot of fyLots) {
+        const breakdowns = await storage.getBagBreakdownsByLot(lot.id, merchantId);
+        for (const bd of breakdowns) {
+          if (bd.size !== "Wastage") continue;
+          const bags = bd.numberOfBags || 0;
+          if (bags <= 0) continue;
+          const weight = bd.weight ? parseFloat(bd.weight) : 0;
+          const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+          if (weight <= 0 || price <= 0) continue;
+          const netWeight = computeNetWeight(weight, bags, lot.place);
+          totalWastageLoss += netWeight * price;
+        }
+      }
+      if (totalWastageLoss > 0) {
+        expenseByType["wastage_loss"] = totalWastageLoss;
+      }
+
       const harvestRevenue = harvestTxns
         .filter(tx => tx.dateOfLoading && tx.dateOfLoading >= fyStartDate && tx.dateOfLoading <= fyEndDate)
         .reduce((sum, tx) => sum + (tx.revenue ? parseFloat(tx.revenue) : 0), 0);
