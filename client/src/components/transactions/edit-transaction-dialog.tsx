@@ -498,8 +498,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const scBase = totalLotAmount + (Math.round(totalLotAmount * mandiPct / 100 * 100) / 100) + (Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100);
       form.setValue("salesCommission", Math.round(scBase * salesCommPct / 100 * 100) / 100 || undefined);
     } else {
-      form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * mandiPct / 100 * 100) / 100 || undefined);
-      form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || undefined);
+      form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * mandiPct / 100 * 100) / 100 || 0);
+      form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || 0);
     }
   }, [mandiPct, aadhatPct, hammaliRate, salesCommPct, totalLotAmount, totalEditBags, isLoadingType, form, totalMandiSaleCOGS]);
 
@@ -1570,7 +1570,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             onChange={(e) => {
                               const pct = Number(e.target.value) || 0;
                               setMandiPct(pct);
-                              form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * pct / 100 * 100) / 100 || undefined);
+                              form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * pct / 100 * 100) / 100 || 0);
                             }}
                             data-testid="input-edit-sale-mandi-commission"
                           />
@@ -1590,7 +1590,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             onChange={(e) => {
                               const rate = Number(e.target.value) || 0;
                               setHammaliRate(rate);
-                              form.setValue("totalHammali", Math.round(totalEditBags * rate * 100) / 100 || undefined);
+                              form.setValue("totalHammali", Math.round(totalEditBags * rate * 100) / 100 || 0);
                             }}
                             data-testid="input-edit-sale-hammali"
                           />
