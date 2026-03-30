@@ -746,10 +746,12 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                                         const availableBags = getAvailableBagsForLot(key, section.id, itemIndex);
                                                         const bags = availableBags || 0;
                                                         const netWeight = calculateNetWeight(selectedInvItem, bags);
+                                                        const totalBags = selectedInvItem.originalBags || selectedInvItem.lotOriginalBags || 1;
+                                                        const grossWeight = totalBags > 0 ? (bags / totalBags) * parseFloat(selectedInvItem.totalWeight || "0") : 0;
                                                         updateLotItem(section.id, itemIndex, {
                                                           inventoryKey: key,
                                                           bagsMoved: bags,
-                                                          totalWeight: Math.round(netWeight * 10) / 10,
+                                                          totalWeight: Math.round(grossWeight * 10) / 10,
                                                           netWeight: Math.round(netWeight * 10) / 10,
                                                         });
                                                       } else {
@@ -799,9 +801,11 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                       const bags = Number(e.target.value) || 0;
                                       if (selectedInv) {
                                         const netWeight = calculateNetWeight(selectedInv, bags);
+                                        const totalBags = selectedInv.originalBags || selectedInv.lotOriginalBags || 1;
+                                        const grossWeight = totalBags > 0 ? (bags / totalBags) * parseFloat(selectedInv.totalWeight || "0") : 0;
                                         updateLotItem(section.id, itemIndex, {
                                           bagsMoved: bags,
-                                          totalWeight: Math.round(netWeight * 10) / 10,
+                                          totalWeight: Math.round(grossWeight * 10) / 10,
                                           netWeight: Math.round(netWeight * 10) / 10,
                                         });
                                       } else {
