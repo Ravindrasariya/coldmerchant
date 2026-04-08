@@ -462,6 +462,7 @@ export class DatabaseStorage implements IStorage {
     
     // 2. Cash entry allocations (reference cash_entries, transactions, lots, stock_entries)
     await db.delete(aadhatPaymentAllocations).where(eq(aadhatPaymentAllocations.merchantId, id));
+    await db.delete(buyerPaymentAllocations).where(eq(buyerPaymentAllocations.merchantId, id));
     await db.delete(cashEntryAllocations).where(eq(cashEntryAllocations.merchantId, id));
     await db.delete(coldStoreChargeAllocations).where(eq(coldStoreChargeAllocations.merchantId, id));
     
