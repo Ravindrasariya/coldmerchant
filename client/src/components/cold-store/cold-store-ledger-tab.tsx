@@ -639,6 +639,17 @@ export default function ColdStoreLedgerTab() {
       return 0;
     });
 
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 1 }).format(value);
+
+  const summary = useMemo(() => ({
+    total: filteredColdStores.length,
+    withDue: filteredColdStores.filter(cs => cs.totalDue > 0).length,
+    pyPayable: filteredColdStores.reduce((s, cs) => s + parseFloat(cs.pyPayable || "0"), 0),
+    csDue: filteredColdStores.reduce((s, cs) => s + cs.coldStoreDue, 0),
+    totalDue: filteredColdStores.reduce((s, cs) => s + cs.totalDue, 0),
+  }), [filteredColdStores]);
+
   const bankFields = (form: ColdStoreFormFields, setForm: (f: ColdStoreFormFields) => void, prefix: string) => (
     <>
       <div className="space-y-2">
@@ -675,6 +686,24 @@ export default function ColdStoreLedgerTab() {
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="border-blue-300 dark:border-blue-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Cold Stores / With Due", "कोल्ड स्टोर / बकाया")}</div>
+          <div className="text-sm font-bold mt-1" data-testid="cs-summary-count">{summary.total} / {summary.withDue}</div>
+        </Card>
+        <Card className="border-purple-300 dark:border-purple-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("PY Payable", "पीवाय देय")}</div>
+          <div className="text-sm font-bold mt-1 text-purple-600 dark:text-purple-400" data-testid="cs-summary-py-payable">{formatCurrency(summary.pyPayable)}</div>
+        </Card>
+        <Card className="border-orange-300 dark:border-orange-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("CS Due", "CS बकाया")}</div>
+          <div className="text-sm font-bold mt-1 text-orange-600 dark:text-orange-400" data-testid="cs-summary-cs-due">{formatCurrency(summary.csDue)}</div>
+        </Card>
+        <Card className="border-blue-300 dark:border-blue-700 p-4">
+          <div className="text-xs text-muted-foreground">{t("Total Due", "कुल बकाया")}</div>
+          <div className="text-sm font-bold mt-1" data-testid="cs-summary-total-due">{formatCurrency(summary.totalDue)}</div>
+        </Card>
+      </div>
       <Card>
         <CardHeader className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
