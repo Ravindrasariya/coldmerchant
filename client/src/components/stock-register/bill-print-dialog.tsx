@@ -353,7 +353,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <tr>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bd.numberOfBags}</td>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${weight > 0 ? weight.toFixed(2) : "—"}</td>
+              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${netWeight > 0 ? netWeight.toFixed(2) : "—"}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
             </tr>
@@ -366,7 +366,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <tr style="background: #f5f5f5;">
                 <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">${lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
               </tr>
@@ -387,7 +387,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <tr style="background: #f5f5f5;">
                 <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Weight (kg) / वजन</th>
+                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">${lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
                 <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
               </tr>
@@ -396,7 +396,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <tr>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lot.originalBags}</td>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotNetWeight > 0 ? lotNetWeight.toFixed(2) : "—"}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
               </tr>
@@ -787,7 +787,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     <tr className="border-b bg-gray-100">
                       <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
                       <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">{lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
                       <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
                       <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
                     </tr>
@@ -802,7 +802,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                         <tr key={bd.id || bdIndex} className="border-b border-gray-200">
                           <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
                           <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
-                          <td className="py-1 px-2 text-right font-mono">{weight > 0 ? weight.toFixed(2) : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono">{netWeight > 0 ? netWeight.toFixed(2) : "—"}</td>
                           <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
                           <td className="py-1 px-2 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
                         </tr>
@@ -822,7 +822,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                         <tr className="border-b bg-gray-100">
                           <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
                           <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Weight (kg) / वजन</th>
+                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">{lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
                           <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
                           <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
                         </tr>
@@ -831,7 +831,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                         <tr className="border-b border-gray-200">
                           <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
                           <td className="py-1 px-2 text-right font-mono">{lot.originalBags}</td>
-                          <td className="py-1 px-2 text-right font-mono">{lotWeight > 0 ? lotWeight.toFixed(2) : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono">{lotNetWeight > 0 ? lotNetWeight.toFixed(2) : "—"}</td>
                           <td className="py-1 px-2 text-right font-mono">{lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
                           <td className="py-1 px-2 text-right font-mono font-medium">{lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
                         </tr>
