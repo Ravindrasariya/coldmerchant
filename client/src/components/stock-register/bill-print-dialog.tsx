@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
+import krashuvedLogo from "@assets/Gemini_Generated_Image_lu75dlu75dlu75dl(1)_1777315339846.png";
 
 interface StockEntryWithLots {
   id: number;
@@ -636,6 +637,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <!-- Footer -->
             <div style="margin-top: 16px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center;">
               <p style="font-size: 11px; color: #666; margin: 0;">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
+              <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <img src="${window.location.origin}${krashuvedLogo}" alt="KrashuVed" style="width: 32px; height: 32px; object-fit: contain;" />
+                <span style="font-size: 32px; line-height: 1; color: #166534; font-weight: 600;">कृषुवेद</span>
+              </div>
             </div>
           </div>
         </body>
@@ -975,6 +980,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
       <div className="mt-4 pt-2 border-t border-gray-300 text-center">
         <p className="text-xs text-gray-600">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
+        <div className="mt-2 flex items-center justify-center gap-2.5">
+          <img src={krashuvedLogo} alt="KrashuVed" className="w-9 h-9 object-contain" />
+          <span className="text-4xl leading-none font-semibold text-green-800">कृषुवेद</span>
+        </div>
       </div>
     </div>
   );
