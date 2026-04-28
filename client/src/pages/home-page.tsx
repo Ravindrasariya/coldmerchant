@@ -647,9 +647,14 @@ export default function HomePage() {
             <DialogTitle>{isFirstLoginDialog ? t("Set New Password", "नया पासवर्ड सेट करें") : t("Change Password", "पासवर्ड बदलें")}</DialogTitle>
           </DialogHeader>
           {isFirstLoginDialog && (
-            <p className="text-sm text-muted-foreground">
-              {t("Please set a new password to continue. This is required on first login.", "जारी रखने के लिए कृपया नया पासवर्ड सेट करें। पहले लॉगिन पर यह आवश्यक है।")}
-            </p>
+            <>
+              <p className="text-sm text-muted-foreground">
+                {t("Please set a new password to continue. This is required on first login.", "जारी रखने के लिए कृपया नया पासवर्ड सेट करें। पहले लॉगिन पर यह आवश्यक है।")}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t("Don't recognise the registered mobile number? Tap Logout and contact your administrator.", "पंजीकृत मोबाइल नंबर नहीं पता? लॉगआउट करें और अपने व्यवस्थापक से संपर्क करें।")}
+              </p>
+            </>
           )}
           <div className="space-y-4 py-4" data-no-capitalize>
             {/* Mobile number is always required for validation */}
@@ -704,6 +709,21 @@ export default function HomePage() {
             </div>
           </div>
           <DialogFooter>
+            {isFirstLoginDialog && (
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                disabled={logoutMutation.isPending}
+                data-testid="button-logout-first-login"
+              >
+                {logoutMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4 mr-2" />
+                )}
+                {t("Logout", "लॉगआउट")}
+              </Button>
+            )}
             {!isFirstLoginDialog && (
               <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
                 {t("Cancel", "रद्द करें")}
