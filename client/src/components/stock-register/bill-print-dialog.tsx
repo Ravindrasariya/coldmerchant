@@ -658,7 +658,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
             <!-- Footer -->
             <div style="margin-top: 16px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center;">
-              <p style="font-size: 11px; color: #666; margin: 0;">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
+              <p style="font-size: 11px; color: #666; margin: 0;">Thank you for the opportunity! / इस अवसर के लिए धन्यवाद!</p>
               <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                 <img src="${window.location.origin}${krashuvedLogo}" alt="KrashuVed" style="width: 32px; height: 32px; object-fit: contain;" />
                 <span style="font-size: 24px; line-height: 1; font-weight: 600;"><span style="color: #166534;">कृषु</span><span style="color: #ea580c;">वेद</span></span>
@@ -1001,7 +1001,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       )}
 
       <div className="mt-4 pt-2 border-t border-gray-300 text-center">
-        <p className="text-xs text-gray-600">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
+        <p className="text-xs text-gray-600">Thank you for the opportunity! / इस अवसर के लिए धन्यवाद!</p>
         <div
           style={{
             marginTop: 8,
