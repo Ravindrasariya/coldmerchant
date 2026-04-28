@@ -661,7 +661,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               <p style="font-size: 11px; color: #666; margin: 0;">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
               <div style="margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 10px;">
                 <img src="${window.location.origin}${krashuvedLogo}" alt="KrashuVed" style="width: 32px; height: 32px; object-fit: contain;" />
-                <span style="font-size: 16px; line-height: 1; font-weight: 600;"><span style="color: #166534;">कृषु</span><span style="color: #ea580c;">वेद</span></span>
+                <span style="font-size: 24px; line-height: 1; font-weight: 600;"><span style="color: #166534;">कृषु</span><span style="color: #ea580c;">वेद</span></span>
               </div>
             </div>
           </div>
@@ -1018,7 +1018,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             height={36}
             style={{ width: 36, height: 36, objectFit: "contain" }}
           />
-          <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 600 }}>
+          <span style={{ fontSize: 27, lineHeight: 1, fontWeight: 600 }}>
             <span style={{ color: "#166534" }}>कृषु</span>
             <span style={{ color: "#ea580c" }}>वेद</span>
           </span>
