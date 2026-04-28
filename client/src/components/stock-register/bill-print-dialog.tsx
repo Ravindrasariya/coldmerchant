@@ -980,11 +980,25 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
       <div className="mt-4 pt-2 border-t border-gray-300 text-center">
         <p className="text-xs text-gray-600">Thank you for your business! / व्यापार के लिए धन्यवाद!</p>
-        <div className="mt-2 flex items-center justify-center gap-2.5">
-          <img src={krashuvedLogo} alt="KrashuVed" className="w-9 h-9 object-contain" />
-          <span className="text-lg leading-none font-semibold">
-            <span className="text-green-800">कृषु</span>
-            <span className="text-orange-600">वेद</span>
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+          }}
+        >
+          <img
+            src={krashuvedLogo}
+            alt="KrashuVed"
+            width={36}
+            height={36}
+            style={{ width: 36, height: 36, objectFit: "contain" }}
+          />
+          <span style={{ fontSize: 18, lineHeight: 1, fontWeight: 600 }}>
+            <span style={{ color: "#166534" }}>कृषु</span>
+            <span style={{ color: "#ea580c" }}>वेद</span>
           </span>
         </div>
       </div>
