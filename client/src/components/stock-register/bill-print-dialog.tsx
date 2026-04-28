@@ -19,6 +19,7 @@ import krashuvedLogo from "@assets/Gemini_Generated_Image_lu75dlu75dlu75dl(1)_17
 interface StockEntryWithLots {
   id: number;
   serialNumber: number;
+  crop?: string | null;
   purchaseDate: string;
   farmerName: string;
   farmerContact: string | null;
@@ -124,11 +125,32 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   });
   const aadhatRecord = aadhats?.find(a => a.id === entry.aadhatDbId);
 
+  const buildReceiptFilename = () => {
+    const sanitizeForFilename = (s: string) =>
+      s.replace(/[\/\\:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
+    const formatDateForFilename = (iso: string) => {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d
+        .toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+        .replace(/\s+/g, "-");
+    };
+    const cropRaw = (entry.crop || "potato").toLowerCase();
+    const crop = cropRaw.charAt(0).toUpperCase() + cropRaw.slice(1);
+    const farmer = sanitizeForFilename(entry.farmerName || "Farmer");
+    const date = formatDateForFilename(entry.purchaseDate);
+    return `${crop}_${farmer}_${date}_${entry.serialNumber}`;
+  };
+
   const handleShare = async () => {
     if (!billRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(billRef.current, `Purchase-Receipt-${entry.serialNumber}`);
+      await shareReceiptAsPdf(billRef.current, buildReceiptFilename());
     } catch (err: any) {
       console.error("Share/PDF error:", err);
       if (err?.name !== "AbortError") {
