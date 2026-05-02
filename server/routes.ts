@@ -5075,7 +5075,10 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
 
-      const validationResult = insertFarmerSchema.omit({ merchantId: true }).safeParse(req.body);
+      const validationResult = insertFarmerSchema
+        .omit({ merchantId: true })
+        .extend({ dateAdded: insertFarmerSchema.shape.dateAdded.optional() })
+        .safeParse(req.body);
       if (!validationResult.success) {
         return res.status(400).json({
           message: "Validation failed",
