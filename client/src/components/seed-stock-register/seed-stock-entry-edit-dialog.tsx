@@ -342,11 +342,11 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                   <span className="text-muted-foreground shrink-0">{t("Supplier", "आपूर्तिकर्ता")}:</span>
                   <InlinePartyPicker
                     currentName={displayEntry.supplierName}
-                    currentKey={`${displayEntry.supplierName}|${displayEntry.supplierContact || ""}`}
+                    currentKey={`${displayEntry.supplierName}|${displayEntry.supplierContact || ""}|${displayEntry.address || ""}|${displayEntry.district || ""}|${displayEntry.state || ""}`}
                     fetchKey={["/api/suppliers/list"]}
                     mapOptions={(rows: any[]) =>
                       (rows || []).map((s: any): PartyOption => ({
-                        key: `${s.supplierName}|${s.supplierContact || ""}`,
+                        key: `${s.supplierName}|${s.supplierContact || ""}|${s.address || ""}|${s.district || ""}|${s.state || ""}`,
                         label: s.supplierName,
                         sublabel: [s.district, s.state, s.supplierContact].filter(Boolean).join(" • "),
                         searchText: `${s.supplierName} ${s.supplierContact || ""} ${s.address || ""} ${s.district || ""} ${s.state || ""}`,
