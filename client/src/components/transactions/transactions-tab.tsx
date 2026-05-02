@@ -873,15 +873,15 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
         {/* Party Header */}
         <div className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800">
           {/* Row 1: Name + Address + Contact + Badge — all on one line */}
-          <div className="flex items-center justify-between gap-3 flex-wrap px-4 py-2.5">
-            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap px-4 py-2.5">
+            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap md:flex-nowrap min-w-0 flex-1">
               <span className="font-bold text-base leading-tight whitespace-nowrap" data-testid={`text-party-name-${group.partyKey}`}>
                 {group.partyName}
               </span>
               {group.partyAddress && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground" data-testid={`text-party-address-${group.partyKey}`}>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0" data-testid={`text-party-address-${group.partyKey}`}>
                   <MapPin className="h-3 w-3 flex-shrink-0" />
-                  {group.partyAddress}
+                  <span className="truncate">{group.partyAddress}</span>
                 </span>
               )}
               {group.partyContact && (
