@@ -253,12 +253,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     enabled: open,
   });
 
-  const updateSerialMutation = useMutation({
+  const updateSerialMutation = useMutation<{ serialNumber: number }, Error, number>({
     mutationFn: async (newSerial: number) => {
       const res = await apiRequest("PATCH", `/api/stock-entries/${entry.id}/serial-number`, { serialNumber: newSerial });
       return await res.json();
     },
-    onSuccess: (updated: any) => {
+    onSuccess: (updated) => {
       const newVal = Number(updated?.serialNumber ?? serialDraft);
       if (Number.isFinite(newVal)) setCurrentSerial(newVal);
       setIsEditingSerial(false);

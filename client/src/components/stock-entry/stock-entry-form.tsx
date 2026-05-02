@@ -1,7 +1,7 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { getTodayIST } from "@/lib/date-utils";
+import { getTodayIST, getISTYear } from "@/lib/date-utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -124,11 +124,11 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
 
   const watchedPurchaseDate = form.watch("purchaseDate");
   const nextSerialYear = useMemo(() => {
-    const fallback = new Date().getFullYear();
-    if (!watchedPurchaseDate) return fallback;
-    const parsed = new Date(watchedPurchaseDate);
-    const y = parsed.getFullYear();
-    return Number.isFinite(y) && y > 1900 ? y : fallback;
+    // Use IST year as the source of truth so client/server agree on the
+    // calendar year of purchase_date regardless of the client's local TZ.
+    if (!watchedPurchaseDate) return getISTYear();
+    const y = getISTYear(watchedPurchaseDate);
+    return Number.isFinite(y) && y > 1900 ? y : getISTYear();
   }, [watchedPurchaseDate]);
 
   const { data: nextSerialData, isLoading: nextSerialLoading } = useQuery<{ next: number; year: number }>({
@@ -210,7 +210,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
 
   const createMutation = useMutation({
     mutationFn: async (data: StockEntryFormType) => {
-      const payload: any = { ...data };
+      const payload: StockEntryFormType & { serialNumber?: number } = { ...data };
       if (overrideSerial !== null && overrideSerial !== "") {
         const n = Number(overrideSerial);
         if (Number.isInteger(n) && n > 0) {
@@ -459,10 +459,12 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
                     {t("Sr#:", "Sr#:")}{" "}
                     {overrideSerial !== null ? (
                       overrideSerial
-                    ) : nextSerialLoading || autoNext == null ? (
+                    ) : nextSerialLoading ? (
                       <Loader2 className="inline h-3 w-3 ml-1 animate-spin" />
-                    ) : (
+                    ) : autoNext != null ? (
                       autoNext
+                    ) : (
+                      "—"
                     )}
                   </Badge>
                   <Button

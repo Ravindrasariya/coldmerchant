@@ -745,7 +745,7 @@ export async function registerRoutes(
       // a positive integer and that it is not already used by another entry
       // in the same merchant + same calendar year of purchase_date.
       let serialOverride: number | undefined = undefined;
-      const rawSerial = (req.body as any)?.serialNumber;
+      const rawSerial: unknown = (req.body as Record<string, unknown> | undefined)?.serialNumber;
       if (rawSerial !== undefined && rawSerial !== null && rawSerial !== "") {
         // Strict: only accept canonical positive integers; reject "12abc",
         // floats, etc. Number(...) returns NaN for non-numeric strings.
