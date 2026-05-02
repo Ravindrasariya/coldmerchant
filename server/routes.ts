@@ -1990,11 +1990,48 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/transactions/next-number - Preview the upcoming Tnx# for a crop.
+  // Used by the Load A Truck and Loading dialogs to show the upcoming number
+  // in the dialog header before the user saves.
+  // IMPORTANT: must be registered before /api/transactions/:id so Express does
+  // not treat "next-number" as the :id param.
+  app.get("/api/transactions/next-number", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const cropRaw = req.query.crop;
+      const crop = typeof cropRaw === "string" && cropRaw.length > 0 ? cropRaw : "potato";
+      const next = await storage.getNextTransactionNumber(merchantId, crop);
+      res.json({ next });
+    } catch (error) {
+      console.error("Error computing next transaction number:", error);
+      res.status(500).json({ message: "Failed to compute next transaction number" });
+    }
+  });
+
   // POST /api/transactions - Create a new transaction (Load a Truck)
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+
+      // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
+      // same Load A Truck submission share this id so they can be linked into
+      // a "loading session" group on the server.
+      let tnxGroupId: string | null = null;
+      if (typeof tnxGroupIdRaw === "string" && tnxGroupIdRaw.trim().length > 0) {
+        tnxGroupId = tnxGroupIdRaw.trim().slice(0, 64);
+      }
+
+      // Optional client-supplied Tnx# override. When provided, validate as a
+      // positive integer.
+      let tnxOverride: number | undefined = undefined;
+      if (transactionNumberOverride !== undefined && transactionNumberOverride !== null && transactionNumberOverride !== "") {
+        const parsed = typeof transactionNumberOverride === "number" ? transactionNumberOverride : Number(transactionNumberOverride);
+        if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+          return res.status(400).json({ message: "Tnx# must be a positive integer." });
+        }
+        tnxOverride = parsed;
+      }
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -2056,8 +2093,38 @@ export async function registerRoutes(
       const firstLot = await storage.getLotById(parsedItems[0].lotId, merchantId);
       const transactionCrop = firstLot?.crop || "potato";
 
-      // Get next transaction number for this crop
-      const transactionNumber = await storage.getNextTransactionNumber(merchantId, transactionCrop);
+      // Resolve the Tnx# for this row. Order of precedence:
+      //   1. If a tnxGroupId is provided AND a row already exists for that
+      //      group on this merchant, reuse that group's transactionNumber
+      //      (this is the second/third buyer in a multi-buyer Load A Truck
+      //      submission).
+      //   2. Else if the client supplied an explicit transactionNumber
+      //      override, validate it isn't already in use by another group on
+      //      the same merchant + same year, then use it.
+      //   3. Otherwise auto-allocate via getNextTransactionNumber.
+      let transactionNumber: number;
+      if (tnxGroupId) {
+        const existingGroupRow = await storage.getTransactionByGroupId(merchantId, tnxGroupId);
+        if (existingGroupRow) {
+          transactionNumber = existingGroupRow.transactionNumber;
+        } else if (tnxOverride !== undefined) {
+          const taken = await storage.isTransactionNumberTakenForCrop(merchantId, tnxOverride, transactionCrop, tnxGroupId);
+          if (taken) {
+            return res.status(409).json({ message: `Tnx# ${tnxOverride} is already in use. Choose a different number.` });
+          }
+          transactionNumber = tnxOverride;
+        } else {
+          transactionNumber = await storage.getNextTransactionNumber(merchantId, transactionCrop);
+        }
+      } else if (tnxOverride !== undefined) {
+        const taken = await storage.isTransactionNumberTakenForCrop(merchantId, tnxOverride, transactionCrop, null);
+        if (taken) {
+          return res.status(409).json({ message: `Tnx# ${tnxOverride} is already in use. Choose a different number.` });
+        }
+        transactionNumber = tnxOverride;
+      } else {
+        transactionNumber = await storage.getNextTransactionNumber(merchantId, transactionCrop);
+      }
 
       // Calculate totals
       let totalBags = 0;
@@ -2159,6 +2226,7 @@ export async function registerRoutes(
         {
           merchantId,
           transactionNumber,
+          tnxGroupId,
           transactionType: transactionType || "sale",
           crop: transactionCrop,
           transporterName: titleCase(transporterName) || null,
@@ -2213,6 +2281,81 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching transaction:", error);
       res.status(500).json({ message: "Failed to fetch transaction" });
+    }
+  });
+
+  // PATCH /api/transactions/:id/transaction-number - Update the Tnx# on a
+  // transaction. When the row belongs to a tnxGroupId, the new number is
+  // cascaded across every sibling row in the same loading session.
+  // IMPORTANT: this specific route must be registered before the more general
+  // PATCH /api/transactions/:id route below.
+  app.patch("/api/transactions/:id/transaction-number", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid transaction id." });
+      }
+
+      const bodySchema = z.object({ transactionNumber: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Tnx# must be a positive integer." });
+      }
+      const newNumber = parsed.data.transactionNumber;
+
+      const existing = await storage.getTransactionById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Transaction not found." });
+      }
+
+      if (existing.transactionNumber === newNumber) {
+        return res.json(existing);
+      }
+
+      const taken = await storage.isTransactionNumberTakenForCrop(
+        merchantId,
+        newNumber,
+        existing.crop || "potato",
+        existing.tnxGroupId ?? null,
+      );
+      if (taken) {
+        return res.status(409).json({
+          message: `Tnx# ${newNumber} is already in use. Choose a different number.`,
+        });
+      }
+
+      const oldNumber = existing.transactionNumber;
+      const { updatedIds } = await storage.updateTransactionNumberForGroup(
+        merchantId,
+        existing.tnxGroupId ?? null,
+        id,
+        newNumber,
+      );
+
+      // Log edit history on every cascaded row so each card's history
+      // reflects the change. Build the changeSet per-row so entityId points
+      // to the actual sibling being annotated, not the originally edited id.
+      for (const updatedId of updatedIds) {
+        await storage.createTransactionEditHistory({
+          transactionId: updatedId,
+          merchantId,
+          userId,
+          changeSet: [{
+            scope: 'transaction',
+            entityId: updatedId,
+            label: 'Transaction',
+            changes: [{ field: 'transactionNumber', oldValue: String(oldNumber), newValue: String(newNumber) }],
+          }],
+        });
+      }
+
+      const refreshed = await storage.getTransactionById(id, merchantId);
+      res.json({ ...refreshed, updatedIds });
+    } catch (error) {
+      console.error("Error updating transaction number:", error);
+      res.status(500).json({ message: "Failed to update transaction number" });
     }
   });
 

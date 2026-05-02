@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, date, boolean, serial, timestamp, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, date, boolean, serial, timestamp, jsonb, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -163,6 +163,12 @@ export const transactions = pgTable("transactions", {
   uniqueId: text("unique_id"), // HTE + YYYYMMDD + sequence (e.g., HTE202602021)
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   transactionNumber: integer("transaction_number").notNull(),
+  // tnxGroupId links transaction rows that originated from the same loading
+  // session (e.g. one Load A Truck submission with multiple buyer sections
+  // creates one row per buyer, all sharing this group id and the same
+  // transactionNumber). Nullable for legacy rows created before this column
+  // existed.
+  tnxGroupId: text("tnx_group_id"),
   transactionType: text("transaction_type").default("sale"), // "sale" or "loading"
   crop: text("crop").default("potato"), // potato, onion, or garlic - for separate transaction number sequences
   transporterName: text("transporter_name"), // transporter/driver name for autocomplete history
@@ -193,7 +199,12 @@ export const transactions = pgTable("transactions", {
   palaKarai: decimal("pala_karai", { precision: 12, scale: 2 }),
   bardan: decimal("bardan", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  // Lookup index for "find all rows in this loading session" queries used by
+  // the cascading Tnx# update.
+  merchantTnxGroupIdx: index("transactions_merchant_tnx_group_idx")
+    .on(table.merchantId, table.tnxGroupId),
+}));
 
 // Transaction Items - each lot selection in a transaction
 export const transactionItems = pgTable("transaction_items", {

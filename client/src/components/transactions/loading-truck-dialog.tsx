@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, AlertTriangle, Check, ChevronsUpDown, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
@@ -94,6 +94,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 },
   ]);
 
+  // Tnx# preview + group id. Single-buyer dialog, but still uses a group id
+  // so the saved row can be linked / cascaded just like Load A Truck rows.
+  const [tnxGroupId, setTnxGroupId] = useState<string>(() => crypto.randomUUID());
+
   const [salesCommissionPct, setSalesCommissionPct] = useState(() => {
     const stored = localStorage.getItem("vyapar_sales_comm_pct");
     return stored ? Number(stored) || 0 : 0;
@@ -119,6 +123,21 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const [aadhatCommissionPct, setAadhatCommissionPct] = useState(0);
   const [hammaliPerBagRate, setHammaliPerBagRate] = useState(0);
   const [editExtraCharges, setEditExtraCharges] = useState(0);
+
+  const { data: nextTnxData } = useQuery<{ next: number }>({
+    queryKey: ["/api/transactions/next-number", selectedCrop],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/transactions/next-number?crop=${encodeURIComponent(selectedCrop)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to fetch next Tnx#");
+      return await res.json();
+    },
+    enabled: open,
+    staleTime: 0,
+  });
+  const upcomingTnxNumber = nextTnxData?.next;
 
   const { data: inventory = [], isLoading: loadingInventory } = useQuery<UnsoldInventoryItem[]>({
     queryKey: ["/api/inventory/unsold"],
@@ -338,6 +357,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         thelaBhada: additionalCharges.thelaBhada,
         palaKarai: additionalCharges.palaKarai,
         bardan: additionalCharges.bardan,
+        // Lock the previewed Tnx# for this loading row.
+        transactionNumber: upcomingTnxNumber,
+        tnxGroupId,
       });
     },
     onSuccess: () => {
@@ -377,6 +399,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setPartyName("");
     setPartyAddress("");
     setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 }]);
+    // Roll a fresh group id for the next loading session.
+    setTnxGroupId(crypto.randomUUID());
     setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
     setDriverAdvance(0);
     setAdvanceAmount(0);
@@ -467,6 +491,16 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
           <DialogTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
             <Truck className="h-5 w-5" />
             {t("Loading", "लोडिंग")}
+            {upcomingTnxNumber !== undefined && (
+              <Badge
+                variant="outline"
+                className="ml-2 gap-1 bg-[#52a7ff]/10 text-[#52a7ff] border-[#52a7ff]/40 font-mono"
+                data-testid="badge-loading-next-tnx"
+              >
+                <Receipt className="h-3 w-3" />
+                {t("Tnx#", "लेन-देन#")} {upcomingTnxNumber}
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {t("Create a loading transaction with mandi charges", "मंडी शुल्क के साथ लोडिंग लेनदेन बनाएं")}

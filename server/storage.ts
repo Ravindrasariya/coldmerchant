@@ -165,6 +165,10 @@ export interface IStorage {
   getTransactionsByMerchant(merchantId: number): Promise<(Transaction & { items: (TransactionItem & { farmerName?: string; farmerVillage?: string })[] })[]>;
   createTransaction(transaction: InsertTransaction & { transactionNumber: number }, items: Omit<InsertTransactionItem, 'transactionId'>[]): Promise<Transaction & { items: TransactionItem[] }>;
   getNextTransactionNumber(merchantId: number, crop?: string): Promise<number>;
+  // Tnx# sharing + editing helpers (Task #125)
+  getTransactionByGroupId(merchantId: number, tnxGroupId: string): Promise<Transaction | undefined>;
+  isTransactionNumberTakenForCrop(merchantId: number, transactionNumber: number, crop: string, excludeTnxGroupId: string | null): Promise<boolean>;
+  updateTransactionNumberForGroup(merchantId: number, tnxGroupId: string | null, fallbackTransactionId: number, newTransactionNumber: number): Promise<{ updatedIds: number[] }>;
   getUnsoldInventory(merchantId: number): Promise<any[]>;
   getUniqueTransporterNames(merchantId: number): Promise<string[]>;
   
@@ -877,7 +881,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(
-    transaction: Omit<InsertTransaction, 'uniqueId'> & { transactionNumber: number }, 
+    transaction: Omit<InsertTransaction, 'uniqueId'> & { transactionNumber: number; tnxGroupId?: string | null }, 
     items: Omit<InsertTransactionItem, 'transactionId'>[]
   ): Promise<Transaction & { items: TransactionItem[] }> {
     const dateStr = getISTDateYYYYMMDD();
@@ -951,6 +955,86 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return result ? result.transactionNumber + 1 : 1;
+  }
+
+  // Look up any transaction in the same loading session (group). Used by
+  // POST /api/transactions to detect "this is the second-buyer post for a
+  // group already created in this submission" and reuse the same Tnx#.
+  async getTransactionByGroupId(merchantId: number, tnxGroupId: string): Promise<Transaction | undefined> {
+    const [row] = await db.select().from(transactions)
+      .where(and(
+        eq(transactions.merchantId, merchantId),
+        eq(transactions.tnxGroupId, tnxGroupId),
+      ))
+      .limit(1);
+    return row;
+  }
+
+  // Check whether a Tnx# is already used by another loading session in the
+  // same merchant + same calendar year of createdAt (mirroring the year
+  // scoping used by getNextTransactionNumber). Rows in the excluded group
+  // are ignored so editing a number on one card of a group doesn't false-
+  // positive against its own siblings.
+  async isTransactionNumberTakenForCrop(
+    merchantId: number,
+    transactionNumber: number,
+    _crop: string,
+    excludeTnxGroupId: string | null,
+  ): Promise<boolean> {
+    // Year-scope the check to mirror getNextTransactionNumber, which resets
+    // the series each calendar year. Without this, a Tnx# used in a previous
+    // year would block reuse in the current year.
+    const currentYear = new Date().getFullYear();
+    const conditions = [
+      eq(transactions.merchantId, merchantId),
+      eq(transactions.transactionNumber, transactionNumber),
+      sql`EXTRACT(YEAR FROM ${transactions.createdAt}) = ${currentYear}`,
+    ];
+    if (excludeTnxGroupId !== null) {
+      // Exclude rows that share the same group id (same loading session).
+      conditions.push(sql`(${transactions.tnxGroupId} IS NULL OR ${transactions.tnxGroupId} <> ${excludeTnxGroupId})`);
+    }
+
+    const [match] = await db.select({ id: transactions.id })
+      .from(transactions)
+      .where(and(...conditions))
+      .limit(1);
+
+    return !!match;
+  }
+
+  // Cascade-update the Tnx# across every row that shares the same loading
+  // session. When tnxGroupId is null (legacy rows from before the column
+  // existed), only update the single fallback row.
+  async updateTransactionNumberForGroup(
+    merchantId: number,
+    tnxGroupId: string | null,
+    fallbackTransactionId: number,
+    newTransactionNumber: number,
+  ): Promise<{ updatedIds: number[] }> {
+    const updatedIds: number[] = [];
+    await db.transaction(async (tx) => {
+      if (tnxGroupId) {
+        const rows = await tx.update(transactions)
+          .set({ transactionNumber: newTransactionNumber })
+          .where(and(
+            eq(transactions.merchantId, merchantId),
+            eq(transactions.tnxGroupId, tnxGroupId),
+          ))
+          .returning({ id: transactions.id });
+        for (const r of rows) updatedIds.push(r.id);
+      } else {
+        const rows = await tx.update(transactions)
+          .set({ transactionNumber: newTransactionNumber })
+          .where(and(
+            eq(transactions.merchantId, merchantId),
+            eq(transactions.id, fallbackTransactionId),
+          ))
+          .returning({ id: transactions.id });
+        for (const r of rows) updatedIds.push(r.id);
+      }
+    });
+    return { updatedIds };
   }
 
   computeProportionateNetWeight(lot: any, breakdowns: any[], breakdownId: number | null, bagsMoved: number): number {

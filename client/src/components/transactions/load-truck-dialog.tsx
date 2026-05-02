@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, UserPlus, ChevronDown, ChevronUp, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, Truck, Loader2, Package, IndianRupee, UserPlus, ChevronDown, ChevronUp, AlertTriangle, Check, ChevronsUpDown, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
@@ -113,6 +113,26 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
   // Buyer sections
   const [buyerSections, setBuyerSections] = useState<BuyerSection[]>([createEmptyBuyerSection()]);
+
+  // Tnx# preview + shared group id. The tnxGroupId is generated once per
+  // dialog open so every per-buyer POST in this loading session shares the
+  // same Tnx# on the server.
+  const [tnxGroupId, setTnxGroupId] = useState<string>(() => crypto.randomUUID());
+
+  const { data: nextTnxData } = useQuery<{ next: number }>({
+    queryKey: ["/api/transactions/next-number", selectedCrop],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/transactions/next-number?crop=${encodeURIComponent(selectedCrop)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to fetch next Tnx#");
+      return await res.json();
+    },
+    enabled: open,
+    staleTime: 0,
+  });
+  const upcomingTnxNumber = nextTnxData?.next;
 
   const { data: inventory = [], isLoading: loadingInventory } = useQuery<UnsoldInventoryItem[]>({
     queryKey: ["/api/inventory/unsold"],
@@ -344,6 +364,10 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           transportationCharges: section.transportationCharges,
           otherCharges: section.otherCharges,
           items,
+          // Lock the previewed Tnx# and share it across all buyers in this
+          // loading session via tnxGroupId.
+          transactionNumber: upcomingTnxNumber,
+          tnxGroupId,
         });
       });
 
@@ -381,6 +405,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
     setVehicleNumber("");
     setDateOfLoading(getTodayIST());
     setBuyerSections([createEmptyBuyerSection()]);
+    // Roll a fresh group id for the next loading session.
+    setTnxGroupId(crypto.randomUUID());
   };
 
   const handleSubmit = () => {
@@ -473,6 +499,16 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           <DialogTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
             <Truck className="h-5 w-5" />
             {t("Load A Truck", "ट्रक लोड करें")}
+            {upcomingTnxNumber !== undefined && (
+              <Badge
+                variant="outline"
+                className="ml-2 gap-1 bg-[#52a7ff]/10 text-[#52a7ff] border-[#52a7ff]/40 font-mono"
+                data-testid="badge-load-truck-next-tnx"
+              >
+                <Receipt className="h-3 w-3" />
+                {t("Tnx#", "लेन-देन#")} {upcomingTnxNumber}
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {t(
