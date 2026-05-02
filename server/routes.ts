@@ -5070,21 +5070,12 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/farmers - Manually create a new farmer ledger entry (mirrors POST /api/buyers)
-  // Schema: omit server-generated fields (merchantId, farmerCode), make all
-  // other columns optional, then re-require `name` (the only truly mandatory
-  // input). dateAdded is honoured if provided, defaulted to today's IST date
-  // otherwise.
-  const createFarmerSchema = insertFarmerSchema
-    .omit({ merchantId: true, farmerCode: true })
-    .partial()
-    .required({ name: true });
-
+  // POST /api/farmers - Manually create a new farmer ledger entry
   app.post("/api/farmers", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
 
-      const validationResult = createFarmerSchema.safeParse(req.body);
+      const validationResult = insertFarmerSchema.omit({ merchantId: true }).safeParse(req.body);
       if (!validationResult.success) {
         return res.status(400).json({
           message: "Validation failed",
@@ -5092,9 +5083,9 @@ export async function registerRoutes(
         });
       }
 
-      const { name, contact, village, tehsil, district, state, dateAdded } = validationResult.data;
+      const { dateAdded, name, contact, village, tehsil, district, state } = validationResult.data;
 
-      const trimmedName = (name ?? "").trim();
+      const trimmedName = name.trim();
       if (!trimmedName) {
         return res.status(400).json({ message: "Farmer name is required" });
       }
@@ -5104,9 +5095,6 @@ export async function registerRoutes(
       const trimmedDistrict = district?.trim() || null;
       const trimmedState = state?.trim() || null;
 
-      // Composite-key dup check (name + contact + village). If a match is found
-      // we surface the existing farmer with requiresMerge=true so the client
-      // can open the merge dialog instead of silently creating a duplicate.
       const existingFarmer = await storage.getFarmerByCompositeKey(
         merchantId,
         trimmedName,
@@ -5121,7 +5109,6 @@ export async function registerRoutes(
         });
       }
 
-      // Generate farmer code: FMYYYYMMDD{seq} — unique per merchant
       const effectiveDateAdded = dateAdded || getISTDateString();
       const dateStr = parseDateToCodeFormat(effectiveDateAdded);
       const codePrefix = `FM${dateStr}`;
