@@ -393,11 +393,11 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
         )}
 
         <div className="space-y-4">
-          <div className="flex items-end gap-4 flex-wrap">
-            <h3 className="text-lg font-medium leading-10">{t("Lots", "लॉट")}</h3>
-            <div className="flex items-end gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="next-serial-input">{t("Sr#", "Sr#")}</Label>
+          <div className="flex items-center gap-4 flex-wrap">
+            <h3 className="text-lg font-medium">{t("Lots", "लॉट")}</h3>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="next-serial-input" className="whitespace-nowrap">{t("Sr#", "Sr#")}</Label>
                 <div className="relative">
                   <Input
                     id="next-serial-input"
@@ -442,7 +442,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
               {overrideSerial !== null && (
                 <button
                   type="button"
-                  className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded h-9 self-end"
+                  className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded"
                   onClick={() => setOverrideSerial(null)}
                   data-testid="button-reset-next-serial"
                 >
