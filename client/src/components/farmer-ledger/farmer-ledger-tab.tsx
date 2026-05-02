@@ -1008,9 +1008,10 @@ export function FarmerLedgerTab() {
             <Button
               onClick={() => setAddDialogOpen(true)}
               variant="outline"
+              size="sm"
               data-testid="button-add-farmer"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-1" />
               {t("Add Farmer", "किसान जोड़ें")}
             </Button>
             <Button
