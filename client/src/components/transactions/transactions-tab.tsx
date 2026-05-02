@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, FileDown } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, FileDown, ChevronDown, ChevronRight, MapPin, Phone } from "lucide-react";
+import { type Buyer } from "@shared/schema";
 import { CropToggle } from "@/components/crop-toggle";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -119,6 +120,18 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     queryKey: ["/api/transactions"],
   });
 
+  const { data: buyers = [] } = useQuery<Buyer[]>({
+    queryKey: ["/api/buyers"],
+  });
+
+  const buyerByName = useMemo(() => {
+    const map = new Map<string, Buyer>();
+    for (const b of buyers) {
+      if (b.name) map.set(b.name.toLowerCase().trim(), b);
+    }
+    return map;
+  }, [buyers]);
+
   // Get unique years for dropdown
   const availableYears = useMemo(() => {
     if (!transactions) return [new Date().getFullYear().toString()];
@@ -204,6 +217,66 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       return true;
     });
   }, [transactions, txnCropFilter, filterYear, filterMonths, filterDay, filterTxnNumber, filterSerialNumber, filterTxnType, filterParty, filterPaymentDue]);
+
+  // Group filtered transactions by party (trimmed name; em-dash fallback)
+  const partyGroups = useMemo(() => {
+    const groups = new Map<string, Transaction[]>();
+    for (const txn of filteredTransactions) {
+      const key = (txn.partyName || "").trim() || "—";
+      const arr = groups.get(key);
+      if (arr) arr.push(txn);
+      else groups.set(key, [txn]);
+    }
+
+    return Array.from(groups.entries())
+      .map(([partyName, txns]) => {
+        const sortedTxns = [...txns].sort((a, b) => b.transactionNumber - a.transactionNumber);
+        const buyer = buyerByName.get(partyName.toLowerCase());
+        const partyAddress = buyer?.address || sortedTxns.find(t => t.partyAddress)?.partyAddress || "";
+        const partyContact = buyer?.contact || "";
+
+        let totalBags = 0;
+        let totalCost = 0;
+        let totalRevenue = 0;
+        let totalPL = 0;
+        let totalDue = 0;
+
+        for (const txn of txns) {
+          const cost = txn.transactionType === "loading"
+            ? parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalAadhatCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.totalMandiExtraCharges || "0") + parseFloat(txn.tulai || "0") + parseFloat(txn.majduri || "0") + parseFloat(txn.thelaBhada || "0") + parseFloat(txn.palaKarai || "0") + parseFloat(txn.bardan || "0") + parseFloat(txn.advancePayment || "0")
+            : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+          const rev = txn.revenue
+            ? parseFloat(txn.revenue)
+            : txn.items.reduce((s, i) => s + parseFloat(i.revenue || "0"), 0);
+          const recv = parseFloat(txn.amountReceived || "0");
+          const pl = txn.revenue ? parseFloat(txn.profitLoss || "0") : (rev - cost);
+
+          totalBags += txn.totalBags;
+          totalCost += cost;
+          totalRevenue += rev;
+          totalPL += pl;
+          totalDue += Math.max(0, rev - recv);
+        }
+
+        const maxTnxNumber = sortedTxns[0]?.transactionNumber ?? 0;
+        const displayName = buyer?.name?.trim() || partyName;
+
+        return {
+          partyName: displayName,
+          partyKey: (buyer?.id ? `b${buyer.id}` : displayName.replace(/[^a-zA-Z0-9\u0900-\u097F]+/g, "_").toLowerCase()) || "unknown",
+          partyAddress,
+          partyContact,
+          txns: sortedTxns,
+          totalBags,
+          totalCost,
+          totalRevenue,
+          totalPL,
+          totalDue,
+          maxTnxNumber,
+        };
+      })
+      .sort((a, b) => b.maxTnxNumber - a.maxTnxNumber);
+  }, [filteredTransactions, buyerByName]);
 
   const currentYear = new Date().getFullYear().toString();
   const currentMonth = new Date().getMonth();
@@ -637,12 +710,12 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredTransactions.slice().sort((a, b) => b.transactionNumber - a.transactionNumber).map((txn) => (
-            <TransactionCard 
-              key={txn.id} 
-              transaction={txn} 
-              onEdit={() => setEditTransactionId(txn.id)}
-              onPrint={() => {
+          {partyGroups.map((group) => (
+            <PartyCard
+              key={group.partyKey + "-" + group.maxTnxNumber}
+              group={group}
+              onEdit={(id) => setEditTransactionId(id)}
+              onPrint={(txn) => {
                 if (txn.transactionType === "loading") {
                   setPrintLoadingTransactionId(txn.id);
                 } else {
@@ -747,189 +820,261 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   );
 }
 
-interface TransactionCardProps {
-  transaction: Transaction;
-  onEdit: () => void;
-  onPrint: () => void;
+interface PartyGroup {
+  partyName: string;
+  partyKey: string;
+  partyAddress: string;
+  partyContact: string;
+  txns: Transaction[];
+  totalBags: number;
+  totalCost: number;
+  totalRevenue: number;
+  totalPL: number;
+  totalDue: number;
+  maxTnxNumber: number;
 }
 
-function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps) {
-  const { t } = useLanguage();
+interface PartyCardProps {
+  group: PartyGroup;
+  onEdit: (id: number) => void;
+  onPrint: (txn: Transaction) => void;
+}
 
-  const totalCost = transaction.transactionType === "loading"
-    ? parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.totalMandiCommission || "0") + parseFloat(transaction.totalAadhatCommission || "0") + parseFloat(transaction.totalHammali || "0") + parseFloat(transaction.totalMandiExtraCharges || "0") + parseFloat(transaction.tulai || "0") + parseFloat(transaction.majduri || "0") + parseFloat(transaction.thelaBhada || "0") + parseFloat(transaction.palaKarai || "0") + parseFloat(transaction.bardan || "0") + parseFloat(transaction.advancePayment || "0")
-    : parseFloat(transaction.totalCostOfGoods || "0") + parseFloat(transaction.totalMandiCommission || "0") + parseFloat(transaction.totalHammali || "0") + parseFloat(transaction.transportationCharges || "0") + parseFloat(transaction.otherCharges || "0");
-  const revenue = transaction.revenue 
-    ? parseFloat(transaction.revenue) 
-    : transaction.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
-  const amountReceived = parseFloat(transaction.amountReceived || "0");
-  const dueAmount = Math.max(0, revenue - amountReceived);
-  const profitLoss = transaction.revenue 
-    ? parseFloat(transaction.profitLoss || "0")
-    : revenue - totalCost;
-  
-  // Get unique potato types from transaction items (Wafer, Ration, Seed)
-  const bagTypes = Array.from(new Set(transaction.items.map(item => item.potatoType).filter(Boolean))) as string[];
+function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
+  const { t } = useLanguage();
+  const [expandedTxnId, setExpandedTxnId] = useState<number | null>(null);
+
+  const fmtMoney = (n: number) => parseFloat(n.toFixed(1)).toLocaleString("en-IN");
+
+  const computeRow = (txn: Transaction) => {
+    const cost = txn.transactionType === "loading"
+      ? parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalAadhatCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.totalMandiExtraCharges || "0") + parseFloat(txn.tulai || "0") + parseFloat(txn.majduri || "0") + parseFloat(txn.thelaBhada || "0") + parseFloat(txn.palaKarai || "0") + parseFloat(txn.bardan || "0") + parseFloat(txn.advancePayment || "0")
+      : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+    const revenue = txn.revenue
+      ? parseFloat(txn.revenue)
+      : txn.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
+    const amountReceived = parseFloat(txn.amountReceived || "0");
+    const due = Math.max(0, revenue - amountReceived);
+    const profitLoss = txn.revenue ? parseFloat(txn.profitLoss || "0") : (revenue - cost);
+    return { cost, revenue, due, profitLoss };
+  };
+
+  const cropBadgeClasses = (c: string) => c === "onion"
+    ? "bg-pink-100 text-pink-700 border-pink-300 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-600"
+    : c === "garlic"
+      ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
+      : "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600";
+
+  const cropLabel = (c: string) => c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
 
   return (
-    <Card className="border border-orange-300 dark:border-orange-700 hover-elevate" data-testid={`card-transaction-${transaction.id}`}>
-      <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="flex-1 min-w-0 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1 mr-1">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#52a7ff]/10">
-                  <Receipt className="h-3.5 w-3.5 text-[#52a7ff]" />
-                </div>
-                <span className="font-bold text-sm leading-tight whitespace-nowrap">
-                  Tr No: {transaction.transactionNumber}
-                </span>
-                <span className="text-muted-foreground text-xs ml-1">
-                  {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </span>
-                {transaction.transactionType === "loading" ? (
-                  <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-600 h-5">
-                    {t("Loading", "लोडिंग")}
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-600 h-5" data-testid={`badge-bikri-${transaction.id}`}>
-                    {t("Bikri", "बिक्री")}
-                  </Badge>
-                )}
-                {(() => {
-                  const c = transaction.crop || (transaction.items.length > 0 ? (transaction.items[0].crop || "potato") : "potato");
-                  const cls = c === "onion"
-                    ? "bg-pink-100 text-pink-700 border-pink-300 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-600"
-                    : c === "garlic"
-                      ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-600"
-                      : "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-600";
-                  const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
-                  return (
-                    <Badge variant="outline" className={`text-[10px] h-5 ${cls}`} data-testid={`badge-crop-${transaction.id}`}>
-                      {label}
-                    </Badge>
-                  );
-                })()}
+    <Card className="border border-orange-300 dark:border-orange-700 overflow-hidden" data-testid={`card-party-${group.partyKey}`}>
+      <CardContent className="p-0">
+        {/* Party Header */}
+        <div className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 px-4 py-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-base leading-tight" data-testid={`text-party-name-${group.partyKey}`}>
+                {group.partyName}
               </div>
-              {transaction.partyName && (
-                <span className="font-semibold text-sm leading-tight">
-                  - {transaction.partyName}
-                </span>
-              )}
-              <div className="flex items-center gap-2 ml-auto">
-                {transaction.vehicleNumber && (
-                  <Badge variant="outline" className="text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600">
-                    <Truck className="h-3 w-3 mr-1" />
-                    {transaction.vehicleNumber}
-                  </Badge>
+              <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-muted-foreground mt-1">
+                {group.partyAddress && (
+                  <span className="flex items-center gap-1" data-testid={`text-party-address-${group.partyKey}`}>
+                    <MapPin className="h-3 w-3" />
+                    {group.partyAddress}
+                  </span>
                 )}
-                {profitLoss !== 0 && (
-                  <Badge variant={profitLoss >= 0 ? "default" : "destructive"} className="flex items-center gap-1">
-                    {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    ₹{parseFloat(Math.abs(profitLoss).toFixed(1)).toLocaleString('en-IN')}
-                  </Badge>
+                {group.partyContact && (
+                  <span className="flex items-center gap-1" data-testid={`text-party-contact-${group.partyKey}`}>
+                    <Phone className="h-3 w-3" />
+                    {group.partyContact}
+                  </span>
                 )}
               </div>
             </div>
+            <Badge variant="outline" className="text-[10px] bg-white/60 dark:bg-black/20">
+              {t("Transactions", "लेनदेन")}: {group.txns.length}
+            </Badge>
+          </div>
 
-            <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-2 sm:gap-3 text-sm">
-              <span className="flex items-center gap-1">
-                <Package className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium">{transaction.totalBags}</span>
-                <span className="text-muted-foreground">{t("Bags", "बोरी")}</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-medium">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</span>
-                <span className="text-muted-foreground ml-1">{t("Kg", "किग्रा")}</span>
-              </span>
-              <span className="col-span-1">
-                <span className="text-muted-foreground">{t("Cost", "लागत")}:</span>
-                <span className="font-medium ml-1">₹{parseFloat(totalCost.toFixed(1)).toLocaleString('en-IN')}</span>
-              </span>
-              <span className="col-span-1">
-                <span className="text-muted-foreground">{t("Revenue", "राजस्व")}:</span>
-                <span className="font-medium ml-1">₹{parseFloat(revenue.toFixed(1)).toLocaleString('en-IN')}</span>
-              </span>
-              {dueAmount > 0 ? (
-                <div className="col-span-2 sm:col-span-1">
-                  <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
-                    {t("Due", "बकाया")}: ₹{parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN')}
-                  </Badge>
-                </div>
-              ) : revenue > 0 && (
-                <div className="col-span-2 sm:col-span-1">
-                  <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-300 dark:border-green-600">
-                    {t("Paid", "भुगतान")}
-                  </Badge>
-                </div>
-              )}
+          {/* Aggregate row */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 mt-3 text-xs">
+            <div>
+              <div className="text-muted-foreground">{t("Total Bags", "कुल बोरी")}</div>
+              <div className="font-semibold text-sm" data-testid={`text-aggregate-bags-${group.partyKey}`}>
+                <Package className="h-3 w-3 inline mr-1" />{group.totalBags}
+              </div>
             </div>
+            <div>
+              <div className="text-muted-foreground">{t("Total Cost", "कुल लागत")}</div>
+              <div className="font-semibold text-sm" data-testid={`text-aggregate-cost-${group.partyKey}`}>
+                ₹{fmtMoney(group.totalCost)}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}</div>
+              <div className="font-semibold text-sm" data-testid={`text-aggregate-revenue-${group.partyKey}`}>
+                ₹{fmtMoney(group.totalRevenue)}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">{t("P&L", "लाभ/हानि")}</div>
+              <div className={`font-semibold text-sm flex items-center gap-1 ${group.totalPL >= 0 ? "text-green-600" : "text-red-600"}`} data-testid={`text-aggregate-pl-${group.partyKey}`}>
+                {group.totalPL >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {group.totalPL >= 0 ? "+" : "-"}₹{fmtMoney(Math.abs(group.totalPL))}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">{t("Total Due", "कुल बकाया")}</div>
+              <div className={`font-semibold text-sm ${group.totalDue > 0 ? "text-orange-600" : "text-muted-foreground"}`} data-testid={`text-aggregate-due-${group.partyKey}`}>
+                ₹{fmtMoney(group.totalDue)}
+              </div>
+            </div>
+          </div>
+        </div>
 
-            {transaction.transactionType === "loading" && (() => {
-              const charges = [
-                { key: "tulai", label: t("Tulai", "तुलाई"), value: parseFloat(transaction.tulai || "0") },
-                { key: "majduri", label: t("Majduri", "मजदूरी"), value: parseFloat(transaction.majduri || "0") },
-                { key: "thelaBhada", label: t("Thela Bhada", "ठेला भाड़ा"), value: parseFloat(transaction.thelaBhada || "0") },
-                { key: "palaKarai", label: t("Pala Karai", "पाला कराई"), value: parseFloat(transaction.palaKarai || "0") },
-                { key: "bardan", label: t("Bardan", "बरदान"), value: parseFloat(transaction.bardan || "0") },
-              ].filter(c => c.value > 0);
-              if (charges.length === 0) return null;
-              return (
-                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {charges.map(c => (
-                    <span key={c.key}>
-                      {c.label}: <span className="font-medium text-foreground">₹{parseFloat(c.value.toFixed(1)).toLocaleString('en-IN')}</span>
-                    </span>
-                  ))}
-                </div>
-              );
-            })()}
-
-            <div className="flex flex-wrap gap-1.5 pt-1 border-t sm:border-0 mt-2 sm:mt-0">
-              {transaction.items.map((item) => {
-                const parts = [item.bagsMoved.toString(), item.potatoType, item.size].filter(Boolean);
-                const farmerInfo = item.farmerName ? ` ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : "";
+        {/* Transactions table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs sm:text-sm border-collapse">
+            <thead className="bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100">
+              <tr>
+                <th className="w-7 px-1 py-2"></th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Tnx#", "लेनदेन#")}</th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Date", "तिथि")}</th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Type", "प्रकार")}</th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Crop", "फसल")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Bags", "बोरी")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Net Wt", "वजन")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Cost", "लागत")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Revenue", "राजस्व")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Due", "बकाया")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("P&L", "लाभ/हानि")}</th>
+                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap">{t("Edit", "संपादित")}</th>
+                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap">{t("Print", "प्रिंट")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.txns.map((txn) => {
+                const { cost, revenue, due, profitLoss } = computeRow(txn);
+                const c = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
+                const isExpanded = expandedTxnId === txn.id;
                 return (
-                  <Badge 
-                    key={item.id} 
-                    variant="outline" 
-                    className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
-                  >
-                    S#{item.serialNumber} ({parts.join("- ")}){farmerInfo}
-                  </Badge>
+                  <Fragment key={txn.id}>
+                    <tr
+                      className="border-b border-border hover:bg-muted/50 cursor-pointer"
+                      onClick={() => setExpandedTxnId(prev => prev === txn.id ? null : txn.id)}
+                      data-testid={`row-tnx-${txn.id}`}
+                    >
+                      <td className="px-1 py-2 text-center">
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedTxnId(prev => prev === txn.id ? null : txn.id);
+                          }}
+                          aria-label={isExpanded ? "Collapse" : "Expand"}
+                          data-testid={`button-expand-tnx-${txn.id}`}
+                        >
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      </td>
+                      <td className="px-2 py-2 font-mono font-semibold whitespace-nowrap" data-testid={`text-tnx-number-${txn.id}`}>
+                        {txn.transactionNumber}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap text-muted-foreground">
+                        {new Date(txn.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {txn.transactionType === "loading" ? (
+                          <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-600 h-5">
+                            {t("Loading", "लोडिंग")}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-600 h-5" data-testid={`badge-bikri-${txn.id}`}>
+                            {t("Bikri", "बिक्री")}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <Badge variant="outline" className={`text-[10px] h-5 ${cropBadgeClasses(c)}`} data-testid={`badge-crop-${txn.id}`}>
+                          {cropLabel(c)}
+                        </Badge>
+                      </td>
+                      <td className="px-2 py-2 text-right font-mono whitespace-nowrap">{txn.totalBags}</td>
+                      <td className="px-2 py-2 text-right font-mono whitespace-nowrap">{parseFloat(txn.totalNetWeight || "0").toFixed(1)}</td>
+                      <td className="px-2 py-2 text-right font-mono whitespace-nowrap">₹{fmtMoney(cost)}</td>
+                      <td className="px-2 py-2 text-right font-mono whitespace-nowrap">₹{fmtMoney(revenue)}</td>
+                      <td className={`px-2 py-2 text-right font-mono whitespace-nowrap ${due > 0 ? "text-orange-600" : "text-muted-foreground"}`}>
+                        ₹{fmtMoney(due)}
+                      </td>
+                      <td className={`px-2 py-2 text-right font-mono whitespace-nowrap ${profitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        <span className="inline-flex items-center gap-0.5 justify-end">
+                          {profitLoss >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          ₹{fmtMoney(Math.abs(profitLoss))}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); onEdit(txn.id); }}
+                          data-testid={`button-edit-tnx-${txn.id}`}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); onPrint(txn); }}
+                          data-testid={`button-print-tnx-${txn.id}`}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-muted/30">
+                        <td colSpan={13} className="px-4 py-3" data-testid={`region-tnx-items-${txn.id}`}>
+                          <div className="flex flex-wrap gap-1.5">
+                            {txn.items.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">{t("No items", "कोई आइटम नहीं")}</span>
+                            ) : txn.items.map((item) => {
+                              const parts = [item.bagsMoved.toString(), item.potatoType, item.size].filter(Boolean);
+                              const farmerInfo = item.farmerName ? ` ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : "";
+                              return (
+                                <Badge
+                                  key={item.id}
+                                  variant="outline"
+                                  className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
+                                  data-testid={`badge-lot-${txn.id}-${item.id}`}
+                                >
+                                  S#{item.serialNumber} ({parts.join("- ")}){farmerInfo}
+                                </Badge>
+                              );
+                            })}
+                            {txn.vehicleNumber && (
+                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600 h-5">
+                                <Truck className="h-3 w-3 mr-1" />
+                                {txn.vehicleNumber}
+                              </Badge>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
-            </div>
-          </div>
-
-          <div className="flex sm:flex-col gap-2 flex-shrink-0 border-t sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0 justify-end">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={onEdit}
-              className="flex-1 sm:flex-none h-8 sm:h-9"
-              data-testid={`button-edit-transaction-${transaction.id}`}
-            >
-              <Edit className="h-3.5 w-3.5 mr-1.5" />
-              {t("Edit", "संपादित")}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={onPrint}
-              className="flex-1 sm:flex-none h-8 sm:h-9"
-              data-testid={`button-print-receipt-${transaction.id}`}
-            >
-              <Printer className="h-3.5 w-3.5 mr-1.5" />
-              {t("Receipt", "रसीद")}
-            </Button>
-          </div>
+            </tbody>
+          </table>
         </div>
       </CardContent>
     </Card>
   );
 }
+
