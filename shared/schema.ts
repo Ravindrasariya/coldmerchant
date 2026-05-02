@@ -65,7 +65,13 @@ export const stockEntries = pgTable("stock_entries", {
   attachmentImage: text("attachment_image"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  // Database-level guard so two concurrent inserts/updates can never end up
+  // with the same Sr# for a given merchant within the same calendar year of
+  // purchase_date. Mirrors the application-level check in storage/routes.
+  merchantSerialYearUnique: uniqueIndex("stock_entries_merchant_serial_year_unique")
+    .on(table.merchantId, table.serialNumber, sql`EXTRACT(YEAR FROM ${table.purchaseDate})`),
+}));
 
 // Charge types for dynamic charges system
 export const CHARGE_TYPES = [
