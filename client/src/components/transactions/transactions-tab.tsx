@@ -934,21 +934,21 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
         {/* Transactions table */}
         <div className="overflow-x-auto">
           <table className="w-full text-xs sm:text-sm border-collapse">
-            <thead className="bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 text-sm sm:text-base">
+            <thead className="bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 text-[11px] sm:text-xs">
               <tr>
-                <th className="w-7 px-1 py-2.5"></th>
-                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Tnx#", "लेनदेन#")}</th>
-                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Date", "तिथि")}</th>
-                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Type", "प्रकार")}</th>
-                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Crop", "फसल")}</th>
-                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Bags", "बोरी")}</th>
-                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Net Wt", "वजन")}</th>
-                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Cost", "लागत")}</th>
-                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Revenue", "राजस्व")}</th>
-                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Due", "बकाया")}</th>
-                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("P&L", "लाभ/हानि")}</th>
-                <th className="px-2 py-2.5 text-center font-semibold whitespace-nowrap">{t("Edit", "संपादित")}</th>
-                <th className="px-2 py-2.5 text-center font-semibold whitespace-nowrap">{t("Print", "प्रिंट")}</th>
+                <th className="w-7 px-1 py-2"></th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Tnx#", "लेनदेन#")}</th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Date", "तिथि")}</th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Type", "प्रकार")}</th>
+                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Crop", "फसल")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Bags", "बोरी")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Net Wt", "वजन")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Cost", "लागत")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Revenue", "राजस्व")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Due", "बकाया")}</th>
+                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("P&L", "लाभ/हानि")}</th>
+                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap">{t("Edit", "संपादित")}</th>
+                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap">{t("Print", "प्रिंट")}</th>
               </tr>
             </thead>
             <tbody>
