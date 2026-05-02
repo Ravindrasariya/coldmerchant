@@ -899,31 +899,31 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
           {/* Divider between buyer info and aggregate row */}
           <div className="border-t border-orange-200 dark:border-orange-800" />
 
-          {/* Row 2: Aggregate metrics — inline label: value pairs, equally spaced */}
-          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-2.5 text-sm">
-            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-bags-${group.partyKey}`}>
-              <span className="text-muted-foreground">{t("Total Bags", "कुल बोरी")}:</span>
+          {/* Row 2: Aggregate metrics — inline label: value pairs in equal-width columns */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
+            <div className="flex items-center gap-1.5 min-w-0" data-testid={`text-aggregate-bags-${group.partyKey}`}>
+              <span className="text-muted-foreground whitespace-nowrap">{t("Total Bags", "कुल बोरी")}:</span>
               <span className="font-semibold flex items-center gap-1">
                 <Package className="h-3.5 w-3.5" />{group.totalBags}
               </span>
             </div>
-            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-cost-${group.partyKey}`}>
-              <span className="text-muted-foreground">{t("Total Cost", "कुल लागत")}:</span>
+            <div className="flex items-center gap-1.5 min-w-0" data-testid={`text-aggregate-cost-${group.partyKey}`}>
+              <span className="text-muted-foreground whitespace-nowrap">{t("Total Cost", "कुल लागत")}:</span>
               <span className="font-semibold">₹{fmtMoney(group.totalCost)}</span>
             </div>
-            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-revenue-${group.partyKey}`}>
-              <span className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}:</span>
+            <div className="flex items-center gap-1.5 min-w-0" data-testid={`text-aggregate-revenue-${group.partyKey}`}>
+              <span className="text-muted-foreground whitespace-nowrap">{t("Total Revenue", "कुल राजस्व")}:</span>
               <span className="font-semibold">₹{fmtMoney(group.totalRevenue)}</span>
             </div>
-            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-pl-${group.partyKey}`}>
-              <span className="text-muted-foreground">{t("P&L", "लाभ/हानि")}:</span>
+            <div className="flex items-center gap-1.5 min-w-0" data-testid={`text-aggregate-pl-${group.partyKey}`}>
+              <span className="text-muted-foreground whitespace-nowrap">{t("P&L", "लाभ/हानि")}:</span>
               <span className={`font-semibold flex items-center gap-1 ${group.totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {group.totalPL >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                 {group.totalPL >= 0 ? "+" : "-"}₹{fmtMoney(Math.abs(group.totalPL))}
               </span>
             </div>
-            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-due-${group.partyKey}`}>
-              <span className="text-muted-foreground">{t("Total Due", "कुल बकाया")}:</span>
+            <div className="flex items-center gap-1.5 min-w-0" data-testid={`text-aggregate-due-${group.partyKey}`}>
+              <span className="text-muted-foreground whitespace-nowrap">{t("Total Due", "कुल बकाया")}:</span>
               <span className={`font-semibold ${group.totalDue > 0 ? "text-orange-600" : "text-muted-foreground"}`}>
                 ₹{fmtMoney(group.totalDue)}
               </span>
