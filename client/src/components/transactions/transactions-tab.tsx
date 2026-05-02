@@ -871,66 +871,62 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
     <Card className="border border-orange-300 dark:border-orange-700 overflow-hidden" data-testid={`card-party-${group.partyKey}`}>
       <CardContent className="p-0">
         {/* Party Header */}
-        <div className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 px-4 py-3">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="min-w-0 flex-1">
-              <div className="font-bold text-base leading-tight" data-testid={`text-party-name-${group.partyKey}`}>
+        <div className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800">
+          {/* Row 1: Name + Address + Contact + Badge — all on one line */}
+          <div className="flex items-center justify-between gap-3 flex-wrap px-4 py-2.5">
+            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap min-w-0 flex-1">
+              <span className="font-bold text-base leading-tight whitespace-nowrap" data-testid={`text-party-name-${group.partyKey}`}>
                 {group.partyName}
-              </div>
-              <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-xs text-muted-foreground mt-1">
-                {group.partyAddress && (
-                  <span className="flex items-center gap-1" data-testid={`text-party-address-${group.partyKey}`}>
-                    <MapPin className="h-3 w-3" />
-                    <span className="font-medium">{t("Address", "पता")}:</span>
-                    {group.partyAddress}
-                  </span>
-                )}
-                {group.partyContact && (
-                  <span className="flex items-center gap-1" data-testid={`text-party-contact-${group.partyKey}`}>
-                    <Phone className="h-3 w-3" />
-                    <span className="font-medium">{t("Phone", "फोन")}:</span>
-                    {group.partyContact}
-                  </span>
-                )}
-              </div>
+              </span>
+              {group.partyAddress && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground" data-testid={`text-party-address-${group.partyKey}`}>
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  {group.partyAddress}
+                </span>
+              )}
+              {group.partyContact && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-party-contact-${group.partyKey}`}>
+                  <Phone className="h-3 w-3 flex-shrink-0" />
+                  {group.partyContact}
+                </span>
+              )}
             </div>
-            <Badge variant="outline" className="text-[10px] bg-white/60 dark:bg-black/20">
+            <Badge variant="outline" className="text-[10px] bg-white/60 dark:bg-black/20 flex-shrink-0">
               {t("Transactions", "लेनदेन")}: {group.txns.length}
             </Badge>
           </div>
 
-          {/* Aggregate row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 mt-3 text-xs">
-            <div>
-              <div className="text-muted-foreground">{t("Total Bags", "कुल बोरी")}</div>
-              <div className="font-semibold text-sm" data-testid={`text-aggregate-bags-${group.partyKey}`}>
-                <Package className="h-3 w-3 inline mr-1" />{group.totalBags}
-              </div>
+          {/* Divider between buyer info and aggregate row */}
+          <div className="border-t border-orange-200 dark:border-orange-800" />
+
+          {/* Row 2: Aggregate metrics — inline label: value pairs, equally spaced */}
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-2.5 text-sm">
+            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-bags-${group.partyKey}`}>
+              <span className="text-muted-foreground">{t("Total Bags", "कुल बोरी")}:</span>
+              <span className="font-semibold flex items-center gap-1">
+                <Package className="h-3.5 w-3.5" />{group.totalBags}
+              </span>
             </div>
-            <div>
-              <div className="text-muted-foreground">{t("Total Cost", "कुल लागत")}</div>
-              <div className="font-semibold text-sm" data-testid={`text-aggregate-cost-${group.partyKey}`}>
-                ₹{fmtMoney(group.totalCost)}
-              </div>
+            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-cost-${group.partyKey}`}>
+              <span className="text-muted-foreground">{t("Total Cost", "कुल लागत")}:</span>
+              <span className="font-semibold">₹{fmtMoney(group.totalCost)}</span>
             </div>
-            <div>
-              <div className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}</div>
-              <div className="font-semibold text-sm" data-testid={`text-aggregate-revenue-${group.partyKey}`}>
-                ₹{fmtMoney(group.totalRevenue)}
-              </div>
+            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-revenue-${group.partyKey}`}>
+              <span className="text-muted-foreground">{t("Total Revenue", "कुल राजस्व")}:</span>
+              <span className="font-semibold">₹{fmtMoney(group.totalRevenue)}</span>
             </div>
-            <div>
-              <div className="text-muted-foreground">{t("P&L", "लाभ/हानि")}</div>
-              <div className={`font-semibold text-sm flex items-center gap-1 ${group.totalPL >= 0 ? "text-green-600" : "text-red-600"}`} data-testid={`text-aggregate-pl-${group.partyKey}`}>
-                {group.totalPL >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-pl-${group.partyKey}`}>
+              <span className="text-muted-foreground">{t("P&L", "लाभ/हानि")}:</span>
+              <span className={`font-semibold flex items-center gap-1 ${group.totalPL >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {group.totalPL >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                 {group.totalPL >= 0 ? "+" : "-"}₹{fmtMoney(Math.abs(group.totalPL))}
-              </div>
+              </span>
             </div>
-            <div>
-              <div className="text-muted-foreground">{t("Total Due", "कुल बकाया")}</div>
-              <div className={`font-semibold text-sm ${group.totalDue > 0 ? "text-orange-600" : "text-muted-foreground"}`} data-testid={`text-aggregate-due-${group.partyKey}`}>
+            <div className="flex items-center gap-1.5" data-testid={`text-aggregate-due-${group.partyKey}`}>
+              <span className="text-muted-foreground">{t("Total Due", "कुल बकाया")}:</span>
+              <span className={`font-semibold ${group.totalDue > 0 ? "text-orange-600" : "text-muted-foreground"}`}>
                 ₹{fmtMoney(group.totalDue)}
-              </div>
+              </span>
             </div>
           </div>
         </div>
@@ -938,21 +934,21 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
         {/* Transactions table */}
         <div className="overflow-x-auto">
           <table className="w-full text-xs sm:text-sm border-collapse">
-            <thead className="bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100">
+            <thead className="bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 text-sm sm:text-base">
               <tr>
-                <th className="w-7 px-1 py-2"></th>
-                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Tnx#", "लेनदेन#")}</th>
-                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Date", "तिथि")}</th>
-                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Type", "प्रकार")}</th>
-                <th className="px-2 py-2 text-left font-semibold whitespace-nowrap">{t("Crop", "फसल")}</th>
-                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Bags", "बोरी")}</th>
-                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Net Wt", "वजन")}</th>
-                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Cost", "लागत")}</th>
-                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Revenue", "राजस्व")}</th>
-                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("Due", "बकाया")}</th>
-                <th className="px-2 py-2 text-right font-semibold whitespace-nowrap">{t("P&L", "लाभ/हानि")}</th>
-                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap">{t("Edit", "संपादित")}</th>
-                <th className="px-2 py-2 text-center font-semibold whitespace-nowrap">{t("Print", "प्रिंट")}</th>
+                <th className="w-7 px-1 py-2.5"></th>
+                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Tnx#", "लेनदेन#")}</th>
+                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Date", "तिथि")}</th>
+                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Type", "प्रकार")}</th>
+                <th className="px-2 py-2.5 text-left font-semibold whitespace-nowrap">{t("Crop", "फसल")}</th>
+                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Bags", "बोरी")}</th>
+                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Net Wt", "वजन")}</th>
+                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Cost", "लागत")}</th>
+                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Revenue", "राजस्व")}</th>
+                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("Due", "बकाया")}</th>
+                <th className="px-2 py-2.5 text-right font-semibold whitespace-nowrap">{t("P&L", "लाभ/हानि")}</th>
+                <th className="px-2 py-2.5 text-center font-semibold whitespace-nowrap">{t("Edit", "संपादित")}</th>
+                <th className="px-2 py-2.5 text-center font-semibold whitespace-nowrap">{t("Print", "प्रिंट")}</th>
               </tr>
             </thead>
             <tbody>
