@@ -881,12 +881,14 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                 {group.partyAddress && (
                   <span className="flex items-center gap-1" data-testid={`text-party-address-${group.partyKey}`}>
                     <MapPin className="h-3 w-3" />
+                    <span className="font-medium">{t("Address", "पता")}:</span>
                     {group.partyAddress}
                   </span>
                 )}
                 {group.partyContact && (
                   <span className="flex items-center gap-1" data-testid={`text-party-contact-${group.partyKey}`}>
                     <Phone className="h-3 w-3" />
+                    <span className="font-medium">{t("Phone", "फोन")}:</span>
                     {group.partyContact}
                   </span>
                 )}
@@ -1040,7 +1042,8 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                     {isExpanded && (
                       <tr className="bg-muted/30">
                         <td colSpan={13} className="px-4 py-3" data-testid={`region-tnx-items-${txn.id}`}>
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-semibold text-muted-foreground mr-1">{t("Items", "आइटम")}:</span>
                             {txn.items.length === 0 ? (
                               <span className="text-xs text-muted-foreground">{t("No items", "कोई आइटम नहीं")}</span>
                             ) : txn.items.map((item) => {
