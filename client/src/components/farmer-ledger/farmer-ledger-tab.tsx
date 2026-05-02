@@ -22,7 +22,8 @@ import {
   History,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  Plus
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -90,7 +91,22 @@ export function FarmerLedgerTab() {
   // Merge state
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergingFarmer, setMergingFarmer] = useState<{ id: number; farmerCode: string; name: string } | null>(null);
-  
+
+  // Add farmer dialog state (mirrors Add Buyer in buyers-tab.tsx)
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    name: "",
+    contact: "",
+    village: "",
+    tehsil: "",
+    district: "",
+    state: "",
+  });
+  const [showAddVillageSuggestions, setShowAddVillageSuggestions] = useState(false);
+  const [showAddTehsilSuggestions, setShowAddTehsilSuggestions] = useState(false);
+  const addVillageSuggestionsRef = useRef<HTMLDivElement>(null);
+  const addTehsilSuggestionsRef = useRef<HTMLDivElement>(null);
+
   const { toast } = useToast();
 
   const { data: farmers = [], isLoading } = useQuery<FarmerWithDues[]>({
@@ -205,6 +221,80 @@ export function FarmerLedgerTab() {
     },
   });
 
+  // Create farmer mutation (raw fetch so we can handle 409 duplicate-detection
+  // before throwIfResNotOk turns it into a generic error)
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof addForm) => {
+      const response = await fetch("/api/farmers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name.trim(),
+          contact: data.contact.trim() || null,
+          village: data.village.trim() || null,
+          tehsil: data.tehsil.trim() || null,
+          district: data.district.trim() || null,
+          state: data.state.trim() || null,
+        }),
+        credentials: "include",
+      });
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw { status: response.status, data: responseData };
+      }
+      return responseData;
+    },
+    onSuccess: (farmer) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/villages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/tehsils"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      setAddDialogOpen(false);
+      setAddForm({ name: "", contact: "", village: "", tehsil: "", district: "", state: "" });
+      toast({
+        title: t("Farmer Added", "किसान जोड़ा गया"),
+        description: `${farmer.name} (${farmer.farmerCode})`,
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      const errorData = error?.data || error;
+      if (error?.status === 409 && errorData?.requiresMerge && errorData?.existingFarmer) {
+        toast({
+          title: t("Farmer Already Exists", "किसान पहले से मौजूद है"),
+          description: `${errorData.existingFarmer.name} (${errorData.existingFarmer.farmerCode})`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: t("Error", "त्रुटि"),
+          description: errorData?.message || t("Failed to add farmer", "किसान जोड़ने में विफल"),
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const handleAddFarmer = () => {
+    const missingFields: string[] = [];
+    if (!addForm.name.trim()) missingFields.push(t("Name", "नाम"));
+    if (!addForm.contact.trim()) missingFields.push(t("Contact", "संपर्क"));
+    if (addForm.contact.trim() && !/^\d{10}$/.test(addForm.contact.trim())) missingFields.push(t("Valid 10-digit Contact", "मान्य 10 अंकों का संपर्क"));
+    if (!addForm.village.trim()) missingFields.push(t("Village", "गांव"));
+    if (!addForm.tehsil.trim()) missingFields.push(t("Tehsil", "तहसील"));
+    if (!addForm.district.trim()) missingFields.push(t("District", "जिला"));
+    if (!addForm.state.trim()) missingFields.push(t("State", "राज्य"));
+    if (missingFields.length > 0) {
+      toast({
+        title: t("Required Fields Missing", "आवश्यक फ़ील्ड गायब हैं"),
+        description: `${t("Please fill:", "कृपया भरें:")} ${missingFields.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    createMutation.mutate(addForm);
+  };
+
   // Merge farmers mutation
   const mergeMutation = useMutation({
     mutationFn: async ({ sourceId, targetId }: { sourceId: number; targetId: number }) => {
@@ -304,6 +394,12 @@ export function FarmerLedgerTab() {
       }
       if (editTehsilSuggestionsRef.current && !editTehsilSuggestionsRef.current.contains(event.target as Node)) {
         setShowEditTehsilSuggestions(false);
+      }
+      if (addVillageSuggestionsRef.current && !addVillageSuggestionsRef.current.contains(event.target as Node)) {
+        setShowAddVillageSuggestions(false);
+      }
+      if (addTehsilSuggestionsRef.current && !addTehsilSuggestionsRef.current.contains(event.target as Node)) {
+        setShowAddTehsilSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -846,6 +942,14 @@ export function FarmerLedgerTab() {
               </span>
             </div>
             <Button
+              onClick={() => setAddDialogOpen(true)}
+              variant="outline"
+              data-testid="button-add-farmer"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {t("Add Farmer", "किसान जोड़ें")}
+            </Button>
+            <Button
               onClick={() => syncMutation.mutate()}
               disabled={syncMutation.isPending}
               variant="outline"
@@ -1244,6 +1348,194 @@ export function FarmerLedgerTab() {
             >
               {updateDetailsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("Save Changes", "परिवर्तन सहेजें")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Farmer Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={(open) => {
+        setAddDialogOpen(open);
+        if (!open) {
+          setShowAddVillageSuggestions(false);
+          setShowAddTehsilSuggestions(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              {t("Add Farmer", "किसान जोड़ें")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-farmer-name">{t("Name", "नाम")} <span className="text-destructive">*</span></Label>
+                <Input
+                  id="add-farmer-name"
+                  value={addForm.name}
+                  onChange={(e) => setAddForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder={t("Farmer name", "किसान का नाम")}
+                  data-testid="input-add-farmer-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-farmer-contact">{t("Contact", "संपर्क")} <span className="text-destructive">*</span></Label>
+                <Input
+                  id="add-farmer-contact"
+                  type="tel"
+                  maxLength={10}
+                  value={addForm.contact}
+                  onChange={(e) => setAddForm(f => ({ ...f, contact: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                  placeholder={t("Phone number", "फोन नंबर")}
+                  data-testid="input-add-farmer-contact"
+                />
+                {addForm.contact && addForm.contact.length > 0 && addForm.contact.length < 10 && (
+                  <p className="text-xs text-destructive mt-1" data-testid="warning-add-farmer-contact-invalid">{t("Please enter a valid 10-digit mobile number", "कृपया 10 अंकों का मोबाइल नंबर दर्ज करें")}</p>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-farmer-village">{t("Village", "गांव")} <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Input
+                    id="add-farmer-village"
+                    value={addForm.village}
+                    onChange={(e) => {
+                      setAddForm(f => ({ ...f, village: e.target.value }));
+                      setShowAddVillageSuggestions(true);
+                    }}
+                    onFocus={() => setShowAddVillageSuggestions(true)}
+                    placeholder={t("Village name", "गांव का नाम")}
+                    autoComplete="off"
+                    data-testid="input-add-farmer-village"
+                  />
+                  {showAddVillageSuggestions && (() => {
+                    const term = addForm.village.toLowerCase().trim();
+                    const filtered = term
+                      ? apiVillages.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
+                      : apiVillages.slice(0, 10);
+                    return filtered.length > 0 ? (
+                      <div
+                        ref={addVillageSuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                      >
+                        {filtered.map((village, idx) => (
+                          <button
+                            key={village}
+                            type="button"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setAddForm(f => ({ ...f, village }));
+                              setShowAddVillageSuggestions(false);
+                            }}
+                            data-testid={`suggestion-add-village-${idx}`}
+                          >
+                            {village}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-farmer-tehsil">{t("Tehsil", "तहसील")} <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Input
+                    id="add-farmer-tehsil"
+                    value={addForm.tehsil}
+                    onChange={(e) => {
+                      setAddForm(f => ({ ...f, tehsil: e.target.value }));
+                      setShowAddTehsilSuggestions(true);
+                    }}
+                    onFocus={() => setShowAddTehsilSuggestions(true)}
+                    placeholder={t("Tehsil name", "तहसील का नाम")}
+                    autoComplete="off"
+                    data-testid="input-add-farmer-tehsil"
+                  />
+                  {showAddTehsilSuggestions && (() => {
+                    const term = addForm.tehsil.toLowerCase().trim();
+                    const filtered = term
+                      ? apiTehsils.filter(v => v.toLowerCase().includes(term)).slice(0, 10)
+                      : apiTehsils.slice(0, 10);
+                    return filtered.length > 0 ? (
+                      <div
+                        ref={addTehsilSuggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto"
+                      >
+                        {filtered.map((tehsil, idx) => (
+                          <button
+                            key={tehsil}
+                            type="button"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setAddForm(f => ({ ...f, tehsil }));
+                              setShowAddTehsilSuggestions(false);
+                            }}
+                            data-testid={`suggestion-add-tehsil-${idx}`}
+                          >
+                            {tehsil}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t("District", "जिला")} <span className="text-destructive">*</span></Label>
+                <Select
+                  value={addForm.district}
+                  onValueChange={(value) => setAddForm(f => ({ ...f, district: value }))}
+                >
+                  <SelectTrigger data-testid="select-add-farmer-district">
+                    <SelectValue placeholder={t("Select district", "जिला चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DISTRICTS.map((district) => (
+                      <SelectItem key={district} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("State", "राज्य")} <span className="text-destructive">*</span></Label>
+                <Select
+                  value={addForm.state}
+                  onValueChange={(value) => setAddForm(f => ({ ...f, state: value }))}
+                >
+                  <SelectTrigger data-testid="select-add-farmer-state">
+                    <SelectValue placeholder={t("Select state", "राज्य चुनें")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+              {t("Cancel", "रद्द करें")}
+            </Button>
+            <Button
+              onClick={handleAddFarmer}
+              disabled={createMutation.isPending}
+              data-testid="button-save-add-farmer"
+            >
+              {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("Add", "जोड़ें")}
             </Button>
           </DialogFooter>
         </DialogContent>

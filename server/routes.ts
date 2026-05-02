@@ -5070,6 +5070,82 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/farmers - Manually create a new farmer ledger entry (mirrors POST /api/buyers)
+  app.post("/api/farmers", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const { name, contact, village, tehsil, district, state } = req.body ?? {};
+
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+
+      const trimmedName = name.trim();
+      const trimmedContact = typeof contact === "string" && contact.trim() ? contact.trim() : null;
+      const trimmedVillage = typeof village === "string" && village.trim() ? village.trim() : null;
+      const trimmedTehsil = typeof tehsil === "string" && tehsil.trim() ? tehsil.trim() : null;
+      const trimmedDistrict = typeof district === "string" && district.trim() ? district.trim() : null;
+      const trimmedState = typeof state === "string" && state.trim() ? state.trim() : null;
+
+      // Composite-key dup check (name + contact + village). If a match is found
+      // we surface the existing farmer with requiresMerge=true so the client
+      // can prompt the user to open the existing record instead of creating a
+      // duplicate.
+      const existingFarmer = await storage.getFarmerByCompositeKey(
+        merchantId,
+        trimmedName,
+        trimmedContact,
+        trimmedVillage,
+      );
+      if (existingFarmer) {
+        return res.status(409).json({
+          message: "A farmer with these details already exists",
+          existingFarmer,
+          requiresMerge: true,
+        });
+      }
+
+      // Generate farmer code: FMYYYYMMDD{seq} — unique per merchant
+      const dateAdded = getISTDateString();
+      const dateStr = parseDateToCodeFormat(dateAdded);
+      const codePrefix = `FM${dateStr}`;
+
+      const maxRetries = 3;
+      let farmer: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxFarmerCodeSequence(merchantId, codePrefix);
+        const farmerCode = `${codePrefix}${maxSeq + 1 + attempt}`;
+        try {
+          farmer = await storage.createFarmer({
+            merchantId,
+            farmerCode,
+            dateAdded,
+            name: titleCaseKeep(trimmedName),
+            contact: trimmedContact,
+            village: titleCase(trimmedVillage),
+            tehsil: titleCase(trimmedTehsil),
+            district: titleCase(trimmedDistrict),
+            state: titleCase(trimmedState),
+          });
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('farmer_code') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      if (!farmer) {
+        throw new Error("Failed to generate unique farmer code after multiple attempts");
+      }
+      res.status(201).json(farmer);
+    } catch (error) {
+      console.error("Error creating farmer:", error);
+      res.status(500).json({ message: "Failed to create farmer" });
+    }
+  });
+
   // POST /api/farmers/lookup-or-create - Find existing farmer or create new one based on composite key (name+contact+village)
   app.post("/api/farmers/lookup-or-create", requireMerchant, async (req, res) => {
     try {
