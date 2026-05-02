@@ -397,7 +397,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
             <h3 className="text-lg font-medium leading-10">{t("Lots", "लॉट")}</h3>
             <div className="flex items-end gap-3">
               <div className="space-y-2">
-                <Label htmlFor="next-serial-input" className="text-xs text-muted-foreground">{t("Sr#", "Sr#")}</Label>
+                <Label htmlFor="next-serial-input">{t("Sr#", "Sr#")}</Label>
                 <div className="relative">
                   <Input
                     id="next-serial-input"
