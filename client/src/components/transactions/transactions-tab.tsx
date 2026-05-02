@@ -1060,12 +1060,6 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                                 </Badge>
                               );
                             })}
-                            {txn.vehicleNumber && (
-                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-600 h-5">
-                                <Truck className="h-3 w-3 mr-1" />
-                                {txn.vehicleNumber}
-                              </Badge>
-                            )}
                           </div>
                         </td>
                       </tr>
