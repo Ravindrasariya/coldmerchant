@@ -5,9 +5,9 @@ import { getTodayIST, getISTYear } from "@/lib/date-utils";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Save, X, Loader2, Pencil, Check } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Plus, Save, X, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { StockEntryForm as StockEntryFormType, stockEntryFormSchema } from "@shared/schema";
@@ -114,8 +114,6 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   const isPausingAutoSaveRef = useRef(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [overrideSerial, setOverrideSerial] = useState<string | null>(null);
-  const [isEditingSerial, setIsEditingSerial] = useState(false);
-  const [serialDraft, setSerialDraft] = useState<string>("");
 
   const form = useForm<StockEntryFormType>({
     resolver: zodResolver(stockEntryFormSchema),
@@ -195,8 +193,6 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     form.reset(getDefaultFormValues(selectedCrop, selectedPlace));
     setAttachmentFile(null);
     setOverrideSerial(null);
-    setIsEditingSerial(false);
-    setSerialDraft("");
     scrollToTop();
     setTimeout(() => {
       isPausingAutoSaveRef.current = false;
@@ -384,115 +380,61 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
         )}
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-lg font-medium">{t("Lots", "लॉट")}</h3>
-            <div className="flex items-center gap-2">
-              {isEditingSerial ? (
-                <>
-                  <span className="text-sm text-muted-foreground">{t("Sr#", "Sr#")}</span>
+          <div className="flex items-end justify-between gap-3 flex-wrap">
+            <h3 className="text-lg font-medium leading-10">{t("Lots", "लॉट")}</h3>
+            <div className="flex items-end gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="next-serial-input">{t("Sr#", "Sr#")}</Label>
+                <div className="relative">
                   <Input
+                    id="next-serial-input"
                     type="number"
                     inputMode="numeric"
                     min={1}
                     step={1}
-                    value={serialDraft}
-                    onChange={(e) => setSerialDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const n = Number(serialDraft);
-                        if (!Number.isInteger(n) || n <= 0) return;
-                        if (autoNext != null && n === autoNext) {
-                          setOverrideSerial(null);
-                        } else {
-                          setOverrideSerial(String(n));
-                        }
-                        setIsEditingSerial(false);
-                      } else if (e.key === "Escape") {
-                        e.preventDefault();
-                        setIsEditingSerial(false);
+                    className="w-28 font-mono"
+                    placeholder={nextSerialLoading ? "" : autoNext != null ? String(autoNext) : "—"}
+                    value={
+                      overrideSerial !== null
+                        ? overrideSerial
+                        : autoNext != null
+                          ? String(autoNext)
+                          : ""
+                    }
+                    disabled={nextSerialLoading}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        // Empty = revert to auto (no override)
+                        setOverrideSerial(null);
+                        return;
                       }
-                    }}
-                    className="h-7 w-20 font-mono"
-                    data-testid="input-edit-next-serial"
-                    autoFocus
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    disabled={(() => {
-                      const n = Number(serialDraft);
-                      return !serialDraft || !Number.isInteger(n) || n <= 0;
-                    })()}
-                    onClick={() => {
-                      const n = Number(serialDraft);
-                      if (!Number.isInteger(n) || n <= 0) return;
-                      if (autoNext != null && n === autoNext) {
+                      const n = Number(raw);
+                      if (autoNext != null && Number.isInteger(n) && n === autoNext) {
                         setOverrideSerial(null);
                       } else {
-                        setOverrideSerial(String(n));
+                        setOverrideSerial(raw);
                       }
-                      setIsEditingSerial(false);
                     }}
-                    data-testid="button-apply-next-serial"
-                    aria-label={t("Apply", "लागू करें")}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setIsEditingSerial(false)}
-                    data-testid="button-cancel-next-serial"
-                    aria-label={t("Cancel", "रद्द करें")}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Badge variant="secondary" className="font-mono" data-testid="badge-next-serial">
-                    {t("Sr#:", "Sr#:")}{" "}
-                    {overrideSerial !== null ? (
-                      overrideSerial
-                    ) : nextSerialLoading ? (
-                      <Loader2 className="inline h-3 w-3 ml-1 animate-spin" />
-                    ) : autoNext != null ? (
-                      autoNext
-                    ) : (
-                      "—"
-                    )}
-                  </Badge>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => {
-                      const initial = overrideSerial ?? (autoNext != null ? String(autoNext) : "");
-                      setSerialDraft(initial);
-                      setIsEditingSerial(true);
-                    }}
-                    data-testid="button-edit-next-serial"
-                    aria-label={t("Edit Sr#", "Sr# संपादित करें")}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  {overrideSerial !== null && (
-                    <button
-                      type="button"
-                      className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded"
-                      onClick={() => setOverrideSerial(null)}
-                      data-testid="button-reset-next-serial"
-                    >
-                      {t("Reset", "रीसेट")}
-                    </button>
+                    data-testid="input-next-serial"
+                  />
+                  {nextSerialLoading && (
+                    <Loader2
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   )}
-                </>
+                </div>
+              </div>
+              {overrideSerial !== null && (
+                <button
+                  type="button"
+                  className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded h-10 self-end"
+                  onClick={() => setOverrideSerial(null)}
+                  data-testid="button-reset-next-serial"
+                >
+                  {t("Reset", "रीसेट")}
+                </button>
               )}
             </div>
           </div>
