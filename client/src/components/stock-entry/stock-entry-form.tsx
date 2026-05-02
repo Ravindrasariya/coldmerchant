@@ -1,11 +1,13 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { getTodayIST } from "@/lib/date-utils";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Plus, Save, X, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Plus, Save, X, Loader2, Pencil, Check } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { StockEntryForm as StockEntryFormType, stockEntryFormSchema } from "@shared/schema";
@@ -111,11 +113,33 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   const formContainerRef = useRef<HTMLFormElement>(null);
   const isPausingAutoSaveRef = useRef(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
-  
+  const [overrideSerial, setOverrideSerial] = useState<string | null>(null);
+  const [isEditingSerial, setIsEditingSerial] = useState(false);
+  const [serialDraft, setSerialDraft] = useState<string>("");
+
   const form = useForm<StockEntryFormType>({
     resolver: zodResolver(stockEntryFormSchema),
     defaultValues: loadSavedFormData(selectedCrop, selectedPlace),
   });
+
+  const watchedPurchaseDate = form.watch("purchaseDate");
+  const nextSerialYear = useMemo(() => {
+    const fallback = new Date().getFullYear();
+    if (!watchedPurchaseDate) return fallback;
+    const parsed = new Date(watchedPurchaseDate);
+    const y = parsed.getFullYear();
+    return Number.isFinite(y) && y > 1900 ? y : fallback;
+  }, [watchedPurchaseDate]);
+
+  const { data: nextSerialData, isLoading: nextSerialLoading } = useQuery<{ next: number; year: number }>({
+    queryKey: ["/api/stock-entries/next-serial", nextSerialYear],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/stock-entries/next-serial?year=${nextSerialYear}`);
+      return await res.json();
+    },
+    staleTime: 0,
+  });
+  const autoNext = nextSerialData?.next;
 
   useEffect(() => {
     const subscription = form.watch((data) => {
@@ -170,6 +194,9 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     clearSavedFormData(selectedCrop);
     form.reset(getDefaultFormValues(selectedCrop, selectedPlace));
     setAttachmentFile(null);
+    setOverrideSerial(null);
+    setIsEditingSerial(false);
+    setSerialDraft("");
     scrollToTop();
     setTimeout(() => {
       isPausingAutoSaveRef.current = false;
@@ -183,7 +210,14 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
 
   const createMutation = useMutation({
     mutationFn: async (data: StockEntryFormType) => {
-      const res = await apiRequest("POST", "/api/stock-entries", data);
+      const payload: any = { ...data };
+      if (overrideSerial !== null && overrideSerial !== "") {
+        const n = Number(overrideSerial);
+        if (Number.isInteger(n) && n > 0) {
+          payload.serialNumber = n;
+        }
+      }
+      const res = await apiRequest("POST", "/api/stock-entries", payload);
       return await res.json();
     },
     onSuccess: async (result: { id: number }) => {
@@ -208,6 +242,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
         variant: imageError ? "destructive" : "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries/next-serial"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
@@ -349,7 +384,116 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
         )}
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">{t("Lots", "लॉट")}</h3>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-lg font-medium">{t("Lots", "लॉट")}</h3>
+            <div className="flex items-center gap-2">
+              {isEditingSerial ? (
+                <>
+                  <span className="text-sm text-muted-foreground">{t("Sr#", "Sr#")}</span>
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    value={serialDraft}
+                    onChange={(e) => setSerialDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const n = Number(serialDraft);
+                        if (!Number.isInteger(n) || n <= 0) return;
+                        if (autoNext != null && n === autoNext) {
+                          setOverrideSerial(null);
+                        } else {
+                          setOverrideSerial(String(n));
+                        }
+                        setIsEditingSerial(false);
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setIsEditingSerial(false);
+                      }
+                    }}
+                    className="h-7 w-20 font-mono"
+                    data-testid="input-edit-next-serial"
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    disabled={(() => {
+                      const n = Number(serialDraft);
+                      return !serialDraft || !Number.isInteger(n) || n <= 0;
+                    })()}
+                    onClick={() => {
+                      const n = Number(serialDraft);
+                      if (!Number.isInteger(n) || n <= 0) return;
+                      if (autoNext != null && n === autoNext) {
+                        setOverrideSerial(null);
+                      } else {
+                        setOverrideSerial(String(n));
+                      }
+                      setIsEditingSerial(false);
+                    }}
+                    data-testid="button-apply-next-serial"
+                    aria-label={t("Apply", "लागू करें")}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setIsEditingSerial(false)}
+                    data-testid="button-cancel-next-serial"
+                    aria-label={t("Cancel", "रद्द करें")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Badge variant="secondary" className="font-mono" data-testid="badge-next-serial">
+                    {t("Sr#:", "Sr#:")}{" "}
+                    {overrideSerial !== null ? (
+                      overrideSerial
+                    ) : nextSerialLoading || autoNext == null ? (
+                      <Loader2 className="inline h-3 w-3 ml-1 animate-spin" />
+                    ) : (
+                      autoNext
+                    )}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                      const initial = overrideSerial ?? (autoNext != null ? String(autoNext) : "");
+                      setSerialDraft(initial);
+                      setIsEditingSerial(true);
+                    }}
+                    data-testid="button-edit-next-serial"
+                    aria-label={t("Edit Sr#", "Sr# संपादित करें")}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  {overrideSerial !== null && (
+                    <button
+                      type="button"
+                      className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded"
+                      onClick={() => setOverrideSerial(null)}
+                      data-testid="button-reset-next-serial"
+                    >
+                      {t("Reset", "रीसेट")}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
 
           {lotFields.map((field, index) => (
             <LotCard

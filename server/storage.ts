@@ -114,10 +114,13 @@ export interface IStorage {
   // Stock Entry operations
   getStockEntriesByMerchant(merchantId: number): Promise<any[]>;
   getStockEntryById(id: number, merchantId: number): Promise<any | undefined>;
-  createStockEntry(entry: InsertStockEntry & { merchantId: number; crop?: string }): Promise<StockEntry>;
+  createStockEntry(entry: InsertStockEntry & { merchantId: number; crop?: string; serialNumber?: number }): Promise<StockEntry>;
   updateStockEntry(id: number, merchantId: number, data: Partial<StockEntry>): Promise<StockEntry | undefined>;
   updateStockEntryImage(id: number, merchantId: number, filename: string | null): Promise<void>;
   getNextSerialNumber(merchantId: number, crop?: string): Promise<number>;
+  getNextSerialNumberForYear(merchantId: number, year: number): Promise<number>;
+  isSerialNumberTakenForYear(merchantId: number, serialNumber: number, year: number, excludeEntryId: number | null): Promise<boolean>;
+  updateStockEntrySerialNumber(id: number, merchantId: number, newSerial: number): Promise<void>;
   
   // Lot operations
   createLot(lot: InsertLot): Promise<Lot>;
@@ -571,9 +574,18 @@ export class DatabaseStorage implements IStorage {
     return { ...entry, lots: lotsWithBreakdowns };
   }
 
-  async createStockEntry(entry: Omit<InsertStockEntry, 'uniqueId'> & { merchantId: number; crop?: string }): Promise<StockEntry> {
+  async createStockEntry(entry: Omit<InsertStockEntry, 'uniqueId'> & { merchantId: number; crop?: string; serialNumber?: number }): Promise<StockEntry> {
     const crop = entry.crop || "potato";
-    const serialNumber = await this.getNextSerialNumber(entry.merchantId, crop);
+    const { serialNumber: providedSerial, ...entryRest } = entry;
+    // Auto-assigned Sr# is scoped per merchant + per calendar year of
+    // purchase_date (matches the "next serial" preview shown on the form).
+    // Fall back to current IST year only if purchaseDate is missing.
+    const autoYear = entry.purchaseDate
+      ? new Date(entry.purchaseDate).getFullYear()
+      : getISTYear();
+    const serialNumber = providedSerial != null
+      ? providedSerial
+      : await this.getNextSerialNumberForYear(entry.merchantId, autoYear);
     // Use purchaseDate for unique ID generation (not current date)
     const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : undefined;
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
@@ -584,7 +596,7 @@ export class DatabaseStorage implements IStorage {
       const uniqueId = await generateUniqueId("HSE", dateStr, stockEntries, stockEntries.uniqueId, attempt);
       try {
         const [created] = await db.insert(stockEntries).values({
-          ...entry,
+          ...entryRest,
           crop,
           serialNumber,
           uniqueId,
@@ -626,6 +638,58 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return (result?.maxSerial || 0) + 1;
+  }
+
+  async getNextSerialNumberForYear(merchantId: number, year: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: stockEntries.serialNumber })
+      .from(stockEntries)
+      .where(and(
+        eq(stockEntries.merchantId, merchantId),
+        sql`EXTRACT(YEAR FROM ${stockEntries.purchaseDate}) = ${year}`
+      ))
+      .orderBy(desc(stockEntries.serialNumber))
+      .limit(1);
+
+    return (result?.maxSerial || 0) + 1;
+  }
+
+  async isSerialNumberTakenForYear(merchantId: number, serialNumber: number, year: number, excludeEntryId: number | null): Promise<boolean> {
+    const conditions = [
+      eq(stockEntries.merchantId, merchantId),
+      eq(stockEntries.serialNumber, serialNumber),
+      sql`EXTRACT(YEAR FROM ${stockEntries.purchaseDate}) = ${year}`,
+    ];
+    if (excludeEntryId !== null) {
+      conditions.push(ne(stockEntries.id, excludeEntryId));
+    }
+
+    const [match] = await db.select({ id: stockEntries.id })
+      .from(stockEntries)
+      .where(and(...conditions))
+      .limit(1);
+
+    return !!match;
+  }
+
+  async updateStockEntrySerialNumber(id: number, merchantId: number, newSerial: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.update(stockEntries)
+        .set({ serialNumber: newSerial, updatedAt: new Date() })
+        .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
+
+      // Cascade: transaction_items.serial_number is a cached snapshot of stock_entries.serial_number
+      await tx.update(transactionItems)
+        .set({ serialNumber: newSerial })
+        .where(and(
+          eq(transactionItems.merchantId, merchantId),
+          inArray(
+            transactionItems.lotId,
+            tx.select({ id: lots.id })
+              .from(lots)
+              .where(and(eq(lots.stockEntryId, id), eq(lots.merchantId, merchantId)))
+          )
+        ));
+    });
   }
 
   // Lot operations

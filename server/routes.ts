@@ -687,6 +687,27 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/stock-entries/next-serial - Get the upcoming Sr# for a given year (defaults to current IST year)
+  // IMPORTANT: must be registered before /api/stock-entries/:id so Express does not treat
+  // "next-serial" as the :id param.
+  app.get("/api/stock-entries/next-serial", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const yearRaw = req.query.year;
+      let year: number;
+      if (typeof yearRaw === "string" && /^\d{4}$/.test(yearRaw)) {
+        year = parseInt(yearRaw, 10);
+      } else {
+        year = getISTYear();
+      }
+      const next = await storage.getNextSerialNumberForYear(merchantId, year);
+      res.json({ next, year });
+    } catch (error) {
+      console.error("Error computing next stock entry serial number:", error);
+      res.status(500).json({ message: "Failed to compute next serial number" });
+    }
+  });
+
   // GET /api/stock-entries/:id - Get a specific stock entry
   app.get("/api/stock-entries/:id", requireMerchant, async (req, res) => {
     try {
@@ -719,7 +740,29 @@ export async function registerRoutes(
       }
 
       const data = validationResult.data;
-      
+
+      // Optional client-supplied Sr# override. When present, validate it is
+      // a positive integer and that it is not already used by another entry
+      // in the same merchant + same calendar year of purchase_date.
+      let serialOverride: number | undefined = undefined;
+      const rawSerial = (req.body as any)?.serialNumber;
+      if (rawSerial !== undefined && rawSerial !== null && rawSerial !== "") {
+        // Strict: only accept canonical positive integers; reject "12abc",
+        // floats, etc. Number(...) returns NaN for non-numeric strings.
+        const parsed = typeof rawSerial === "number" ? rawSerial : Number(rawSerial);
+        if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+          return res.status(400).json({ message: "Sr# must be a positive integer." });
+        }
+        const overrideYear = new Date(data.purchaseDate).getFullYear();
+        const taken = await storage.isSerialNumberTakenForYear(merchantId, parsed, overrideYear, null);
+        if (taken) {
+          return res.status(409).json({
+            message: `Sr# ${parsed} is already used in ${overrideYear}. Choose a different number.`,
+          });
+        }
+        serialOverride = parsed;
+      }
+
       // Determine crop from first lot (all lots in an entry should have the same crop)
       const entryCrop = data.lots?.[0]?.crop || "potato";
       const entryPlace = data.place || data.lots?.[0]?.place || "cold_store";
@@ -775,6 +818,7 @@ export async function registerRoutes(
         aadhatName,
         remarks: data.remarks || null,
         paymentStatus: "due",
+        ...(serialOverride !== undefined ? { serialNumber: serialOverride } : {}),
       });
 
       // Create lots and bag breakdowns
@@ -913,7 +957,63 @@ export async function registerRoutes(
     }
   });
 
-  // PATCH /api/stock-entries/:id - Update a stock entry
+  // PATCH /api/stock-entries/:id/serial-number - Update an existing entry's Sr#
+  // (with duplicate guard scoped to merchant + calendar year of purchase_date,
+  // cascade to transaction_items.serial_number, and edit-history log).
+  app.patch("/api/stock-entries/:id/serial-number", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid stock entry id." });
+      }
+
+      const bodySchema = z.object({ serialNumber: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Sr# must be a positive integer." });
+      }
+      const newSerial = parsed.data.serialNumber;
+
+      const existingEntry = await storage.getStockEntryById(id, merchantId);
+      if (!existingEntry) {
+        return res.status(404).json({ message: "Stock entry not found." });
+      }
+
+      // No-op when value is unchanged
+      if (existingEntry.serialNumber === newSerial) {
+        return res.json(existingEntry);
+      }
+
+      const year = new Date(existingEntry.purchaseDate).getFullYear();
+      const taken = await storage.isSerialNumberTakenForYear(merchantId, newSerial, year, id);
+      if (taken) {
+        return res.status(409).json({
+          message: `Sr# ${newSerial} is already used in ${year}. Choose a different number.`,
+        });
+      }
+
+      const oldSerial = existingEntry.serialNumber;
+      await storage.updateStockEntrySerialNumber(id, merchantId, newSerial);
+
+      // Log edit history mirroring the existing PATCH /:id route style
+      const change: ChangeSet = [{
+        scope: 'entry',
+        entityId: id,
+        label: 'Stock Entry',
+        changes: [{ field: 'serialNumber', oldValue: String(oldSerial), newValue: String(newSerial) }],
+      }];
+      await storage.createEditHistory(id, merchantId, userId, change);
+
+      const refreshed = await storage.getStockEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating stock entry serial number:", error);
+      res.status(500).json({ message: "Failed to update Sr#." });
+    }
+  });
+
   app.patch("/api/stock-entries/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
