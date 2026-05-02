@@ -360,13 +360,13 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
             control={form.control}
             name={`seedLots.${lotIndex}.remarks`}
             render={({ field }) => (
-              <FormItem className="w-full md:w-1/3">
+              <FormItem className="w-full">
                 <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
                 <FormControl>
                   <Textarea 
                     placeholder={t("Enter any remarks for this lot...", "इस लॉट के लिए कोई टिप्पणी दर्ज करें...")} 
                     className="resize-none"
-                    rows={2}
+                    rows={1}
                     {...field} 
                     value={field.value || ""}
                     data-testid={`textarea-seed-remarks-${lotIndex}`}
