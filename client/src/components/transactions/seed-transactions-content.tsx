@@ -605,6 +605,9 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                             Tr No: {txn.transactionNumber}
                           </span>
                         </div>
+                        <span className="text-xs text-muted-foreground/80 font-medium whitespace-nowrap" data-testid={`text-seed-txn-date-${txn.id}`}>
+                          {format(new Date(txn.createdAt), "dd MMM yyyy")}
+                        </span>
                         <span className="font-semibold text-sm leading-tight">
                           - {txn.farmerName}{txn.village ? `, ${txn.village}` : ""}
                         </span>
@@ -673,12 +676,8 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                         )}
                       </div>
 
-                      {/* Row 3: Date and serial badges */}
+                      {/* Row 3: Serial badges */}
                       <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground pt-1 border-t sm:border-0 mt-2 sm:mt-0">
-                        <span className="font-medium text-muted-foreground/80">
-                          {format(new Date(txn.createdAt), "dd MMM yyyy")}
-                        </span>
-                        <span className="hidden sm:inline">|</span>
                         <div className="flex flex-wrap gap-1.5 mt-1 sm:mt-0">
                           {txn.items.slice(0, 3).map((item, idx) => (
                             <Badge 

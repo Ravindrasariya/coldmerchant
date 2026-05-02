@@ -115,7 +115,7 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
         )}
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <FormField
             control={form.control}
             name={`seedLots.${lotIndex}.coldStoreName`}
@@ -360,7 +360,7 @@ export function SeedLotCard({ form, lotIndex, onRemove, canRemove }: SeedLotCard
             control={form.control}
             name={`seedLots.${lotIndex}.remarks`}
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="w-full md:w-1/3">
                 <FormLabel>{t("Remarks", "टिप्पणी")}</FormLabel>
                 <FormControl>
                   <Textarea 
