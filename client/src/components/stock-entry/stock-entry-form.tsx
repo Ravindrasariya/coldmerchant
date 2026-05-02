@@ -139,6 +139,19 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
   });
   const autoNext = nextSerialData?.next;
 
+  // Reconcile override against autoNext: if the user typed a number that
+  // (later, e.g. after changing purchase date) becomes equal to the new
+  // auto-suggested Sr#, drop the override so we don't unnecessarily send
+  // a serialNumber and so the Reset affordance disappears.
+  useEffect(() => {
+    if (overrideSerial === null) return;
+    if (autoNext == null) return;
+    const n = Number(overrideSerial);
+    if (Number.isInteger(n) && n === autoNext) {
+      setOverrideSerial(null);
+    }
+  }, [autoNext, overrideSerial]);
+
   useEffect(() => {
     const subscription = form.watch((data) => {
       if (data && !isPausingAutoSaveRef.current) {
@@ -429,7 +442,7 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
               {overrideSerial !== null && (
                 <button
                   type="button"
-                  className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded h-10 self-end"
+                  className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded h-9 self-end"
                   onClick={() => setOverrideSerial(null)}
                   data-testid="button-reset-next-serial"
                 >
