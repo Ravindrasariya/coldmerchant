@@ -13,6 +13,16 @@ interface EditableTnxNumberProps {
   prefix?: string;
   className?: string;
   testIdSuffix?: string | number;
+  /**
+   * Endpoint to PATCH. Defaults to harvest transactions endpoint. Pass the
+   * seed transactions endpoint to reuse this component for seed Tnx# edits.
+   */
+  endpoint?: string;
+  /**
+   * Query keys to invalidate on success. Defaults to harvest transactions
+   * keys. Pass seed transaction keys when using this for seed Tnx# edits.
+   */
+  invalidateKeys?: (string | number)[][];
 }
 
 export function EditableTnxNumber({
@@ -21,6 +31,8 @@ export function EditableTnxNumber({
   prefix = "Tr No: ",
   className = "",
   testIdSuffix,
+  endpoint,
+  invalidateKeys,
 }: EditableTnxNumberProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -28,12 +40,17 @@ export function EditableTnxNumber({
   const [draft, setDraft] = useState<string>("");
 
   const suffix = testIdSuffix !== undefined ? `-${testIdSuffix}` : "";
+  const patchUrl = endpoint ?? `/api/transactions/${transactionId}/transaction-number`;
+  const keysToInvalidate: (string | number)[][] = invalidateKeys ?? [
+    ["/api/transactions"],
+    ["/api/transactions/next-number"],
+  ];
 
   const mutation = useMutation<{ transactionNumber: number; updatedIds?: number[] }, Error, number>({
     mutationFn: async (newNumber: number) => {
       const res = await apiRequest(
         "PATCH",
-        `/api/transactions/${transactionId}/transaction-number`,
+        patchUrl,
         { transactionNumber: newNumber },
       );
       return await res.json();
@@ -50,8 +67,9 @@ export function EditableTnxNumber({
         ),
         variant: "success",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions/next-number"] });
+      for (const key of keysToInvalidate) {
+        queryClient.invalidateQueries({ queryKey: key });
+      }
     },
     onError: (error: Error) => {
       toast({

@@ -5323,6 +5323,28 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/seed-stock-entries/next-serial - Get the upcoming Sr# for a given year
+  // (defaults to current IST year). Mirrors harvest /api/stock-entries/next-serial.
+  // IMPORTANT: must be registered before /api/seed-stock-entries/:id so Express
+  // does not treat "next-serial" as the :id param.
+  app.get("/api/seed-stock-entries/next-serial", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const yearRaw = req.query.year;
+      let year: number;
+      if (typeof yearRaw === "string" && /^\d{4}$/.test(yearRaw)) {
+        year = parseInt(yearRaw, 10);
+      } else {
+        year = getISTYear();
+      }
+      const next = await storage.getNextSeedSerialNumberForYear(merchantId, year);
+      res.json({ next, year });
+    } catch (error) {
+      console.error("Error computing next seed stock entry serial number:", error);
+      res.status(500).json({ message: "Failed to compute next serial number" });
+    }
+  });
+
   // GET /api/seed-stock-entries/:id - Get a specific seed stock entry
   app.get("/api/seed-stock-entries/:id", requireMerchant, async (req, res) => {
     try {
@@ -5356,6 +5378,26 @@ export async function registerRoutes(
 
       const data = validationResult.data;
 
+      // Optional client-supplied Sr# override. Mirror harvest contract:
+      // strict positive integer, scoped to merchant + calendar year of
+      // purchase_date. 409 on duplicate.
+      let serialOverride: number | undefined = undefined;
+      const rawSerial: unknown = (req.body as Record<string, unknown> | undefined)?.serialNumber;
+      if (rawSerial !== undefined && rawSerial !== null && rawSerial !== "") {
+        const parsed = typeof rawSerial === "number" ? rawSerial : Number(rawSerial);
+        if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+          return res.status(400).json({ message: "Sr# must be a positive integer." });
+        }
+        const overrideYear = new Date(data.purchaseDate).getFullYear();
+        const taken = await storage.isSeedSerialNumberTakenForYear(merchantId, parsed, overrideYear, null);
+        if (taken) {
+          return res.status(409).json({
+            message: `Sr# ${parsed} is already used in ${overrideYear}. Choose a different number.`,
+          });
+        }
+        serialOverride = parsed;
+      }
+
       // Create seed stock entry
       const seedEntry = await storage.createSeedEntry({
         merchantId,
@@ -5367,6 +5409,7 @@ export async function registerRoutes(
         state: titleCase(data.state) || data.state,
         remarks: data.remarks || null,
         paymentStatus: "due",
+        ...(serialOverride !== undefined ? { serialNumber: serialOverride } : {}),
       });
 
       // Create seed lots
@@ -5398,6 +5441,63 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error creating seed stock entry:", error);
       res.status(500).json({ message: "Failed to create seed stock entry" });
+    }
+  });
+
+  // PATCH /api/seed-stock-entries/:id/serial-number - Update an existing seed
+  // entry's Sr# (with duplicate guard scoped to merchant + calendar year of
+  // purchase_date, cascade to seed_transaction_items.serial_number, and
+  // edit-history log). Mirrors harvest /api/stock-entries/:id/serial-number.
+  // IMPORTANT: must be registered before PATCH /api/seed-stock-entries/:id.
+  app.patch("/api/seed-stock-entries/:id/serial-number", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid seed stock entry id." });
+      }
+
+      const bodySchema = z.object({ serialNumber: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Sr# must be a positive integer." });
+      }
+      const newSerial = parsed.data.serialNumber;
+
+      const existingEntry = await storage.getSeedEntryById(id, merchantId);
+      if (!existingEntry) {
+        return res.status(404).json({ message: "Seed stock entry not found." });
+      }
+
+      if (existingEntry.serialNumber === newSerial) {
+        return res.json(existingEntry);
+      }
+
+      const year = new Date(existingEntry.purchaseDate).getFullYear();
+      const taken = await storage.isSeedSerialNumberTakenForYear(merchantId, newSerial, year, id);
+      if (taken) {
+        return res.status(409).json({
+          message: `Sr# ${newSerial} is already used in ${year}. Choose a different number.`,
+        });
+      }
+
+      const oldSerial = existingEntry.serialNumber;
+      await storage.updateSeedStockEntrySerialNumber(id, merchantId, newSerial);
+
+      const change: ChangeSet = [{
+        scope: 'entry',
+        entityId: id,
+        label: 'Seed Stock Entry',
+        changes: [{ field: 'serialNumber', oldValue: String(oldSerial), newValue: String(newSerial) }],
+      }];
+      await storage.createSeedEditHistory(id, merchantId, userId, change);
+
+      const refreshed = await storage.getSeedEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating seed stock entry serial number:", error);
+      res.status(500).json({ message: "Failed to update serial number" });
     }
   });
 
@@ -5625,6 +5725,20 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/seed-transactions/next-number - Get the upcoming Tnx# for the
+  // current IST year. Mirrors harvest /api/transactions/next-number.
+  // IMPORTANT: must be registered before /api/seed-transactions/:id.
+  app.get("/api/seed-transactions/next-number", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const next = await storage.getNextSeedTransactionNumber(merchantId);
+      res.json({ next });
+    } catch (error) {
+      console.error("Error computing next seed transaction number:", error);
+      res.status(500).json({ message: "Failed to compute next transaction number" });
+    }
+  });
+
   // GET /api/seed-transactions/unsold-inventory - Get unsold seed inventory
   app.get("/api/seed-transactions/unsold-inventory", requireMerchant, async (req, res) => {
     try {
@@ -5663,6 +5777,66 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching seed transaction edit history:", error);
       res.status(500).json({ message: "Failed to fetch edit history" });
+    }
+  });
+
+  // PATCH /api/seed-transactions/:id/transaction-number - Update the Tnx# on a
+  // seed transaction. Mirrors harvest /api/transactions/:id/transaction-number.
+  // Seed transactions have no tnxGroupId (single row per Load Truck), so
+  // there is no cascade — only the targeted row is updated.
+  // IMPORTANT: must be registered before PATCH /api/seed-transactions/:id.
+  app.patch("/api/seed-transactions/:id/transaction-number", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid seed transaction id." });
+      }
+
+      const bodySchema = z.object({ transactionNumber: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Tnx# must be a positive integer." });
+      }
+      const newNumber = parsed.data.transactionNumber;
+
+      const existing = await storage.getSeedTransactionById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Seed transaction not found." });
+      }
+
+      if (existing.transactionNumber === newNumber) {
+        return res.json(existing);
+      }
+
+      const taken = await storage.isSeedTransactionNumberTaken(merchantId, newNumber, id);
+      if (taken) {
+        return res.status(409).json({
+          message: `Tnx# ${newNumber} is already in use. Choose a different number.`,
+        });
+      }
+
+      const oldNumber = existing.transactionNumber;
+      await storage.updateSeedTransactionNumber(id, merchantId, newNumber);
+
+      await storage.createSeedTransactionEditHistory({
+        seedTransactionId: id,
+        merchantId,
+        userId,
+        changeSet: [{
+          scope: 'transaction',
+          entityId: id,
+          label: 'Seed Transaction',
+          changes: [{ field: 'transactionNumber', oldValue: String(oldNumber), newValue: String(newNumber) }],
+        }],
+      });
+
+      const refreshed = await storage.getSeedTransactionById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating seed transaction number:", error);
+      res.status(500).json({ message: "Failed to update seed transaction number" });
     }
   });
 
@@ -5975,7 +6149,26 @@ export async function registerRoutes(
       }
       const totalDueToFarmer = baseDueToFarmer + interestAdj;
 
-      const transactionNumber = await storage.getNextSeedTransactionNumber(merchantId);
+      // Optional client-supplied Tnx# override. Mirror harvest contract:
+      // strict positive integer, scoped to merchant + current IST year.
+      // 409 on duplicate.
+      let transactionNumber: number;
+      const rawTnx: unknown = (req.body as Record<string, unknown> | undefined)?.transactionNumber;
+      if (rawTnx !== undefined && rawTnx !== null && rawTnx !== "") {
+        const parsedTnx = typeof rawTnx === "number" ? rawTnx : Number(rawTnx);
+        if (!Number.isFinite(parsedTnx) || !Number.isInteger(parsedTnx) || parsedTnx <= 0) {
+          return res.status(400).json({ message: "Tnx# must be a positive integer." });
+        }
+        const taken = await storage.isSeedTransactionNumberTaken(merchantId, parsedTnx, null);
+        if (taken) {
+          return res.status(409).json({
+            message: `Tnx# ${parsedTnx} is already in use. Choose a different number.`,
+          });
+        }
+        transactionNumber = parsedTnx;
+      } else {
+        transactionNumber = await storage.getNextSeedTransactionNumber(merchantId);
+      }
 
       const transaction = await storage.createSeedTransaction(
         {

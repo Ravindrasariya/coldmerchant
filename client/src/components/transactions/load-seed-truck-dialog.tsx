@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Trash2, Loader2, Package, IndianRupee, AlertTriangle, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, IndianRupee, AlertTriangle, Check, ChevronsUpDown, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -78,6 +78,19 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [adjustmentReason, setAdjustmentReason] = useState("");
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
+
+  // Tnx# preview — fetch the upcoming seed transaction number while the
+  // dialog is open so the user knows which Tnx# this load will be assigned.
+  const { data: nextTnxData } = useQuery<{ next: number }>({
+    queryKey: ["/api/seed-transactions/next-number"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/seed-transactions/next-number");
+      return await res.json();
+    },
+    enabled: open,
+    staleTime: 0,
+  });
+  const upcomingTnxNumber = nextTnxData?.next;
   const [lotPopoverOpen, setLotPopoverOpen] = useState<Record<string, boolean>>({});
   
   const [redFlagWarning, setRedFlagWarning] = useState<string | null>(null);
@@ -448,7 +461,19 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t("Load Seed Truck", "बीज ट्रक लोड करें")}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            {t("Load Seed Truck", "बीज ट्रक लोड करें")}
+            {upcomingTnxNumber !== undefined && (
+              <Badge
+                variant="outline"
+                className="ml-2 gap-1 bg-[#52a7ff]/10 text-[#52a7ff] border-[#52a7ff]/40 font-mono"
+                data-testid="badge-load-seed-truck-next-tnx"
+              >
+                <Receipt className="h-3 w-3" />
+                {t("Tnx#", "लेन-देन#")} {upcomingTnxNumber}
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">

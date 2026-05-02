@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { getTodayIST } from "@/lib/date-utils";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { getTodayIST, getISTYear } from "@/lib/date-utils";
 import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Plus, Save, X, Loader2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -87,11 +89,42 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
   const { toast } = useToast();
   const { t } = useLanguage();
   const isPausingAutoSaveRef = useRef(false);
-  
+  const [overrideSerial, setOverrideSerial] = useState<string | null>(null);
+
   const form = useForm<SeedStockEntryFormType>({
     resolver: zodResolver(seedStockEntryFormSchema),
     defaultValues: loadSavedSeedFormData(),
   });
+
+  const watchedPurchaseDate = form.watch("purchaseDate");
+  const nextSerialYear = useMemo(() => {
+    if (!watchedPurchaseDate) return getISTYear();
+    const y = getISTYear(watchedPurchaseDate);
+    return Number.isFinite(y) && y > 1900 ? y : getISTYear();
+  }, [watchedPurchaseDate]);
+
+  const { data: nextSerialData, isLoading: nextSerialLoading } = useQuery<{ next: number; year: number }>({
+    queryKey: ["/api/seed-stock-entries/next-serial", nextSerialYear],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/seed-stock-entries/next-serial?year=${nextSerialYear}`);
+      return await res.json();
+    },
+    staleTime: 0,
+  });
+  const autoNext = nextSerialData?.next;
+
+  // Reconcile override against autoNext: if the user typed a number that
+  // (later, e.g. after changing purchase date) becomes equal to the new
+  // auto-suggested Sr#, drop the override so we don't unnecessarily send
+  // a serialNumber and so the Reset affordance disappears.
+  useEffect(() => {
+    if (overrideSerial === null) return;
+    if (autoNext == null) return;
+    const n = Number(overrideSerial);
+    if (Number.isInteger(n) && n === autoNext) {
+      setOverrideSerial(null);
+    }
+  }, [autoNext, overrideSerial]);
 
   useEffect(() => {
     const subscription = form.watch((data) => {
@@ -109,7 +142,14 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
 
   const createMutation = useMutation({
     mutationFn: async (data: SeedStockEntryFormType) => {
-      const res = await apiRequest("POST", "/api/seed-stock-entries", data);
+      const payload: SeedStockEntryFormType & { serialNumber?: number } = { ...data };
+      if (overrideSerial !== null && overrideSerial !== "") {
+        const n = Number(overrideSerial);
+        if (Number.isInteger(n) && n > 0) {
+          payload.serialNumber = n;
+        }
+      }
+      const res = await apiRequest("POST", "/api/seed-stock-entries", payload);
       return await res.json();
     },
     onSuccess: () => {
@@ -119,6 +159,7 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
         variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries/next-serial"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
@@ -126,6 +167,7 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
       isPausingAutoSaveRef.current = true;
       clearSavedSeedFormData();
       form.reset(getDefaultSeedFormValues());
+      setOverrideSerial(null);
       setTimeout(() => { isPausingAutoSaveRef.current = false; }, 100);
       onSuccess?.();
     },
@@ -161,7 +203,63 @@ export function SeedStockEntryForm({ onSuccess, onCancel }: SeedStockEntryFormPr
         <SupplierInfoSection form={form} />
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium">{t("Seed Lots", "बीज लॉट")}</h3>
+          <div className="flex items-center gap-4 flex-wrap">
+            <h3 className="text-lg font-medium">{t("Seed Lots", "बीज लॉट")}</h3>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="next-seed-serial-input" className="whitespace-nowrap">{t("Sr#", "Sr#")}</Label>
+                <div className="relative">
+                  <Input
+                    id="next-seed-serial-input"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    className="w-28 font-mono"
+                    placeholder={nextSerialLoading ? "" : autoNext != null ? String(autoNext) : "—"}
+                    value={
+                      overrideSerial !== null
+                        ? overrideSerial
+                        : autoNext != null
+                          ? String(autoNext)
+                          : ""
+                    }
+                    disabled={nextSerialLoading}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setOverrideSerial(null);
+                        return;
+                      }
+                      const n = Number(raw);
+                      if (autoNext != null && Number.isInteger(n) && n === autoNext) {
+                        setOverrideSerial(null);
+                      } else {
+                        setOverrideSerial(raw);
+                      }
+                    }}
+                    data-testid="input-next-seed-serial"
+                  />
+                  {nextSerialLoading && (
+                    <Loader2
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+              </div>
+              {overrideSerial !== null && (
+                <button
+                  type="button"
+                  className="text-xs underline text-muted-foreground hover-elevate active-elevate-2 px-1 rounded"
+                  onClick={() => setOverrideSerial(null)}
+                  data-testid="button-reset-next-seed-serial"
+                >
+                  {t("Reset", "रीसेट")}
+                </button>
+              )}
+            </div>
+          </div>
 
           {lotFields.map((field, index) => (
             <SeedLotCard

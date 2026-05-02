@@ -17,7 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Save, Loader2, Snowflake, ChevronDown, ChevronRight, History } from "lucide-react";
+import { Save, Loader2, Snowflake, ChevronDown, ChevronRight, History, Pencil, Check, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -36,6 +36,53 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
   const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [currentSerial, setCurrentSerial] = useState<number>(entry.serialNumber);
+  const [isEditingSerial, setIsEditingSerial] = useState(false);
+  const [serialDraft, setSerialDraft] = useState<string>("");
+  useEffect(() => {
+    setCurrentSerial(entry.serialNumber);
+  }, [entry.id, entry.serialNumber]);
+
+  const updateSerialMutation = useMutation<{ serialNumber: number }, Error, number>({
+    mutationFn: async (newSerial: number) => {
+      const res = await apiRequest("PATCH", `/api/seed-stock-entries/${entry.id}/serial-number`, { serialNumber: newSerial });
+      return await res.json();
+    },
+    onSuccess: (updated) => {
+      const newVal = Number(updated?.serialNumber ?? serialDraft);
+      if (Number.isFinite(newVal)) setCurrentSerial(newVal);
+      setIsEditingSerial(false);
+      setSerialDraft("");
+      toast({
+        title: t("Sr# updated", "Sr# अपडेट किया गया"),
+        description: t(`Serial number changed to #${newVal}`, `सीरियल नंबर #${newVal} में बदला गया`),
+        variant: "success",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries/next-serial"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/seed-stock-entries', entry.id, 'edit-history'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveSerial = () => {
+    const n = Number(serialDraft);
+    if (!Number.isInteger(n) || n <= 0) return;
+    if (n === currentSerial) {
+      setIsEditingSerial(false);
+      setSerialDraft("");
+      return;
+    }
+    updateSerialMutation.mutate(n);
+  };
   const [seedLots, setSeedLots] = useState(entry.seedLots.map(lot => ({
     ...lot,
     pricePerBag: lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0,
@@ -192,8 +239,87 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {t("Edit Seed Stock Entry", "बीज स्टॉक एंट्री संपादित करें")} #{entry.serialNumber}
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            {isEditingSerial ? (
+              <span className="flex items-center gap-1">
+                <span className="text-primary font-mono">#</span>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={serialDraft}
+                  onChange={(e) => setSerialDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSaveSerial();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setIsEditingSerial(false);
+                      setSerialDraft("");
+                    }
+                  }}
+                  className="h-7 w-24 font-mono"
+                  data-testid="input-edit-seed-serial"
+                  autoFocus
+                  disabled={updateSerialMutation.isPending}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={(() => {
+                    const n = Number(serialDraft);
+                    return !serialDraft || !Number.isInteger(n) || n <= 0 || n === currentSerial || updateSerialMutation.isPending;
+                  })()}
+                  onClick={handleSaveSerial}
+                  data-testid="button-save-seed-serial"
+                  aria-label={t("Save", "सहेजें")}
+                >
+                  {updateSerialMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    setIsEditingSerial(false);
+                    setSerialDraft("");
+                  }}
+                  data-testid="button-cancel-seed-serial"
+                  aria-label={t("Cancel", "रद्द करें")}
+                  disabled={updateSerialMutation.isPending}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <span className="font-mono text-primary" data-testid="text-edit-seed-serial">#{currentSerial}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => {
+                    setSerialDraft(String(currentSerial));
+                    setIsEditingSerial(true);
+                  }}
+                  data-testid="button-edit-seed-serial"
+                  aria-label={t("Edit Sr#", "Sr# संपादित करें")}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </span>
+            )}
+            <span>{t("Edit Seed Stock Entry", "बीज स्टॉक एंट्री संपादित करें")}</span>
           </DialogTitle>
         </DialogHeader>
 

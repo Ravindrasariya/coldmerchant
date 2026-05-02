@@ -287,9 +287,13 @@ export interface IStorage {
   // Seed Stock Entry operations
   getSeedEntriesByMerchant(merchantId: number): Promise<SeedStockEntryWithLots[]>;
   getSeedEntryById(id: number, merchantId: number): Promise<SeedStockEntryWithLots | undefined>;
-  createSeedEntry(entry: InsertSeedStockEntry & { merchantId: number }): Promise<SeedStockEntry>;
+  createSeedEntry(entry: InsertSeedStockEntry & { merchantId: number; serialNumber?: number }): Promise<SeedStockEntry>;
   updateSeedEntry(id: number, merchantId: number, data: Partial<SeedStockEntry>): Promise<SeedStockEntry | undefined>;
   getNextSeedSerialNumber(merchantId: number): Promise<number>;
+  // Seed Sr# preview / override / edit helpers (parallels harvest #123)
+  getNextSeedSerialNumberForYear(merchantId: number, year: number): Promise<number>;
+  isSeedSerialNumberTakenForYear(merchantId: number, serialNumber: number, year: number, excludeEntryId: number | null): Promise<boolean>;
+  updateSeedStockEntrySerialNumber(id: number, merchantId: number, newSerial: number): Promise<void>;
   
   // Seed Lot operations
   createSeedLot(lot: InsertSeedLot): Promise<SeedLot>;
@@ -309,6 +313,9 @@ export interface IStorage {
   updateSeedTransaction(id: number, merchantId: number, data: any, items: any[], userId?: number): Promise<any>;
   updateSeedTransactionFarmerId(id: number, merchantId: number, farmerId: number): Promise<void>;
   getNextSeedTransactionNumber(merchantId: number): Promise<number>;
+  // Seed Tnx# preview / edit helpers (parallels harvest #125 + post-#129)
+  isSeedTransactionNumberTaken(merchantId: number, transactionNumber: number, excludeId: number | null): Promise<boolean>;
+  updateSeedTransactionNumber(id: number, merchantId: number, newNumber: number): Promise<void>;
   getUnsoldSeedInventory(merchantId: number): Promise<any[]>;
   createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<any>;
   getSeedTransactionEditHistory(seedTransactionId: number, merchantId: number): Promise<any[]>;
@@ -3375,8 +3382,11 @@ export class DatabaseStorage implements IStorage {
     return { ...entry, seedLots: entryLots };
   }
 
-  async createSeedEntry(entry: Omit<InsertSeedStockEntry, 'uniqueId'> & { merchantId: number }): Promise<SeedStockEntry> {
-    const serialNumber = await this.getNextSeedSerialNumber(entry.merchantId);
+  async createSeedEntry(entry: Omit<InsertSeedStockEntry, 'uniqueId'> & { merchantId: number; serialNumber?: number }): Promise<SeedStockEntry> {
+    const { serialNumber: providedSerial, ...entryRest } = entry;
+    const serialNumber = providedSerial != null
+      ? providedSerial
+      : await this.getNextSeedSerialNumber(entry.merchantId);
     // Use purchaseDate for unique ID generation (not current date)
     const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : undefined;
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
@@ -3387,7 +3397,7 @@ export class DatabaseStorage implements IStorage {
       const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId, attempt);
       try {
         const [created] = await db.insert(seedStockEntries).values({
-          ...entry,
+          ...entryRest,
           serialNumber,
           uniqueId,
         }).returning();
@@ -3422,6 +3432,65 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return (result?.maxSerial || 0) + 1;
+  }
+
+  async getNextSeedSerialNumberForYear(merchantId: number, year: number): Promise<number> {
+    const [result] = await db.select({ maxSerial: seedStockEntries.serialNumber })
+      .from(seedStockEntries)
+      .where(and(
+        eq(seedStockEntries.merchantId, merchantId),
+        sql`EXTRACT(YEAR FROM ${seedStockEntries.purchaseDate}) = ${year}`
+      ))
+      .orderBy(desc(seedStockEntries.serialNumber))
+      .limit(1);
+
+    return (result?.maxSerial || 0) + 1;
+  }
+
+  async isSeedSerialNumberTakenForYear(
+    merchantId: number,
+    serialNumber: number,
+    year: number,
+    excludeEntryId: number | null,
+  ): Promise<boolean> {
+    const conditions = [
+      eq(seedStockEntries.merchantId, merchantId),
+      eq(seedStockEntries.serialNumber, serialNumber),
+      sql`EXTRACT(YEAR FROM ${seedStockEntries.purchaseDate}) = ${year}`,
+    ];
+    if (excludeEntryId !== null) {
+      conditions.push(ne(seedStockEntries.id, excludeEntryId));
+    }
+
+    const [match] = await db.select({ id: seedStockEntries.id })
+      .from(seedStockEntries)
+      .where(and(...conditions))
+      .limit(1);
+
+    return !!match;
+  }
+
+  async updateSeedStockEntrySerialNumber(id: number, merchantId: number, newSerial: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.update(seedStockEntries)
+        .set({ serialNumber: newSerial, updatedAt: new Date() })
+        .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)));
+
+      // Cascade: seed_transaction_items.serial_number is a cached snapshot
+      // of seed_stock_entries.serial_number for any items pulled from a lot
+      // that belongs to this seed entry.
+      await tx.update(seedTransactionItems)
+        .set({ serialNumber: newSerial })
+        .where(and(
+          eq(seedTransactionItems.merchantId, merchantId),
+          inArray(
+            seedTransactionItems.seedLotId,
+            tx.select({ id: seedLots.id })
+              .from(seedLots)
+              .where(and(eq(seedLots.seedEntryId, id), eq(seedLots.merchantId, merchantId)))
+          )
+        ));
+    });
   }
 
   // ===================== SEED LOT OPERATIONS =====================
@@ -3683,6 +3752,38 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return (result?.maxNum || 0) + 1;
+  }
+
+  async isSeedTransactionNumberTaken(
+    merchantId: number,
+    transactionNumber: number,
+    excludeId: number | null,
+  ): Promise<boolean> {
+    // Year-scope mirrors getNextSeedTransactionNumber, which resets the
+    // series each calendar year. Without this, a Tnx# used in a previous
+    // year would block reuse in the current year.
+    const currentYear = getISTYear();
+    const conditions = [
+      eq(seedTransactions.merchantId, merchantId),
+      eq(seedTransactions.transactionNumber, transactionNumber),
+      sql`EXTRACT(YEAR FROM ${seedTransactions.createdAt}) = ${currentYear}`,
+    ];
+    if (excludeId !== null) {
+      conditions.push(ne(seedTransactions.id, excludeId));
+    }
+
+    const [match] = await db.select({ id: seedTransactions.id })
+      .from(seedTransactions)
+      .where(and(...conditions))
+      .limit(1);
+
+    return !!match;
+  }
+
+  async updateSeedTransactionNumber(id: number, merchantId: number, newNumber: number): Promise<void> {
+    await db.update(seedTransactions)
+      .set({ transactionNumber: newNumber })
+      .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
   }
 
   async getUnsoldSeedInventory(merchantId: number): Promise<any[]> {

@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Plus, Trash2, Loader2, Package, IndianRupee, History, ChevronDown, ChevronUp, Check, ChevronsUpDown } from "lucide-react";
+import { EditableTnxNumber } from "./editable-tnx-number";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -363,8 +364,22 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {t("Edit Seed Transaction", "बीज लेनदेन संपादित करें")} #{transaction?.transactionNumber}
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <span>{t("Edit Seed Transaction", "बीज लेनदेन संपादित करें")}</span>
+            {transaction && (
+              <EditableTnxNumber
+                transactionId={transaction.id}
+                transactionNumber={transaction.transactionNumber}
+                prefix="#"
+                endpoint={`/api/seed-transactions/${transaction.id}/transaction-number`}
+                invalidateKeys={[
+                  ["/api/seed-transactions"],
+                  ["/api/seed-transactions/next-number"],
+                  ["/api/seed-transactions", transaction.id, "edit-history"],
+                ]}
+                testIdSuffix="seed"
+              />
+            )}
           </DialogTitle>
         </DialogHeader>
 
