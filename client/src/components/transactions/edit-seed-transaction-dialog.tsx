@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { getTodayIST } from "@/lib/date-utils";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Plus, Trash2, Loader2, Package, IndianRupee, History, ChevronDown, ChevronUp, Check, ChevronsUpDown } from "lucide-react";
 import { EditableTnxNumber } from "./editable-tnx-number";
+import { InlineEditableDate } from "@/components/ui/inline-editable-date";
+import { InlinePartyPicker, type PartyOption } from "@/components/ui/inline-party-picker";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -61,6 +63,7 @@ interface SeedTransaction {
   id: number;
   merchantId: number;
   transactionNumber: number;
+  farmerId: number | null;
   farmerName: string;
   farmerContact: string | null;
   village: string | null;
@@ -143,34 +146,49 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     enabled: open,
   });
 
-  // Initialize form when transaction data loads
+  // Initialize form ONLY when the dialog binds to a different record
+  // (transactionId changes). Re-running on every `transaction` reference
+  // change would clobber the user's unsaved field edits whenever inline
+  // editors (farmer/date/Tnx#) invalidate the query and trigger a refetch.
+  // We track which id we have already initialized for so a refetched
+  // payload for the same id keeps the user's draft intact.
+  const initializedForIdRef = useRef<number | null>(null);
   useEffect(() => {
-    if (transaction) {
-      setFarmerName(transaction.farmerName);
-      setFarmerContact(transaction.farmerContact || "");
-      setVillage(transaction.village || "");
-      setTehsil(transaction.tehsil || "");
-      setDistrict(transaction.district ?? "");
-      setState(transaction.state ?? "");
-      setVehicleNumber(transaction.vehicleNumber || "");
-      setTransportCharges(transaction.transportCharges && parseFloat(transaction.transportCharges) !== 0 ? transaction.transportCharges : "");
-      setOtherCharges(transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? transaction.otherCharges : "");
-      setOtherChargesRemarks(transaction.otherChargesRemarks || "");
-      setAdjustmentType(transaction.adjustmentType || "credit");
-      setAdjustmentAmount(transaction.adjustmentAmount || "");
-      setAdjustmentRate(transaction.adjustmentRate || "");
-      setAdjustmentEffectiveDate(transaction.adjustmentEffectiveDate || "");
-      setAdjustmentReason(transaction.adjustmentReason || "");
-      
-      // Convert transaction items to lot selections
-      const lots = transaction.items.map(item => ({
-        seedLotId: item.seedLotId,
-        bagsMoved: item.bagsMoved,
-        pricePerBag: parseFloat(item.pricePerBag) || 0,
-      }));
-      setSelectedLots(lots.length > 0 ? lots : [{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
-    }
+    if (!transaction) return;
+    if (initializedForIdRef.current === transaction.id) return;
+    initializedForIdRef.current = transaction.id;
+    setFarmerName(transaction.farmerName);
+    setFarmerContact(transaction.farmerContact || "");
+    setVillage(transaction.village || "");
+    setTehsil(transaction.tehsil || "");
+    setDistrict(transaction.district ?? "");
+    setState(transaction.state ?? "");
+    setVehicleNumber(transaction.vehicleNumber || "");
+    setTransportCharges(transaction.transportCharges && parseFloat(transaction.transportCharges) !== 0 ? transaction.transportCharges : "");
+    setOtherCharges(transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? transaction.otherCharges : "");
+    setOtherChargesRemarks(transaction.otherChargesRemarks || "");
+    setAdjustmentType(transaction.adjustmentType || "credit");
+    setAdjustmentAmount(transaction.adjustmentAmount || "");
+    setAdjustmentRate(transaction.adjustmentRate || "");
+    setAdjustmentEffectiveDate(transaction.adjustmentEffectiveDate || "");
+    setAdjustmentReason(transaction.adjustmentReason || "");
+
+    // Convert transaction items to lot selections
+    const lots = transaction.items.map(item => ({
+      seedLotId: item.seedLotId,
+      bagsMoved: item.bagsMoved,
+      pricePerBag: parseFloat(item.pricePerBag) || 0,
+    }));
+    setSelectedLots(lots.length > 0 ? lots : [{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
   }, [transaction]);
+
+  // Reset the init guard when the dialog closes so reopening on the same
+  // record (with possibly newer server data) re-initializes cleanly.
+  useEffect(() => {
+    if (!open) {
+      initializedForIdRef.current = null;
+    }
+  }, [open]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -380,25 +398,74 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                 testIdSuffix="seed"
               />
             )}
+            {transaction?.createdAt && (
+              <InlineEditableDate
+                currentDate={transaction.createdAt}
+                endpoint={`/api/seed-transactions/${transaction.id}/date`}
+                invalidateKeys={[
+                  ["/api/seed-transactions"],
+                  ["/api/seed-transactions/next-number"],
+                  ["/api/seed-transactions", transaction.id],
+                  ["/api/seed-transactions", transaction.id, "edit-history"],
+                ]}
+                testIdSuffix="seed-tnx"
+              />
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Farmer Info Section - Read Only (edit via Farmer Ledger) */}
+          {/* Farmer Info Section - Name editable via picker; rest cascades */}
           <div className="space-y-4">
             <h3 className="font-medium text-sm text-muted-foreground">
               {t("Farmer Details", "किसान विवरण")}
-              <span className="ml-2 text-xs text-muted-foreground/60">({t("Edit via Farmer Ledger", "किसान खाता बही द्वारा संपादित करें")})</span>
+              <span className="ml-2 text-xs text-muted-foreground/60">({t("Pick a different farmer to switch the party", "पार्टी बदलने के लिए दूसरा किसान चुनें")})</span>
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>{t("Farmer Name", "किसान का नाम")}</Label>
-                <Input
-                  value={farmerName}
-                  disabled
-                  className="bg-muted"
-                  data-testid="input-edit-seed-farmer-name"
-                />
+                <div className="flex items-center gap-2 h-9 px-3 rounded-md border bg-muted/40 min-w-0">
+                  {transaction && (
+                    <InlinePartyPicker
+                      currentName={farmerName}
+                      currentKey={transaction.farmerId}
+                      fetchKey={["/api/farmers"]}
+                      mapOptions={(rows: any[]) =>
+                        (rows || []).map((f: any): PartyOption => ({
+                          key: String(f.id),
+                          label: f.name,
+                          sublabel: [f.village, f.contact].filter(Boolean).join(" • "),
+                          searchText: `${f.name} ${f.contact || ""} ${f.village || ""}`,
+                          payload: { farmerId: f.id },
+                        }))
+                      }
+                      endpoint={`/api/seed-transactions/${transaction.id}/farmer`}
+                      invalidateKeys={[
+                        ["/api/seed-transactions"],
+                        ["/api/seed-transactions", transaction.id],
+                        ["/api/seed-transactions", transaction.id, "edit-history"],
+                        ["/api/farmers"],
+                      ]}
+                      testIdSuffix="seed-tnx-farmer"
+                      searchPlaceholder={t("Search farmer...", "किसान खोजें...")}
+                      emptyText={t("No farmer found.", "कोई किसान नहीं मिला।")}
+                      successTitle={{ en: "Farmer updated", hi: "किसान अपडेट किया गया" }}
+                      ariaLabel={{ en: "Change farmer", hi: "किसान बदलें" }}
+                      className="w-full"
+                      onSuccess={(data: any) => {
+                        // Patch only the farmer-cascaded display fields so
+                        // the user's other unsaved edits (vehicle/charges/
+                        // adjustments/lots) stay intact.
+                        if (data?.farmerName !== undefined) setFarmerName(data.farmerName ?? "");
+                        if (data?.farmerContact !== undefined) setFarmerContact(data.farmerContact ?? "");
+                        if (data?.village !== undefined) setVillage(data.village ?? "");
+                        if (data?.tehsil !== undefined) setTehsil(data.tehsil ?? "");
+                        if (data?.district !== undefined) setDistrict(data.district ?? "");
+                        if (data?.state !== undefined) setState(data.state ?? "");
+                      }}
+                    />
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>{t("Contact Number", "संपर्क नंबर")}</Label>

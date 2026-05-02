@@ -23,6 +23,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { EditableTnxNumber } from "./editable-tnx-number";
+import { InlineEditableDate } from "@/components/ui/inline-editable-date";
 
 interface TransactionItem {
   id: number;
@@ -156,6 +157,7 @@ interface TransactionWithHistory {
   bardan: string | null;
   tnxGroupId: string | null;
   createdAt: string;
+  dateOfLoading: string | null;
   items: TransactionItem[];
   editHistory: EditHistoryEntry[];
 }
@@ -832,6 +834,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 transactionNumber={transaction.transactionNumber}
                 prefix="#"
                 testIdSuffix="dialog"
+              />
+            )}
+            {transaction?.dateOfLoading && (
+              <InlineEditableDate
+                currentDate={transaction.dateOfLoading}
+                endpoint={`/api/transactions/${transaction.id}/date`}
+                invalidateKeys={[
+                  ["/api/transactions"],
+                  ["/api/transactions", transaction.id],
+                ]}
+                testIdSuffix="harvest-tnx"
               />
             )}
           </DialogTitle>

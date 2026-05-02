@@ -1024,6 +1024,193 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/stock-entries/:id/date — inline date editor on the harvest
+  // stock edit dialog. Re-validates Sr# uniqueness against the new IST year
+  // because the (merchantId, serialNumber, year-of-purchase_date) DB index
+  // partitions by year. Edit history mirrors the /serial-number pattern.
+  app.patch("/api/stock-entries/:id/date", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid stock entry id." });
+      }
+
+      const bodySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD") });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid date." });
+      }
+      const newDate = parsed.data.date;
+
+      const existing = await storage.getStockEntryById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Stock entry not found." });
+      }
+
+      const oldDate = existing.purchaseDate ? String(existing.purchaseDate).slice(0, 10) : "";
+      if (oldDate === newDate) {
+        return res.json(existing);
+      }
+
+      const newYear = parseInt(newDate.slice(0, 4), 10);
+      const taken = await storage.isSerialNumberTakenForYear(
+        merchantId,
+        existing.serialNumber,
+        newYear,
+        id,
+      );
+      if (taken) {
+        return res.status(409).json({
+          message: `Sr# ${existing.serialNumber} is already used in ${newYear}. Pick a different date or change the Sr# first.`,
+        });
+      }
+
+      await storage.updateStockEntry(id, merchantId, { purchaseDate: newDate });
+
+      const change: ChangeSet = [{
+        scope: 'entry',
+        entityId: id,
+        label: 'Stock Entry',
+        changes: [{ field: 'purchaseDate', oldValue: oldDate, newValue: newDate }],
+      }];
+      await storage.createEditHistory(id, merchantId, userId, change);
+
+      const refreshed = await storage.getStockEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating stock entry date:", error);
+      res.status(500).json({ message: "Failed to update date." });
+    }
+  });
+
+  // PATCH /api/stock-entries/:id/farmer — pick a different farmer from the
+  // ledger; cascades the cached farmer fields (name/contact/village/...).
+  app.patch("/api/stock-entries/:id/farmer", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid stock entry id." });
+      }
+
+      const bodySchema = z.object({ farmerId: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "farmerId must be a positive integer." });
+      }
+      const newFarmerId = parsed.data.farmerId;
+
+      const existing = await storage.getStockEntryById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Stock entry not found." });
+      }
+
+      const newFarmer = await storage.getFarmerById(newFarmerId, merchantId);
+      if (!newFarmer) {
+        return res.status(404).json({ message: "Farmer not found in ledger." });
+      }
+
+      if (existing.farmerId === newFarmerId) {
+        return res.json(existing);
+      }
+
+      const updates: Record<string, any> = {
+        farmerId: newFarmerId,
+        farmerName: newFarmer.name,
+        farmerContact: newFarmer.contact,
+        village: newFarmer.village,
+        tehsil: newFarmer.tehsil,
+        district: newFarmer.district,
+        state: newFarmer.state,
+      };
+      await storage.updateStockEntry(id, merchantId, updates);
+
+      const fieldChanges: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+      const fields: { f: keyof typeof updates; oldV: any }[] = [
+        { f: 'farmerName', oldV: existing.farmerName },
+        { f: 'farmerContact', oldV: existing.farmerContact },
+        { f: 'village', oldV: existing.village },
+        { f: 'tehsil', oldV: existing.tehsil },
+        { f: 'district', oldV: existing.district },
+        { f: 'state', oldV: existing.state },
+      ];
+      for (const { f, oldV } of fields) {
+        const newV = updates[f as string];
+        if ((oldV ?? null) !== (newV ?? null)) {
+          fieldChanges.push({ field: f as string, oldValue: oldV ?? null, newValue: newV ?? null });
+        }
+      }
+      const change: ChangeSet = [{
+        scope: 'entry',
+        entityId: id,
+        label: 'Stock Entry',
+        changes: fieldChanges,
+      }];
+      await storage.createEditHistory(id, merchantId, userId, change);
+
+      const refreshed = await storage.getStockEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating stock entry farmer:", error);
+      res.status(500).json({ message: "Failed to update farmer." });
+    }
+  });
+
+  // PATCH /api/stock-entries/:id/aadhtiya — pick a different aadhtiya from
+  // the ledger; cascades the cached aadhatName field. Only meaningful for
+  // mandi entries but the route is permissive.
+  app.patch("/api/stock-entries/:id/aadhtiya", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid stock entry id." });
+      }
+
+      const bodySchema = z.object({ aadhatDbId: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "aadhatDbId must be a positive integer." });
+      }
+      const newAadhatId = parsed.data.aadhatDbId;
+
+      const existing = await storage.getStockEntryById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Stock entry not found." });
+      }
+
+      const newAadhat = await storage.getAadhatById(newAadhatId, merchantId);
+      if (!newAadhat) {
+        return res.status(404).json({ message: "Aadhtiya not found in ledger." });
+      }
+
+      if (existing.aadhatDbId === newAadhatId) {
+        return res.json(existing);
+      }
+
+      const updates = { aadhatDbId: newAadhatId, aadhatName: newAadhat.name };
+      await storage.updateStockEntry(id, merchantId, updates);
+
+      const change: ChangeSet = [{
+        scope: 'entry',
+        entityId: id,
+        label: 'Stock Entry',
+        changes: [{ field: 'aadhatName', oldValue: existing.aadhatName ?? null, newValue: newAadhat.name }],
+      }];
+      await storage.createEditHistory(id, merchantId, userId, change);
+
+      const refreshed = await storage.getStockEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating stock entry aadhtiya:", error);
+      res.status(500).json({ message: "Failed to update aadhtiya." });
+    }
+  });
+
   app.patch("/api/stock-entries/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
@@ -2359,6 +2546,64 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/transactions/:id/date — inline date editor on the harvest
+  // transaction edit dialog. Cascades to every sibling row sharing the same
+  // tnxGroupId so the loading session stays internally consistent. Edit
+  // history is logged per-row, mirroring the /transaction-number cascade.
+  app.patch("/api/transactions/:id/date", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid transaction id." });
+      }
+
+      const bodySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD") });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid date." });
+      }
+      const newDate = parsed.data.date;
+
+      const existing = await storage.getTransactionById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Transaction not found." });
+      }
+      const oldDate = existing.dateOfLoading || "";
+      if (oldDate === newDate) {
+        return res.json(existing);
+      }
+
+      const { updatedIds } = await storage.updateTransactionDateForGroup(
+        merchantId,
+        existing.tnxGroupId ?? null,
+        id,
+        newDate,
+      );
+
+      for (const updatedId of updatedIds) {
+        await storage.createTransactionEditHistory({
+          transactionId: updatedId,
+          merchantId,
+          userId,
+          changeSet: [{
+            scope: 'transaction',
+            entityId: updatedId,
+            label: 'Transaction',
+            changes: [{ field: 'dateOfLoading', oldValue: oldDate, newValue: newDate }],
+          }],
+        });
+      }
+
+      const refreshed = await storage.getTransactionById(id, merchantId);
+      res.json({ ...refreshed, updatedIds });
+    } catch (error) {
+      console.error("Error updating transaction date:", error);
+      res.status(500).json({ message: "Failed to update transaction date." });
+    }
+  });
+
   // PATCH /api/transactions/:id - Update a transaction (only partyName, advancePayment, transportationCharges, otherCharges, revenue)
   app.patch("/api/transactions/:id", requireMerchant, async (req, res) => {
     try {
@@ -2982,6 +3227,21 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error searching suppliers:", error);
       res.status(500).json({ message: "Failed to search suppliers" });
+    }
+  });
+
+  // GET /api/suppliers/list - List ALL distinct suppliers (used by the
+  // inline supplier picker in the seed stock edit dialog). Mirrors the dedupe
+  // logic in storage.searchSuppliers but always returns the full set so the
+  // shadcn Command popover can do its own client-side filtering.
+  app.get("/api/suppliers/list", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const suppliers = await storage.listAllSuppliers(merchantId);
+      res.json(suppliers);
+    } catch (error) {
+      console.error("Error listing suppliers:", error);
+      res.status(500).json({ message: "Failed to list suppliers" });
     }
   });
 
@@ -5689,6 +5949,139 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH /api/seed-stock-entries/:id/date — inline date editor. Mirrors the
+  // harvest /date route: re-validates Sr# uniqueness against the new IST
+  // year using the same expression as the DB-level unique index.
+  app.patch("/api/seed-stock-entries/:id/date", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid seed stock entry id." });
+      }
+
+      const bodySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD") });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid date." });
+      }
+      const newDate = parsed.data.date;
+
+      const existing = await storage.getSeedEntryById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Seed stock entry not found." });
+      }
+
+      const oldDate = existing.purchaseDate ? String(existing.purchaseDate).slice(0, 10) : "";
+      if (oldDate === newDate) {
+        return res.json(existing);
+      }
+
+      const newYear = parseInt(newDate.slice(0, 4), 10);
+      const taken = await storage.isSeedSerialNumberTakenForYear(
+        merchantId,
+        existing.serialNumber,
+        newYear,
+        id,
+      );
+      if (taken) {
+        return res.status(409).json({
+          message: `Sr# ${existing.serialNumber} is already used in ${newYear}. Pick a different date or change the Sr# first.`,
+        });
+      }
+
+      await storage.updateSeedEntry(id, merchantId, { purchaseDate: newDate });
+
+      const change: ChangeSet = [{
+        scope: 'entry',
+        entityId: id,
+        label: 'Seed Stock Entry',
+        changes: [{ field: 'purchaseDate', oldValue: oldDate, newValue: newDate }],
+      }];
+      await storage.createSeedEditHistory(id, merchantId, userId, change);
+
+      const refreshed = await storage.getSeedEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating seed stock entry date:", error);
+      res.status(500).json({ message: "Failed to update date." });
+    }
+  });
+
+  // PATCH /api/seed-stock-entries/:id/supplier — pick a different supplier
+  // composite from the dedup'd suppliers list. Suppliers have no FK; the
+  // composite (name + contact + address + district + state) is overwritten
+  // wholesale.
+  app.patch("/api/seed-stock-entries/:id/supplier", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid seed stock entry id." });
+      }
+
+      const bodySchema = z.object({
+        supplierName: z.string().min(1, "Supplier name is required"),
+        supplierContact: z.string().nullable().optional(),
+        address: z.string().nullable().optional(),
+        district: z.string().min(1, "District is required"),
+        state: z.string().min(1, "State is required"),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid supplier payload." });
+      }
+
+      const existing = await storage.getSeedEntryById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Seed stock entry not found." });
+      }
+
+      const updates = {
+        supplierName: parsed.data.supplierName,
+        supplierContact: parsed.data.supplierContact ?? null,
+        address: parsed.data.address ?? null,
+        district: parsed.data.district,
+        state: parsed.data.state,
+      };
+
+      await storage.updateSeedEntry(id, merchantId, updates);
+
+      const fieldChanges: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+      const compare: { f: keyof typeof updates; oldV: any }[] = [
+        { f: 'supplierName', oldV: existing.supplierName },
+        { f: 'supplierContact', oldV: existing.supplierContact },
+        { f: 'address', oldV: existing.address },
+        { f: 'district', oldV: existing.district },
+        { f: 'state', oldV: existing.state },
+      ];
+      for (const { f, oldV } of compare) {
+        const newV = (updates as any)[f];
+        if ((oldV ?? null) !== (newV ?? null)) {
+          fieldChanges.push({ field: f as string, oldValue: oldV ?? null, newValue: newV ?? null });
+        }
+      }
+
+      if (fieldChanges.length > 0) {
+        const change: ChangeSet = [{
+          scope: 'entry',
+          entityId: id,
+          label: 'Seed Stock Entry',
+          changes: fieldChanges,
+        }];
+        await storage.createSeedEditHistory(id, merchantId, userId, change);
+      }
+
+      const refreshed = await storage.getSeedEntryById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating seed stock entry supplier:", error);
+      res.status(500).json({ message: "Failed to update supplier." });
+    }
+  });
+
   // PATCH /api/seed-stock-entries/:id - Update a seed stock entry
   app.patch("/api/seed-stock-entries/:id", requireMerchant, async (req, res) => {
     try {
@@ -5919,8 +6312,17 @@ export async function registerRoutes(
   app.get("/api/seed-transactions/next-number", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const next = await storage.getNextSeedTransactionNumber(merchantId);
-      res.json({ next });
+      // Optional ?year= so the Load Seed Truck dialog can preview the next
+      // Tnx# for a back-dated load. Falls back to the current IST year.
+      const yearRaw = req.query.year;
+      let year: number;
+      if (typeof yearRaw === "string" && /^\d{4}$/.test(yearRaw)) {
+        year = parseInt(yearRaw, 10);
+      } else {
+        year = getISTYear();
+      }
+      const next = await storage.getNextSeedTransactionNumberForYear(merchantId, year);
+      res.json({ next, year });
     } catch (error) {
       console.error("Error computing next seed transaction number:", error);
       res.status(500).json({ message: "Failed to compute next transaction number" });
@@ -6035,6 +6437,172 @@ export async function registerRoutes(
       }
       console.error("Error updating seed transaction number:", error);
       res.status(500).json({ message: "Failed to update seed transaction number" });
+    }
+  });
+
+  // PATCH /api/seed-transactions/:id/date — inline date editor. Re-validates
+  // Tnx# uniqueness against the IST year of the new date so the in-app
+  // pre-check matches the year-partitioned DB unique index. Stores the new
+  // createdAt as IST midnight (UTC 00:00 of the date), which the (UTC →
+  // Asia/Kolkata) conversion in the index expression maps back to the same
+  // IST date.
+  app.patch("/api/seed-transactions/:id/date", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid seed transaction id." });
+      }
+
+      const bodySchema = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD") });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid date." });
+      }
+      const newDate = parsed.data.date;
+
+      const existing = await storage.getSeedTransactionById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Seed transaction not found." });
+      }
+
+      const oldCreatedAt: Date | null = existing.createdAt ? new Date(existing.createdAt) : null;
+      const oldYear = oldCreatedAt ? getISTYear(oldCreatedAt) : getISTYear();
+      const newYear = parseInt(newDate.slice(0, 4), 10);
+
+      const newCreatedAt = new Date(`${newDate}T00:00:00Z`);
+      if (isNaN(newCreatedAt.getTime())) {
+        return res.status(400).json({ message: "Invalid date." });
+      }
+
+      // Only re-check Tnx# uniqueness when the IST year actually changes —
+      // within the same year, the existing row is already the unique entry
+      // for its (merchant, tnx#, year) tuple.
+      if (newYear !== oldYear) {
+        const taken = await storage.isSeedTransactionNumberTakenForYear(
+          merchantId,
+          existing.transactionNumber,
+          newYear,
+          id,
+        );
+        if (taken) {
+          return res.status(409).json({
+            message: `Tnx# ${existing.transactionNumber} is already in use in ${newYear}. Pick a different date or change the Tnx# first.`,
+          });
+        }
+      }
+
+      const oldDateStr = oldCreatedAt
+        ? oldCreatedAt.toISOString().slice(0, 10)
+        : "";
+      try {
+        await storage.updateSeedTransactionCreatedAt(id, merchantId, newCreatedAt);
+      } catch (innerError) {
+        if (innerError instanceof DuplicateSeedTransactionNumberError) {
+          return res.status(409).json({ message: innerError.message });
+        }
+        throw innerError;
+      }
+
+      await storage.createSeedTransactionEditHistory({
+        seedTransactionId: id,
+        merchantId,
+        userId,
+        changeSet: [{
+          scope: 'transaction',
+          entityId: id,
+          label: 'Seed Transaction',
+          changes: [{ field: 'createdAt', oldValue: oldDateStr, newValue: newDate }],
+        }],
+      });
+
+      const refreshed = await storage.getSeedTransactionById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      if (error instanceof DuplicateSeedTransactionNumberError) {
+        return res.status(409).json({ message: error.message });
+      }
+      console.error("Error updating seed transaction date:", error);
+      res.status(500).json({ message: "Failed to update seed transaction date." });
+    }
+  });
+
+  // PATCH /api/seed-transactions/:id/farmer — pick a different farmer from
+  // the ledger; cascades the cached farmer fields onto the transaction row.
+  app.patch("/api/seed-transactions/:id/farmer", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ message: "Invalid seed transaction id." });
+      }
+
+      const bodySchema = z.object({ farmerId: z.number().int().positive() });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "farmerId must be a positive integer." });
+      }
+      const newFarmerId = parsed.data.farmerId;
+
+      const existing = await storage.getSeedTransactionById(id, merchantId);
+      if (!existing) {
+        return res.status(404).json({ message: "Seed transaction not found." });
+      }
+
+      const newFarmer = await storage.getFarmerById(newFarmerId, merchantId);
+      if (!newFarmer) {
+        return res.status(404).json({ message: "Farmer not found in ledger." });
+      }
+
+      if (existing.farmerId === newFarmerId) {
+        return res.json(existing);
+      }
+
+      const updates: Record<string, any> = {
+        farmerId: newFarmerId,
+        farmerName: newFarmer.name,
+        farmerContact: newFarmer.contact,
+        village: newFarmer.village,
+        tehsil: newFarmer.tehsil,
+        district: newFarmer.district,
+        state: newFarmer.state,
+      };
+      await storage.updateSeedTransactionFarmerFields(id, merchantId, updates);
+
+      const fieldChanges: { field: string; oldValue: string | null; newValue: string | null }[] = [];
+      const compare: { f: string; oldV: any }[] = [
+        { f: 'farmerName', oldV: existing.farmerName },
+        { f: 'farmerContact', oldV: existing.farmerContact },
+        { f: 'village', oldV: existing.village },
+        { f: 'tehsil', oldV: existing.tehsil },
+        { f: 'district', oldV: existing.district },
+        { f: 'state', oldV: existing.state },
+      ];
+      for (const { f, oldV } of compare) {
+        const newV = (updates as any)[f];
+        if ((oldV ?? null) !== (newV ?? null)) {
+          fieldChanges.push({ field: f, oldValue: oldV ?? null, newValue: newV ?? null });
+        }
+      }
+      await storage.createSeedTransactionEditHistory({
+        seedTransactionId: id,
+        merchantId,
+        userId,
+        changeSet: [{
+          scope: 'transaction',
+          entityId: id,
+          label: 'Seed Transaction',
+          changes: fieldChanges,
+        }],
+      });
+
+      const refreshed = await storage.getSeedTransactionById(id, merchantId);
+      res.json(refreshed);
+    } catch (error) {
+      console.error("Error updating seed transaction farmer:", error);
+      res.status(500).json({ message: "Failed to update farmer." });
     }
   });
 
@@ -6264,10 +6832,26 @@ export async function registerRoutes(
   app.post("/api/seed-transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items } = req.body;
+      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items, transactionDate } = req.body;
 
       if (!farmerName || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Optional client-supplied transaction date override. Accepts a
+      // YYYY-MM-DD string and stamps it as IST midnight (stored as a naive
+      // timestamp whose UTC wall-clock value reads as the same IST date when
+      // converted back via the (UTC → Asia/Kolkata) expression used by the
+      // Tnx# uniqueness logic). When omitted, defaultNow() is used.
+      let createdAtOverride: Date | undefined;
+      if (transactionDate !== undefined && transactionDate !== null && transactionDate !== "") {
+        if (typeof transactionDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
+          return res.status(400).json({ message: "Tnx Date must be a YYYY-MM-DD string." });
+        }
+        createdAtOverride = new Date(`${transactionDate}T00:00:00Z`);
+        if (isNaN(createdAtOverride.getTime())) {
+          return res.status(400).json({ message: "Tnx Date is invalid." });
+        }
       }
 
       // Lookup or create farmer in farmer ledger
@@ -6347,8 +6931,16 @@ export async function registerRoutes(
       }
       const totalDueToFarmer = baseDueToFarmer + interestAdj;
 
+      // Tnx# uniqueness is partitioned by the IST calendar year of createdAt.
+      // When the user supplies an explicit transactionDate, scope the
+      // duplicate check (and the next-number allocation) to THAT year so the
+      // in-app pre-check matches the DB uniqueness expression.
+      const tnxYear = createdAtOverride
+        ? getISTYear(createdAtOverride)
+        : getISTYear();
+
       // Optional client-supplied Tnx# override. Mirror harvest contract:
-      // strict positive integer, scoped to merchant + current IST year.
+      // strict positive integer, scoped to merchant + tnxYear.
       // 409 on duplicate.
       let transactionNumber: number;
       const rawTnx: unknown = (req.body as Record<string, unknown> | undefined)?.transactionNumber;
@@ -6357,21 +6949,27 @@ export async function registerRoutes(
         if (!Number.isFinite(parsedTnx) || !Number.isInteger(parsedTnx) || parsedTnx <= 0) {
           return res.status(400).json({ message: "Tnx# must be a positive integer." });
         }
-        const taken = await storage.isSeedTransactionNumberTaken(merchantId, parsedTnx, null);
+        const taken = await storage.isSeedTransactionNumberTakenForYear(
+          merchantId,
+          parsedTnx,
+          tnxYear,
+          null,
+        );
         if (taken) {
           return res.status(409).json({
-            message: `Tnx# ${parsedTnx} is already in use. Choose a different number.`,
+            message: `Tnx# ${parsedTnx} is already in use in ${tnxYear}. Choose a different number.`,
           });
         }
         transactionNumber = parsedTnx;
       } else {
-        transactionNumber = await storage.getNextSeedTransactionNumber(merchantId);
+        transactionNumber = await storage.getNextSeedTransactionNumberForYear(merchantId, tnxYear);
       }
 
       const transaction = await storage.createSeedTransaction(
         {
           merchantId,
           transactionNumber,
+          ...(createdAtOverride ? { createdAt: createdAtOverride } : {}),
           farmerId,
           farmerName: tcFarmerName,
           farmerContact: farmerContact || null,

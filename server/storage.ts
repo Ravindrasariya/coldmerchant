@@ -196,6 +196,7 @@ export interface IStorage {
   getTransactionByGroupId(merchantId: number, tnxGroupId: string): Promise<Transaction | undefined>;
   isTransactionNumberTakenForCrop(merchantId: number, transactionNumber: number, crop: string, excludeTnxGroupId: string | null): Promise<boolean>;
   updateTransactionNumberForGroup(merchantId: number, tnxGroupId: string | null, fallbackTransactionId: number, newTransactionNumber: number): Promise<{ updatedIds: number[] }>;
+  updateTransactionDateForGroup(merchantId: number, tnxGroupId: string | null, fallbackTransactionId: number, newDate: string): Promise<{ updatedIds: number[] }>;
   getUnsoldInventory(merchantId: number): Promise<any[]>;
   getUniqueTransporterNames(merchantId: number): Promise<string[]>;
   
@@ -339,7 +340,18 @@ export interface IStorage {
   createSeedTransaction(transaction: any, items: any[]): Promise<any>;
   updateSeedTransaction(id: number, merchantId: number, data: any, items: any[], userId?: number): Promise<any>;
   updateSeedTransactionFarmerId(id: number, merchantId: number, farmerId: number): Promise<void>;
+  updateSeedTransactionFarmerFields(id: number, merchantId: number, fields: { farmerId: number; farmerName: string; farmerContact: string | null; village: string | null; tehsil: string | null; district: string | null; state: string | null }): Promise<void>;
+  updateSeedTransactionCreatedAt(id: number, merchantId: number, newCreatedAt: Date): Promise<void>;
   getNextSeedTransactionNumber(merchantId: number): Promise<number>;
+  getNextSeedTransactionNumberForYear(merchantId: number, year: number): Promise<number>;
+  isSeedTransactionNumberTakenForYear(merchantId: number, transactionNumber: number, year: number, excludeId: number | null): Promise<boolean>;
+  listAllSuppliers(merchantId: number): Promise<{
+    supplierName: string;
+    supplierContact: string | null;
+    address: string | null;
+    district: string;
+    state: string;
+  }[]>;
   // Seed Tnx# preview / edit helpers (parallels harvest #125 + post-#129)
   isSeedTransactionNumberTaken(merchantId: number, transactionNumber: number, excludeId: number | null): Promise<boolean>;
   updateSeedTransactionNumber(id: number, merchantId: number, newNumber: number): Promise<void>;
@@ -1035,6 +1047,40 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
 
     return !!match;
+  }
+
+  // updateTransactionDateForGroup — cascades a date edit to every sibling
+  // row in the same tnxGroupId, mirroring updateTransactionNumberForGroup so
+  // the loading session keeps a single shared dateOfLoading.
+  async updateTransactionDateForGroup(
+    merchantId: number,
+    tnxGroupId: string | null,
+    fallbackTransactionId: number,
+    newDate: string,
+  ): Promise<{ updatedIds: number[] }> {
+    const updatedIds: number[] = [];
+    await db.transaction(async (tx) => {
+      if (tnxGroupId) {
+        const rows = await tx.update(transactions)
+          .set({ dateOfLoading: newDate })
+          .where(and(
+            eq(transactions.merchantId, merchantId),
+            eq(transactions.tnxGroupId, tnxGroupId),
+          ))
+          .returning({ id: transactions.id });
+        for (const r of rows) updatedIds.push(r.id);
+      } else {
+        const rows = await tx.update(transactions)
+          .set({ dateOfLoading: newDate })
+          .where(and(
+            eq(transactions.merchantId, merchantId),
+            eq(transactions.id, fallbackTransactionId),
+          ))
+          .returning({ id: transactions.id });
+        for (const r of rows) updatedIds.push(r.id);
+      }
+    });
+    return { updatedIds };
   }
 
   // Cascade-update the Tnx# across every row that shares the same loading
@@ -3765,6 +3811,51 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
   }
 
+  // updateSeedTransactionFarmerFields — overwrites the cached farmer
+  // snapshot on a seed transaction row when the user picks a different
+  // farmer from the ledger via the inline picker on the edit dialog.
+  async updateSeedTransactionFarmerFields(
+    id: number,
+    merchantId: number,
+    fields: {
+      farmerId: number;
+      farmerName: string;
+      farmerContact: string | null;
+      village: string | null;
+      tehsil: string | null;
+      district: string | null;
+      state: string | null;
+    },
+  ): Promise<void> {
+    await db.update(seedTransactions)
+      .set(fields)
+      .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
+  }
+
+  // updateSeedTransactionCreatedAt — used by the inline date editor on the
+  // seed transaction edit dialog. Wrapped to translate the year-unique index
+  // violation into the friendly DuplicateSeedTransactionNumberError so the
+  // route can return a clean 409.
+  async updateSeedTransactionCreatedAt(
+    id: number,
+    merchantId: number,
+    newCreatedAt: Date,
+  ): Promise<void> {
+    try {
+      await db.update(seedTransactions)
+        .set({ createdAt: newCreatedAt })
+        .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
+    } catch (error: any) {
+      if (isSeedTransactionNumberYearUniqueViolation(error)) {
+        const [existing] = await db.select({ transactionNumber: seedTransactions.transactionNumber })
+          .from(seedTransactions)
+          .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
+        throw new DuplicateSeedTransactionNumberError(existing?.transactionNumber ?? 0);
+      }
+      throw error;
+    }
+  }
+
   async createSeedTransaction(
     transaction: Omit<InsertSeedTransaction, 'uniqueId'> & { transactionNumber: number },
     items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
@@ -3835,16 +3926,31 @@ export class DatabaseStorage implements IStorage {
     transactionNumber: number,
     excludeId: number | null,
   ): Promise<boolean> {
-    // Year-scope mirrors getNextSeedTransactionNumber and the
-    // seed_transactions_merchant_tnx_year_unique DB index, both of which
-    // partition by the IST calendar year of createdAt. Keeping the exact
-    // same SQL expression here is what makes the pre-check and the DB
-    // constraint agree (no false 409s near the IST new-year boundary).
-    const currentYear = getISTYear();
+    return this.isSeedTransactionNumberTakenForYear(
+      merchantId,
+      transactionNumber,
+      getISTYear(),
+      excludeId,
+    );
+  }
+
+  // isSeedTransactionNumberTakenForYear — variant scoped to an arbitrary
+  // IST year, needed when the user explicitly sets a transaction date that
+  // crosses the IST new-year boundary (either at create time via the Load
+  // Seed Truck date input, or when editing the date inline on an existing
+  // seed transaction). Keeping the SQL expression identical to the one in
+  // the seed_transactions_merchant_tnx_year_unique DB index is what makes
+  // the pre-check and the DB constraint agree.
+  async isSeedTransactionNumberTakenForYear(
+    merchantId: number,
+    transactionNumber: number,
+    year: number,
+    excludeId: number | null,
+  ): Promise<boolean> {
     const conditions = [
       eq(seedTransactions.merchantId, merchantId),
       eq(seedTransactions.transactionNumber, transactionNumber),
-      sql`EXTRACT(YEAR FROM ((${seedTransactions.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')) = ${currentYear}`,
+      sql`EXTRACT(YEAR FROM ((${seedTransactions.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')) = ${year}`,
     ];
     if (excludeId !== null) {
       conditions.push(ne(seedTransactions.id, excludeId));
@@ -3856,6 +3962,19 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
 
     return !!match;
+  }
+
+  async getNextSeedTransactionNumberForYear(merchantId: number, year: number): Promise<number> {
+    const [result] = await db.select({ maxNum: seedTransactions.transactionNumber })
+      .from(seedTransactions)
+      .where(and(
+        eq(seedTransactions.merchantId, merchantId),
+        sql`EXTRACT(YEAR FROM ((${seedTransactions.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')) = ${year}`,
+      ))
+      .orderBy(desc(seedTransactions.transactionNumber))
+      .limit(1);
+
+    return (result?.maxNum || 0) + 1;
   }
 
   async updateSeedTransactionNumber(id: number, merchantId: number, newNumber: number): Promise<void> {
@@ -4961,6 +5080,54 @@ export class DatabaseStorage implements IStorage {
       .map(r => r.tehsil!)
       .filter(v => v.trim().length > 0)
       .sort((a, b) => a.localeCompare(b));
+  }
+
+  // listAllSuppliers - dedupes seed_stock_entries supplier composite (name +
+  // contact + address) and returns the full list, sorted by name. Used by
+  // the inline supplier picker on the seed stock edit dialog. Mirrors the
+  // dedupe logic in searchSuppliers but skips the query filter so the
+  // shadcn Command popover can do its own client-side filtering.
+  async listAllSuppliers(merchantId: number): Promise<{
+    supplierName: string;
+    supplierContact: string | null;
+    address: string | null;
+    district: string;
+    state: string;
+  }[]> {
+    const suppliers = await db.select({
+      supplierName: seedStockEntries.supplierName,
+      supplierContact: seedStockEntries.supplierContact,
+      address: seedStockEntries.address,
+      district: seedStockEntries.district,
+      state: seedStockEntries.state,
+    })
+    .from(seedStockEntries)
+    .where(eq(seedStockEntries.merchantId, merchantId));
+
+    const supplierMap = new Map<string, {
+      supplierName: string;
+      supplierContact: string | null;
+      address: string | null;
+      district: string;
+      state: string;
+    }>();
+
+    for (const s of suppliers) {
+      const key = `${(s.supplierName || '').toLowerCase().trim()}|${(s.supplierContact || '').toLowerCase().trim()}|${(s.address || '').toLowerCase().trim()}`;
+      if (!supplierMap.has(key)) {
+        supplierMap.set(key, {
+          supplierName: s.supplierName,
+          supplierContact: s.supplierContact,
+          address: s.address,
+          district: s.district,
+          state: s.state,
+        });
+      }
+    }
+
+    return Array.from(supplierMap.values()).sort((a, b) =>
+      a.supplierName.localeCompare(b.supplierName),
+    );
   }
 
   async searchSuppliers(merchantId: number, query: string): Promise<{

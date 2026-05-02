@@ -65,6 +65,10 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   const [tehsil, setTehsil] = useState("");
   const [district, setDistrict] = useState("");
   const [state, setState] = useState("");
+  // Tnx Date — defaults to today IST. Drives both the createdAt timestamp and
+  // the year used when picking the next Tnx# (so retroactive entries for a
+  // prior year get a Tnx# from that year's series).
+  const [transactionDate, setTransactionDate] = useState<string>(() => getTodayIST());
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [transportCharges, setTransportCharges] = useState("");
   const [otherCharges, setOtherCharges] = useState("");
@@ -79,12 +83,17 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([{ seedLotId: 0, bagsMoved: 0, pricePerBag: 0 }]);
 
-  // Tnx# preview — fetch the upcoming seed transaction number while the
-  // dialog is open so the user knows which Tnx# this load will be assigned.
+  // Tnx# preview — fetch the upcoming seed transaction number for the IST
+  // year of the chosen Tnx Date, so the badge stays in sync if the user
+  // back-dates the load to a prior year.
+  const tnxYear = useMemo(() => {
+    const m = /^(\d{4})-/.exec(transactionDate);
+    return m ? parseInt(m[1], 10) : new Date().getFullYear();
+  }, [transactionDate]);
   const { data: nextTnxData } = useQuery<{ next: number }>({
-    queryKey: ["/api/seed-transactions/next-number"],
+    queryKey: ["/api/seed-transactions/next-number", tnxYear],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/seed-transactions/next-number");
+      const res = await apiRequest("GET", `/api/seed-transactions/next-number?year=${tnxYear}`);
       return await res.json();
     },
     enabled: open,
@@ -279,6 +288,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
     setTehsil("");
     setDistrict("");
     setState("");
+    setTransactionDate(getTodayIST());
     setVehicleNumber("");
     setTransportCharges("");
     setOtherCharges("");
@@ -413,6 +423,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       tehsil: tehsil || undefined,
       district: district || undefined,
       state: state || undefined,
+      transactionDate: transactionDate || undefined,
       vehicleNumber: vehicleNumber || undefined,
       transportCharges: transportCharges || undefined,
       otherCharges: otherCharges || undefined,
@@ -431,7 +442,14 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      if (!isOpen) {
+        // Reset form on every close path (cancel, backdrop, ESC) so reopening
+        // the dialog never shows a stale Tnx Date / lots / farmer fields.
+        resetForm();
+      }
+      onOpenChange(isOpen);
+    }}>
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 flex-wrap">
@@ -657,15 +675,29 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 <span>{redFlagWarning} {t("is marked as Red Flag", "रेड फ्लैग के रूप में चिह्नित है")}</span>
               </div>
             )}
-            <div className="space-y-2">
-              <Label>{t("Vehicle Number", "वाहन नंबर")} ({t("Optional", "वैकल्पिक")})</Label>
-              <Input
-                value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
-                placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
-                className="w-48"
-                data-testid="input-seed-vehicle"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="input-seed-tnx-date">{t("Tnx Date", "लेन-देन तिथि")}</Label>
+                <Input
+                  id="input-seed-tnx-date"
+                  type="date"
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  max={getTodayIST()}
+                  className="w-48"
+                  data-testid="input-load-seed-tnx-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("Vehicle Number", "वाहन नंबर")} ({t("Optional", "वैकल्पिक")})</Label>
+                <Input
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                  placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")}
+                  className="w-48"
+                  data-testid="input-seed-vehicle"
+                />
+              </div>
             </div>
           </div>
 

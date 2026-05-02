@@ -18,6 +18,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Save, Loader2, Snowflake, ChevronDown, ChevronRight, History, Pencil, Check, X } from "lucide-react";
+import { InlineEditableDate } from "@/components/ui/inline-editable-date";
+import { InlinePartyPicker, type PartyOption } from "@/components/ui/inline-party-picker";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
@@ -33,6 +35,12 @@ interface SeedStockEntryEditDialogProps {
 export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStockEntryEditDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  // Local mirror so inline supplier/date edits show through immediately
+  // without waiting for the parent list query to refetch and re-derive props.
+  const [displayEntry, setDisplayEntry] = useState<SeedStockEntryWithLots>(entry);
+  useEffect(() => {
+    setDisplayEntry(entry);
+  }, [entry]);
   const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -330,22 +338,62 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">{t("Supplier", "आपूर्तिकर्ता")}:</span>{" "}
-                  <span className="font-medium">{entry.supplierName}</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-muted-foreground shrink-0">{t("Supplier", "आपूर्तिकर्ता")}:</span>
+                  <InlinePartyPicker
+                    currentName={displayEntry.supplierName}
+                    currentKey={`${displayEntry.supplierName}|${displayEntry.supplierContact || ""}`}
+                    fetchKey={["/api/suppliers/list"]}
+                    mapOptions={(rows: any[]) =>
+                      (rows || []).map((s: any): PartyOption => ({
+                        key: `${s.supplierName}|${s.supplierContact || ""}`,
+                        label: s.supplierName,
+                        sublabel: [s.district, s.state, s.supplierContact].filter(Boolean).join(" • "),
+                        searchText: `${s.supplierName} ${s.supplierContact || ""} ${s.address || ""} ${s.district || ""} ${s.state || ""}`,
+                        payload: {
+                          supplierName: s.supplierName,
+                          supplierContact: s.supplierContact,
+                          address: s.address,
+                          district: s.district,
+                          state: s.state,
+                        },
+                      }))
+                    }
+                    endpoint={`/api/seed-stock-entries/${entry.id}/supplier`}
+                    invalidateKeys={[
+                      ["/api/seed-stock-entries"],
+                      ["/api/seed-stock-entries", entry.id],
+                      ["/api/suppliers/list"],
+                    ]}
+                    testIdSuffix="seed-supplier"
+                    searchPlaceholder={t("Search supplier...", "आपूर्तिकर्ता खोजें...")}
+                    emptyText={t("No supplier found.", "कोई आपूर्तिकर्ता नहीं मिला।")}
+                    successTitle={{ en: "Supplier updated", hi: "आपूर्तिकर्ता अपडेट किया गया" }}
+                    ariaLabel={{ en: "Change supplier", hi: "आपूर्तिकर्ता बदलें" }}
+                    onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
+                  />
                 </div>
-                <div>
-                  <span className="text-muted-foreground">{t("Date", "तिथि")}:</span>{" "}
-                  <span className="font-medium">{entry.purchaseDate}</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-muted-foreground shrink-0">{t("Date", "तिथि")}:</span>
+                  <InlineEditableDate
+                    currentDate={displayEntry.purchaseDate}
+                    endpoint={`/api/seed-stock-entries/${entry.id}/date`}
+                    invalidateKeys={[
+                      ["/api/seed-stock-entries"],
+                      ["/api/seed-stock-entries", entry.id],
+                    ]}
+                    testIdSuffix="seed-stock"
+                    onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
+                  />
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("Location", "स्थान")}:</span>{" "}
-                  <span className="font-medium">{entry.district}, {entry.state}</span>
+                  <span className="font-medium">{displayEntry.district}, {displayEntry.state}</span>
                 </div>
-                {entry.supplierContact && (
+                {displayEntry.supplierContact && (
                   <div>
                     <span className="text-muted-foreground">{t("Contact", "संपर्क")}:</span>{" "}
-                    <span className="font-medium">{entry.supplierContact}</span>
+                    <span className="font-medium">{displayEntry.supplierContact}</span>
                   </div>
                 )}
               </div>

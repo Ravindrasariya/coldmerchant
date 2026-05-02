@@ -33,6 +33,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Save, Loader2, Plus, Trash2, Package, History, ChevronDown, ChevronRight, Paperclip, Eye, X, Pencil, Check } from "lucide-react";
+import { InlineEditableDate } from "@/components/ui/inline-editable-date";
+import { InlinePartyPicker, type PartyOption } from "@/components/ui/inline-party-picker";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SIZE_OPTIONS, CHARGE_TYPES } from "@shared/schema";
@@ -43,6 +45,7 @@ interface StockEntryWithLots {
   serialNumber: number;
   purchaseDate: string;
   place: string | null;
+  farmerId: number | null;
   farmerName: string;
   farmerContact: string | null;
   village: string | null;
@@ -107,11 +110,18 @@ interface StockEntryEditDialogProps {
 export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEditDialogProps) {
   const { toast } = useToast();
   const { t } = useLanguage();
+  // Local mirror of the prop so inline edits (date / farmer / aadhtiya) can
+  // patch the displayed values immediately without waiting for the parent
+  // list query to refetch and re-derive the prop.
+  const [displayEntry, setDisplayEntry] = useState<StockEntryWithLots>(entry);
+  useEffect(() => {
+    setDisplayEntry(entry);
+  }, [entry]);
   const { data: aadhats } = useQuery<Array<{ id: number; name: string; address: string; contact: string | null }>>({
     queryKey: ["/api/aadhats"],
-    enabled: entry.place === "mandi" && !!entry.aadhatDbId,
+    enabled: displayEntry.place === "mandi" && !!displayEntry.aadhatDbId,
   });
-  const aadhatRecord = aadhats?.find(a => a.id === entry.aadhatDbId);
+  const aadhatRecord = aadhats?.find(a => a.id === displayEntry.aadhatDbId);
   const [remarks, setRemarks] = useState(entry.remarks || "");
   const [lots, setLots] = useState(entry.lots.map(lot => ({
     ...lot,
@@ -680,7 +690,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {entry.place === "mandi" ? (
+          {displayEntry.place === "mandi" ? (
             <Card className="border-border">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">{t("Aadhtiya Details", "आढ़तिया विवरण")}</CardTitle>
@@ -689,17 +699,45 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Aadhtiya Name", "आढ़तिया नाम")}</p>
-                    <p className="font-medium">{entry.aadhatName || entry.farmerName}</p>
+                    <InlinePartyPicker
+                      currentName={displayEntry.aadhatName || displayEntry.farmerName}
+                      currentKey={displayEntry.aadhatDbId}
+                      fetchKey={["/api/aadhats"]}
+                      mapOptions={(rows: any[]) =>
+                        (rows || []).map((a: any): PartyOption => ({
+                          key: String(a.id),
+                          label: a.name,
+                          sublabel: [a.address, a.contact].filter(Boolean).join(" • "),
+                          searchText: `${a.name} ${a.contact || ""} ${a.address || ""}`,
+                          payload: { aadhatDbId: a.id },
+                        }))
+                      }
+                      endpoint={`/api/stock-entries/${entry.id}/aadhtiya`}
+                      invalidateKeys={[
+                        ["/api/stock-entries"],
+                        ["/api/stock-entries", entry.id],
+                        ["/api/aadhats"],
+                      ]}
+                      testIdSuffix="aadhtiya"
+                      searchPlaceholder={t("Search aadhtiya...", "आढ़तिया खोजें...")}
+                      emptyText={t("No aadhtiya found.", "कोई आढ़तिया नहीं मिला।")}
+                      successTitle={{ en: "Aadhtiya updated", hi: "आढ़तिया अपडेट किया गया" }}
+                      ariaLabel={{ en: "Change aadhtiya", hi: "आढ़तिया बदलें" }}
+                      onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
+                    />
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Date", "तिथि")}</p>
-                    <p className="font-medium">
-                      {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
+                    <InlineEditableDate
+                      currentDate={displayEntry.purchaseDate}
+                      endpoint={`/api/stock-entries/${entry.id}/date`}
+                      invalidateKeys={[
+                        ["/api/stock-entries"],
+                        ["/api/stock-entries", entry.id],
+                      ]}
+                      testIdSuffix="stock-aadhtiya"
+                      onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
+                    />
                   </div>
                   <div className="md:col-span-1">
                     <p className="text-muted-foreground text-xs">{t("Address", "पता")}</p>
@@ -717,33 +755,61 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Name", "नाम")}</p>
-                    <p className="font-medium">{entry.farmerName}</p>
+                    <InlinePartyPicker
+                      currentName={displayEntry.farmerName}
+                      currentKey={displayEntry.farmerId}
+                      fetchKey={["/api/farmers"]}
+                      mapOptions={(rows: any[]) =>
+                        (rows || []).map((f: any): PartyOption => ({
+                          key: String(f.id),
+                          label: f.name,
+                          sublabel: [f.village, f.contact].filter(Boolean).join(" • "),
+                          searchText: `${f.name} ${f.contact || ""} ${f.village || ""}`,
+                          payload: { farmerId: f.id },
+                        }))
+                      }
+                      endpoint={`/api/stock-entries/${entry.id}/farmer`}
+                      invalidateKeys={[
+                        ["/api/stock-entries"],
+                        ["/api/stock-entries", entry.id],
+                        ["/api/farmers"],
+                      ]}
+                      testIdSuffix="stock-farmer"
+                      searchPlaceholder={t("Search farmer...", "किसान खोजें...")}
+                      emptyText={t("No farmer found.", "कोई किसान नहीं मिला।")}
+                      successTitle={{ en: "Farmer updated", hi: "किसान अपडेट किया गया" }}
+                      ariaLabel={{ en: "Change farmer", hi: "किसान बदलें" }}
+                      onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
+                    />
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Contact", "संपर्क")}</p>
-                    <p className="font-medium">{entry.farmerContact || "—"}</p>
+                    <p className="font-medium">{displayEntry.farmerContact || "—"}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Date", "तिथि")}</p>
-                    <p className="font-medium">
-                      {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
+                    <InlineEditableDate
+                      currentDate={displayEntry.purchaseDate}
+                      endpoint={`/api/stock-entries/${entry.id}/date`}
+                      invalidateKeys={[
+                        ["/api/stock-entries"],
+                        ["/api/stock-entries", entry.id],
+                      ]}
+                      testIdSuffix="stock-farmer"
+                      onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
+                    />
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">{t("Village", "गाँव")}</p>
-                    <p className="font-medium">{entry.village || "—"}</p>
+                    <p className="font-medium">{displayEntry.village || "—"}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">{t("District", "जिला")}</p>
-                    <p className="font-medium">{entry.district}</p>
+                    <p className="font-medium">{displayEntry.district}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">{t("State", "राज्य")}</p>
-                    <p className="font-medium">{entry.state}</p>
+                    <p className="font-medium">{displayEntry.state}</p>
                   </div>
                 </div>
               </CardContent>
