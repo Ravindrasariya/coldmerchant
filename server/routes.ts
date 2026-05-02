@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, DuplicateSerialNumberError } from "./storage";
+import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError } from "./storage";
 import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders } from "@shared/schema";
 import { db } from "./db";
@@ -5828,7 +5828,14 @@ export async function registerRoutes(
       }
 
       const oldNumber = existing.transactionNumber;
-      await storage.updateSeedTransactionNumber(id, merchantId, newNumber);
+      try {
+        await storage.updateSeedTransactionNumber(id, merchantId, newNumber);
+      } catch (innerError) {
+        if (innerError instanceof DuplicateSeedTransactionNumberError) {
+          return res.status(409).json({ message: innerError.message });
+        }
+        throw innerError;
+      }
 
       await storage.createSeedTransactionEditHistory({
         seedTransactionId: id,
@@ -5845,6 +5852,9 @@ export async function registerRoutes(
       const refreshed = await storage.getSeedTransactionById(id, merchantId);
       res.json(refreshed);
     } catch (error) {
+      if (error instanceof DuplicateSeedTransactionNumberError) {
+        return res.status(409).json({ message: error.message });
+      }
       console.error("Error updating seed transaction number:", error);
       res.status(500).json({ message: "Failed to update seed transaction number" });
     }
@@ -6212,6 +6222,9 @@ export async function registerRoutes(
 
       res.status(201).json(transaction);
     } catch (error) {
+      if (error instanceof DuplicateSeedTransactionNumberError) {
+        return res.status(409).json({ message: error.message });
+      }
       console.error("Error creating seed transaction:", error);
       res.status(500).json({ message: "Failed to create seed transaction" });
     }

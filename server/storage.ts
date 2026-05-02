@@ -98,6 +98,25 @@ function isSeedSerialYearUniqueViolation(error: any): boolean {
   );
 }
 
+// Thrown when the database-level unique constraint on
+// (merchant_id, transaction_number, year(created_at)) for seed_transactions is
+// violated. Routes catch this to surface a friendly 409 response that matches
+// the harvest Tnx# protections.
+export class DuplicateSeedTransactionNumberError extends Error {
+  constructor(public transactionNumber: number) {
+    super(`Tnx# ${transactionNumber} is already in use. Choose a different number.`);
+    this.name = 'DuplicateSeedTransactionNumberError';
+  }
+}
+
+function isSeedTransactionNumberYearUniqueViolation(error: any): boolean {
+  return (
+    error?.code === '23505' &&
+    typeof error?.constraint === 'string' &&
+    error.constraint === 'seed_transactions_merchant_tnx_year_unique'
+  );
+}
+
 async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any, retryOffset: number = 0): Promise<string> {
   const fullPrefix = `${prefix}${dateStr}`;
   const prefixLength = fullPrefix.length;
@@ -3762,6 +3781,11 @@ export class DatabaseStorage implements IStorage {
         createdTxn = result;
         break;
       } catch (error: any) {
+        if (isSeedTransactionNumberYearUniqueViolation(error)) {
+          // Two concurrent loads picked the same Tnx# and the in-app
+          // duplicate check raced past us. Surface as a friendly 409.
+          throw new DuplicateSeedTransactionNumberError(transaction.transactionNumber);
+        }
         if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
           continue;
         }
@@ -3789,12 +3813,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSeedTransactionNumber(merchantId: number): Promise<number> {
+    // Year-scope by IST calendar year of createdAt. Must match exactly the
+    // expression used by the seed_transactions_merchant_tnx_year_unique DB
+    // index (see shared/schema.ts) so the in-app number allocation and the
+    // DB-level uniqueness check can never disagree at the IST year boundary.
     const currentYear = getISTYear();
     const [result] = await db.select({ maxNum: seedTransactions.transactionNumber })
       .from(seedTransactions)
       .where(and(
         eq(seedTransactions.merchantId, merchantId),
-        sql`EXTRACT(YEAR FROM ${seedTransactions.createdAt}) = ${currentYear}`
+        sql`EXTRACT(YEAR FROM ((${seedTransactions.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')) = ${currentYear}`
       ))
       .orderBy(desc(seedTransactions.transactionNumber))
       .limit(1);
@@ -3807,14 +3835,16 @@ export class DatabaseStorage implements IStorage {
     transactionNumber: number,
     excludeId: number | null,
   ): Promise<boolean> {
-    // Year-scope mirrors getNextSeedTransactionNumber, which resets the
-    // series each calendar year. Without this, a Tnx# used in a previous
-    // year would block reuse in the current year.
+    // Year-scope mirrors getNextSeedTransactionNumber and the
+    // seed_transactions_merchant_tnx_year_unique DB index, both of which
+    // partition by the IST calendar year of createdAt. Keeping the exact
+    // same SQL expression here is what makes the pre-check and the DB
+    // constraint agree (no false 409s near the IST new-year boundary).
     const currentYear = getISTYear();
     const conditions = [
       eq(seedTransactions.merchantId, merchantId),
       eq(seedTransactions.transactionNumber, transactionNumber),
-      sql`EXTRACT(YEAR FROM ${seedTransactions.createdAt}) = ${currentYear}`,
+      sql`EXTRACT(YEAR FROM ((${seedTransactions.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata')) = ${currentYear}`,
     ];
     if (excludeId !== null) {
       conditions.push(ne(seedTransactions.id, excludeId));
@@ -3829,9 +3859,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSeedTransactionNumber(id: number, merchantId: number, newNumber: number): Promise<void> {
-    await db.update(seedTransactions)
-      .set({ transactionNumber: newNumber })
-      .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
+    try {
+      await db.update(seedTransactions)
+        .set({ transactionNumber: newNumber })
+        .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
+    } catch (error: any) {
+      if (isSeedTransactionNumberYearUniqueViolation(error)) {
+        // Concurrent edit raced past the in-app duplicate check. Surface as
+        // a friendly 409 just like the harvest cascade path does.
+        throw new DuplicateSeedTransactionNumberError(newNumber);
+      }
+      throw error;
+    }
   }
 
   async getUnsoldSeedInventory(merchantId: number): Promise<any[]> {

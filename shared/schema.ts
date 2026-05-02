@@ -552,7 +552,22 @@ export const seedTransactions = pgTable("seed_transactions", {
   adjustmentEffectiveDate: date("adjustment_effective_date"), // effective date for interest calculation
   adjustmentReason: text("adjustment_reason"), // reason for adjustment
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  // Database-level guard so two concurrent seed Tnx# overrides/edits can
+  // never collide for the same merchant within the same IST calendar year of
+  // created_at. created_at is `timestamp` (no tz); rows are persisted as the
+  // UTC wall-clock value of `now()`, so we re-stamp it as UTC and convert to
+  // IST before extracting the year. The application-level helpers
+  // isSeedTransactionNumberTaken / getNextSeedTransactionNumber use the EXACT
+  // same expression so the in-app pre-check and the DB constraint can never
+  // disagree at the IST new-year boundary.
+  merchantTnxYearUnique: uniqueIndex("seed_transactions_merchant_tnx_year_unique")
+    .on(
+      table.merchantId,
+      table.transactionNumber,
+      sql`EXTRACT(YEAR FROM ((${table.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata'))`,
+    ),
+}));
 
 // Seed Transaction Items - each seed lot selection in a transaction
 export const seedTransactionItems = pgTable("seed_transaction_items", {
