@@ -55,8 +55,8 @@ export const stockEntries = pgTable("stock_entries", {
   farmerContact: text("farmer_contact"),
   village: text("village"),
   tehsil: text("tehsil"),
-  district: text("district").notNull(),
-  state: text("state").notNull(),
+  district: text("district"),
+  state: text("state"),
   aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // links to aadhat ledger for mandi entries
   aadhatName: text("aadhat_name"), // cached aadhtiya name for mandi entries
   paymentStatus: text("payment_status").default("due"), // due, partial, paid
@@ -534,8 +534,8 @@ export const seedTransactions = pgTable("seed_transactions", {
   farmerContact: text("farmer_contact"),
   village: text("village"),
   tehsil: text("tehsil"),
-  district: text("district").notNull(),
-  state: text("state").notNull(),
+  district: text("district"),
+  state: text("state"),
   vehicleNumber: text("vehicle_number"),
   transportCharges: decimal("transport_charges", { precision: 12, scale: 2 }),
   otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),
@@ -1183,15 +1183,6 @@ export const stockEntryFormSchema = z.object({
     if (!data.village || data.village.trim() === "") {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Village name is required", path: ["village"] });
     }
-    if (!data.tehsil || data.tehsil.trim() === "") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tehsil is required", path: ["tehsil"] });
-    }
-    if (!data.district || data.district.trim() === "") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "District is required", path: ["district"] });
-    }
-    if (!data.state || data.state.trim() === "") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "State is required", path: ["state"] });
-    }
   }
 });
 
@@ -1319,8 +1310,8 @@ export const seedTransactionFormSchema = z.object({
   farmerContact: z.string().regex(/^\d{10}$/, "Enter valid 10-digit number").optional().or(z.literal("")),
   village: z.string().optional(),
   tehsil: z.string().optional(),
-  district: z.string().min(1, "District is required"),
-  state: z.string().min(1, "State is required"),
+  district: z.string().optional(),
+  state: z.string().optional(),
   vehicleNumber: z.string().optional(),
   transportCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),

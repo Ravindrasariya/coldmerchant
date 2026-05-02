@@ -384,33 +384,6 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       return;
     }
 
-    if (!tehsil.trim()) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("Tehsil is required", "तहसील आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!district) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("District is required", "जिला आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!state) {
-      toast({
-        title: t("Error", "त्रुटि"),
-        description: t("State is required", "राज्य आवश्यक है"),
-        variant: "destructive",
-      });
-      return;
-    }
-
     const validLots = selectedLots.filter(lot => lot.seedLotId > 0 && lot.bagsMoved > 0);
     if (validLots.length === 0) {
       toast({
@@ -438,8 +411,8 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       farmerContact: farmerContact || undefined,
       village: village || undefined,
       tehsil: tehsil || undefined,
-      district,
-      state,
+      district: district || undefined,
+      state: state || undefined,
       vehicleNumber: vehicleNumber || undefined,
       transportCharges: transportCharges || undefined,
       otherCharges: otherCharges || undefined,
@@ -614,7 +587,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 )}
               </div>
               <div className="space-y-2 relative">
-                <Label>{t("Tehsil", "तहसील")} *</Label>
+                <Label>{t("Tehsil", "तहसील")}</Label>
                 <Input
                   ref={tehsilInputRef}
                   value={tehsil}
@@ -652,7 +625,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 )}
               </div>
               <div className="space-y-2">
-                <Label>{t("District", "जिला")} *</Label>
+                <Label>{t("District", "जिला")}</Label>
                 <Select value={district} onValueChange={setDistrict}>
                   <SelectTrigger data-testid="select-seed-district">
                     <SelectValue placeholder={t("Select district", "जिला चुनें")} />
@@ -665,7 +638,7 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{t("State", "राज्य")} *</Label>
+                <Label>{t("State", "राज्य")}</Label>
                 <Select value={state} onValueChange={setState}>
                   <SelectTrigger data-testid="select-seed-state">
                     <SelectValue placeholder={t("Select state", "राज्य चुनें")} />

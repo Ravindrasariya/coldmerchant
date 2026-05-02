@@ -65,8 +65,8 @@ interface SeedTransaction {
   farmerContact: string | null;
   village: string | null;
   tehsil: string | null;
-  district: string;
-  state: string;
+  district: string | null;
+  state: string | null;
   vehicleNumber: string | null;
   transportCharges: string | null;
   otherCharges: string | null;
@@ -150,8 +150,8 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       setFarmerContact(transaction.farmerContact || "");
       setVillage(transaction.village || "");
       setTehsil(transaction.tehsil || "");
-      setDistrict(transaction.district);
-      setState(transaction.state);
+      setDistrict(transaction.district ?? "");
+      setState(transaction.state ?? "");
       setVehicleNumber(transaction.vehicleNumber || "");
       setTransportCharges(transaction.transportCharges && parseFloat(transaction.transportCharges) !== 0 ? transaction.transportCharges : "");
       setOtherCharges(transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? transaction.otherCharges : "");

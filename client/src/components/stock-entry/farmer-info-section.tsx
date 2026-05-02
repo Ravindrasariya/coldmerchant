@@ -508,7 +508,7 @@ export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: 
             name="tehsil"
             render={({ field }) => (
               <FormItem className="relative">
-                <FormLabel>{t("Tehsil", "तहसील")} *</FormLabel>
+                <FormLabel>{t("Tehsil", "तहसील")}</FormLabel>
                 <FormControl>
                   <Input 
                     placeholder={t("Enter tehsil", "तहसील दर्ज करें")} 
@@ -566,7 +566,7 @@ export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: 
             name="district"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("District", "जिला")} *</FormLabel>
+                <FormLabel>{t("District", "जिला")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger 
@@ -594,7 +594,7 @@ export function FarmerInfoSection({ form, attachmentFile, onAttachmentChange }: 
             name="state"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t("State", "राज्य")} *</FormLabel>
+                <FormLabel>{t("State", "राज्य")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger 

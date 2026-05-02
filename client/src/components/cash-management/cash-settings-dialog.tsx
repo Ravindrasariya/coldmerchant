@@ -1215,7 +1215,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 )}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">{t("Tehsil", "तहसील")} *</Label>
+                <Label className="text-xs">{t("Tehsil", "तहसील")}</Label>
                 <Input
                   value={formData.tehsil}
                   onChange={(e) => setFormData({ ...formData, tehsil: e.target.value })}
@@ -1226,7 +1226,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">{t("District", "ज़िला")} *</Label>
+                <Label className="text-xs">{t("District", "ज़िला")}</Label>
                 <Select
                   value={formData.district}
                   onValueChange={(value) => setFormData({ ...formData, district: value })}
@@ -1242,7 +1242,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">{t("State", "राज्य")} *</Label>
+                <Label className="text-xs">{t("State", "राज्य")}</Label>
                 <Select
                   value={formData.state}
                   onValueChange={(value) => setFormData({ ...formData, state: value })}
@@ -1315,7 +1315,7 @@ function FarmersSection({ farmers, isLoading }: FarmersSectionProps) {
               <Button 
                 size="sm" 
                 onClick={() => createMutation.mutate(formData)}
-                disabled={!formData.name || !formData.contactNumber || !/^\d{10}$/.test(formData.contactNumber) || !formData.village || !formData.tehsil || !formData.district || !formData.state || createMutation.isPending}
+                disabled={!formData.name || !formData.contactNumber || !/^\d{10}$/.test(formData.contactNumber) || !formData.village || createMutation.isPending}
                 data-testid="button-save-farmer"
               >
                 {createMutation.isPending ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}

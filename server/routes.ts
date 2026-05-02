@@ -772,8 +772,8 @@ export async function registerRoutes(
       let farmerContact: string | null = null;
       let village: string | null = null;
       let tehsil: string | null = null;
-      let district: string = "";
-      let state: string = "";
+      let district: string | null = null;
+      let state: string | null = null;
       let aadhatDbId: number | null = null;
       let aadhatName: string | null = null;
 
@@ -797,8 +797,8 @@ export async function registerRoutes(
         farmerContact = data.farmerContact || null;
         village = titleCase(data.village) || null;
         tehsil = titleCase(data.tehsil) || null;
-        district = titleCase(data.district) || data.district || "";
-        state = titleCase(data.state) || data.state || "";
+        district = titleCase(data.district) || data.district || null;
+        state = titleCase(data.state) || data.state || null;
       }
 
       // Create stock entry
@@ -6266,7 +6266,7 @@ export async function registerRoutes(
       const merchantId = req.user!.merchantId!;
       const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items } = req.body;
 
-      if (!farmerName || !district || !state || !items || items.length === 0) {
+      if (!farmerName || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
@@ -6377,8 +6377,8 @@ export async function registerRoutes(
           farmerContact: farmerContact || null,
           village: titleCase(village) || null,
           tehsil: titleCase(tehsil) || null,
-          district: titleCase(district) || district,
-          state: titleCase(state) || state,
+          district: titleCase(district) || district || null,
+          state: titleCase(state) || state || null,
           vehicleNumber: vehicleNumber || null,
           transportCharges: transportTotal.toString(),
           otherCharges: otherTotal.toString(),

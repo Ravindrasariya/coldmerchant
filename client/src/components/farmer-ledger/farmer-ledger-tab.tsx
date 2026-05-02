@@ -295,9 +295,6 @@ export function FarmerLedgerTab() {
     if (!addForm.contact.trim()) missingFields.push(t("Contact", "संपर्क"));
     if (addForm.contact.trim() && !/^\d{10}$/.test(addForm.contact.trim())) missingFields.push(t("Valid 10-digit Contact", "मान्य 10 अंकों का संपर्क"));
     if (!addForm.village.trim()) missingFields.push(t("Village", "गांव"));
-    if (!addForm.tehsil.trim()) missingFields.push(t("Tehsil", "तहसील"));
-    if (!addForm.district.trim()) missingFields.push(t("District", "जिला"));
-    if (!addForm.state.trim()) missingFields.push(t("State", "राज्य"));
     if (missingFields.length > 0) {
       toast({
         title: t("Required Fields Missing", "आवश्यक फ़ील्ड गायब हैं"),
@@ -428,9 +425,6 @@ export function FarmerLedgerTab() {
     if (!editForm.contact.trim()) missingFields.push(t("Contact", "संपर्क"));
     if (editForm.contact.trim() && !/^\d{10}$/.test(editForm.contact.trim())) missingFields.push(t("Valid 10-digit Contact", "मान्य 10 अंकों का संपर्क"));
     if (!editForm.village.trim()) missingFields.push(t("Village", "गांव"));
-    if (!editForm.tehsil.trim()) missingFields.push(t("Tehsil", "तहसील"));
-    if (!editForm.district.trim()) missingFields.push(t("District", "जिला"));
-    if (!editForm.state.trim()) missingFields.push(t("State", "राज्य"));
     
     if (missingFields.length > 0) {
       toast({
@@ -1241,7 +1235,7 @@ export function FarmerLedgerTab() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-tehsil">{t("Tehsil", "तहसील")} <span className="text-destructive">*</span></Label>
+                <Label htmlFor="edit-tehsil">{t("Tehsil", "तहसील")}</Label>
                 <div className="relative">
                   <Input
                     id="edit-tehsil"
@@ -1287,7 +1281,7 @@ export function FarmerLedgerTab() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t("District", "जिला")} <span className="text-destructive">*</span></Label>
+                <Label>{t("District", "जिला")}</Label>
                 <Select
                   value={editForm.district}
                   onValueChange={(value) => setEditForm(f => ({ ...f, district: value }))}
@@ -1310,7 +1304,7 @@ export function FarmerLedgerTab() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{t("State", "राज्य")} <span className="text-destructive">*</span></Label>
+                <Label>{t("State", "राज्य")}</Label>
                 <Select
                   value={editForm.state}
                   onValueChange={(value) => setEditForm(f => ({ ...f, state: value }))}
@@ -1507,7 +1501,7 @@ export function FarmerLedgerTab() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="add-farmer-tehsil">{t("Tehsil", "तहसील")} <span className="text-destructive">*</span></Label>
+                <Label htmlFor="add-farmer-tehsil">{t("Tehsil", "तहसील")}</Label>
                 <div className="relative">
                   <Input
                     id="add-farmer-tehsil"
@@ -1553,7 +1547,7 @@ export function FarmerLedgerTab() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t("District", "जिला")} <span className="text-destructive">*</span></Label>
+                <Label>{t("District", "जिला")}</Label>
                 <Select
                   value={addForm.district}
                   onValueChange={(value) => setAddForm(f => ({ ...f, district: value }))}
@@ -1576,7 +1570,7 @@ export function FarmerLedgerTab() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>{t("State", "राज्य")} <span className="text-destructive">*</span></Label>
+                <Label>{t("State", "राज्य")}</Label>
                 <Select
                   value={addForm.state}
                   onValueChange={(value) => setAddForm(f => ({ ...f, state: value }))}
