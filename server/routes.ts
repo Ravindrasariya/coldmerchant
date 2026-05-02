@@ -5439,6 +5439,11 @@ export async function registerRoutes(
       const completeEntry = await storage.getSeedEntryById(seedEntry.id, merchantId);
       res.status(201).json(completeEntry);
     } catch (error) {
+      if (error instanceof DuplicateSerialNumberError) {
+        return res.status(409).json({
+          message: `Sr# ${error.serialNumber} is already used in ${error.year}. Choose a different number.`,
+        });
+      }
       console.error("Error creating seed stock entry:", error);
       res.status(500).json({ message: "Failed to create seed stock entry" });
     }
@@ -5496,6 +5501,11 @@ export async function registerRoutes(
       const refreshed = await storage.getSeedEntryById(id, merchantId);
       res.json(refreshed);
     } catch (error) {
+      if (error instanceof DuplicateSerialNumberError) {
+        return res.status(409).json({
+          message: `Sr# ${error.serialNumber} is already used in ${error.year}. Choose a different number.`,
+        });
+      }
       console.error("Error updating seed stock entry serial number:", error);
       res.status(500).json({ message: "Failed to update serial number" });
     }

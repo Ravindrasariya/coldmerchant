@@ -479,7 +479,13 @@ export const seedStockEntries = pgTable("seed_stock_entries", {
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  // Database-level guard so two concurrent inserts/updates can never end up
+  // with the same Sr# for a given merchant within the same calendar year of
+  // purchase_date. Mirrors the application-level check in storage/routes.
+  merchantSerialYearUnique: uniqueIndex("seed_stock_entries_merchant_serial_year_unique")
+    .on(table.merchantId, table.serialNumber, sql`EXTRACT(YEAR FROM ${table.purchaseDate})`),
+}));
 
 // Seed Lots - each seed stock entry can have multiple lots
 export const seedLots = pgTable("seed_lots", {

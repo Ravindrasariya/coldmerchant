@@ -90,6 +90,14 @@ function isStockSerialYearUniqueViolation(error: any): boolean {
   );
 }
 
+function isSeedSerialYearUniqueViolation(error: any): boolean {
+  return (
+    error?.code === '23505' &&
+    typeof error?.constraint === 'string' &&
+    error.constraint === 'seed_stock_entries_merchant_serial_year_unique'
+  );
+}
+
 async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any, retryOffset: number = 0): Promise<string> {
   const fullPrefix = `${prefix}${dateStr}`;
   const prefixLength = fullPrefix.length;
@@ -3384,15 +3392,28 @@ export class DatabaseStorage implements IStorage {
 
   async createSeedEntry(entry: Omit<InsertSeedStockEntry, 'uniqueId'> & { merchantId: number; serialNumber?: number }): Promise<SeedStockEntry> {
     const { serialNumber: providedSerial, ...entryRest } = entry;
-    const serialNumber = providedSerial != null
-      ? providedSerial
-      : await this.getNextSeedSerialNumber(entry.merchantId);
+    // Auto-assigned Sr# is scoped per merchant + per calendar year of
+    // purchase_date (matches the "next serial" preview shown on the form).
+    // Fall back to current IST year only if purchaseDate is missing.
+    const autoYear = entry.purchaseDate
+      ? new Date(entry.purchaseDate).getFullYear()
+      : getISTYear();
     // Use purchaseDate for unique ID generation (not current date)
     const purchaseDateForId = entry.purchaseDate ? new Date(entry.purchaseDate) : undefined;
     const dateStr = formatDateYYYYMMDD(purchaseDateForId);
-    
-    // Retry loop for handling concurrent unique ID collisions
-    const maxRetries = 3;
+
+    // Retry loop handles BOTH:
+    //   1. Concurrent unique_id collisions (sequence race), and
+    //   2. Concurrent (merchant, serial, year) collisions when Sr# is
+    //      auto-assigned — the DB-level unique index now blocks these so we
+    //      recompute the next serial and try again.
+    // When the caller explicitly provided a Sr#, a DB-level conflict is
+    // surfaced as DuplicateSerialNumberError instead of being retried.
+    const maxRetries = 5;
+    let serialNumber = providedSerial != null
+      ? providedSerial
+      : await this.getNextSeedSerialNumberForYear(entry.merchantId, autoYear);
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const uniqueId = await generateUniqueId("SSE", dateStr, seedStockEntries, seedStockEntries.uniqueId, attempt);
       try {
@@ -3403,13 +3424,25 @@ export class DatabaseStorage implements IStorage {
         }).returning();
         return created;
       } catch (error: any) {
+        if (isSeedSerialYearUniqueViolation(error)) {
+          if (providedSerial != null) {
+            // Explicit user override lost a race against another insert.
+            throw new DuplicateSerialNumberError(serialNumber, autoYear);
+          }
+          if (attempt < maxRetries - 1) {
+            // Auto-assigned: recompute next serial and try again.
+            serialNumber = await this.getNextSeedSerialNumberForYear(entry.merchantId, autoYear);
+            continue;
+          }
+          throw new DuplicateSerialNumberError(serialNumber, autoYear);
+        }
         if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
           continue;
         }
         throw error;
       }
     }
-    throw new Error("Failed to generate unique ID after multiple attempts");
+    throw new Error("Failed to insert seed stock entry after multiple attempts");
   }
 
   async updateSeedEntry(id: number, merchantId: number, data: Partial<SeedStockEntry>): Promise<SeedStockEntry | undefined> {
@@ -3471,26 +3504,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSeedStockEntrySerialNumber(id: number, merchantId: number, newSerial: number): Promise<void> {
-    await db.transaction(async (tx) => {
-      await tx.update(seedStockEntries)
-        .set({ serialNumber: newSerial, updatedAt: new Date() })
-        .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)));
+    try {
+      await db.transaction(async (tx) => {
+        await tx.update(seedStockEntries)
+          .set({ serialNumber: newSerial, updatedAt: new Date() })
+          .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)));
 
-      // Cascade: seed_transaction_items.serial_number is a cached snapshot
-      // of seed_stock_entries.serial_number for any items pulled from a lot
-      // that belongs to this seed entry.
-      await tx.update(seedTransactionItems)
-        .set({ serialNumber: newSerial })
-        .where(and(
-          eq(seedTransactionItems.merchantId, merchantId),
-          inArray(
-            seedTransactionItems.seedLotId,
-            tx.select({ id: seedLots.id })
-              .from(seedLots)
-              .where(and(eq(seedLots.seedEntryId, id), eq(seedLots.merchantId, merchantId)))
-          )
-        ));
-    });
+        // Cascade: seed_transaction_items.serial_number is a cached snapshot
+        // of seed_stock_entries.serial_number for any items pulled from a lot
+        // that belongs to this seed entry.
+        await tx.update(seedTransactionItems)
+          .set({ serialNumber: newSerial })
+          .where(and(
+            eq(seedTransactionItems.merchantId, merchantId),
+            inArray(
+              seedTransactionItems.seedLotId,
+              tx.select({ id: seedLots.id })
+                .from(seedLots)
+                .where(and(eq(seedLots.seedEntryId, id), eq(seedLots.merchantId, merchantId)))
+            )
+          ));
+      });
+    } catch (error: any) {
+      if (isSeedSerialYearUniqueViolation(error)) {
+        // Look up the year from the existing entry so the friendly message
+        // matches the application-level guard wording.
+        const [existing] = await db.select({ purchaseDate: seedStockEntries.purchaseDate })
+          .from(seedStockEntries)
+          .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)));
+        const year = existing?.purchaseDate
+          ? new Date(existing.purchaseDate).getFullYear()
+          : getISTYear();
+        throw new DuplicateSerialNumberError(newSerial, year);
+      }
+      throw error;
+    }
   }
 
   // ===================== SEED LOT OPERATIONS =====================
