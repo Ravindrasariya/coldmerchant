@@ -355,6 +355,71 @@ export function FarmerLedgerTab() {
     });
   };
 
+  // Add-flow merge: force-create the new farmer (bypassing the composite-key
+  // dup check), then call /api/farmers/merge with the new ID as the source so
+  // the existing record (lower ID) survives.
+  const mergeFromAddMutation = useMutation({
+    mutationFn: async () => {
+      if (!mergingFarmer) throw new Error("No existing farmer to merge into");
+      const createRes = await fetch("/api/farmers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          force: true,
+          dateAdded: getTodayIST(),
+          name: addForm.name.trim(),
+          contact: addForm.contact.trim() || null,
+          village: addForm.village.trim() || null,
+          tehsil: addForm.tehsil.trim() || null,
+          district: addForm.district.trim() || null,
+          state: addForm.state.trim() || null,
+        }),
+        credentials: "include",
+      });
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        throw new Error(err?.message || "Failed to create farmer");
+      }
+      const newFarmer = await createRes.json();
+      const mergeRes = await apiRequest("POST", "/api/farmers/merge", {
+        sourceId: newFarmer.id,
+        targetId: mergingFarmer.id,
+      });
+      if (!mergeRes.ok) {
+        const err = await mergeRes.json().catch(() => ({}));
+        throw new Error(err?.message || "Failed to merge farmers");
+      }
+      return mergeRes.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/villages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/tehsils"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/managed-farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      setMergeDialogOpen(false);
+      setMergingFarmer(null);
+      setMergeFromAdd(false);
+      resetAddForm();
+      toast({
+        title: t("Farmers Merged", "किसान मर्ज किए गए"),
+        description: data.message,
+        variant: "success",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: t("Error", "त्रुटि"),
+        description: error?.message || t("Failed to merge farmers", "किसानों को मर्ज करने में विफल"),
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditFarmer = (farmer: FarmerWithDues) => {
     setEditingFarmer(farmer);
     setEditForm({
@@ -1620,11 +1685,11 @@ export function FarmerLedgerTab() {
               {t("Cancel", "रद्द करें")}
             </Button>
             <Button
-              onClick={handleConfirmMerge}
-              disabled={mergeMutation.isPending || mergeFromAdd}
+              onClick={() => mergeFromAdd ? mergeFromAddMutation.mutate() : handleConfirmMerge()}
+              disabled={mergeMutation.isPending || mergeFromAddMutation.isPending}
               data-testid="button-confirm-merge"
             >
-              {mergeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {(mergeMutation.isPending || mergeFromAddMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {t("Confirm Merge", "मर्ज की पुष्टि करें")}
             </Button>
           </DialogFooter>

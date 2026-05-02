@@ -5087,6 +5087,7 @@ export async function registerRoutes(
       }
 
       const { dateAdded, name, contact, village, tehsil, district, state } = validationResult.data;
+      const force = (req.body as { force?: unknown })?.force === true;
 
       const trimmedName = name.trim();
       if (!trimmedName) {
@@ -5098,18 +5099,20 @@ export async function registerRoutes(
       const trimmedDistrict = district?.trim() || null;
       const trimmedState = state?.trim() || null;
 
-      const existingFarmer = await storage.getFarmerByCompositeKey(
-        merchantId,
-        trimmedName,
-        trimmedContact,
-        trimmedVillage,
-      );
-      if (existingFarmer) {
-        return res.status(409).json({
-          message: "A farmer with these details already exists",
-          existingFarmer,
-          requiresMerge: true,
-        });
+      if (!force) {
+        const existingFarmer = await storage.getFarmerByCompositeKey(
+          merchantId,
+          trimmedName,
+          trimmedContact,
+          trimmedVillage,
+        );
+        if (existingFarmer) {
+          return res.status(409).json({
+            message: "A farmer with these details already exists",
+            existingFarmer,
+            requiresMerge: true,
+          });
+        }
       }
 
       const effectiveDateAdded = dateAdded || getISTDateString();
