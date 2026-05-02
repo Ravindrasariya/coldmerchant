@@ -5071,26 +5071,42 @@ export async function registerRoutes(
   });
 
   // POST /api/farmers - Manually create a new farmer ledger entry (mirrors POST /api/buyers)
+  // Schema: omit server-generated fields (merchantId, farmerCode), make all
+  // other columns optional, then re-require `name` (the only truly mandatory
+  // input). dateAdded is honoured if provided, defaulted to today's IST date
+  // otherwise.
+  const createFarmerSchema = insertFarmerSchema
+    .omit({ merchantId: true, farmerCode: true })
+    .partial()
+    .required({ name: true });
+
   app.post("/api/farmers", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { name, contact, village, tehsil, district, state } = req.body ?? {};
 
-      if (!name || typeof name !== "string" || !name.trim()) {
-        return res.status(400).json({ message: "Farmer name is required" });
+      const validationResult = createFarmerSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validationResult.error.flatten().fieldErrors,
+        });
       }
 
-      const trimmedName = name.trim();
-      const trimmedContact = typeof contact === "string" && contact.trim() ? contact.trim() : null;
-      const trimmedVillage = typeof village === "string" && village.trim() ? village.trim() : null;
-      const trimmedTehsil = typeof tehsil === "string" && tehsil.trim() ? tehsil.trim() : null;
-      const trimmedDistrict = typeof district === "string" && district.trim() ? district.trim() : null;
-      const trimmedState = typeof state === "string" && state.trim() ? state.trim() : null;
+      const { name, contact, village, tehsil, district, state, dateAdded } = validationResult.data;
+
+      const trimmedName = (name ?? "").trim();
+      if (!trimmedName) {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+      const trimmedContact = contact?.trim() || null;
+      const trimmedVillage = village?.trim() || null;
+      const trimmedTehsil = tehsil?.trim() || null;
+      const trimmedDistrict = district?.trim() || null;
+      const trimmedState = state?.trim() || null;
 
       // Composite-key dup check (name + contact + village). If a match is found
       // we surface the existing farmer with requiresMerge=true so the client
-      // can prompt the user to open the existing record instead of creating a
-      // duplicate.
+      // can open the merge dialog instead of silently creating a duplicate.
       const existingFarmer = await storage.getFarmerByCompositeKey(
         merchantId,
         trimmedName,
@@ -5106,8 +5122,8 @@ export async function registerRoutes(
       }
 
       // Generate farmer code: FMYYYYMMDD{seq} — unique per merchant
-      const dateAdded = getISTDateString();
-      const dateStr = parseDateToCodeFormat(dateAdded);
+      const effectiveDateAdded = dateAdded || getISTDateString();
+      const dateStr = parseDateToCodeFormat(effectiveDateAdded);
       const codePrefix = `FM${dateStr}`;
 
       const maxRetries = 3;
@@ -5119,7 +5135,7 @@ export async function registerRoutes(
           farmer = await storage.createFarmer({
             merchantId,
             farmerCode,
-            dateAdded,
+            dateAdded: effectiveDateAdded,
             name: titleCaseKeep(trimmedName),
             contact: trimmedContact,
             village: titleCase(trimmedVillage),
