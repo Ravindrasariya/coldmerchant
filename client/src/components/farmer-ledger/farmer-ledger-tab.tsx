@@ -355,41 +355,24 @@ export function FarmerLedgerTab() {
     });
   };
 
-  // Add-flow merge: force-create the new farmer (bypassing the composite-key
-  // dup check), then call /api/farmers/merge with the new ID as the source so
-  // the existing record (lower ID) survives.
   const mergeFromAddMutation = useMutation({
     mutationFn: async () => {
       if (!mergingFarmer) throw new Error("No existing farmer to merge into");
-      const createRes = await fetch("/api/farmers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          force: true,
-          dateAdded: getTodayIST(),
-          name: addForm.name.trim(),
-          contact: addForm.contact.trim() || null,
-          village: addForm.village.trim() || null,
-          tehsil: addForm.tehsil.trim() || null,
-          district: addForm.district.trim() || null,
-          state: addForm.state.trim() || null,
-        }),
-        credentials: "include",
-      });
-      if (!createRes.ok) {
-        const err = await createRes.json().catch(() => ({}));
-        throw new Error(err?.message || "Failed to create farmer");
-      }
-      const newFarmer = await createRes.json();
-      const mergeRes = await apiRequest("POST", "/api/farmers/merge", {
-        sourceId: newFarmer.id,
+      const res = await apiRequest("POST", "/api/farmers/create-and-merge", {
         targetId: mergingFarmer.id,
+        dateAdded: getTodayIST(),
+        name: addForm.name.trim(),
+        contact: addForm.contact.trim() || null,
+        village: addForm.village.trim() || null,
+        tehsil: addForm.tehsil.trim() || null,
+        district: addForm.district.trim() || null,
+        state: addForm.state.trim() || null,
       });
-      if (!mergeRes.ok) {
-        const err = await mergeRes.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
         throw new Error(err?.message || "Failed to merge farmers");
       }
-      return mergeRes.json();
+      return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });

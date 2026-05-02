@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -5087,7 +5087,6 @@ export async function registerRoutes(
       }
 
       const { dateAdded, name, contact, village, tehsil, district, state } = validationResult.data;
-      const force = (req.body as { force?: unknown })?.force === true;
 
       const trimmedName = name.trim();
       if (!trimmedName) {
@@ -5099,20 +5098,18 @@ export async function registerRoutes(
       const trimmedDistrict = district?.trim() || null;
       const trimmedState = state?.trim() || null;
 
-      if (!force) {
-        const existingFarmer = await storage.getFarmerByCompositeKey(
-          merchantId,
-          trimmedName,
-          trimmedContact,
-          trimmedVillage,
-        );
-        if (existingFarmer) {
-          return res.status(409).json({
-            message: "A farmer with these details already exists",
-            existingFarmer,
-            requiresMerge: true,
-          });
-        }
+      const existingFarmer = await storage.getFarmerByCompositeKey(
+        merchantId,
+        trimmedName,
+        trimmedContact,
+        trimmedVillage,
+      );
+      if (existingFarmer) {
+        return res.status(409).json({
+          message: "A farmer with these details already exists",
+          existingFarmer,
+          requiresMerge: true,
+        });
       }
 
       const effectiveDateAdded = dateAdded || getISTDateString();
@@ -5291,6 +5288,102 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating farmer details:", error);
       res.status(500).json({ message: "Failed to update farmer details" });
+    }
+  });
+
+  // POST /api/farmers/create-and-merge - Atomically (best-effort) create a new
+  // farmer and immediately merge it into the supplied targetId, used by the
+  // Add Farmer "merge into existing" UX so the merge endpoint receives a real
+  // sourceId without exposing a duplicate-bypass on the public POST route.
+  app.post("/api/farmers/create-and-merge", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+
+      const validationResult = insertFarmerSchema
+        .omit({ merchantId: true })
+        .extend({ dateAdded: insertFarmerSchema.shape.dateAdded.optional() })
+        .safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validationResult.error.flatten().fieldErrors,
+        });
+      }
+      const { dateAdded, name, contact, village, tehsil, district, state } = validationResult.data;
+      const targetId = (req.body as { targetId?: unknown })?.targetId;
+      if (typeof targetId !== "number" || !Number.isFinite(targetId)) {
+        return res.status(400).json({ message: "Numeric targetId is required" });
+      }
+
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        return res.status(400).json({ message: "Farmer name is required" });
+      }
+      const trimmedContact = contact?.trim() || null;
+      const trimmedVillage = village?.trim() || null;
+      const trimmedTehsil = tehsil?.trim() || null;
+      const trimmedDistrict = district?.trim() || null;
+      const trimmedState = state?.trim() || null;
+
+      const target = await storage.getFarmerById(targetId, merchantId);
+      if (!target) {
+        return res.status(404).json({ message: "Target farmer not found" });
+      }
+
+      const effectiveDateAdded = dateAdded || getISTDateString();
+      const dateStr = parseDateToCodeFormat(effectiveDateAdded);
+      const codePrefix = `FM${dateStr}`;
+
+      let newFarmer: any;
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const maxSeq = await storage.getMaxFarmerCodeSequence(merchantId, codePrefix);
+        const farmerCode = `${codePrefix}${maxSeq + 1 + attempt}`;
+        try {
+          newFarmer = await storage.createFarmer({
+            merchantId,
+            farmerCode,
+            dateAdded: effectiveDateAdded,
+            name: titleCaseKeep(trimmedName),
+            contact: trimmedContact,
+            village: titleCase(trimmedVillage),
+            tehsil: titleCase(trimmedTehsil),
+            district: titleCase(trimmedDistrict),
+            state: titleCase(trimmedState),
+          });
+          break;
+        } catch (error: any) {
+          if (error?.code === '23505' && error?.constraint?.includes('farmer_code') && attempt < maxRetries - 1) {
+            continue;
+          }
+          throw error;
+        }
+      }
+      if (!newFarmer) {
+        throw new Error("Failed to generate unique farmer code after multiple attempts");
+      }
+
+      try {
+        const result = await storage.mergeFarmers(merchantId, userId, newFarmer.id, targetId);
+        return res.json({
+          survivingFarmer: result.survivingFarmer,
+          mergedCount: result.mergedCount,
+          message: `Farmers merged successfully. ${result.mergedCount} linked records transferred.`,
+        });
+      } catch (mergeError) {
+        // Best-effort cleanup of the just-created farmer so we don't leave a
+        // duplicate behind if the merge step fails.
+        try {
+          await db.delete(farmers).where(and(eq(farmers.id, newFarmer.id), eq(farmers.merchantId, merchantId)));
+        } catch (cleanupError) {
+          console.error("Failed to cleanup new farmer after merge failure:", cleanupError);
+        }
+        throw mergeError;
+      }
+    } catch (error) {
+      console.error("Error in create-and-merge:", error);
+      res.status(500).json({ message: "Failed to create and merge farmer" });
     }
   });
 
