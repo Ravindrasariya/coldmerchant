@@ -17,7 +17,6 @@ import { useLanguage } from "@/hooks/use-language";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
-import { EditableTnxNumber } from "./editable-tnx-number";
 import { SalesReceiptDialog } from "./sales-receipt";
 import { LoadingReceiptDialog } from "./loading-receipt";
 import { TransactionNakalDialog } from "./transaction-nakal";
@@ -782,25 +781,9 @@ function TransactionCard({ transaction, onEdit, onPrint }: TransactionCardProps)
                 <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#52a7ff]/10">
                   <Receipt className="h-3.5 w-3.5 text-[#52a7ff]" />
                 </div>
-                <EditableTnxNumber
-                  transactionId={transaction.id}
-                  transactionNumber={transaction.transactionNumber}
-                  prefix="Tr No: "
-                  testIdSuffix={transaction.id}
-                />
-                {transaction.tnxGroupId && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] h-5 bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-600"
-                    title={t(
-                      "Shared Tnx# across this loading session",
-                      "इस लोडिंग सत्र में साझा किया गया लेन-देन#",
-                    )}
-                    data-testid={`badge-tnx-shared-${transaction.id}`}
-                  >
-                    {t("shared", "साझा")}
-                  </Badge>
-                )}
+                <span className="font-bold text-sm leading-tight whitespace-nowrap">
+                  Tr No: {transaction.transactionNumber}
+                </span>
                 <span className="text-muted-foreground text-xs ml-1">
                   {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
                     day: "numeric",
