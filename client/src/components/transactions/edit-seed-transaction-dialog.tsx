@@ -407,6 +407,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                   ["/api/seed-transactions/next-number"],
                   ["/api/seed-transactions", transaction.id],
                   ["/api/seed-transactions", transaction.id, "edit-history"],
+                  ["/api/dashboard/timeseries"],
                 ]}
                 testIdSuffix="seed-tnx"
               />
@@ -445,6 +446,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                         ["/api/seed-transactions", transaction.id],
                         ["/api/seed-transactions", transaction.id, "edit-history"],
                         ["/api/farmers"],
+                        ["/api/dashboard/timeseries"],
                       ]}
                       testIdSuffix="seed-tnx-farmer"
                       searchPlaceholder={t("Search farmer...", "किसान खोजें...")}

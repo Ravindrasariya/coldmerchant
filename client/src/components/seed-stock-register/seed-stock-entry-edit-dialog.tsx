@@ -364,6 +364,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       ["/api/seed-stock-entries"],
                       ["/api/seed-stock-entries", entry.id],
                       ["/api/suppliers/list"],
+                      ["/api/dashboard/timeseries"],
                     ]}
                     testIdSuffix="seed-supplier"
                     searchPlaceholder={t("Search supplier...", "आपूर्तिकर्ता खोजें...")}
@@ -381,6 +382,7 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                     invalidateKeys={[
                       ["/api/seed-stock-entries"],
                       ["/api/seed-stock-entries", entry.id],
+                      ["/api/dashboard/timeseries"],
                     ]}
                     testIdSuffix="seed-stock"
                     onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}

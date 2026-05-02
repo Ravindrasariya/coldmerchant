@@ -843,6 +843,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 invalidateKeys={[
                   ["/api/transactions"],
                   ["/api/transactions", transaction.id],
+                  ["/api/dashboard/timeseries"],
                 ]}
                 testIdSuffix="harvest-tnx"
               />

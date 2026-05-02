@@ -717,6 +717,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         ["/api/stock-entries"],
                         ["/api/stock-entries", entry.id],
                         ["/api/aadhats"],
+                        ["/api/dashboard/timeseries"],
                       ]}
                       testIdSuffix="aadhtiya"
                       searchPlaceholder={t("Search aadhtiya...", "आढ़तिया खोजें...")}
@@ -734,6 +735,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       invalidateKeys={[
                         ["/api/stock-entries"],
                         ["/api/stock-entries", entry.id],
+                        ["/api/dashboard/timeseries"],
                       ]}
                       testIdSuffix="stock-aadhtiya"
                       onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
@@ -773,6 +775,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         ["/api/stock-entries"],
                         ["/api/stock-entries", entry.id],
                         ["/api/farmers"],
+                        ["/api/dashboard/timeseries"],
                       ]}
                       testIdSuffix="stock-farmer"
                       searchPlaceholder={t("Search farmer...", "किसान खोजें...")}
@@ -794,6 +797,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       invalidateKeys={[
                         ["/api/stock-entries"],
                         ["/api/stock-entries", entry.id],
+                        ["/api/dashboard/timeseries"],
                       ]}
                       testIdSuffix="stock-farmer"
                       onSuccess={(data: any) => setDisplayEntry((prev) => ({ ...prev, ...data }))}
