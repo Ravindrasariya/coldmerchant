@@ -1430,14 +1430,14 @@ export class DatabaseStorage implements IStorage {
     const t = txn[0];
 
     const advance = parseFloat(t.advancePayment || "0");
-    if (advance > 0) {
+    if (advance !== 0) {
       return {
         reason: `An advance payment of ₹${advance.toLocaleString("en-IN")} is recorded on this transaction. Reverse the advance first, then delete.`,
         amount: advance,
       };
     }
     const received = parseFloat(t.amountReceived || "0");
-    if (received > 0) {
+    if (received !== 0) {
       return {
         reason: `A payment of ₹${received.toLocaleString("en-IN")} is recorded against this transaction. Reverse the payment first, then delete.`,
         amount: received,

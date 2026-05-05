@@ -898,14 +898,14 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
   // need to query each row separately.
   const getDeleteBlockReason = (txn: Transaction): string | null => {
     const advance = parseFloat(txn.advancePayment || "0");
-    if (advance > 0) {
+    if (advance !== 0) {
       return t(
         `An advance of ₹${advance.toLocaleString("en-IN")} is recorded. Reverse it first.`,
         `₹${advance.toLocaleString("en-IN")} का अग्रिम दर्ज है। पहले उसे वापस लें।`,
       );
     }
     const received = parseFloat(txn.amountReceived || "0");
-    if (received > 0) {
+    if (received !== 0) {
       return t(
         `A payment of ₹${received.toLocaleString("en-IN")} is recorded. Reverse it first.`,
         `₹${received.toLocaleString("en-IN")} का भुगतान दर्ज है। पहले उसे वापस लें।`,
