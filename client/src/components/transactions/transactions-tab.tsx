@@ -1,5 +1,5 @@
 import { useState, useMemo, Fragment } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,14 +7,26 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, FileDown, ChevronDown, ChevronRight, MapPin, Phone } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Edit, Printer, IndianRupee, Wallet, Receipt, CreditCard, Filter, X, Download, FileDown, ChevronDown, ChevronRight, MapPin, Phone, Trash2 } from "lucide-react";
 import { type Buyer } from "@shared/schema";
 import { CropToggle } from "@/components/crop-toggle";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
@@ -842,9 +854,65 @@ interface PartyCardProps {
 
 function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const [expandedTxnId, setExpandedTxnId] = useState<number | null>(null);
+  const [confirmDeleteTxn, setConfirmDeleteTxn] = useState<Transaction | null>(null);
 
   const fmtMoney = (n: number) => parseFloat(n.toFixed(1)).toLocaleString("en-IN");
+
+  const deleteMutation = useMutation({
+    mutationFn: async (transactionId: number) => {
+      const res = await apiRequest("DELETE", `/api/transactions/${transactionId}`);
+      return res.json() as Promise<{ message: string; transactionNumber: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
+      setConfirmDeleteTxn(null);
+      toast({
+        title: t("Transaction deleted", "लेनदेन हटा दिया गया"),
+        description: t(
+          `Tnx #${data.transactionNumber} has been permanently removed.`,
+          `लेनदेन #${data.transactionNumber} स्थायी रूप से हटा दिया गया है।`,
+        ),
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: t("Could not delete transaction", "लेनदेन नहीं हटा सका"),
+        description: err.message || t("Something went wrong.", "कुछ गलत हो गया।"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Pre-disable delete when money is already recorded directly on the row.
+  // Allocation-based blocks still come from the 409 response so we don't
+  // need to query each row separately.
+  const getDeleteBlockReason = (txn: Transaction): string | null => {
+    const advance = parseFloat(txn.advancePayment || "0");
+    if (advance > 0) {
+      return t(
+        `An advance of ₹${advance.toLocaleString("en-IN")} is recorded. Reverse it first.`,
+        `₹${advance.toLocaleString("en-IN")} का अग्रिम दर्ज है। पहले उसे वापस लें।`,
+      );
+    }
+    const received = parseFloat(txn.amountReceived || "0");
+    if (received > 0) {
+      return t(
+        `A payment of ₹${received.toLocaleString("en-IN")} is recorded. Reverse it first.`,
+        `₹${received.toLocaleString("en-IN")} का भुगतान दर्ज है। पहले उसे वापस लें।`,
+      );
+    }
+    return null;
+  };
 
   const computeRow = (txn: Transaction) => {
     const cost = txn.transactionType === "loading"
@@ -1035,31 +1103,68 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                         </Button>
                       </td>
                     </tr>
-                    {isExpanded && (
-                      <tr className="bg-muted/30">
-                        <td colSpan={13} className="px-4 py-3" data-testid={`region-tnx-items-${txn.id}`}>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-semibold text-muted-foreground mr-1">{t("Items", "आइटम")}:</span>
-                            {txn.items.length === 0 ? (
-                              <span className="text-xs text-muted-foreground">{t("No items", "कोई आइटम नहीं")}</span>
-                            ) : txn.items.map((item) => {
-                              const parts = [item.bagsMoved.toString(), item.potatoType, item.size].filter(Boolean);
-                              const farmerInfo = item.farmerName ? ` ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : "";
-                              return (
-                                <Badge
-                                  key={item.id}
-                                  variant="outline"
-                                  className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
-                                  data-testid={`badge-lot-${txn.id}-${item.id}`}
-                                >
-                                  S#{item.serialNumber} ({parts.join("- ")}){farmerInfo}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
+                    {isExpanded && (() => {
+                      const blockReason = getDeleteBlockReason(txn);
+                      const isBlocked = blockReason !== null;
+                      const deleteButton = (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={isBlocked}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isBlocked) setConfirmDeleteTxn(txn);
+                          }}
+                          className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40 disabled:opacity-50"
+                          data-testid={`button-delete-tnx-${txn.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          <span className="text-xs">{t("Delete transaction", "लेनदेन हटाएं")}</span>
+                        </Button>
+                      );
+                      return (
+                        <tr className="bg-muted/30">
+                          <td colSpan={13} className="px-4 py-3" data-testid={`region-tnx-items-${txn.id}`}>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs font-semibold text-muted-foreground mr-1">{t("Items", "आइटम")}:</span>
+                              {txn.items.length === 0 ? (
+                                <span className="text-xs text-muted-foreground">{t("No items", "कोई आइटम नहीं")}</span>
+                              ) : txn.items.map((item) => {
+                                const parts = [item.bagsMoved.toString(), item.potatoType, item.size].filter(Boolean);
+                                const farmerInfo = item.farmerName ? ` ${item.farmerName}${item.farmerVillage ? ` (${item.farmerVillage})` : ""}` : "";
+                                return (
+                                  <Badge
+                                    key={item.id}
+                                    variant="outline"
+                                    className="text-[10px] sm:text-xs bg-teal-100 text-teal-700 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-600 h-5"
+                                    data-testid={`badge-lot-${txn.id}-${item.id}`}
+                                  >
+                                    S#{item.serialNumber} ({parts.join("- ")}){farmerInfo}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                            <div className="mt-3 flex justify-end">
+                              {isBlocked ? (
+                                <TooltipProvider delayDuration={150}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span tabIndex={0}>{deleteButton}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs text-xs">
+                                      {blockReason}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                deleteButton
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })()}
                   </Fragment>
                 );
               })}
@@ -1067,6 +1172,66 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
           </table>
         </div>
       </CardContent>
+
+      <AlertDialog
+        open={confirmDeleteTxn !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setConfirmDeleteTxn(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-confirm-delete-tnx">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                `Delete transaction #${confirmDeleteTxn?.transactionNumber ?? ""}?`,
+                `लेनदेन #${confirmDeleteTxn?.transactionNumber ?? ""} हटाएं?`,
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p className="font-semibold text-destructive">
+                  {t("This action cannot be undone.", "यह क्रिया पूर्ववत नहीं की जा सकती।")}
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>
+                    {t(
+                      "All numbers tied to this transaction — bags, cost, revenue, due amount, P&L, and edit history — will be permanently lost.",
+                      "इस लेनदेन से जुड़े सभी आंकड़े — बोरी, लागत, राजस्व, बकाया राशि, लाभ/हानि और संपादन इतिहास — स्थायी रूप से हट जाएंगे।",
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      "The bags will be returned to inventory so the source lots become available again.",
+                      "बोरियाँ इन्वेंटरी में वापस जोड़ दी जाएँगी ताकि उनके स्रोत लॉट फिर से उपलब्ध हो जाएँ।",
+                    )}
+                  </li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={deleteMutation.isPending}
+              data-testid="button-cancel-delete-tnx"
+            >
+              {t("Cancel", "रद्द करें")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmDeleteTxn) deleteMutation.mutate(confirmDeleteTxn.id);
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-tnx"
+            >
+              {deleteMutation.isPending
+                ? t("Deleting…", "हटा रहे हैं…")
+                : t("Delete permanently", "स्थायी रूप से हटाएं")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

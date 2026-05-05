@@ -1417,6 +1417,132 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(transactionItems.id, id), eq(transactionItems.merchantId, merchantId)));
   }
 
+  // Returns a human-readable blocker reason if the transaction has any
+  // recorded/allocated payment that prevents deletion. Otherwise returns null.
+  async getTransactionDeleteBlocker(
+    id: number,
+    merchantId: number,
+  ): Promise<{ reason: string; amount: number } | null> {
+    const txn = await db.select().from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)))
+      .limit(1);
+    if (txn.length === 0) return null;
+    const t = txn[0];
+
+    const advance = parseFloat(t.advancePayment || "0");
+    if (advance > 0) {
+      return {
+        reason: `An advance payment of ₹${advance.toLocaleString("en-IN")} is recorded on this transaction. Reverse the advance first, then delete.`,
+        amount: advance,
+      };
+    }
+    const received = parseFloat(t.amountReceived || "0");
+    if (received > 0) {
+      return {
+        reason: `A payment of ₹${received.toLocaleString("en-IN")} is recorded against this transaction. Reverse the payment first, then delete.`,
+        amount: received,
+      };
+    }
+
+    const buyerAllocs = await db.select().from(buyerPaymentAllocations)
+      .where(and(
+        eq(buyerPaymentAllocations.transactionId, id),
+        eq(buyerPaymentAllocations.merchantId, merchantId),
+      ));
+    if (buyerAllocs.length > 0) {
+      const total = buyerAllocs.reduce((s, a) => s + parseFloat(a.appliedAmount || "0"), 0);
+      return {
+        reason: `A buyer payment of ₹${total.toLocaleString("en-IN")} has been allocated to this transaction. Reverse the payment allocation first, then delete.`,
+        amount: total,
+      };
+    }
+
+    const fifoAllocs = await db.select().from(cashEntryAllocations)
+      .where(and(
+        eq(cashEntryAllocations.transactionId, id),
+        eq(cashEntryAllocations.merchantId, merchantId),
+      ));
+    if (fifoAllocs.length > 0) {
+      const total = fifoAllocs.reduce((s, a) => s + parseFloat(a.appliedAmount || "0"), 0);
+      return {
+        reason: `A cash inward of ₹${total.toLocaleString("en-IN")} has been auto-applied (FIFO) to this transaction. Reverse the cash entry first, then delete.`,
+        amount: total,
+      };
+    }
+
+    return null;
+  }
+
+  // Hard-delete a transaction (and via cascade, its items + edit history).
+  // Returns bags from each item back to inventory before deletion.
+  // Caller must have already verified that the transaction exists and belongs
+  // to the merchant, AND that getTransactionDeleteBlocker returned null.
+  // The whole operation runs inside a DB transaction so that if the final
+  // DELETE fails (e.g., an FK we did not block), inventory is rolled back
+  // and stock totals never drift out of sync with reality.
+  async deleteTransaction(id: number, merchantId: number): Promise<void> {
+    const items = await db.select().from(transactionItems)
+      .where(and(
+        eq(transactionItems.transactionId, id),
+        eq(transactionItems.merchantId, merchantId),
+      ));
+
+    await db.transaction(async (tx) => {
+      // Group bag deltas per (lotId, breakdownId) so we apply each lot once.
+      const bdDeltas = new Map<number, number>();
+      const lotDeltas = new Map<number, number>();
+      for (const item of items) {
+        if (item.breakdownId) {
+          bdDeltas.set(item.breakdownId, (bdDeltas.get(item.breakdownId) || 0) + item.bagsMoved);
+        } else {
+          lotDeltas.set(item.lotId, (lotDeltas.get(item.lotId) || 0) + item.bagsMoved);
+        }
+      }
+
+      // Bilty cuts: bump breakdown.remainingBags up to its original capacity.
+      const touchedLots = new Set<number>(lotDeltas.keys());
+      for (const [breakdownId, delta] of Array.from(bdDeltas.entries())) {
+        const [bd] = await tx.select().from(bagBreakdowns)
+          .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+        if (!bd) continue;
+        const current = bd.remainingBags ?? bd.numberOfBags ?? 0;
+        const cap = bd.numberOfBags ?? current;
+        const next = Math.min(cap, Math.max(0, current + delta));
+        await tx.update(bagBreakdowns)
+          .set({ remainingBags: next })
+          .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+        touchedLots.add(bd.lotId);
+      }
+
+      // Gate cuts: bump lot.remainingBags directly (capped at originalBags).
+      for (const [lotId, delta] of Array.from(lotDeltas.entries())) {
+        const [lot] = await tx.select().from(lots)
+          .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+        if (!lot) continue;
+        const next = Math.min(lot.originalBags, Math.max(0, lot.remainingBags + delta));
+        await tx.update(lots)
+          .set({ remainingBags: next })
+          .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+      }
+
+      // Recompute lot totals from breakdowns for any lot whose breakdowns moved.
+      for (const lotId of Array.from(touchedLots)) {
+        if (lotDeltas.has(lotId)) continue; // gate-cut path already handled
+        const allBd = await tx.select().from(bagBreakdowns)
+          .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+        const totalRemaining = allBd
+          .filter(b => b.size !== "Wastage")
+          .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
+        await tx.update(lots)
+          .set({ remainingBags: totalRemaining })
+          .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+      }
+
+      await tx.delete(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)));
+    });
+  }
+
   async addTransactionItem(item: InsertTransactionItem): Promise<TransactionItem> {
     const [created] = await db.insert(transactionItems).values(item).returning();
     return created;

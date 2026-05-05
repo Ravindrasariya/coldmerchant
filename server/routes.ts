@@ -2779,6 +2779,39 @@ export async function registerRoutes(
     }
   });
 
+  // DELETE /api/transactions/:id - Hard-delete a harvest transaction (Task #144)
+  // Blocked when any payment is recorded (advance, amountReceived, buyer
+  // payment allocation, or FIFO cash inward allocation). Returns bags to
+  // inventory before deletion. Items + edit history cascade automatically.
+  app.delete("/api/transactions/:id", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const transactionId = parseInt(req.params.id);
+      if (Number.isNaN(transactionId)) {
+        return res.status(400).json({ message: "Invalid transaction id" });
+      }
+
+      const existingTxn = await storage.getTransactionById(transactionId, merchantId);
+      if (!existingTxn) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+
+      const blocker = await storage.getTransactionDeleteBlocker(transactionId, merchantId);
+      if (blocker) {
+        return res.status(409).json({ message: blocker.reason });
+      }
+
+      await storage.deleteTransaction(transactionId, merchantId);
+      res.json({
+        message: "Transaction deleted",
+        transactionNumber: existingTxn.transactionNumber,
+      });
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      res.status(500).json({ message: "Failed to delete transaction" });
+    }
+  });
+
   // PUT /api/transactions/:id/items - Update transaction items (add/remove/update bags)
   app.put("/api/transactions/:id/items", requireMerchant, async (req, res) => {
     try {
