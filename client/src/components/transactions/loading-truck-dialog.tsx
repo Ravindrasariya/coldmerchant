@@ -1056,7 +1056,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     type="number"
                     step="any"
                     value={debit || ""}
-                    onChange={(e) => setDebit(Number(e.target.value) || 0)}
+                    min="0"
+                    onChange={(e) => setDebit(Math.max(0, Number(e.target.value) || 0))}
                     placeholder="0"
                     data-testid="input-loading-debit"
                   />

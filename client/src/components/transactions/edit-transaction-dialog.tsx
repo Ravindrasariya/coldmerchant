@@ -1506,7 +1506,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           <FormItem>
                             <FormLabel>{t("Debit", "डेबिट")} (₹)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="any" placeholder="0" {...field} value={field.value ?? ""} data-testid="input-edit-debit" />
+                              <Input type="number" step="any" min="0" placeholder="0" {...field} value={field.value ?? ""} onChange={(e) => { const v = Number(e.target.value); field.onChange(e.target.value === "" ? "" : Math.max(0, v)); }} data-testid="input-edit-debit" />
                             </FormControl>
                             <p className="text-xs text-muted-foreground">{t("Buyer deduction; reduces revenue & P&L", "खरीदार कटौती; राजस्व व लाभ/हानि घटाता है")}</p>
                             <FormMessage />

@@ -275,11 +275,15 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
     let chargesRowsHtml: string;
+    const isDeduction = (label: string) => label === "Advance Amount" || label === "Debit";
     if (nonZeroCharges.length > 0) {
       chargesRowsHtml = nonZeroCharges
         .map(([name, v], i) => {
           const labelCell = i === 0 ? `<td colspan="3" rowspan="${nonZeroCharges.length}" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td>` : "";
-          return `<tr>${labelCell}<td colspan="2" style="border:1px solid #000">${name}</td><td style="text-align:right;border:1px solid #000">${fmtInr(v)}</td></tr>`;
+          const dedu = isDeduction(name);
+          const valStyle = dedu ? "text-align:right;border:1px solid #000;color:#dc2626" : "text-align:right;border:1px solid #000";
+          const valText = dedu ? `-${fmtInr(v)}` : fmtInr(v);
+          return `<tr>${labelCell}<td colspan="2" style="border:1px solid #000">${name}</td><td style="${valStyle}">${valText}</td></tr>`;
         })
         .join("");
     } else {

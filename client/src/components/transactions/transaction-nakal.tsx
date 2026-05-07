@@ -27,6 +27,7 @@ interface TxnData {
   partyName: string | null;
   vehicleNumber: string | null;
   revenue: string | null;
+  debit: string | null;
   crop?: string | null;
   items: TxnItem[];
 }
@@ -139,6 +140,15 @@ function buildPrintHtml(
           </tr>`;
       }
     });
+
+    const dbt = isLoading ? parseFloat(txn.debit || "0") : 0;
+    if (dbt > 0) {
+      bodyRows += `
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ccc;font-size:13px;color:#dc2626;">Less: Debit / डेबिट</td>
+          <td style="padding:5px 8px;border:1px solid #ccc;text-align:right;font-size:13px;color:#dc2626;white-space:nowrap;">-&#8377;${escHtml(fmt(dbt))}</td>
+        </tr>`;
+    }
 
     bodyRows += `
       <tr style="background:#f9f9f9;">
@@ -309,6 +319,7 @@ export function TransactionNakalDialog({
                 <tbody>
                   {txnBlocks.map(({ txn, isLoading, particulars, txnAmount, txnBags, txnWeight }) => {
                     const rowspan = Math.max(txn.items.length, 1);
+                    const dbt = isLoading ? parseFloat(txn.debit || "0") : 0;
                     return (
                       <Fragment key={txn.id}>
                         {txn.items.length === 0 && (
@@ -347,6 +358,17 @@ export function TransactionNakalDialog({
                             </tr>
                           );
                         })}
+
+                        {dbt > 0 && (
+                          <tr key={`${txn.id}-debit`}>
+                            <td className="border border-gray-300 px-2 py-1 text-sm text-red-600">
+                              Less: Debit / डेबिट
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-right text-sm text-red-600 whitespace-nowrap">
+                              -₹{fmt(dbt)}
+                            </td>
+                          </tr>
+                        )}
 
                         <tr key={`${txn.id}-summary`} className="bg-gray-50">
                           <td className="border border-gray-300 px-2 py-1 text-sm font-semibold">
