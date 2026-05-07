@@ -1449,7 +1449,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <Label className="text-sm font-medium">{t("Sales Comm. %", "बिक्री कमीशन %")}</Label>
                         <div className="relative mt-1.5">
