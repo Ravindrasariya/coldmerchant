@@ -51,6 +51,7 @@ interface LoadingTransaction {
   thelaBhada: string | null;
   palaKarai: string | null;
   bardan: string | null;
+  debit: string | null;
   crop: string | null;
   createdAt: string;
   items: TransactionItem[];
@@ -221,6 +222,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
         parseFloat(transaction.bardan || "0"),
         parseFloat(transaction.advancePayment || "0"),
         parseFloat(transaction.otherCharges || "0"),
+        parseFloat(transaction.debit || "0"),
       ].filter(v => v > 0).length;
       const _chargeRows = Math.max(_nonZeroCount, 1) + 1;
       const _fixedPx = 340 + _chargeRows * 26;
@@ -252,7 +254,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const pk = parseFloat(transaction.palaKarai || "0");
     const bd = parseFloat(transaction.bardan || "0");
     const addlCharges = tl + mj + tb + pk + bd;
-    const gt = totalAmount + mandiComm + aadhatComm + hamm + extra + salesComm + addlCharges + drvAdv - advAmt;
+    const dbt = parseFloat(transaction.debit || "0");
+    const gt = totalAmount + mandiComm + aadhatComm + hamm + extra + salesComm + addlCharges + drvAdv - advAmt - dbt;
 
     const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
 
@@ -268,6 +271,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Bardan", bd],
       ["Driver Advance", drvAdv],
       ["Advance Amount", advAmt],
+      ["Debit", dbt],
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
     let chargesRowsHtml: string;
@@ -311,6 +315,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       "{{bardan}}": fmtInr(bd),
       "{{driverAdvance}}": fmtInr(drvAdv),
       "{{advanceAmount}}": fmtInr(advAmt),
+      "{{debit}}": fmtInr(dbt),
       "{{grandTotal}}": fmtInr(gt),
       "{{grandTotalRaw}}": gt.toFixed(1),
       "{{amountInWords}}": numberToIndianWords(gt),
@@ -336,7 +341,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   const palaKarai = parseFloat(transaction?.palaKarai || "0");
   const bardan = parseFloat(transaction?.bardan || "0");
   const totalAdditionalCharges = tulai + majduri + thelaBhada + palaKarai + bardan;
-  const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges + driverAdvance - advanceAmount;
+  const debit = parseFloat(transaction?.debit || "0");
+  const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -518,6 +524,13 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", color: "#dc2626" }}>
                   <span>Less: Advance Amount / अग्रिम राशि</span>
                   <span>-₹{parseFloat(advanceAmount.toFixed(1)).toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              {debit > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", color: "#dc2626" }}>
+                  <span>Less: Debit / डेबिट</span>
+                  <span>-₹{parseFloat(debit.toFixed(1)).toLocaleString('en-IN')}</span>
                 </div>
               )}
 

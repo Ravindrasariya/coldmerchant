@@ -104,6 +104,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   });
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
+  const [debit, setDebit] = useState(0);
 
   const ADDITIONAL_CHARGE_OPTIONS = [
     { key: "tulai", label: "Tulai", labelHi: "तुलाई" },
@@ -286,8 +287,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalCostOfGoods += breakdownPricePerKg * (Number(item.netWeight) || 0);
     });
 
-    const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount;
-    const totalPL = (totalAmount - totalCostOfGoods) + computedSalesComm;
+    const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
+    const totalPL = (totalAmount - totalCostOfGoods) + computedSalesComm - debit;
 
     return {
       totalBags,
@@ -297,7 +298,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       grandTotal,
       totalPL,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount]);
+  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -357,6 +358,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         thelaBhada: additionalCharges.thelaBhada,
         palaKarai: additionalCharges.palaKarai,
         bardan: additionalCharges.bardan,
+        debit,
         // Lock the previewed Tnx# for this loading row.
         transactionNumber: upcomingTnxNumber,
         tnxGroupId,
@@ -410,6 +412,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setAadhatCommissionPct(0);
     setHammaliPerBagRate(0);
     setEditExtraCharges(0);
+    setDebit(0);
   };
 
   const handleSubmit = () => {
@@ -1045,6 +1048,17 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     onChange={(e) => setAdvanceAmount(Number(e.target.value) || 0)}
                     placeholder="0"
                     data-testid="input-loading-advance-amount"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">{t("Debit", "डेबिट")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={debit || ""}
+                    onChange={(e) => setDebit(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    data-testid="input-loading-debit"
                   />
                 </div>
               </div>

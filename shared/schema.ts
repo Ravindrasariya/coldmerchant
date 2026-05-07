@@ -198,6 +198,7 @@ export const transactions = pgTable("transactions", {
   thelaBhada: decimal("thela_bhada", { precision: 12, scale: 2 }),
   palaKarai: decimal("pala_karai", { precision: 12, scale: 2 }),
   bardan: decimal("bardan", { precision: 12, scale: 2 }),
+  debit: decimal("debit", { precision: 12, scale: 2 }), // unexpected buyer deduction (loading only); reduces revenue, grand total & P&L
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Lookup index for "find all rows in this loading session" queries used by

@@ -155,6 +155,7 @@ interface TransactionWithHistory {
   thelaBhada: string | null;
   palaKarai: string | null;
   bardan: string | null;
+  debit: string | null;
   tnxGroupId: string | null;
   createdAt: string;
   dateOfLoading: string | null;
@@ -182,6 +183,7 @@ const editTransactionSchema = z.object({
   thelaBhada: z.coerce.number().optional(),
   palaKarai: z.coerce.number().optional(),
   bardan: z.coerce.number().optional(),
+  debit: z.coerce.number().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -315,6 +317,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       thelaBhada: undefined,
       palaKarai: undefined,
       bardan: undefined,
+      debit: undefined,
     },
   });
 
@@ -337,6 +340,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         totalMandiExtraCharges: transaction.totalMandiExtraCharges ? parseFloat(transaction.totalMandiExtraCharges) : undefined,
         tulai: transaction.tulai ? parseFloat(transaction.tulai) : undefined,
         majduri: transaction.majduri ? parseFloat(transaction.majduri) : undefined,
+        debit: transaction.debit ? parseFloat(transaction.debit) : undefined,
         thelaBhada: transaction.thelaBhada ? parseFloat(transaction.thelaBhada) : undefined,
         palaKarai: transaction.palaKarai ? parseFloat(transaction.palaKarai) : undefined,
         bardan: transaction.bardan ? parseFloat(transaction.bardan) : undefined,
@@ -787,11 +791,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   const hasItemChanges = editableItems.some(item => item.action !== 'keep');
 
-  const onSubmit = (data: EditTransactionFormData) => {
-    updateMutation.mutate({ ...data, buyerId: selectedBuyerId });
-    // Also update items (bags, weights, revenue) if there are any changes
-    if (hasItemChanges) {
-      updateItemsMutation.mutate();
+  const onSubmit = async (data: EditTransactionFormData) => {
+    try {
+      await updateMutation.mutateAsync({ ...data, buyerId: selectedBuyerId });
+      // Sequence: items recompute reads stored debit/charges, so PATCH must finish first
+      if (hasItemChanges) {
+        await updateItemsMutation.mutateAsync();
+      }
+    } catch {
+      // Errors surfaced via individual mutation onError toasts
     }
   };
 
@@ -810,6 +818,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       totalAadhatCommission: t("Aadhat Commission", "आढ़त कमीशन"),
       totalHammali: t("Hammali", "हम्माली"),
       totalMandiExtraCharges: t("Extra Charges", "अतिरिक्त शुल्क"),
+      debit: t("Debit", "डेबिट"),
     };
     return labels[field] || field;
   };
@@ -1471,7 +1480,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             const sc = Number(form.watch("salesCommission")) || 0;
                             const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
                             const drvAdv = Number(form.watch("advancePayment")) || 0;
-                            return parseFloat((lotAmounts + mandiTotal + sc + addlCharges + drvAdv).toFixed(1)).toLocaleString('en-IN');
+                            const dbt = Number(form.watch("debit")) || 0;
+                            return parseFloat((lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt).toFixed(1)).toLocaleString('en-IN');
                           })()}
                         </div>
                       </div>
@@ -1485,6 +1495,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                               <Input type="number" step="any" placeholder="0" {...field} readOnly className="bg-muted cursor-not-allowed" data-testid="input-amount-received" />
                             </FormControl>
                             <p className="text-xs text-muted-foreground">{t("Managed via Cash tab", "कैश टैब से प्रबंधित")}</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="debit"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("Debit", "डेबिट")} (₹)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="any" placeholder="0" {...field} value={field.value ?? ""} data-testid="input-edit-debit" />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground">{t("Buyer deduction; reduces revenue & P&L", "खरीदार कटौती; राजस्व व लाभ/हानि घटाता है")}</p>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -1561,7 +1585,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         return sum + (i.loadingAmount - i.costOfGoods);
                       }, 0);
                       const sc = Number(form.watch("salesCommission")) || 0;
-                      const totalPL = totalItemPL + sc;
+                      const dbt = Number(form.watch("debit")) || 0;
+                      const totalPL = totalItemPL + sc - dbt;
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
                           <CardContent className="py-3 px-4 flex items-center justify-between">

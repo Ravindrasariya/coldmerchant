@@ -76,6 +76,7 @@ interface Transaction {
   thelaBhada: string | null;
   palaKarai: string | null;
   bardan: string | null;
+  debit: string | null;
   revenue: string | null;
   tnxGroupId: string | null;
   totalBags: number;
@@ -339,6 +340,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       t("Thela Bhada", "ठेला भाड़ा"),
       t("Pala Karai", "पाला कराई"),
       t("Bardan", "बरदान"),
+      t("Debit", "डेबिट"),
       t("Amount Received", "प्राप्त राशि"),
       t("Due Amount", "बकाया राशि"),
       t("Profit/Loss", "लाभ/हानि"),
@@ -364,6 +366,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       const thelaBhada = parseFloat(txn.thelaBhada || "0");
       const palaKarai = parseFloat(txn.palaKarai || "0");
       const bardan = parseFloat(txn.bardan || "0");
+      const debit = parseFloat(txn.debit || "0");
 
       const totalCost = txn.transactionType === "loading"
         ? parseFloat(txn.totalCostOfGoods || "0") + mandiComm + aadhatComm + hammali + extraCharges + tulai + majduri + thelaBhada + palaKarai + bardan + parseFloat(txn.advancePayment || "0")
@@ -391,6 +394,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         fmt(thelaBhada),
         fmt(palaKarai),
         fmt(bardan),
+        fmt(debit),
         parseFloat(amountReceived.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN'),
         txn.profitLoss || "-",
