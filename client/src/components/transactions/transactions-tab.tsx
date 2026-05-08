@@ -943,33 +943,33 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
     <Card className="border border-orange-300 dark:border-orange-700 overflow-hidden" data-testid={`card-party-${group.partyKey}`}>
       <CardContent className="p-0">
         {/* Party Header */}
-        <div className="bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800">
+        <div className="bg-blue-700 dark:bg-blue-800 border-b border-blue-600 dark:border-blue-700">
           {/* Row 1: Name + Address + Contact + Badge — all on one line */}
           <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap px-4 py-2.5">
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap md:flex-nowrap min-w-0 flex-1">
-              <span className="font-bold text-base leading-tight whitespace-nowrap" data-testid={`text-party-name-${group.partyKey}`}>
+              <span className="font-bold text-base leading-tight whitespace-nowrap text-white" data-testid={`text-party-name-${group.partyKey}`}>
                 {group.partyName}
               </span>
               {group.partyAddress && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0" data-testid={`text-party-address-${group.partyKey}`}>
+                <span className="flex items-center gap-1 text-xs text-blue-100 min-w-0" data-testid={`text-party-address-${group.partyKey}`}>
                   <MapPin className="h-3 w-3 flex-shrink-0" />
                   <span className="truncate">{group.partyAddress}</span>
                 </span>
               )}
               {group.partyContact && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap" data-testid={`text-party-contact-${group.partyKey}`}>
+                <span className="flex items-center gap-1 text-xs text-blue-100 whitespace-nowrap" data-testid={`text-party-contact-${group.partyKey}`}>
                   <Phone className="h-3 w-3 flex-shrink-0" />
                   {group.partyContact}
                 </span>
               )}
             </div>
-            <Badge variant="outline" className="text-[10px] bg-white/60 dark:bg-black/20 flex-shrink-0">
+            <Badge variant="outline" className="text-[10px] text-white border-white/40 bg-white/20 flex-shrink-0">
               {t("Transactions", "लेनदेन")}: {group.txns.length}
             </Badge>
           </div>
 
           {/* Divider between buyer info and aggregate row */}
-          <div className="border-t border-orange-200 dark:border-orange-800" />
+          <div className="border-t border-blue-600 dark:border-blue-700" />
 
           {/* Row 2: Aggregate metrics — inline label: value pairs in equal-width columns */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
