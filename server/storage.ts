@@ -2031,7 +2031,9 @@ export class DatabaseStorage implements IStorage {
       if (reversedEntryIds.has(alloc.cashEntryId)) continue;
       if (alloc.lotId && alloc.coldStoreId) {
         const key = `${alloc.lotId}-${alloc.coldStoreId}`;
-        farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0"));
+        // Include pettyAdjustment so per-charge cold-store dues match the
+        // payment dialog's view (routes.ts cold-store-pending-charges).
+        farmGatePaidMap.set(key, (farmGatePaidMap.get(key) || 0) + parseFloat(alloc.appliedAmount || "0") + parseFloat(alloc.pettyAdjustment || "0"));
       }
     }
     
