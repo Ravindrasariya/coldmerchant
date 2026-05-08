@@ -1245,7 +1245,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 )}
 
                 {/* Dynamic Charges Section — for mandi, restricted to the 3 bypass-aadhtiya types */}
-                {(
                 <CardContent className="pt-0 border-t">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -1444,7 +1443,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     )}
                   </div>
                 </CardContent>
-                )}
                 
                 {/* Summary Row */}
                 <CardContent className="pt-0 border-t">
