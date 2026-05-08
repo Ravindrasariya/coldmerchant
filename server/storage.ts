@@ -1505,17 +1505,24 @@ export class DatabaseStorage implements IStorage {
       const lot = await db.select().from(lots).where(and(eq(lots.id, item.lotId), eq(lots.merchantId, merchantId))).limit(1);
       let lotSourceWeight = 0;
       let lotSourceBags = 0;
+      let costPerBag = 0;
       if (lot.length > 0) {
         if (item.breakdownId) {
           const [bd] = await db.select().from(bagBreakdowns).where(and(eq(bagBreakdowns.id, item.breakdownId), eq(bagBreakdowns.merchantId, merchantId))).limit(1);
           if (bd) {
             lotSourceWeight = bd.weight ? parseFloat(bd.weight) : (lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0);
             lotSourceBags = bd.numberOfBags || 0;
+            costPerBag = bd.costPerBag ? parseFloat(bd.costPerBag) : 0;
           }
         }
         if (lotSourceBags === 0) {
           lotSourceWeight = lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0;
           lotSourceBags = lot[0].originalBags || 0;
+        }
+        if (costPerBag === 0) {
+          const lotTotalCogs = lot[0].totalCogs ? parseFloat(lot[0].totalCogs) : 0;
+          const lotBags = lot[0].originalBags || 0;
+          if (lotTotalCogs > 0 && lotBags > 0) costPerBag = lotTotalCogs / lotBags;
         }
       }
       return {
@@ -1523,6 +1530,7 @@ export class DatabaseStorage implements IStorage {
         place: lot.length > 0 ? lot[0].place : undefined,
         lotSourceWeight,
         lotSourceBags,
+        costPerBag,
         mandiCommissionPercent: lot.length > 0 ? (lot[0].mandiCommissionPercent || null) : null,
         aadhatCommissionPercent: lot.length > 0 ? (lot[0].aadhatCommissionPercent || null) : null,
         hammaliPerBag: lot.length > 0 ? (lot[0].hammaliPerBag || null) : null,

@@ -48,6 +48,7 @@ interface TransactionItem {
   hammaliPerBag: string | null;
   mandiExtraCharges: string | null;
   lotOriginalBags: number;
+  costPerBag: number;
 }
 
 interface UnsoldInventoryItem {
@@ -104,6 +105,7 @@ interface EditableItem {
   hammaliPerBag: string | null;
   mandiExtraCharges: string | null;
   lotOriginalBags: number;
+  costPerBag: number;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
 
@@ -406,6 +408,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         hammaliPerBag: item.hammaliPerBag || null,
         mandiExtraCharges: item.mandiExtraCharges || null,
         lotOriginalBags: item.lotOriginalBags || 0,
+        costPerBag: Number(item.costPerBag) || 0,
         action: 'keep' as const
       })));
     }
@@ -760,6 +763,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       hammaliPerBag: inv.hammaliPerBag || null,
       mandiExtraCharges: inv.mandiExtraCharges || null,
       lotOriginalBags: inv.lotOriginalBags || 0,
+      costPerBag: costPerBag,
       action: 'add' as const
     }]);
     
@@ -777,6 +781,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         hammaliPerBag: inv.hammaliPerBag || null,
         mandiExtraCharges: inv.mandiExtraCharges || null,
         lotOriginalBags: inv.lotOriginalBags || 0,
+        costPerBag: costPerBag,
         action: 'add',
       };
       adjustMandiCharges(computeItemMandiCharges(newItem), 1, newItem.loadingAmount, newItem.bagsMoved);
@@ -1139,7 +1144,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
               {editableItems.map((item, index) => {
                 if (item.action === 'remove') return null;
-                const itemCost = item.costOfGoods;
+                // Loading P&L mirrors the Create-Loading dialog: use the stock
+                // register's per-bag cost (which already includes Extra Charges
+                // to Buyer and farm-gate cold/warehouse share) when available,
+                // and fall back to the legacy stored COGS otherwise.
+                const itemCost = (isLoadingType && item.costPerBag > 0 && item.bagsMoved > 0)
+                  ? item.costPerBag * item.bagsMoved
+                  : item.costOfGoods;
                 const itemPL = isLoadingType 
                   ? item.loadingAmount - itemCost
                   : item.revenue - itemCost;
@@ -1326,7 +1337,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 const totalWeight = activeItems.reduce((sum, i) => sum + (i.netWeight || 0), 0);
                 const totalRevOrAmt = activeItems.reduce((sum, i) => sum + (isLoadingType ? i.loadingAmount : (i.revenue || 0)), 0);
                 const totalPL = activeItems.reduce((sum, i) => {
-                  return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - i.costOfGoods);
+                  const cogs = (isLoadingType && i.costPerBag > 0 && i.bagsMoved > 0)
+                    ? i.costPerBag * i.bagsMoved
+                    : i.costOfGoods;
+                  return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - cogs);
                 }, 0);
                 return (
                   <>
@@ -1582,7 +1596,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
                       const totalItemPL = activeItems.reduce((sum, i) => {
-                        return sum + (i.loadingAmount - i.costOfGoods);
+                        const cogs = (i.costPerBag > 0 && i.bagsMoved > 0)
+                          ? i.costPerBag * i.bagsMoved
+                          : i.costOfGoods;
+                        return sum + (i.loadingAmount - cogs);
                       }, 0);
                       const sc = Number(form.watch("salesCommission")) || 0;
                       const dbt = Number(form.watch("debit")) || 0;
