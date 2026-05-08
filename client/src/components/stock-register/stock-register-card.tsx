@@ -531,11 +531,10 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
     filteredEntries.forEach(entry => {
       let entryNetPayable = 0;
-      let entryTotalAmount = 0;
+      let entryPayable = 0;
       let entryColdStoreTotalCharges = 0;
       let entryColdStorePaid = 0;
-      let entryFarmGateColdCharges = 0;
-      let entryTotalDeductions = 0;
+      let entryDeductions = 0;
       const isMandi = (entry.place || entry.lots[0]?.place) === "mandi";
       let entryMandiNetPayable = 0;
 
@@ -548,16 +547,31 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const storedNetPayable = lot.netPayable ? parseFloat(lot.netPayable) : 0;
         const storedTotalCharges = lot.totalCharges ? parseFloat(lot.totalCharges) : 0;
         entryNetPayable += storedNetPayable;
-        entryTotalDeductions += storedTotalCharges;
 
-        if (metrics.totalAmount !== null) {
-          entryTotalAmount += metrics.totalAmount;
+        const cog = metrics.totalAmount ?? 0;
+
+        // Per-place Payable / Deductions for the Total Cost summary card.
+        // Buyer Extra is added to Payable for ALL place types (and never to Deductions).
+        if (lot.place === "mandi") {
+          // Mandi: COG + mandi charges (mandi commission + aadhat + hammali + Mandi Extra)
+          // are real outflows to the aadhtiya — flow into Payable, not Deductions.
+          // Use storedNetPayable when present (= COG + mandi charges); fall back to COG.
+          const mandiPayable = storedNetPayable > 0 ? storedNetPayable : cog;
+          entryPayable += mandiPayable + metrics.coldStoreTotalCharges + metrics.extraBuyerCharges;
+        } else if (lot.place === "farm_gate") {
+          // Farm Gate: cold/WH are merchant-paid storage costs added on top of COG.
+          // Deductions (lot.totalCharges) already excludes cold/WH and Buyer Extra.
+          entryPayable += cog + metrics.coldStoreTotalCharges + metrics.extraBuyerCharges;
+          entryDeductions += storedTotalCharges;
+        } else {
+          // Cold Store: cold/WH are farmer deductions and stay in Deductions only —
+          // do not add cold/WH to Payable (would double count with Deductions).
+          entryPayable += cog + metrics.extraBuyerCharges;
+          entryDeductions += storedTotalCharges;
         }
+
         entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
         entryColdStorePaid += metrics.coldStorePaid;
-        if (lot.place === "farm_gate") {
-          entryFarmGateColdCharges += metrics.coldStoreTotalCharges;
-        }
         if (lot.place === "mandi") {
           entryMandiNetPayable += storedNetPayable;
         }
@@ -569,8 +583,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         farmerDue += Math.max(entryNetPayable - amountPaid, 0);
       }
 
-      totalPayable += entryTotalAmount + entryFarmGateColdCharges;
-      totalDeductions += entryTotalDeductions;
+      totalPayable += entryPayable;
+      totalDeductions += entryDeductions;
       coldStoreTotal += entryColdStoreTotalCharges;
       coldStoreDue += Math.max(entryColdStoreTotalCharges - entryColdStorePaid, 0);
 
