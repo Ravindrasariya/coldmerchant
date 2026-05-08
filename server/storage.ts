@@ -82,6 +82,16 @@ export class DuplicateSerialNumberError extends Error {
   }
 }
 
+// Thrown by storage.deleteStockEntry's in-transaction recheck when a
+// payment/sale is created between the route precheck and the cascade
+// delete. Route catches this and returns 409.
+export class StockEntryDeletionBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'StockEntryDeletionBlockedError';
+  }
+}
+
 function isStockSerialYearUniqueViolation(error: any): boolean {
   return (
     error?.code === '23505' &&
@@ -741,17 +751,20 @@ export class DatabaseStorage implements IStorage {
         ));
       saleCount = Number(salesC) || 0;
 
-      // Count ALL cold-store allocations referencing these lots regardless
-      // of cash-entry reversal: reversing a cash entry adjusts balances but
-      // does NOT delete its allocation rows, and the FK from
-      // cold_store_charge_allocations.lot_id → lots.id has no ON DELETE
-      // rule, so any leftover row would FK-fail the cascade delete.
+      // Only NON-reversed cash-entry links block delete. Reversed
+      // allocations are leftover bookkeeping rows that
+      // deleteStockEntry() removes inside its transaction, since the
+      // schema FKs (cold_store_charge_allocations.lot_id,
+      // aadhat_payment_allocations.stock_entry_id) have no ON DELETE
+      // rule and would otherwise FK-fail the cascade.
       const [{ count: csC } = { count: 0 }] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(coldStoreChargeAllocations)
+        .innerJoin(cashEntries, eq(coldStoreChargeAllocations.cashEntryId, cashEntries.id))
         .where(and(
           eq(coldStoreChargeAllocations.merchantId, merchantId),
           inArray(coldStoreChargeAllocations.lotId, lotIds),
+          eq(cashEntries.isReversed, false),
         ));
       coldStorePaymentCount = Number(csC) || 0;
     }
@@ -759,32 +772,96 @@ export class DatabaseStorage implements IStorage {
     // cash_entries has no direct stock_entry_id column.
     const cashPaymentCount = 0;
 
-    // Same reasoning as cold-store allocations above: count every
-    // allocation row referencing this stock entry, since reversal does
-    // not remove them and the FK has no ON DELETE rule.
     const [{ count: aadhatC } = { count: 0 }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(aadhatPaymentAllocations)
+      .innerJoin(cashEntries, eq(aadhatPaymentAllocations.cashEntryId, cashEntries.id))
       .where(and(
         eq(aadhatPaymentAllocations.merchantId, merchantId),
         eq(aadhatPaymentAllocations.stockEntryId, id),
+        eq(cashEntries.isReversed, false),
       ));
     const aadhatPaymentCount = Number(aadhatC) || 0;
 
     return { saleCount, cashPaymentCount, aadhatPaymentCount, coldStorePaymentCount };
   }
 
-  // Hard-delete a stock entry. Lots, bag breakdowns and stock-entry edit
-  // history are removed by the schema's ON DELETE CASCADE rules. Callers
+  // Hard-delete a stock entry inside a single DB transaction. Callers
   // (DELETE /api/stock-entries/:id) MUST run getStockEntryDeletionBlockers
-  // first — there are nullable FKs (cash_entries.stock_entry_id,
-  // transaction_items.lot_id, aadhat/cold-store allocations) that would
-  // either FK-fail or silently orphan downstream rows otherwise.
+  // first — that returns counts of NON-reversed cash links that should
+  // block the delete. This method then cleans up the remaining REVERSED
+  // allocation rows (which the reversal flow leaves behind and which
+  // have no ON DELETE FK rule) before issuing the cascade delete on
+  // stock_entries — which removes lots, bag_breakdowns, and
+  // stock_entry_edit_history via schema ON DELETE CASCADE.
   // Note: the freed Sr# is NOT auto-reused — getNextSerialNumberForYear
   // continues to return max+1, so gaps stay until the user manually picks them.
   async deleteStockEntry(id: number, merchantId: number): Promise<void> {
-    await db.delete(stockEntries)
-      .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
+    await db.transaction(async (tx) => {
+      const lotRows = await tx.select({ id: lots.id })
+        .from(lots)
+        .where(and(eq(lots.stockEntryId, id), eq(lots.merchantId, merchantId)));
+      const lotIds = lotRows.map(r => r.id);
+
+      // Re-check inside the transaction so a payment created after the
+      // route-level precheck still aborts cleanly with a 409 instead of
+      // raising a 500.
+      if (lotIds.length > 0) {
+        const blockingItem = await tx.select({ id: transactionItems.id })
+          .from(transactionItems)
+          .where(and(
+            eq(transactionItems.merchantId, merchantId),
+            inArray(transactionItems.lotId, lotIds),
+          ))
+          .limit(1);
+        if (blockingItem.length > 0) {
+          throw new StockEntryDeletionBlockedError("This entry is now linked to a sale. Reverse it first, then delete.");
+        }
+
+        const blockingCS = await tx.select({ id: coldStoreChargeAllocations.id })
+          .from(coldStoreChargeAllocations)
+          .innerJoin(cashEntries, eq(coldStoreChargeAllocations.cashEntryId, cashEntries.id))
+          .where(and(
+            eq(coldStoreChargeAllocations.merchantId, merchantId),
+            inArray(coldStoreChargeAllocations.lotId, lotIds),
+            eq(cashEntries.isReversed, false),
+          ))
+          .limit(1);
+        if (blockingCS.length > 0) {
+          throw new StockEntryDeletionBlockedError("This entry now has an active cold-store payment. Reverse it first, then delete.");
+        }
+
+        // Clean up reversed cold-store allocations referencing these lots.
+        await tx.delete(coldStoreChargeAllocations)
+          .where(and(
+            eq(coldStoreChargeAllocations.merchantId, merchantId),
+            inArray(coldStoreChargeAllocations.lotId, lotIds),
+          ));
+      }
+
+      const blockingAadhat = await tx.select({ id: aadhatPaymentAllocations.id })
+        .from(aadhatPaymentAllocations)
+        .innerJoin(cashEntries, eq(aadhatPaymentAllocations.cashEntryId, cashEntries.id))
+        .where(and(
+          eq(aadhatPaymentAllocations.merchantId, merchantId),
+          eq(aadhatPaymentAllocations.stockEntryId, id),
+          eq(cashEntries.isReversed, false),
+        ))
+        .limit(1);
+      if (blockingAadhat.length > 0) {
+        throw new StockEntryDeletionBlockedError("This entry now has an active aadhat payment. Reverse it first, then delete.");
+      }
+
+      // Clean up reversed aadhat allocations referencing this stock entry.
+      await tx.delete(aadhatPaymentAllocations)
+        .where(and(
+          eq(aadhatPaymentAllocations.merchantId, merchantId),
+          eq(aadhatPaymentAllocations.stockEntryId, id),
+        ));
+
+      await tx.delete(stockEntries)
+        .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
+    });
   }
 
   async getNextSerialNumber(merchantId: number, crop?: string): Promise<number> {

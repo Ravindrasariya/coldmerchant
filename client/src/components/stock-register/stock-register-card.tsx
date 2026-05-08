@@ -1622,10 +1622,22 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               {t("Delete this stock entry?", "क्या यह स्टॉक एंट्री हटाएं?")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t(
-                `Sr# ${deleteEntry?.serialNumber ?? ""} (${deleteEntry?.farmerName ?? ""}) will be permanently removed along with all its lots and bag breakdowns. This cannot be undone.`,
-                `सीरियल# ${deleteEntry?.serialNumber ?? ""} (${deleteEntry?.farmerName ?? ""}) इसके सभी लॉट और बोरी विवरण के साथ स्थायी रूप से हटा दी जाएगी। यह क्रिया वापस नहीं ली जा सकती।`,
-              )}
+              {(() => {
+                const sr = deleteEntry?.serialNumber ?? "";
+                const name = deleteEntry?.farmerName ?? "";
+                const totalBags = (deleteEntry?.lots ?? []).reduce(
+                  (sum: number, l: any) =>
+                    sum + (l.bagBreakdowns ?? []).reduce(
+                      (s: number, bd: any) => s + (Number(bd.numberOfBags) || 0),
+                      0,
+                    ),
+                  0,
+                );
+                return t(
+                  `Sr# ${sr} (${name}) — ${totalBags} bags will be permanently removed along with all its lots, bag breakdowns and edit history. This cannot be undone.`,
+                  `सीरियल# ${sr} (${name}) — ${totalBags} बोरी इसके सभी लॉट, बोरी विवरण और एडिट इतिहास के साथ स्थायी रूप से हटा दी जाएगी। यह क्रिया वापस नहीं ली जा सकती।`,
+                );
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

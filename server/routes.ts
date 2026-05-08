@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError } from "./storage";
+import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError, StockEntryDeletionBlockedError } from "./storage";
 import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers } from "@shared/schema";
 import { db } from "./db";
@@ -989,10 +989,13 @@ export async function registerRoutes(
       try {
         await storage.deleteStockEntry(id, merchantId);
       } catch (err: any) {
-        // Defensive: if a new allocation row sneaks in between the blocker
-        // check and the delete (race condition), Postgres will raise FK
-        // error 23503. Translate that into the same 409 we'd otherwise
-        // return so the client can show a clean message.
+        // In-transaction recheck inside storage.deleteStockEntry surfaces
+        // race-condition links as a typed error → 409.
+        if (err instanceof StockEntryDeletionBlockedError) {
+          return res.status(409).json({ message: err.message });
+        }
+        // Belt-and-suspenders: any remaining FK violation (23503) also
+        // becomes a 409 instead of a 500.
         if (err && (err.code === "23503" || /foreign key/i.test(String(err.message)))) {
           return res.status(409).json({ message: "This entry was just linked from another record. Reverse the new payment/sale and try again." });
         }
