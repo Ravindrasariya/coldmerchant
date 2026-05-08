@@ -166,6 +166,8 @@ export interface IStorage {
   getNextSerialNumberForYear(merchantId: number, year: number): Promise<number>;
   isSerialNumberTakenForYear(merchantId: number, serialNumber: number, year: number, excludeEntryId: number | null): Promise<boolean>;
   updateStockEntrySerialNumber(id: number, merchantId: number, newSerial: number): Promise<void>;
+  getStockEntryDeletionBlockers(id: number, merchantId: number): Promise<{ saleCount: number; cashPaymentCount: number; aadhatPaymentCount: number; coldStorePaymentCount: number }>;
+  deleteStockEntry(id: number, merchantId: number): Promise<void>;
   
   // Lot operations
   createLot(lot: InsertLot): Promise<Lot>;
@@ -710,6 +712,78 @@ export class DatabaseStorage implements IStorage {
   async updateStockEntryImage(id: number, merchantId: number, filename: string | null): Promise<void> {
     await db.update(stockEntries)
       .set({ attachmentImage: filename, updatedAt: new Date() })
+      .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
+  }
+
+  // Counts of NON-REVERSED downstream records that would be silently broken
+  // by hard-deleting this stock entry. The DELETE route uses these to refuse
+  // the request with a helpful message instead of cascading destruction.
+  async getStockEntryDeletionBlockers(id: number, merchantId: number): Promise<{
+    saleCount: number;
+    cashPaymentCount: number;
+    aadhatPaymentCount: number;
+    coldStorePaymentCount: number;
+  }> {
+    const lotIdRows = await db.select({ id: lots.id })
+      .from(lots)
+      .where(and(eq(lots.stockEntryId, id), eq(lots.merchantId, merchantId)));
+    const lotIds = lotIdRows.map(r => r.id);
+
+    let saleCount = 0;
+    let coldStorePaymentCount = 0;
+    if (lotIds.length > 0) {
+      const [{ count: salesC } = { count: 0 }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(transactionItems)
+        .where(and(
+          eq(transactionItems.merchantId, merchantId),
+          inArray(transactionItems.lotId, lotIds),
+        ));
+      saleCount = Number(salesC) || 0;
+
+      // Count ALL cold-store allocations referencing these lots regardless
+      // of cash-entry reversal: reversing a cash entry adjusts balances but
+      // does NOT delete its allocation rows, and the FK from
+      // cold_store_charge_allocations.lot_id → lots.id has no ON DELETE
+      // rule, so any leftover row would FK-fail the cascade delete.
+      const [{ count: csC } = { count: 0 }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(coldStoreChargeAllocations)
+        .where(and(
+          eq(coldStoreChargeAllocations.merchantId, merchantId),
+          inArray(coldStoreChargeAllocations.lotId, lotIds),
+        ));
+      coldStorePaymentCount = Number(csC) || 0;
+    }
+
+    // cash_entries has no direct stock_entry_id column.
+    const cashPaymentCount = 0;
+
+    // Same reasoning as cold-store allocations above: count every
+    // allocation row referencing this stock entry, since reversal does
+    // not remove them and the FK has no ON DELETE rule.
+    const [{ count: aadhatC } = { count: 0 }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(aadhatPaymentAllocations)
+      .where(and(
+        eq(aadhatPaymentAllocations.merchantId, merchantId),
+        eq(aadhatPaymentAllocations.stockEntryId, id),
+      ));
+    const aadhatPaymentCount = Number(aadhatC) || 0;
+
+    return { saleCount, cashPaymentCount, aadhatPaymentCount, coldStorePaymentCount };
+  }
+
+  // Hard-delete a stock entry. Lots, bag breakdowns and stock-entry edit
+  // history are removed by the schema's ON DELETE CASCADE rules. Callers
+  // (DELETE /api/stock-entries/:id) MUST run getStockEntryDeletionBlockers
+  // first — there are nullable FKs (cash_entries.stock_entry_id,
+  // transaction_items.lot_id, aadhat/cold-store allocations) that would
+  // either FK-fail or silently orphan downstream rows otherwise.
+  // Note: the freed Sr# is NOT auto-reused — getNextSerialNumberForYear
+  // continues to return max+1, so gaps stay until the user manually picks them.
+  async deleteStockEntry(id: number, merchantId: number): Promise<void> {
+    await db.delete(stockEntries)
       .where(and(eq(stockEntries.id, id), eq(stockEntries.merchantId, merchantId)));
   }
 

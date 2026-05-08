@@ -1,7 +1,18 @@
 import { useState, useMemo } from "react";
 import { calculateInterestOnly } from "@/lib/interest-utils";
 import { computeNetWeight } from "@shared/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, FileDown, Check, ChevronsUpDown, Share2, ChevronDown, Paperclip } from "lucide-react";
+import { Filter, Edit, Printer, Package, X, Phone, MapPin, Calendar, Clock, Snowflake, Download, FileDown, Check, ChevronsUpDown, Share2, ChevronDown, Paperclip, Trash2, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -258,6 +269,45 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const [filterColdStore, setFilterColdStore] = useState<string>("");
   const [farmerPopoverOpen, setFarmerPopoverOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<StockEntryWithLots | null>(null);
+  const [deleteEntry, setDeleteEntry] = useState<StockEntryWithLots | null>(null);
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/stock-entries/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      // Mirror invalidations from stock-entry-edit-dialog so every dependent
+      // view refreshes when an entry disappears.
+      const keys = [
+        ["/api/stock-entries"],
+        ["/api/stock-entries/next-serial"],
+        ["/api/transactions"],
+        ["/api/inventory/unsold"],
+        ["/api/buyers"],
+        ["/api/cash/farmers"],
+        ["/api/farmers"],
+        ["/api/dashboard/timeseries"],
+        ["/api/books/balance-sheet"],
+        ["/api/books/profit-loss"],
+        ["/api/cold-store-ledger"],
+        ["/api/cold-stores/search"],
+        ["/api/cash/cold-stores"],
+        ["/api/cash/entries"],
+        ["/api/cash/aadhats-with-dues"],
+        ["/api/cash/aadhat-pending-entries"],
+        ["/api/cash/parties"],
+        ["/api/cash/seed-farmers"],
+        ["/api/cash/seed-suppliers"],
+        ["/api/aadhats"],
+      ];
+      keys.forEach(k => queryClient.invalidateQueries({ queryKey: k }));
+      toast({ title: t("Entry deleted", "एंट्री हटा दी गई") });
+      setDeleteEntry(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: t("Could not delete", "हटाया नहीं जा सका"), description: err.message, variant: "destructive" });
+    },
+  });
   const [printEntry, setPrintEntry] = useState<StockEntryWithLots | null>(null);
   const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
   const [imageViewEntryId, setImageViewEntryId] = useState<number | null>(null);
@@ -1369,16 +1419,30 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                     </div>
                     
                     <div className="flex flex-col gap-1.5 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 gap-1.5 justify-start"
-                        onClick={() => setEditEntry(entry)}
-                        data-testid={`button-edit-${entry.id}`}
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                        {t("Edit", "संपादित")}
-                      </Button>
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-8 gap-1.5 justify-start flex-1"
+                          onClick={() => setEditEntry(entry)}
+                          data-testid={`button-edit-${entry.id}`}
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                          {t("Edit", "संपादित")}
+                        </Button>
+                        {user?.canEdit && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteEntry(entry)}
+                            data-testid={`button-delete-${entry.id}`}
+                            aria-label={t("Delete entry", "एंट्री हटाएं")}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -1547,6 +1611,39 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           onOpenChange={(open: boolean) => !open && setEditEntry(null)}
         />
       )}
+
+      <AlertDialog
+        open={!!deleteEntry}
+        onOpenChange={(open) => { if (!open && !deleteMutation.isPending) setDeleteEntry(null); }}
+      >
+        <AlertDialogContent data-testid="dialog-delete-stock-entry">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("Delete this stock entry?", "क्या यह स्टॉक एंट्री हटाएं?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                `Sr# ${deleteEntry?.serialNumber ?? ""} (${deleteEntry?.farmerName ?? ""}) will be permanently removed along with all its lots and bag breakdowns. This cannot be undone.`,
+                `सीरियल# ${deleteEntry?.serialNumber ?? ""} (${deleteEntry?.farmerName ?? ""}) इसके सभी लॉट और बोरी विवरण के साथ स्थायी रूप से हटा दी जाएगी। यह क्रिया वापस नहीं ली जा सकती।`,
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending} data-testid="button-cancel-delete">
+              {t("Cancel", "रद्द")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteMutation.isPending}
+              onClick={(e) => { e.preventDefault(); if (deleteEntry) deleteMutation.mutate(deleteEntry.id); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {t("Delete", "हटाएं")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {printEntry && (
         <BillPrintDialog

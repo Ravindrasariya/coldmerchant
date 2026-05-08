@@ -945,6 +945,67 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/stock-entries/:id", requireMerchant, async (req, res) => {
+    try {
+      // UI hides the trash button for read-only users; this is the matching
+      // server-side guard so a read-only session can't delete via raw HTTP.
+      if (!req.user!.canEdit) {
+        return res.status(403).json({ message: "You do not have permission to delete entries" });
+      }
+      const merchantId = req.user!.merchantId!;
+      const id = parseInt(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ message: "Invalid stock entry id" });
+      }
+
+      const entry = await storage.getStockEntryById(id, merchantId);
+      if (!entry) return res.status(404).json({ message: "Stock entry not found" });
+
+      const blockers = await storage.getStockEntryDeletionBlockers(id, merchantId);
+      const total =
+        blockers.saleCount +
+        blockers.cashPaymentCount +
+        blockers.aadhatPaymentCount +
+        blockers.coldStorePaymentCount;
+
+      if (total > 0) {
+        const parts: string[] = [];
+        if (blockers.saleCount) parts.push(`${blockers.saleCount} sale${blockers.saleCount === 1 ? "" : "s"}`);
+        const cashTotal = blockers.cashPaymentCount + blockers.aadhatPaymentCount + blockers.coldStorePaymentCount;
+        if (cashTotal) parts.push(`${cashTotal} cash payment${cashTotal === 1 ? "" : "s"}`);
+        return res.status(409).json({
+          message: `This entry has ${parts.join(" and ")} linked to it. Reverse those first, then delete.`,
+          blockers,
+        });
+      }
+
+      // Best-effort: delete on-disk attachment image (if any). DB cascade
+      // handles lots, bag breakdowns and stock-entry edit history.
+      if (entry.attachmentImage) {
+        const filePath = path.join(uploadsDir, entry.attachmentImage);
+        await fsPromises.unlink(filePath).catch(() => {});
+      }
+
+      try {
+        await storage.deleteStockEntry(id, merchantId);
+      } catch (err: any) {
+        // Defensive: if a new allocation row sneaks in between the blocker
+        // check and the delete (race condition), Postgres will raise FK
+        // error 23503. Translate that into the same 409 we'd otherwise
+        // return so the client can show a clean message.
+        if (err && (err.code === "23503" || /foreign key/i.test(String(err.message)))) {
+          return res.status(409).json({ message: "This entry was just linked from another record. Reverse the new payment/sale and try again." });
+        }
+        throw err;
+      }
+      console.log(`[stock-entries] Hard-deleted entry id=${id} sr#=${entry.serialNumber} merchant=${merchantId}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting stock entry:", error);
+      res.status(500).json({ message: "Failed to delete stock entry" });
+    }
+  });
+
   app.delete("/api/stock-entries/:id/image", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
