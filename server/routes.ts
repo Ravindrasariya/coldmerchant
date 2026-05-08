@@ -3477,7 +3477,7 @@ export async function registerRoutes(
           if (totalCharges <= 0) continue;
           const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
           due = totalCharges - paidAmount;
-        } else if (lot.place === "farm_gate") {
+        } else if (lot.place === "farm_gate" || lot.place === "mandi") {
           totalCharges = getColdStoreChargesForCS(lot.charges, coldStoreDbId);
           if (totalCharges <= 0) continue;
           const paidKey = `${lot.id}-${coldStoreDbId}`;

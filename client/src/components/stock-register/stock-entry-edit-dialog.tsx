@@ -1244,8 +1244,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 </CardContent>
                 )}
 
-                {/* Dynamic Charges Section - NOT shown for mandi */}
-                {lot.place !== "mandi" && (
+                {/* Dynamic Charges Section — for mandi, restricted to the 3 bypass-aadhtiya types */}
+                {(
                 <CardContent className="pt-0 border-t">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -1264,9 +1264,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     
                     {(lot.charges || []).map((charge, chargeIndex) => {
                       const isFarmGateLot = lot.place === "farm_gate";
+                      const isMandiLot = lot.place === "mandi";
                       const isEarlyPayCharge = charge.type === "Early Pay/Bataw";
                       const hasOtherEarlyPay = (lot.charges || []).some((c, ci) => ci !== chargeIndex && c.type === "Early Pay/Bataw");
-                      const showChargeCS = isFarmGateLot && coldStoreChargeTypes.includes(charge.type);
+                      const showChargeCS = (isFarmGateLot || isMandiLot) && coldStoreChargeTypes.includes(charge.type);
                       const chargeDropdownKey = `${lotIndex}-${chargeIndex}`;
                       const chargeFilteredCS = allColdStores.filter(cs =>
                         !chargeCSSearch || cs.name.toLowerCase().includes(chargeCSSearch.toLowerCase())
@@ -1292,7 +1293,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               <SelectValue placeholder={t("Select charge type", "शुल्क प्रकार चुनें")} />
                             </SelectTrigger>
                             <SelectContent>
-                              {CHARGE_TYPES.filter(type => type !== "Early Pay/Bataw" || !hasOtherEarlyPay).map((type) => (
+                              {(isMandiLot ? (["Cold Charges", "Ware House Charges", "Extra Charges to Buyer"] as const) : CHARGE_TYPES).filter(type => type !== "Early Pay/Bataw" || !hasOtherEarlyPay).map((type) => (
                                 <SelectItem key={type} value={type}>
                                   {type}
                                 </SelectItem>

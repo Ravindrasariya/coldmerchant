@@ -1354,7 +1354,12 @@ export class DatabaseStorage implements IStorage {
           cpb = rowTotal > 0 ? rowTotal / bags : 0;
         } else if (place === "mandi") {
           const rowCharges = rowTotal * (mandiPct + aadhatPct) / 100;
-          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate + extraBuyerShare;
+          // Cold/Warehouse charges on mandi lots are NOT paid through the aadhtiya
+          // (they go directly to the cold store). They are still a real merchant
+          // cost that must be recovered at sale, so spread them across sellable
+          // bags into COGS — same treatment as farm_gate.
+          const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
+          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate + coldShare + extraBuyerShare;
         } else if (place === "farm_gate") {
           const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
           cpb = (rowTotal / bags) + coldShare + extraBuyerShare;
@@ -1376,7 +1381,10 @@ export class DatabaseStorage implements IStorage {
         cpb = actualSellableBags > 0 ? (totalPayable + coldStoreCharges) / actualSellableBags : 0;
       } else if (place === "mandi") {
         const lotNp = lot.netPayable ? parseFloat(lot.netPayable) : totalPayable;
-        cpb = actualSellableBags > 0 ? lotNp / actualSellableBags : 0;
+        // Cold/Warehouse charges on mandi lots are merchant-side storage cost
+        // (paid directly to cold store, not through the aadhtiya), so add them
+        // on top of netPayable to recover via COGS — same treatment as farm_gate.
+        cpb = actualSellableBags > 0 ? (lotNp + coldStoreCharges) / actualSellableBags : 0;
       } else {
         cpb = actualSellableBags > 0 ? totalPayable / actualSellableBags : 0;
       }
@@ -2055,7 +2063,7 @@ export class DatabaseStorage implements IStorage {
           existing.totalDue += due;
           existing.lotCount += 1;
         }
-      } else if (lot.place === "farm_gate" && Array.isArray(lot.charges)) {
+      } else if ((lot.place === "farm_gate" || lot.place === "mandi") && Array.isArray(lot.charges)) {
         const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
         const csChargeMap = new Map<number, number>();
         for (const charge of lot.charges as any[]) {
@@ -2577,7 +2585,7 @@ export class DatabaseStorage implements IStorage {
             if (totalCharges <= 0) return false;
             const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
             return totalCharges > paidAmount;
-          } else if (lot.place === "farm_gate" && entry.coldStoreDbId) {
+          } else if ((lot.place === "farm_gate" || lot.place === "mandi") && entry.coldStoreDbId) {
             const csCharges = getColdStoreChargesForCS(lot.charges, entry.coldStoreDbId);
             if (csCharges <= 0) return false;
             const paidKey = `${lot.id}-${entry.coldStoreDbId}`;

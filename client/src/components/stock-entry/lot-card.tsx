@@ -119,6 +119,9 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   const [chargeCSSearch, setChargeCSSearch] = useState("");
   const chargeCSDropdownRefs = useRef<{[key: number]: HTMLDivElement | null}>({});
   const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+  // Mandi lots are restricted to only the 3 charge types that bypass the aadhtiya:
+  // Cold/Warehouse → routed to cold store, Extra Charges to Buyer → added to COGS.
+  const mandiAllowedChargeTypes = ["Cold Charges", "Ware House Charges", "Extra Charges to Buyer"];
 
   const [allColdStores, setAllColdStores] = useState<{id: number, name: string}[]>([]);
   const [showColdStoreDropdown, setShowColdStoreDropdown] = useState(false);
@@ -537,7 +540,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
 
         </div>
 
-        {place === "mandi" ? (
+        {place === "mandi" && (
           <div className="pt-4 border-t">
             <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4">
             <h4 className="text-sm font-medium mb-3 lg:mb-0 lg:shrink-0 lg:min-w-[110px]">{t("Mandi Charges", "मंडी शुल्क")}</h4>
@@ -645,8 +648,9 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
             </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-4 pt-4 border-t">
+        )}
+
+        <div className="space-y-4 pt-4 border-t">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-medium">{t("Charges", "शुल्क")}</h4>
               <Button
@@ -667,7 +671,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                   const chargeType = form.watch(`lots.${lotIndex}.charges.${chargeIndex}.type`);
                   const isEarlyPay = chargeType === "Early Pay/Bataw";
                   const hasOtherEarlyPay = chargeFields.some((_, ci) => ci !== chargeIndex && form.watch(`lots.${lotIndex}.charges.${ci}.type`) === "Early Pay/Bataw");
-                  const showCSDropdown = place === "farm_gate" && coldStoreChargeTypes.includes(chargeType);
+                  const showCSDropdown = (place === "farm_gate" || place === "mandi") && coldStoreChargeTypes.includes(chargeType);
                   const chargeFilteredCS = allColdStores.filter(cs =>
                     !chargeCSSearch || cs.name.toLowerCase().includes(chargeCSSearch.toLowerCase())
                   );
@@ -706,7 +710,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {CHARGE_TYPES.filter(type => type !== "Early Pay/Bataw" || !hasOtherEarlyPay).map((type) => (
+                                {(place === "mandi" ? mandiAllowedChargeTypes : (CHARGE_TYPES as readonly string[])).filter(type => type !== "Early Pay/Bataw" || !hasOtherEarlyPay).map((type) => (
                                   <SelectItem key={type} value={type}>
                                     {type}
                                   </SelectItem>
@@ -894,7 +898,6 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
               </div>
             )}
           </div>
-        )}
 
         {cutType === "bilty_cut" && (
           <div className="space-y-4 pt-4 border-t">
