@@ -943,9 +943,9 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
     <Card className="border border-orange-300 dark:border-orange-700 overflow-hidden" data-testid={`card-party-${group.partyKey}`}>
       <CardContent className="p-0">
         {/* Party Header */}
-        <div className="bg-blue-700 dark:bg-blue-800 border-b border-blue-600 dark:border-blue-700">
-          {/* Row 1: Name + Address + Contact + Badge — all on one line */}
-          <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap px-4 py-2.5">
+        <div>
+          {/* Row 1: Name + Address + Contact + Badge — blue header */}
+          <div className="bg-blue-700 dark:bg-blue-800 flex items-center justify-between gap-3 flex-wrap md:flex-nowrap px-4 py-2.5">
             <div className="flex items-center gap-x-4 gap-y-1 flex-wrap md:flex-nowrap min-w-0 flex-1">
               <span className="font-bold text-base leading-tight whitespace-nowrap text-white" data-testid={`text-party-name-${group.partyKey}`}>
                 {group.partyName}
@@ -969,10 +969,10 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
           </div>
 
           {/* Divider between buyer info and aggregate row */}
-          <div className="border-t border-blue-600 dark:border-blue-700" />
+          <div className="border-t border-orange-200 dark:border-orange-800" />
 
-          {/* Row 2: Aggregate metrics — inline label: value pairs in equal-width columns */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
+          {/* Row 2: Aggregate metrics — original orange-tinted background */}
+          <div className="bg-orange-50 dark:bg-orange-950/40 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
             <div className="flex items-center gap-1.5 min-w-0" data-testid={`text-aggregate-bags-${group.partyKey}`}>
               <span className="text-muted-foreground whitespace-nowrap">{t("Total Bags", "कुल बोरी")}:</span>
               <span className="font-semibold flex items-center gap-1">
