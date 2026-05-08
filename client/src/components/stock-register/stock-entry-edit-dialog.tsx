@@ -1337,7 +1337,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   const isFG = lot.place === "farm_gate";
                                   const cstTypes = ["Cold Charges", "Ware House Charges"];
                                   const dynChg = (lot.charges || [])
-                                    .filter(c => c.type !== "Early Pay/Bataw" && !(isFG && cstTypes.includes(c.type)))
+                                    .filter(c => c.type !== "Early Pay/Bataw" && c.type !== "Extra Charges to Buyer" && !(isFG && cstTypes.includes(c.type)))
                                     .reduce((sum, c) => {
                                       const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
                                       return sum + amt;
@@ -1519,7 +1519,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     const isFarmGate = lot.place === "farm_gate";
                     const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
                     const dynamicCharges = (lot.charges || [])
-                      .filter(c => c.type !== "Early Pay/Bataw" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+                      .filter(c => c.type !== "Early Pay/Bataw" && c.type !== "Extra Charges to Buyer" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
                       .reduce((sum, c) => {
                         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
                         return sum + amt;
