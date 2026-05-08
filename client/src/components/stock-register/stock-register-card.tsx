@@ -550,15 +550,19 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
         const cog = metrics.totalAmount ?? 0;
 
+        // Effective place: fall back to entry.place for any legacy rows that
+        // may have a missing lot.place, so totals always bucket correctly.
+        const effectivePlace = lot.place ?? entry.place;
+
         // Per-place Payable / Deductions for the Total Cost summary card.
         // Buyer Extra is added to Payable for ALL place types (and never to Deductions).
-        if (lot.place === "mandi") {
+        if (effectivePlace === "mandi") {
           // Mandi: COG + mandi charges (mandi commission + aadhat + hammali + Mandi Extra)
           // are real outflows to the aadhtiya — flow into Payable, not Deductions.
           // Use storedNetPayable when present (= COG + mandi charges); fall back to COG.
           const mandiPayable = storedNetPayable > 0 ? storedNetPayable : cog;
           entryPayable += mandiPayable + metrics.coldStoreTotalCharges + metrics.extraBuyerCharges;
-        } else if (lot.place === "farm_gate") {
+        } else if (effectivePlace === "farm_gate") {
           // Farm Gate: cold/WH are merchant-paid storage costs added on top of COG.
           // Deductions (lot.totalCharges) already excludes cold/WH and Buyer Extra.
           entryPayable += cog + metrics.coldStoreTotalCharges + metrics.extraBuyerCharges;
@@ -572,7 +576,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
 
         entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
         entryColdStorePaid += metrics.coldStorePaid;
-        if (lot.place === "mandi") {
+        if (effectivePlace === "mandi") {
           entryMandiNetPayable += storedNetPayable;
         }
       });
