@@ -280,11 +280,24 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     items.forEach((item) => {
       const inv = findInventoryByKey(item.inventoryKey);
       const bags = Number(item.bagsMoved) || 0;
+      const netWeight = Number(item.netWeight) || 0;
       totalBags += bags;
-      totalNetWeight += Number(item.netWeight) || 0;
+      totalNetWeight += netWeight;
       totalAmount += Number(item.amount) || 0;
-      const breakdownPricePerKg = inv?.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
-      totalCostOfGoods += breakdownPricePerKg * (Number(item.netWeight) || 0);
+      // Align Loading COGS with Bikri/Sale: use stock register's per-breakdown
+      // costPerBag (which already includes proportionate Extra Charges to Buyer
+      // and, for farm-gate, cold/warehouse share). Fall back to the legacy
+      // netWeight × pricePerKg for any inventory row missing a costPerBag so
+      // legacy data doesn't shift unexpectedly.
+      const costPerBag = Number(inv?.costPerBag) || 0;
+      let lineCogs: number;
+      if (costPerBag > 0 && bags > 0) {
+        lineCogs = costPerBag * bags;
+      } else {
+        const breakdownPricePerKg = inv?.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
+        lineCogs = breakdownPricePerKg * netWeight;
+      }
+      totalCostOfGoods += Math.round(lineCogs * 100) / 100;
     });
 
     const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
@@ -669,8 +682,14 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
                 {items.map((item, itemIndex) => {
                   const selectedInv = findInventoryByKey(item.inventoryKey);
-                  const breakdownPpk = selectedInv?.pricePerKg ? parseFloat(selectedInv.pricePerKg) : 0;
-                  const itemCost = breakdownPpk * (Number(item.netWeight) || 0);
+                  const bagsForRow = Number(item.bagsMoved) || 0;
+                  const netWeightForRow = Number(item.netWeight) || 0;
+                  // Match the COGS formula used in the totals memo so per-row
+                  // P&L stays consistent with Total P&L.
+                  const rowCostPerBag = Number(selectedInv?.costPerBag) || 0;
+                  const itemCost = (rowCostPerBag > 0 && bagsForRow > 0)
+                    ? rowCostPerBag * bagsForRow
+                    : (selectedInv?.pricePerKg ? parseFloat(selectedInv.pricePerKg) : 0) * netWeightForRow;
                   const itemPL = (Number(item.amount) || 0) - itemCost;
 
                   return (
@@ -1007,7 +1026,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 </Popover>
               )}
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <Label className="text-xs">{t("Sales Comm. %", "बिक्री कमीशन %")}</Label>
                   <div className="relative">
