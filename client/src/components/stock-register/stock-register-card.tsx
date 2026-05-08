@@ -477,6 +477,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     let totalDeductions = 0;
     let mandiTotal = 0;
     let mandiDue = 0;
+    let buyerExtraTotal = 0;
 
     filteredEntries.forEach(entry => {
       let entryNetPayable = 0;
@@ -492,6 +493,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const metrics = getLotMetrics(lot);
         bagsTotal += metrics.actualSellableBags;
         bagsRemaining += metrics.remainingToSell;
+        buyerExtraTotal += metrics.extraBuyerCharges;
 
         const storedNetPayable = lot.netPayable ? parseFloat(lot.netPayable) : 0;
         const storedTotalCharges = lot.totalCharges ? parseFloat(lot.totalCharges) : 0;
@@ -528,7 +530,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       }
     });
 
-    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions, mandiTotal, mandiDue };
+    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions, mandiTotal, mandiDue, buyerExtraTotal };
   }, [filteredEntries, lotMetricsMap]);
 
   const handleDownloadCSV = () => {
@@ -1097,7 +1099,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         <Card className="border-blue-300 dark:border-blue-700" data-testid="card-bags-summary">
           <CardContent className="p-3">
             <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
@@ -1164,6 +1166,16 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
               <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-mandi-due">₹{summaryTotals.mandiDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-pink-300 dark:border-pink-700" data-testid="card-buyer-extra-summary">
+          <CardContent className="p-3">
+            <div className="text-xs text-muted-foreground font-medium">{t("Buyer Extra", "खरीदार अतिरिक्त")}</div>
+            <div className="text-sm font-bold mt-1 text-pink-600 dark:text-pink-400" data-testid="text-buyer-extra-total">
+              ₹{summaryTotals.buyerExtraTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+            </div>
+            <div className="text-xs text-muted-foreground">{t("Across filtered entries", "फ़िल्टर की गई एंट्रियों में")}</div>
           </CardContent>
         </Card>
       </div>

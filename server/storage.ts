@@ -1148,12 +1148,11 @@ export class DatabaseStorage implements IStorage {
       .filter((c: any) => c && coldStoreTypes.includes(c.type))
       .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
 
-    // Extra Charges to Buyer: tracked separately as a P&L expense line (recognized at lot creation),
-    // NOT folded into per-bag COGS. Kept here only for legacy reference / unused.
-    void (lot.charges || [])
+    // Extra Charges to Buyer: added to COGS for all place types, spread across sellable bags
+    const extraBuyerCharges = (lot.charges || [])
       .filter((c: any) => c && c.type === "Extra Charges to Buyer")
       .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-    const extraBuyerShare = 0;
+    const extraBuyerShare = actualSellableBags > 0 ? extraBuyerCharges / actualSellableBags : 0;
 
     const sellableBreakdowns = breakdowns.filter((bd: any) => bd.size !== "Wastage");
     const hasBreakdownData = sellableBreakdowns.some((bd: any) => {
@@ -1232,23 +1231,11 @@ export class DatabaseStorage implements IStorage {
       
       const { breakdownCosts } = this.computeBreakdownCosts(lot, breakdowns);
       
-      const wastageBagsForExtra = breakdowns
-        .filter((bd: any) => bd.size === "Wastage")
-        .reduce((sum: number, bd: any) => sum + (bd.numberOfBags || 0), 0);
-      const sellableBagsForExtra = (lot.originalBags || 0) - wastageBagsForExtra;
-      const extraBuyerChargesTotal = (lot.charges || [])
-        .filter((c: any) => c && c.type === "Extra Charges to Buyer")
-        .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-      const extraBuyerChargePerBag = sellableBagsForExtra > 0
-        ? extraBuyerChargesTotal / sellableBagsForExtra
-        : 0;
-
       const mandiCharges = {
         mandiCommissionPercent: lot.mandiCommissionPercent || null,
         aadhatCommissionPercent: lot.aadhatCommissionPercent || null,
         hammaliPerBag: lot.hammaliPerBag || null,
         mandiExtraCharges: lot.mandiExtraCharges || null,
-        extraBuyerChargePerBag,
       };
 
       if (breakdowns.length > 0) {
