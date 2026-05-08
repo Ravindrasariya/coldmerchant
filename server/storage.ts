@@ -831,11 +831,23 @@ export class DatabaseStorage implements IStorage {
           throw new StockEntryDeletionBlockedError("This entry now has an active cold-store payment. Reverse it first, then delete.");
         }
 
-        // Clean up reversed cold-store allocations referencing these lots.
+        // Clean up ONLY reversed cold-store allocations referencing these
+        // lots. Restricting to cash_entries.is_reversed = true means a
+        // concurrent non-reversed allocation committed between the recheck
+        // above and this delete is preserved (it will then FK-fail the
+        // cascade delete below and be re-mapped to a 409 by the route).
+        const reversedCsCashIds = tx
+          .select({ id: cashEntries.id })
+          .from(cashEntries)
+          .where(and(
+            eq(cashEntries.merchantId, merchantId),
+            eq(cashEntries.isReversed, true),
+          ));
         await tx.delete(coldStoreChargeAllocations)
           .where(and(
             eq(coldStoreChargeAllocations.merchantId, merchantId),
             inArray(coldStoreChargeAllocations.lotId, lotIds),
+            inArray(coldStoreChargeAllocations.cashEntryId, reversedCsCashIds),
           ));
       }
 
@@ -852,11 +864,20 @@ export class DatabaseStorage implements IStorage {
         throw new StockEntryDeletionBlockedError("This entry now has an active aadhat payment. Reverse it first, then delete.");
       }
 
-      // Clean up reversed aadhat allocations referencing this stock entry.
+      // Clean up ONLY reversed aadhat allocations (same reasoning as the
+      // cold-store cleanup above).
+      const reversedAadhatCashIds = tx
+        .select({ id: cashEntries.id })
+        .from(cashEntries)
+        .where(and(
+          eq(cashEntries.merchantId, merchantId),
+          eq(cashEntries.isReversed, true),
+        ));
       await tx.delete(aadhatPaymentAllocations)
         .where(and(
           eq(aadhatPaymentAllocations.merchantId, merchantId),
           eq(aadhatPaymentAllocations.stockEntryId, id),
+          inArray(aadhatPaymentAllocations.cashEntryId, reversedAadhatCashIds),
         ));
 
       await tx.delete(stockEntries)

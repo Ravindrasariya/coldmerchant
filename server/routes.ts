@@ -979,13 +979,6 @@ export async function registerRoutes(
         });
       }
 
-      // Best-effort: delete on-disk attachment image (if any). DB cascade
-      // handles lots, bag breakdowns and stock-entry edit history.
-      if (entry.attachmentImage) {
-        const filePath = path.join(uploadsDir, entry.attachmentImage);
-        await fsPromises.unlink(filePath).catch(() => {});
-      }
-
       try {
         await storage.deleteStockEntry(id, merchantId);
       } catch (err: any) {
@@ -1000,6 +993,13 @@ export async function registerRoutes(
           return res.status(409).json({ message: "This entry was just linked from another record. Reverse the new payment/sale and try again." });
         }
         throw err;
+      }
+      // Only after the DB commit succeeded, best-effort remove the on-disk
+      // attachment image. Done after delete so a blocked/failed transaction
+      // does not orphan the entry from its attachment.
+      if (entry.attachmentImage) {
+        const filePath = path.join(uploadsDir, entry.attachmentImage);
+        await fsPromises.unlink(filePath).catch(() => {});
       }
       console.log(`[stock-entries] Hard-deleted entry id=${id} sr#=${entry.serialNumber} merchant=${merchantId}`);
       res.json({ success: true });
