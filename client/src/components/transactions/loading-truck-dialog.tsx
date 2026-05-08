@@ -1026,7 +1026,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 </Popover>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <Label className="text-xs">{t("Sales Comm. %", "बिक्री कमीशन %")}</Label>
                   <div className="relative">
