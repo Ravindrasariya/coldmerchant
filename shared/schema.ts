@@ -79,6 +79,7 @@ export const CHARGE_TYPES = [
   "Bag Charges",
   "Cold Charges",
   "Early Pay/Bataw",
+  "Extra Charges to Buyer",
   "Freight Charges",
   "Grading Charges",
   "Hammali Charges",

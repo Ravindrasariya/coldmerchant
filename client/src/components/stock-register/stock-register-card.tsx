@@ -160,7 +160,12 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   const coldStoreTotalCharges = (lot.charges || [])
     .filter(c => c && coldStoreTypes.includes(c.type))
     .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
-  
+
+  // Extra Charges to Buyer: buyer-side cost only, never deducted from farmer
+  const extraBuyerCharges = (lot.charges || [])
+    .filter(c => c && c.type === "Extra Charges to Buyer")
+    .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
   const coldStoreRemaining = coldStoreTotalCharges - coldStorePaid;
   
@@ -175,11 +180,12 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   // Calculate total deductions: hammali/grading + dynamic charges
   // For Farm Gate lots, exclude Cold Charges and Ware House Charges from farmer deductions
   // (merchant pays cold store separately, not deducted from farmer)
+  // "Extra Charges to Buyer" is buyer-side only — never deducted from farmer (any place type)
   const isFarmGate = lot.place === "farm_gate";
   const farmerDeductionTypes = ["Cold Charges", "Ware House Charges"];
   const hammaliGradingCharges = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
   const dynamicCharges = (lot.charges || [])
-    .filter(c => !(isFarmGate && farmerDeductionTypes.includes(c.type)))
+    .filter(c => c.type !== "Extra Charges to Buyer" && !(isFarmGate && farmerDeductionTypes.includes(c.type)))
     .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
   const totalDeductions = hammaliGradingCharges + dynamicCharges;
   
@@ -195,6 +201,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     coldStoreTotalCharges,
     coldStorePaid,
     coldStoreRemaining,
+    extraBuyerCharges,
     adjustedAmount: finalAdjustment,
     adjustedAmountType,
     totalDeductions,
@@ -1196,6 +1203,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             let entryAdjustment = 0;
             let entryDeductions = 0;
             let entryColdStoreTotalCharges = 0;
+            let entryExtraBuyerCharges = 0;
             let entryColdStorePaid = 0;
             
             const entryIsMandi = (entry.place || entry.lots[0]?.place) === "mandi";
@@ -1218,6 +1226,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
               }
               entryDeductions += metrics.totalDeductions;
               entryColdStoreTotalCharges += metrics.coldStoreTotalCharges;
+              entryExtraBuyerCharges += metrics.extraBuyerCharges ?? 0;
               entryColdStorePaid += metrics.coldStorePaid;
             });
             
@@ -1338,6 +1347,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                             </span>
                           </span>
                         )}
+                        {entryExtraBuyerCharges > 0 && (
+                          <span className="inline-flex items-center gap-1" data-testid={`text-entry-extra-buyer-${entry.id}`}>
+                            <span className="text-muted-foreground whitespace-nowrap">{t("Buyer Extra", "खरीदार अतिरिक्त")}</span>
+                            <span className="font-medium whitespace-nowrap">₹ {entryExtraBuyerCharges.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                     
@@ -1385,6 +1400,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                     {lotsWithMetrics.map(({ lot, metrics }, lotIndex) => {
                       const lotColdTotal = metrics.coldStoreTotalCharges ?? 0;
                       const lotColdDue = metrics.coldStoreRemaining ?? 0;
+                      const lotExtraBuyer = metrics.extraBuyerCharges ?? 0;
                       
                       return (
                         <div 
@@ -1493,6 +1509,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                               <span className={`font-medium whitespace-nowrap ${lotColdDue > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
                                 ₹ {lotColdDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                               </span>
+                            </span>
+                          )}
+                          {lotExtraBuyer > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[13px] mt-1 ml-3" data-testid={`text-lot-extra-buyer-${lot.id}`}>
+                              <span className="text-muted-foreground whitespace-nowrap">{t("Buyer Extra", "खरीदार अतिरिक्त")}</span>
+                              <span className="font-medium whitespace-nowrap">₹ {lotExtraBuyer.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
                             </span>
                           )}
                         </div>

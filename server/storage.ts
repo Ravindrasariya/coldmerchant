@@ -1148,6 +1148,12 @@ export class DatabaseStorage implements IStorage {
       .filter((c: any) => c && coldStoreTypes.includes(c.type))
       .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
 
+    // Extra Charges to Buyer: added to COGS for all place types, spread across sellable bags
+    const extraBuyerCharges = (lot.charges || [])
+      .filter((c: any) => c && c.type === "Extra Charges to Buyer")
+      .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
+    const extraBuyerShare = actualSellableBags > 0 ? extraBuyerCharges / actualSellableBags : 0;
+
     const sellableBreakdowns = breakdowns.filter((bd: any) => bd.size !== "Wastage");
     const hasBreakdownData = sellableBreakdowns.some((bd: any) => {
       const w = bd.weight ? parseFloat(bd.weight) : 0;
@@ -1176,12 +1182,12 @@ export class DatabaseStorage implements IStorage {
           cpb = rowTotal > 0 ? rowTotal / bags : 0;
         } else if (place === "mandi") {
           const rowCharges = rowTotal * (mandiPct + aadhatPct) / 100;
-          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate;
+          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate + extraBuyerShare;
         } else if (place === "farm_gate") {
           const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
-          cpb = (rowTotal / bags) + coldShare;
+          cpb = (rowTotal / bags) + coldShare + extraBuyerShare;
         } else {
-          cpb = rowTotal / bags;
+          cpb = (rowTotal / bags) + extraBuyerShare;
         }
         result.set(bd.id, cpb);
         totalCogs += cpb * bags;
@@ -1202,6 +1208,7 @@ export class DatabaseStorage implements IStorage {
       } else {
         cpb = actualSellableBags > 0 ? totalPayable / actualSellableBags : 0;
       }
+      cpb += extraBuyerShare;
       result.set(null, cpb);
       return { breakdownCosts: result, totalCogs: cpb * Math.max(actualSellableBags, 0) };
     }

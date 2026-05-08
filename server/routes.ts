@@ -144,8 +144,9 @@ function computeHarvestLotCharges(lot: any) {
   const charges: Array<{type: string; amount: number | string}> = lot.charges || [];
   const hammaliGrading = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
   const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+  // "Extra Charges to Buyer" is a buyer-side cost (added to COGS), never deducted from farmer
   const dynamicCharges = charges
-    .filter((c: any) => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+    .filter((c: any) => c.type !== "Extra Charges to Buyer" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
     .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
   let totalDeductions = hammaliGrading + dynamicCharges;
 
@@ -1219,7 +1220,7 @@ export async function registerRoutes(
       const { paymentStatus, remarks, lots } = req.body;
 
       // Validate charges in lots if present using CHARGE_TYPES
-      const validChargeTypes = ["Advance", "Bag Charges", "Cold Charges", "Early Pay/Bataw", "Freight Charges", "Grading Charges", "Hammali Charges", "Kata Charges", "Other Charges", "Pesticide Charges", "Ware House Charges"];
+      const validChargeTypes = ["Advance", "Bag Charges", "Cold Charges", "Early Pay/Bataw", "Extra Charges to Buyer", "Freight Charges", "Grading Charges", "Hammali Charges", "Kata Charges", "Other Charges", "Pesticide Charges", "Ware House Charges"];
       if (lots && Array.isArray(lots)) {
         for (const lot of lots) {
           if (lot.charges && Array.isArray(lot.charges)) {
