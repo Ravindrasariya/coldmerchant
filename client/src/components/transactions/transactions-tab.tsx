@@ -951,13 +951,13 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                 {group.partyName}
               </span>
               {group.partyAddress && (
-                <span className="flex items-center gap-1 text-xs text-blue-100 min-w-0" data-testid={`text-party-address-${group.partyKey}`}>
+                <span className="flex items-center gap-1 text-xs text-white/80 min-w-0" data-testid={`text-party-address-${group.partyKey}`}>
                   <MapPin className="h-3 w-3 flex-shrink-0" />
                   <span className="truncate">{group.partyAddress}</span>
                 </span>
               )}
               {group.partyContact && (
-                <span className="flex items-center gap-1 text-xs text-blue-100 whitespace-nowrap" data-testid={`text-party-contact-${group.partyKey}`}>
+                <span className="flex items-center gap-1 text-xs text-white/80 whitespace-nowrap" data-testid={`text-party-contact-${group.partyKey}`}>
                   <Phone className="h-3 w-3 flex-shrink-0" />
                   {group.partyContact}
                 </span>
