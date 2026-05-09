@@ -196,6 +196,17 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   const grandTotal = calculateGrandTotal();
 
+  // Predicate: is this lot.charges entry shown as a farmer Deductions line on the bill?
+  // - "Extra Charges to Buyer" is a buyer-side cost, never deducted from the farmer (any place).
+  // - "Cold Charges" / "Ware House Charges" are merchant storage costs for Farm Gate / Mandi
+  //   lots; only Cold Store lots show them as a farmer deduction.
+  const isFarmerDeductionCharge = (c: { type?: string | null } | undefined, place: string | null | undefined) => {
+    if (!c) return false;
+    if (c.type === "Extra Charges to Buyer") return false;
+    if ((place === "farm_gate" || place === "mandi") && (c.type === "Cold Charges" || c.type === "Ware House Charges")) return false;
+    return true;
+  };
+
   const calculateLotTotals = (lot: StockEntryWithLots["lots"][0]) => {
     let totalPayable: number;
     let totalBagsForMandi: number;
@@ -222,10 +233,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
     const charges = lot.charges || [];
-    const isFarmGate = lot.place === "farm_gate";
-    const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
     const dynamicCharges = charges
-      .filter(c => c.type !== "Early Pay/Bataw" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+      .filter(c => c.type !== "Early Pay/Bataw" && isFarmerDeductionCharge(c, lot.place))
       .reduce((sum, c) => {
         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
         return sum + amt;
@@ -293,10 +302,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       if (aadhatPct > 0) aadhatPcts.add(aadhatPct);
 
       const charges = lot.charges || [];
-      const isFarmGate = lot.place === "farm_gate";
-      const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
       charges
-        .filter(c => c.type !== "Early Pay/Bataw" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+        .filter(c => c.type !== "Early Pay/Bataw" && isFarmerDeductionCharge(c, lot.place))
         .forEach(c => {
           const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
           if (amt > 0) {
@@ -439,6 +446,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       const hasMandiCharges = lotTotals.totalMandiCharges > 0;
       
       const chargesHtml = lotTotals.charges.filter(c => {
+        if (!isFarmerDeductionCharge(c, lot.place)) return false;
         const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
         return amt > 0;
       }).map(c => {
@@ -916,6 +924,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                             </>
                           )}
                           {lotTotals.charges.filter((c: any) => {
+                            if (!isFarmerDeductionCharge(c, lot.place)) return false;
                             const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
                             return amt > 0;
                           }).map((c: any, i: number) => {
