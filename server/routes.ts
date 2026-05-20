@@ -854,26 +854,38 @@ export async function registerRoutes(
           remainingBags: lotData.originalBags,
         });
 
-        // Create bag breakdowns for both cut types
-        if (lotData.bagBreakdowns) {
-          for (let bdIdx = 0; bdIdx < lotData.bagBreakdowns.length; bdIdx++) {
-            const bdData = lotData.bagBreakdowns[bdIdx];
-            const weight = bdData.weight || 0;
-            const pricePerKg = bdData.pricePerKg || 0;
-            const totalAmount = weight * pricePerKg;
+        // Synthesize a default single breakdown row from lot-level fields if
+        // the client didn't send any. Every harvest lot must own at least one
+        // bag_breakdowns row so the FIFO due basis (Σ lot.netPayable, which
+        // is derived from breakdown weights × prices) is well-defined.
+        let bdInput = lotData.bagBreakdowns || [];
+        const hasRealRow = bdInput.some((b: any) => (b?.numberOfBags || 0) > 0);
+        if (!hasRealRow && lotData.originalBags > 0) {
+          bdInput = [{
+            size: lotData.size || "Large",
+            numberOfBags: lotData.originalBags,
+            weight: lotData.totalWeight || 0,
+            pricePerKg: lotData.pricePerKg || 0,
+          }];
+        }
 
-            await storage.createBagBreakdown({
-              lotId: lot.id,
-              merchantId,
-              size: bdData.size,
-              numberOfBags: bdData.numberOfBags,
-              remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
-              weight: weight > 0 ? weight.toString() : null,
-              pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
-              totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
-              sortOrder: bdIdx,
-            });
-          }
+        for (let bdIdx = 0; bdIdx < bdInput.length; bdIdx++) {
+          const bdData = bdInput[bdIdx];
+          const weight = bdData.weight || 0;
+          const pricePerKg = bdData.pricePerKg || 0;
+          const totalAmount = weight * pricePerKg;
+
+          await storage.createBagBreakdown({
+            lotId: lot.id,
+            merchantId,
+            size: bdData.size,
+            numberOfBags: bdData.numberOfBags,
+            remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
+            weight: weight > 0 ? weight.toString() : null,
+            pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
+            totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
+            sortOrder: bdIdx,
+          });
         }
       }
 
@@ -1512,13 +1524,32 @@ export async function registerRoutes(
                 : undefined,
             });
 
-            // Handle bag breakdowns for both cut types
+            // Handle bag breakdowns for both cut types. Mirror the create
+            // route: if the client sent zero real breakdown rows, synthesize
+            // one from lot-level fields so every lot keeps at least one
+            // bag_breakdowns row (FIFO invariant — see create route above).
             if (lotData.bagBreakdowns) {
               const existingBreakdowns = existingLot?.bagBreakdowns || [];
               const existingIds = new Set<number>(existingBreakdowns.map((b: any) => b.id));
 
-              for (let bdIdx = 0; bdIdx < lotData.bagBreakdowns.length; bdIdx++) {
-                const bdData = lotData.bagBreakdowns[bdIdx];
+              let bdInput: any[] = lotData.bagBreakdowns;
+              const targetBags = lotData.originalBags ?? existingLot?.originalBags ?? 0;
+              const hasRealRow = bdInput.some((b: any) => (b?.numberOfBags || 0) > 0);
+              if (!hasRealRow && targetBags > 0) {
+                const fallbackWeight = lotData.totalWeight ?? (existingLot?.totalWeight ? parseFloat(existingLot.totalWeight) : 0);
+                const fallbackPrice = lotData.pricePerKg ?? (existingLot?.pricePerKg ? parseFloat(existingLot.pricePerKg) : 0);
+                const fallbackSize = lotData.size || existingLot?.size || "Large";
+                bdInput = [{
+                  id: 0,
+                  size: fallbackSize,
+                  numberOfBags: targetBags,
+                  weight: fallbackWeight,
+                  pricePerKg: fallbackPrice,
+                }];
+              }
+
+              for (let bdIdx = 0; bdIdx < bdInput.length; bdIdx++) {
+                const bdData = bdInput[bdIdx];
                 const weight = bdData.weight || 0;
                 const pricePerKg = bdData.pricePerKg || 0;
                 const totalAmount = weight * pricePerKg;
@@ -2202,6 +2233,256 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error recalculating lot payables:", error);
       res.status(500).json({ message: "Failed to recalculate lot payables" });
+    }
+  });
+
+  // POST /api/admin/backfill-harvest-breakdowns - For every harvest lot with
+  // zero bag_breakdowns rows, insert one synthesized row from lot fields and
+  // re-run recomputeHarvestLotCharges so netPayable / costPerBag are
+  // consistent. Idempotent: skips lots that already have ≥1 breakdown.
+  app.post("/api/admin/backfill-harvest-breakdowns", requireSystemAdmin, async (req, res) => {
+    try {
+      const dryRun = req.query.dryRun === "1" || req.query.dryRun === "true";
+      const allMerchants = await storage.getAllMerchants();
+      const report: Array<{ merchantId: number; lotId: number; stockEntryId: number; bags: number; weight: number; pricePerKg: number; size: string }> = [];
+      const touchedEntries = new Set<string>();
+
+      for (const merchant of allMerchants) {
+        const entries = await storage.getStockEntriesByMerchant(merchant.id);
+        for (const entry of entries) {
+          let touched = false;
+          for (const lot of entry.lots) {
+            const breakdowns = lot.bagBreakdowns || [];
+            if (breakdowns.length > 0) continue;
+            if (!lot.originalBags || lot.originalBags <= 0) continue;
+
+            const totalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+            const pricePerKg = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+            const weight = totalWeight > 0 ? totalWeight : lot.originalBags * 50;
+            const size = lot.size || "Large";
+
+            report.push({
+              merchantId: merchant.id,
+              lotId: lot.id,
+              stockEntryId: entry.id,
+              bags: lot.originalBags,
+              weight,
+              pricePerKg,
+              size,
+            });
+
+            if (!dryRun) {
+              const totalAmount = weight * pricePerKg;
+              await storage.createBagBreakdown({
+                lotId: lot.id,
+                merchantId: merchant.id,
+                size,
+                numberOfBags: lot.originalBags,
+                remainingBags: lot.remainingBags ?? lot.originalBags,
+                weight: weight > 0 ? weight.toString() : null,
+                pricePerKg: pricePerKg > 0 ? pricePerKg.toString() : null,
+                totalAmount: totalAmount > 0 ? totalAmount.toString() : null,
+                sortOrder: 0,
+              });
+              touched = true;
+            }
+          }
+          if (touched) touchedEntries.add(`${merchant.id}:${entry.id}`);
+        }
+      }
+
+      if (!dryRun) {
+        for (const key of Array.from(touchedEntries)) {
+          const [mid, eid] = key.split(":").map(Number);
+          await recomputeHarvestLotCharges(eid, mid);
+        }
+      }
+
+      res.json({
+        message: dryRun ? "Dry run complete (no changes written)" : "Backfill complete",
+        dryRun,
+        lotsAffected: report.length,
+        entriesRecomputed: dryRun ? 0 : touchedEntries.size,
+        report,
+      });
+    } catch (error) {
+      console.error("Error backfilling harvest breakdowns:", error);
+      res.status(500).json({ message: "Failed to backfill harvest breakdowns" });
+    }
+  });
+
+  // POST /api/admin/reconcile-amount-paid - For each stock entry already
+  // marked "paid" by the legacy FIFO but whose amountPaid is below the
+  // current Σ lot.netPayable (the display basis), bump amountPaid up so the
+  // stock register card shows Due 0. Covers harvest and seed. Skips any
+  // entry not already marked paid. Idempotent.
+  app.post("/api/admin/reconcile-amount-paid", requireSystemAdmin, async (req, res) => {
+    try {
+      const dryRun = req.query.dryRun === "1" || req.query.dryRun === "true";
+      const allMerchants = await storage.getAllMerchants();
+      const harvestReport: Array<{ merchantId: number; stockEntryId: number; serialNumber: number; before: number; after: number; delta: number; cashEvidence: number }> = [];
+      const seedReport: Array<{ merchantId: number; seedEntryId: number; before: number; after: number; delta: number; cashEvidence: number }> = [];
+      const harvestSkipped: Array<{ merchantId: number; stockEntryId: number; serialNumber: number; gap: number; reason: string }> = [];
+      const seedSkipped: Array<{ merchantId: number; seedEntryId: number; gap: number; reason: string }> = [];
+
+      const norm = (s: string | null | undefined) => (s || "").trim().toLowerCase();
+
+      for (const merchant of allMerchants) {
+        // Pull all non-reversed cash entries for this merchant so we can
+        // verify real cash evidence per farmer/supplier before bumping
+        // amountPaid. Without this, an entry whose paymentStatus was set to
+        // "paid" by a stale process (or manual edit) would be over-credited.
+        const cashList = await storage.getCashEntries(merchant.id);
+        const farmerCashByKey = new Map<string, number>();
+        const supplierCashByKey = new Map<string, number>();
+        for (const c of cashList as any[]) {
+          if (c.status === "reversed") continue;
+          if (c.direction !== "outflow") continue;
+          const amt = parseFloat(c.amount || "0");
+          if (!isFinite(amt) || amt <= 0) continue;
+          if (c.expenseType === "farmer") {
+            const key = c.farmerId != null
+              ? `id:${c.farmerId}`
+              : `n:${norm(c.farmerName)}|c:${norm(c.farmerContact)}|v:${norm(c.farmerVillage)}`;
+            farmerCashByKey.set(key, (farmerCashByKey.get(key) || 0) + amt);
+          } else if (c.expenseType === "supplier") {
+            const key = `n:${norm(c.supplierName)}`;
+            supplierCashByKey.set(key, (supplierCashByKey.get(key) || 0) + amt);
+          }
+        }
+
+        // ---- Harvest ----
+        const entries = await storage.getStockEntriesByMerchant(merchant.id);
+        // Σ amountPaid per farmer-key so we can compute unallocated cash.
+        const appliedByFarmerKey = new Map<string, number>();
+        const farmerKeyFor = (e: any) =>
+          e.farmerId != null
+            ? `id:${e.farmerId}`
+            : `n:${norm(e.farmerName)}|c:${norm(e.farmerContact)}|v:${norm(e.village)}`;
+        for (const e of entries) {
+          const k = farmerKeyFor(e);
+          appliedByFarmerKey.set(k, (appliedByFarmerKey.get(k) || 0) + parseFloat(e.amountPaid || "0"));
+        }
+
+        for (const entry of entries) {
+          if (entry.paymentStatus !== "paid") continue;
+          const target = entry.lots.reduce(
+            (sum: number, lot: any) => sum + parseFloat(lot.netPayable || "0"),
+            0
+          );
+          const current = parseFloat(entry.amountPaid || "0");
+          const gap = target - current;
+          if (gap <= 0.01) continue;
+
+          const key = farmerKeyFor(entry);
+          const totalCash = farmerCashByKey.get(key) || 0;
+          const totalApplied = appliedByFarmerKey.get(key) || 0;
+          const unallocated = totalCash - totalApplied;
+          if (unallocated <= 0.01) {
+            harvestSkipped.push({
+              merchantId: merchant.id,
+              stockEntryId: entry.id,
+              serialNumber: entry.serialNumber,
+              gap,
+              reason: `No unallocated cash evidence (totalCash=${totalCash.toFixed(2)}, totalApplied=${totalApplied.toFixed(2)})`,
+            });
+            continue;
+          }
+
+          const bump = Math.min(gap, unallocated);
+          const newAmt = current + bump;
+          harvestReport.push({
+            merchantId: merchant.id,
+            stockEntryId: entry.id,
+            serialNumber: entry.serialNumber,
+            before: current,
+            after: newAmt,
+            delta: bump,
+            cashEvidence: totalCash,
+          });
+
+          if (!dryRun) {
+            await storage.updateStockEntry(entry.id, merchant.id, {
+              amountPaid: newAmt.toFixed(2),
+              paymentStatus: newAmt + 0.01 >= target ? "paid" : entry.paymentStatus,
+            });
+          }
+          // Decrement so a second eligible entry for the same farmer cannot
+          // double-spend the same unallocated cash.
+          appliedByFarmerKey.set(key, totalApplied + bump);
+        }
+
+        // ---- Seed ----
+        const seedEntries = await storage.getSeedEntriesByMerchant(merchant.id);
+        const appliedBySupplierKey = new Map<string, number>();
+        const supplierKeyFor = (e: any) => `n:${norm(e.supplierName)}`;
+        for (const e of seedEntries) {
+          const k = supplierKeyFor(e);
+          appliedBySupplierKey.set(k, (appliedBySupplierKey.get(k) || 0) + parseFloat(e.amountPaid || "0"));
+        }
+
+        for (const seedEntry of seedEntries) {
+          if (seedEntry.paymentStatus !== "paid") continue;
+          // Seed supplier-dues invariant: Σ (bags × pricePerBag), NOT netPayable.
+          const target = (seedEntry.seedLots || []).reduce((sum: number, lot: any) => {
+            const bags = lot.originalBags || 0;
+            const price = lot.pricePerBag ? parseFloat(lot.pricePerBag) : 0;
+            return sum + bags * price;
+          }, 0);
+          const current = parseFloat(seedEntry.amountPaid || "0");
+          const gap = target - current;
+          if (gap <= 0.01) continue;
+
+          const key = supplierKeyFor(seedEntry);
+          const totalCash = supplierCashByKey.get(key) || 0;
+          const totalApplied = appliedBySupplierKey.get(key) || 0;
+          const unallocated = totalCash - totalApplied;
+          if (unallocated <= 0.01) {
+            seedSkipped.push({
+              merchantId: merchant.id,
+              seedEntryId: seedEntry.id,
+              gap,
+              reason: `No unallocated cash evidence (totalCash=${totalCash.toFixed(2)}, totalApplied=${totalApplied.toFixed(2)})`,
+            });
+            continue;
+          }
+
+          const bump = Math.min(gap, unallocated);
+          const newAmt = current + bump;
+          seedReport.push({
+            merchantId: merchant.id,
+            seedEntryId: seedEntry.id,
+            before: current,
+            after: newAmt,
+            delta: bump,
+            cashEvidence: totalCash,
+          });
+
+          if (!dryRun) {
+            await storage.updateSeedEntry(seedEntry.id, merchant.id, {
+              amountPaid: newAmt.toFixed(2),
+              paymentStatus: newAmt + 0.01 >= target ? "paid" : seedEntry.paymentStatus,
+            });
+          }
+          appliedBySupplierKey.set(key, totalApplied + bump);
+        }
+      }
+
+      res.json({
+        message: dryRun ? "Dry run complete (no changes written)" : "Reconciliation complete",
+        dryRun,
+        harvestEntriesUpdated: harvestReport.length,
+        seedEntriesUpdated: seedReport.length,
+        harvestEntriesSkipped: harvestSkipped.length,
+        seedEntriesSkipped: seedSkipped.length,
+        harvestReport,
+        seedReport,
+        harvestSkipped,
+        seedSkipped,
+      });
+    } catch (error) {
+      console.error("Error reconciling amount paid:", error);
+      res.status(500).json({ message: "Failed to reconcile amount paid" });
     }
   });
 

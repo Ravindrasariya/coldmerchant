@@ -1958,31 +1958,19 @@ export class DatabaseStorage implements IStorage {
       const entryLots = await db.select().from(lots)
         .where(eq(lots.stockEntryId, entry.id));
       
-      let entryTotalCost = 0;
-      let entryAdjustment = 0;
-      for (const lot of entryLots) {
-        const breakdownList = await db.select().from(bagBreakdowns)
-          .where(eq(bagBreakdowns.lotId, lot.id));
-        
-        if (breakdownList.length > 0) {
-          entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-        } else if (lot.pricePerKg) {
-          entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
-        }
-        
-        if (lot.adjustedAmount && lot.adjustedAmountType) {
-          const adjustedAmount = parseFloat(lot.adjustedAmount);
-          if (lot.adjustedAmountType === "debit") {
-            entryAdjustment -= adjustedAmount;
-          } else if (lot.adjustedAmountType === "credit") {
-            entryAdjustment += adjustedAmount;
-          }
-        }
-      }
-      
+      // Per-entry due basis = Σ lot.netPayable (matches stock register card
+      // display). netPayable is authoritative — populated by
+      // recomputeHarvestLotCharges and excludes Cold/WH + "Extra Charges to
+      // Buyer" for Farm Gate, and includes adjustment interest. Do NOT fall
+      // back to bags*50*pricePerKg; that hides the actual recorded weight
+      // and creates a phantom Due after a full payment.
+      const entryTotalCost = entryLots.reduce(
+        (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
+        0
+      );
+
       const amountPaid = parseFloat(entry.amountPaid || "0");
-      const adjustedTotal = entryTotalCost + entryAdjustment;
-      const entryDue = Math.max(0, adjustedTotal - amountPaid);
+      const entryDue = Math.max(0, entryTotalCost - amountPaid);
       
       if (entryDue <= 0) continue;
       
@@ -2478,18 +2466,13 @@ export class DatabaseStorage implements IStorage {
           const entryLots = await tx.select().from(lots)
             .where(eq(lots.stockEntryId, stockEntry.id));
           
-          let entryTotalCost = 0;
-          for (const lot of entryLots) {
-            const breakdownList = await tx.select().from(bagBreakdowns)
-              .where(eq(bagBreakdowns.lotId, lot.id));
-            
-            if (breakdownList.length > 0) {
-              entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-            } else if (lot.pricePerKg) {
-              entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
-            }
-          }
-          
+          // Per-entry due = Σ lot.netPayable − amountPaid (matches stock
+          // register card display; see helper at line ~1964 for rationale).
+          const entryTotalCost = entryLots.reduce(
+            (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
+            0
+          );
+
           const currentPaid = parseFloat(stockEntry.amountPaid || "0");
           const due = entryTotalCost - currentPaid;
           
@@ -2682,7 +2665,12 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // If this is a supplier payment, apply FIFO to seed stock entries
+      // If this is a supplier payment, apply FIFO to seed stock entries.
+      // INVARIANT: seed supplier dues = Σ (bags × pricePerBag). Do NOT switch
+      // this to lot.netPayable — for seed lots, netPayable = total merchant
+      // cost (includes transport/hammali/grading/cold-store-per-bag which are
+      // merchant-side costs that flow to COGS/P&L, NOT supplier deductions).
+      // Display side (seed-stock-register-card.tsx) uses the same basis.
       if (applyFIFO && entry.direction === "outflow" && entry.expenseType === "supplier" && entry.supplierName) {
         let remainingAmount = parseFloat(entry.amount);
         const normalizedSupplierName = normalizeName(entry.supplierName);
@@ -4562,18 +4550,13 @@ export class DatabaseStorage implements IStorage {
             const entryLots = await tx.select().from(lots)
               .where(eq(lots.stockEntryId, stockEntry.id));
             
-            let entryTotalCost = 0;
-            for (const lot of entryLots) {
-              const breakdownList = await tx.select().from(bagBreakdowns)
-                .where(eq(bagBreakdowns.lotId, lot.id));
-              
-              if (breakdownList.length > 0) {
-                entryTotalCost += breakdownList.reduce((sum, b) => sum + parseFloat(b.totalAmount || "0"), 0);
-              } else if (lot.pricePerKg) {
-                entryTotalCost += lot.originalBags * 50 * parseFloat(lot.pricePerKg);
-              }
-            }
-            
+            // Per-entry due = Σ lot.netPayable − amountPaid (matches stock
+            // register card display; see helper at line ~1964 for rationale).
+            const entryTotalCost = entryLots.reduce(
+              (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
+              0
+            );
+
             const currentPaid = parseFloat(stockEntry.amountPaid || "0");
             const due = entryTotalCost - currentPaid;
             
@@ -5119,7 +5102,12 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // 4c. Reverse farmer payment (reduces amountPaid on stock entries)
+      // 4c. Reverse farmer payment (reduces amountPaid on stock entries).
+      // INVARIANT: forward FIFO and this reversal both move the raw allocation
+      // amount in/out of stockEntries.amountPaid. Per-entry due basis (Σ
+      // lot.netPayable) is read-only here — we only subtract the same cash
+      // amount that was applied, so the netPayable basis change in step 3
+      // does NOT require any reversal-side change.
       if (entry.direction === "outflow" && entry.expenseType === "farmer" && entry.farmerName) {
         const farmerStockEntries = await tx.select().from(stockEntries)
           .where(eq(stockEntries.merchantId, merchantId))

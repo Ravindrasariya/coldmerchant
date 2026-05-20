@@ -55,7 +55,16 @@ function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic", selec
         hammaliPerBag: undefined,
         mandiExtraCharges: undefined,
         remarks: "",
-        bagBreakdowns: [],
+        // Always seed one breakdown row so every lot persists a real
+        // bag_breakdowns entry. FIFO due basis = Σ lot.netPayable, which is
+        // derived from breakdown weights × prices; an empty breakdown list
+        // would force a 50kg/bag fallback and produce a phantom Due.
+        bagBreakdowns: [{
+          size: "",
+          numberOfBags: 0,
+          weight: undefined,
+          pricePerKg: undefined,
+        }],
       },
     ],
   };
@@ -310,7 +319,13 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       ...mandiChargesFromPrev,
       mandiExtraCharges: undefined,
       remarks: "",
-      bagBreakdowns: [],
+      // Seed one breakdown row — see comment in getDefaultFormValues.
+      bagBreakdowns: [{
+        size: "",
+        numberOfBags: 0,
+        weight: undefined,
+        pricePerKg: undefined,
+      }],
     });
   };
 

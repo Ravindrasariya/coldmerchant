@@ -896,6 +896,18 @@ export default function AdminPage() {
                     description: "Recalculates totalCharges, netPayable, and avgCostPerBag for all harvest and seed lots across all merchants. Use this after migrations or if farmer dues show as 0.",
                     endpoint: "/api/admin/recalculate-lot-payables",
                   },
+                  {
+                    id: "backfill-harvest-breakdowns",
+                    name: "Backfill Harvest Breakdowns",
+                    description: "For every harvest lot with zero bag breakdowns, inserts one synthesized row from the lot's bags/weight/price and recomputes netPayable. Fixes legacy entries so the farmer-payment FIFO uses the actual recorded weight instead of the 50kg/bag fallback. Idempotent.",
+                    endpoint: "/api/admin/backfill-harvest-breakdowns",
+                  },
+                  {
+                    id: "reconcile-amount-paid",
+                    name: "Reconcile Amount Paid (Fully-Paid Entries)",
+                    description: "For each harvest/seed stock entry already marked 'paid' but whose amountPaid is below the current Σ lot.netPayable (the card display basis), bumps amountPaid up so the stock register card shows Due ₹0. Skips entries still showing real outstanding due. Run AFTER Backfill Harvest Breakdowns. Idempotent.",
+                    endpoint: "/api/admin/reconcile-amount-paid",
+                  },
                 ].map((utility) => {
                   const result = utilityResults[utility.id] || { status: "idle" };
                   return (
