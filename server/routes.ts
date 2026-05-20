@@ -2332,11 +2332,11 @@ export async function registerRoutes(
         // verify real cash evidence per farmer/supplier before bumping
         // amountPaid. Without this, an entry whose paymentStatus was set to
         // "paid" by a stale process (or manual edit) would be over-credited.
-        const cashList = await storage.getCashEntries(merchant.id);
+        const cashList = await storage.getCashEntriesByMerchant(merchant.id);
         const farmerCashByKey = new Map<string, number>();
         const supplierCashByKey = new Map<string, number>();
         for (const c of cashList as any[]) {
-          if (c.status === "reversed") continue;
+          if (c.isReversed) continue;
           if (c.direction !== "outflow") continue;
           const amt = parseFloat(c.amount || "0");
           if (!isFinite(amt) || amt <= 0) continue;
