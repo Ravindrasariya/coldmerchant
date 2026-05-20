@@ -226,6 +226,10 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
   const coldStorePaid = lot.coldStorageChargesPaid ? parseFloat(lot.coldStorageChargesPaid) : 0;
 
+  const extraBuyerCharges = (lot.charges || [])
+    .filter(c => c && c.type === "Extra Charges to Buyer")
+    .reduce((sum, c) => sum + (parseFloat(String(c.amount)) || 0), 0);
+
   const rawAdjustedAmount = lot.adjustedAmount !== null ? parseFloat(lot.adjustedAmount) : 0;
   const adjustedAmountType = lot.adjustedAmountType;
   const adjustedAmountRate = lot.adjustedAmountRate ? parseFloat(lot.adjustedAmountRate) : 0;
@@ -239,6 +243,7 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     totalDeductions,
     coldStoreTotalCharges,
     coldStorePaid,
+    extraBuyerCharges,
     adjustedAmount: finalAdjustment,
     adjustedAmountType,
   };
@@ -507,9 +512,10 @@ export function DashboardTab() {
         if (metrics.totalAmount !== null) {
           totalAmount += metrics.totalAmount;
         }
-        if (lot.place === "farm_gate") {
+        if (lot.place === "farm_gate" || lot.place === "mandi") {
           totalAmount += metrics.coldStoreTotalCharges;
         }
+        totalAmount += metrics.extraBuyerCharges;
       });
     });
 

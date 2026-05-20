@@ -382,6 +382,7 @@ export async function registerRoutes(
       const farmerDueMap = new Map<string, number>();
       const volumeMap = new Map<string, number>();
       const perFarmerHarvestDue = new Map<string, number>();
+      const perFarmerHarvestPayable = new Map<string, number>();
       const cropDuesMap: Record<string, number> = {};
       let summaryColdStoreTotalCharges = 0;
       let summaryColdStoreDue = 0;
@@ -472,6 +473,8 @@ export async function registerRoutes(
           : `composite:${(entry.farmerName || "").toLowerCase().trim()}|${(entry.farmerContact || "").toLowerCase().trim()}|${(entry.village || "").toLowerCase().trim()}`;
         const prev = perFarmerHarvestDue.get(farmerKey) || 0;
         perFarmerHarvestDue.set(farmerKey, prev + farmerDue);
+        const prevPayable = perFarmerHarvestPayable.get(farmerKey) || 0;
+        perFarmerHarvestPayable.set(farmerKey, prevPayable + entryNetPayable);
 
         const entryCrop = entry.crop || "potato";
         cropDuesMap[entryCrop] = (cropDuesMap[entryCrop] || 0) + farmerDue;
@@ -517,6 +520,7 @@ export async function registerRoutes(
       }
 
       const perFarmerSeedDue = new Map<string, number>();
+      const perFarmerSeedPayable = new Map<string, number>();
       for (const seedTx of allSeedTransactions) {
         if (!seedTx.createdAt) continue;
         if (crop === "onion") continue;
@@ -530,10 +534,12 @@ export async function registerRoutes(
 
         const totalDueToFarmer = seedTx.totalDueToFarmer ? parseFloat(seedTx.totalDueToFarmer) : 0;
         const seedDue = Math.max(totalDueToFarmer, 0);
+        const seedTotalCost = seedTx.totalCost ? parseFloat(seedTx.totalCost) : 0;
         const farmerKey = seedTx.farmerId
           ? String(seedTx.farmerId)
           : `composite:${(seedTx.farmerName || "").toLowerCase().trim()}|${(seedTx.farmerContact || "").toLowerCase().trim()}|${(seedTx.village || "").toLowerCase().trim()}`;
         perFarmerSeedDue.set(farmerKey, (perFarmerSeedDue.get(farmerKey) || 0) + seedDue);
+        perFarmerSeedPayable.set(farmerKey, (perFarmerSeedPayable.get(farmerKey) || 0) + seedTotalCost);
       }
 
       const allFarmerIdsArr = Array.from(new Set([...Array.from(perFarmerHarvestDue.keys()), ...Array.from(perFarmerSeedDue.keys())]));
@@ -541,11 +547,15 @@ export async function registerRoutes(
       let summaryFarmerSeedPayable = 0;
       let summaryFarmerHarvestDue = 0;
       let summaryFarmerSeedDue = 0;
+      for (const payable of Array.from(perFarmerHarvestPayable.values())) {
+        summaryFarmerHarvestPayable += payable;
+      }
+      for (const payable of Array.from(perFarmerSeedPayable.values())) {
+        summaryFarmerSeedPayable += payable;
+      }
       for (const fId of allFarmerIdsArr) {
         const hDue = perFarmerHarvestDue.get(fId) || 0;
         const sDue = perFarmerSeedDue.get(fId) || 0;
-        summaryFarmerHarvestPayable += hDue;
-        summaryFarmerSeedPayable += sDue;
         if (hDue >= sDue) {
           summaryFarmerHarvestDue += (hDue - sDue);
         } else {
