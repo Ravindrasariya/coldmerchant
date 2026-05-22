@@ -43,7 +43,11 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   const coldStoreTotal = lot.originalBags * coldStoreChargesPerBag;
   const coldStoreDue = Math.max(coldStoreTotal - coldStoreChargesPaid, 0);
   const totalExtraCost = hammaliCharges + gradingCharges + transportCharges;
-  const soldBags = lot.originalBags - lot.remainingBags;
+  // Derive sold/remaining from persistent soldBags column (single source of
+  // truth after backfill) instead of stored remainingBags which can drift on
+  // legacy data.
+  const soldBags = Math.min(lot.originalBags || 0, (lot as any).soldBags ?? 0);
+  const derivedRemaining = Math.max(0, (lot.originalBags || 0) - soldBags);
   
   // Calculate avgCostPerBag
   const avgCostPerBag = lot.originalBags > 0
@@ -52,7 +56,7 @@ function computeSeedLotMetrics(lot: SeedStockEntryWithLots['seedLots'][0]) {
   
   return {
     originalBags: lot.originalBags,
-    remainingBags: lot.remainingBags,
+    remainingBags: derivedRemaining,
     soldBags,
     pricePerBag,
     totalAmount,

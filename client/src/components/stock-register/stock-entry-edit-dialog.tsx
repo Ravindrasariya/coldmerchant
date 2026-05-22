@@ -916,8 +916,21 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                         {lot.potatoType} • {lot.quality}
                       </Badge>
                       <div className="text-sm text-muted-foreground shrink-0">
-                        <span className="font-mono font-medium">{lot.remainingBags}</span>
-                        <span>/{lot.originalBags} {t("bags", "बोरी")}</span>
+                        {(() => {
+                          // Derive lot remaining from soldBags so it stays in
+                          // sync after edits/backfill without depending on the
+                          // stored remainingBags column.
+                          const sellable = lot.bagBreakdowns.filter(b => b.size !== "Wastage");
+                          const lotRemaining = sellable.length > 0
+                            ? sellable.reduce((s, b) => s + Math.max(0, (b.numberOfBags || 0) - ((b as any).soldBags ?? 0)), 0)
+                            : Math.max(0, (lot.originalBags || 0) - ((lot as any).soldBags ?? 0));
+                          return (
+                            <>
+                              <span className="font-mono font-medium">{lotRemaining}</span>
+                              <span>/{lot.originalBags} {t("bags", "बोरी")}</span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -954,7 +967,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           <div></div>
                         </div>
                         {lot.bagBreakdowns.map((bd, bdIndex) => {
-                          const remaining = bd.remainingBags ?? bd.numberOfBags;
+                          const bdSold = (bd as any).soldBags ?? 0;
+                          const remaining = Math.max(0, (bd.numberOfBags || 0) - bdSold);
                           const netWeight = computeNetWeight(bd.weight || 0, bd.numberOfBags || 0, lot.place);
                           const total = netWeight > 0 ? netWeight * (bd.pricePerKg || 0) : 0;
                           return (
@@ -997,17 +1011,6 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   <span className="text-primary">{remaining}</span>
                                   <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                                 </div>
-                                {(() => {
-                                  const sold = (bd as any).soldBags ?? Math.max(0, (bd.numberOfBags || 0) - (bd.remainingBags ?? bd.numberOfBags ?? 0));
-                                  return sold > 0 ? (
-                                    <div
-                                      className="text-[10px] text-muted-foreground mt-0.5"
-                                      data-testid={`edit-breakdown-sold-${lotIndex}-${bdIndex}`}
-                                    >
-                                      {sold} {t("sold", "बेची")} / {remaining} {t("remaining", "शेष")}
-                                    </div>
-                                  ) : null;
-                                })()}
                               </div>
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Total Wt", "कुल वजन")}</label>

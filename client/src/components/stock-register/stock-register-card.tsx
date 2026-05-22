@@ -125,8 +125,15 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     .reduce((sum, bd) => sum + bd.numberOfBags, 0);
   
   const actualSellableBags = lot.originalBags - wastageBags;
-  const remainingToSell = Math.min(lot.remainingBags, actualSellableBags);
-  const soldBags = actualSellableBags - remainingToSell;
+  // Derive remaining/sold from the persistent soldBags column (single source of
+  // truth after backfill) instead of the stored remainingBags, which can drift
+  // on legacy data.
+  const sellableBreakdownsAll = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
+  const lotSoldFromBreakdowns = sellableBreakdownsAll.length > 0
+    ? sellableBreakdownsAll.reduce((s, bd) => s + ((bd as any).soldBags ?? 0), 0)
+    : ((lot as any).soldBags ?? 0);
+  const soldBags = Math.min(actualSellableBags, lotSoldFromBreakdowns);
+  const remainingToSell = Math.max(0, actualSellableBags - soldBags);
   
   let totalWeight = 0;
   let totalAmount: number | null = null;
@@ -1573,7 +1580,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                                         {idx > 0 && ", "}
                                         <span className="font-medium">{bd.size}</span>
                                         <span className="text-muted-foreground"> - </span>
-                                        <span className="font-semibold text-green-600 dark:text-green-400">{bd.remainingBags ?? bd.numberOfBags}</span>
+                                        <span className="font-semibold text-green-600 dark:text-green-400">{Math.max(0, (bd.numberOfBags || 0) - ((bd as any).soldBags ?? 0))}</span>
                                         <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                                         {weight > 0 && (
                                           <span className="text-muted-foreground">

@@ -6290,11 +6290,14 @@ export async function backfillSoldBags(): Promise<{
   const allBreakdowns = await db.select().from(bagBreakdowns);
   for (const bd of allBreakdowns) {
     const want = bdSoldByid.get(bd.id) ?? 0;
-    if ((bd.soldBags ?? 0) !== want) {
+    const wantRemaining = Math.max(0, (bd.numberOfBags ?? 0) - want);
+    const currentSold = bd.soldBags ?? 0;
+    const currentRemaining = bd.remainingBags ?? bd.numberOfBags ?? 0;
+    if (currentSold !== want || currentRemaining !== wantRemaining) {
       await db.update(bagBreakdowns)
-        .set({ soldBags: want })
+        .set({ soldBags: want, remainingBags: wantRemaining })
         .where(eq(bagBreakdowns.id, bd.id));
-      bagBreakdownsUpdated++;
+      if (currentSold !== want) bagBreakdownsUpdated++;
     }
   }
 
@@ -6326,11 +6329,14 @@ export async function backfillSoldBags(): Promise<{
       want = gateLotSold.get(lot.id) ?? 0;
     }
     want = Math.min(lot.originalBags ?? want, want);
-    if ((lot.soldBags ?? 0) !== want) {
+    const wantRemaining = Math.max(0, (lot.originalBags ?? 0) - want);
+    const currentSold = lot.soldBags ?? 0;
+    const currentRemaining = lot.remainingBags ?? 0;
+    if (currentSold !== want || currentRemaining !== wantRemaining) {
       await db.update(lots)
-        .set({ soldBags: want })
+        .set({ soldBags: want, remainingBags: wantRemaining })
         .where(eq(lots.id, lot.id));
-      lotsUpdated++;
+      if (currentSold !== want) lotsUpdated++;
     }
   }
 
@@ -6347,11 +6353,14 @@ export async function backfillSoldBags(): Promise<{
   const allSeedLots = await db.select().from(seedLots);
   for (const sl of allSeedLots) {
     const want = Math.min(sl.originalBags ?? 0, seedSold.get(sl.id) ?? 0);
-    if ((sl.soldBags ?? 0) !== want) {
+    const wantRemaining = Math.max(0, (sl.originalBags ?? 0) - want);
+    const currentSold = sl.soldBags ?? 0;
+    const currentRemaining = sl.remainingBags ?? 0;
+    if (currentSold !== want || currentRemaining !== wantRemaining) {
       await db.update(seedLots)
-        .set({ soldBags: want })
+        .set({ soldBags: want, remainingBags: wantRemaining })
         .where(eq(seedLots.id, sl.id));
-      seedLotsUpdated++;
+      if (currentSold !== want) seedLotsUpdated++;
     }
   }
 
