@@ -1484,12 +1484,17 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 {/* Summary Row */}
                 <CardContent className="pt-0 border-t">
                   {(() => {
+                    // Gate Cut pays farmer for Wastage rows too; Bilty Cut excludes them.
+                    const isGateCut = lot.cutType === "gate_cut";
+                    const payableFilter = (bd: { size: string }) =>
+                      bd.size && (isGateCut || bd.size !== "Wastage");
+
                     const actualBags = lot.bagBreakdowns
-                      .filter(bd => bd.size && bd.size !== "Wastage")
+                      .filter(payableFilter)
                       .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
                     
                     const costOfGoods = lot.bagBreakdowns
-                      .filter(bd => bd.size && bd.size !== "Wastage")
+                      .filter(payableFilter)
                       .reduce((sum, bd) => {
                         const weight = bd.weight || 0;
                         const netWeight = computeNetWeight(weight, bd.numberOfBags || 0, lot.place);

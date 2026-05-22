@@ -93,18 +93,24 @@ function titleCaseKeep(str: string): string {
 function computeHarvestLotCharges(lot: any) {
   const place = lot.place || "cold_store";
   const breakdowns = lot.bagBreakdowns || [];
-  
+  // Gate Cut lots pay the farmer for Wastage rows as if they were normal bags
+  // (single-price-per-truck arrangement). Bilty Cut keeps the legacy behaviour
+  // where Wastage is excluded from the farmer's payable.
+  const isGateCut = lot.cutType === "gate_cut";
+
   // Calculate cost of goods from bag breakdowns
   let costOfGoods = 0;
-  const sellable = breakdowns.filter((bd: any) => bd.size !== "Wastage");
-  const hasBdData = sellable.some((bd: any) => {
+  const payableBreakdowns = isGateCut
+    ? breakdowns
+    : breakdowns.filter((bd: any) => bd.size !== "Wastage");
+  const hasBdData = payableBreakdowns.some((bd: any) => {
     const w = bd.weight ? parseFloat(bd.weight) : 0;
     const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
     return w > 0 && p > 0;
   });
   
   if (hasBdData) {
-    for (const bd of sellable) {
+    for (const bd of payableBreakdowns) {
       const weight = bd.weight ? parseFloat(bd.weight) : 0;
       const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
       const netWeight = computeNetWeight(weight, bd.numberOfBags, place);
@@ -124,7 +130,9 @@ function computeHarvestLotCharges(lot: any) {
   const wastageBags = breakdowns
     .filter((bd: any) => bd.size === "Wastage")
     .reduce((sum: number, bd: any) => sum + bd.numberOfBags, 0);
-  const actualBags = lot.originalBags - wastageBags;
+  // For Gate Cut, Wastage bags are still paid for, so hammali charges apply
+  // to all originalBags. For Bilty Cut, hammali base excludes Wastage.
+  const actualBags = isGateCut ? lot.originalBags : lot.originalBags - wastageBags;
 
   if (place === "mandi") {
     const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
@@ -289,6 +297,44 @@ export async function registerRoutes(
       if (updatedBd > 0 || updatedLots > 0) console.log(`[backfill] Updated ${updatedBd} breakdown costPerBag, ${updatedLots} lot totalCogs`);
     } catch (err) {
       console.error("[backfill] Error backfilling breakdown costs:", err);
+    }
+  })();
+
+  // One-time backfill: recompute harvest lot netPayable/totalCharges so legacy
+  // Gate Cut lots that were stored with Wastage excluded are corrected without
+  // requiring users to re-save each entry. Skips silently when nothing changes.
+  (async () => {
+    try {
+      const { db } = await import("./db");
+      const { stockEntries } = await import("@shared/schema");
+      const allEntries = await db.select({ id: stockEntries.id, merchantId: stockEntries.merchantId })
+        .from(stockEntries);
+      let updatedLots = 0;
+      for (const entry of allEntries) {
+        const full = await storage.getStockEntryById(entry.id, entry.merchantId);
+        if (!full) continue;
+        for (const lot of full.lots) {
+          const { totalCharges, netPayable, earlyPayAmount } = computeHarvestLotCharges(lot);
+          const existingNp = lot.netPayable ? parseFloat(lot.netPayable) : 0;
+          const existingTc = lot.totalCharges ? parseFloat(lot.totalCharges) : 0;
+          const existingEp = lot.earlyPayAmount ? parseFloat(lot.earlyPayAmount) : 0;
+          if (
+            Math.abs(parseFloat(netPayable) - existingNp) > 0.01 ||
+            Math.abs(parseFloat(totalCharges) - existingTc) > 0.01 ||
+            Math.abs(parseFloat(earlyPayAmount) - existingEp) > 0.01
+          ) {
+            await storage.updateLot(lot.id, entry.merchantId, {
+              totalCharges,
+              netPayable,
+              earlyPayAmount,
+            });
+            updatedLots++;
+          }
+        }
+      }
+      if (updatedLots > 0) console.log(`[backfill] Updated ${updatedLots} lot netPayable/totalCharges (Gate Cut Wastage fix)`);
+    } catch (err) {
+      console.error("[backfill] Error backfilling lot netPayable:", err);
     }
   })();
 

@@ -14,17 +14,21 @@ async function backfillHarvestLots() {
       for (const lot of entry.lots) {
         const breakdowns = lot.bagBreakdowns || [];
         const place = lot.place || "cold_store";
-        
+        // Gate Cut: pay farmer for Wastage too; Bilty Cut: exclude Wastage.
+        const isGateCut = lot.cutType === "gate_cut";
+
         let costOfGoods = 0;
-        const sellable = breakdowns.filter((bd: any) => bd.size !== "Wastage");
-        const hasBdData = sellable.some((bd: any) => {
+        const payableBreakdowns = isGateCut
+          ? breakdowns
+          : breakdowns.filter((bd: any) => bd.size !== "Wastage");
+        const hasBdData = payableBreakdowns.some((bd: any) => {
           const w = bd.weight ? parseFloat(bd.weight) : 0;
           const p = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
           return w > 0 && p > 0;
         });
         
         if (hasBdData) {
-          for (const bd of sellable) {
+          for (const bd of payableBreakdowns) {
             const weight = bd.weight ? parseFloat(bd.weight) : 0;
             const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
             const netWeight = computeNetWeight(weight, bd.numberOfBags, place);
@@ -44,10 +48,11 @@ async function backfillHarvestLots() {
         const wastageBags = breakdowns
           .filter((bd: any) => bd.size === "Wastage")
           .reduce((sum: number, bd: any) => sum + bd.numberOfBags, 0);
-        const actualBags = lot.originalBags - wastageBags;
+        const actualBags = isGateCut ? lot.originalBags : lot.originalBags - wastageBags;
 
         let totalCharges = 0;
         let netPayable = 0;
+        let earlyPayAmount = 0;
 
         if (place === "mandi") {
           const mandiPct = lot.mandiCommissionPercent ? parseFloat(lot.mandiCommissionPercent) : 0;
@@ -61,23 +66,31 @@ async function backfillHarvestLots() {
           const charges: Array<{type: string; amount: number | string}> = lot.charges || [];
           const hammaliGrading = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
           const coldStoreChargeTypes = ["Cold Charges", "Ware House Charges"];
+          // "Extra Charges to Buyer" is a buyer-side cost (added to COGS), never deducted from farmer.
           const dynamicCharges = charges
-            .filter((c: any) => !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
+            .filter((c: any) => c.type !== "Extra Charges to Buyer" && !(isFarmGate && coldStoreChargeTypes.includes(c.type)))
             .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
-          totalCharges = hammaliGrading + dynamicCharges;
-          
+          let totalDeductions = hammaliGrading + dynamicCharges;
+
+          const earlyPayPct = lot.earlyPayPercent ? parseFloat(lot.earlyPayPercent) : 0;
+          const earlyPayBase = costOfGoods - totalDeductions;
+          earlyPayAmount = earlyPayPct > 0 && earlyPayBase > 0 ? earlyPayBase * earlyPayPct / 100 : 0;
+          totalDeductions += earlyPayAmount;
+
           const adjType = lot.adjustedAmountType;
           const adjPrincipal = lot.adjustedAmount ? parseFloat(lot.adjustedAmount) : 0;
           const adjFinal = lot.adjustedAmountFinal ? parseFloat(lot.adjustedAmountFinal) : adjPrincipal;
           const interestOnly = adjFinal - adjPrincipal;
           const signedAdj = adjType === "credit" ? interestOnly : adjType === "debit" ? -interestOnly : 0;
-          netPayable = costOfGoods - totalCharges + signedAdj;
+          totalCharges = totalDeductions;
+          netPayable = costOfGoods - totalDeductions + signedAdj;
         }
 
         await db.update(lots)
           .set({ 
             totalCharges: totalCharges.toFixed(2), 
-            netPayable: netPayable.toFixed(2) 
+            netPayable: netPayable.toFixed(2),
+            earlyPayAmount: earlyPayAmount.toFixed(2),
           })
           .where(eq(lots.id, lot.id));
       }
