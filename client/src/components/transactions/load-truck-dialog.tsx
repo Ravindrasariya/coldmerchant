@@ -936,39 +936,6 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
                         <Separator />
 
-                        {/* Mandi Commission & Hammali */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label className="text-xs">{t("Mandi Comm. %", "मंडी कमीशन %")}</Label>
-                            <div className="relative mt-1">
-                              <Input
-                                type="number"
-                                step="any"
-                                placeholder="0"
-                                className="pr-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                value={section.mandiCommissionPct || ""}
-                                onChange={(e) => updateBuyerSection(section.id, { mandiCommissionPct: Number(e.target.value) || 0 })}
-                                data-testid={`input-mandi-comm-${sectionIndex}`}
-                              />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
-                            </div>
-                            <p className="text-xs text-orange-500 font-mono mt-0.5">₹{summary.mandiCommAmount.toLocaleString('en-IN')}</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
-                            <Input
-                              type="number"
-                              step="any"
-                              placeholder="0"
-                              className="mt-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              value={section.hammaliPerBag || ""}
-                              onChange={(e) => updateBuyerSection(section.id, { hammaliPerBag: Number(e.target.value) || 0 })}
-                              data-testid={`input-hammali-${sectionIndex}`}
-                            />
-                            <p className="text-xs text-orange-500 font-mono mt-0.5">₹{summary.hammaliAmount.toLocaleString('en-IN')}</p>
-                          </div>
-                        </div>
-
                         {/* Charges */}
                         <div className="grid grid-cols-3 gap-3">
                           <div>
