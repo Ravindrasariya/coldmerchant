@@ -6646,7 +6646,14 @@ export async function registerRoutes(
               hammaliCharges: lotData.hammaliCharges?.toString() || null,
               gradingCharges: lotData.gradingCharges?.toString() || null,
               transportCharges: lotData.transportCharges?.toString() || null,
-              remainingBags: lotData.remainingBags ?? lotData.originalBags,
+              // Derive remainingBags from persistent soldBags rather than
+              // trusting client. Sold history is the source of truth — the
+              // client field is read-only display only.
+              remainingBags: Math.max(
+                0,
+                (lotData.originalBags ?? existingLot?.originalBags ?? 0)
+                  - ((existingLot as any)?.soldBags ?? 0),
+              ),
               remarks: lotData.remarks || null,
             });
           } else if (lotData.coldStoreName && lotData.originalBags && lotData.potatoType && lotData.bagType && lotData.size && lotData.pricePerBag !== undefined) {
