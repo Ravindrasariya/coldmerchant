@@ -6312,13 +6312,20 @@ export async function backfillSoldBags(): Promise<{
 
   const allLots = await db.select().from(lots);
   for (const lot of allLots) {
-    // Lot soldBags = sum of non-wastage breakdown soldBags + gate-cut leftover.
+    // Invariant: when any breakdown rows exist, lot.soldBags is sourced
+    // exclusively from non-wastage breakdown.soldBags. Only pure-legacy
+    // gate-cut lots with zero breakdown rows fall back to transaction_items
+    // rows whose breakdownId is null.
     const lotBds = allBreakdowns.filter(b => b.lotId === lot.id);
-    const fromBreakdowns = lotBds
-      .filter(b => b.size !== "Wastage")
-      .reduce((s, b) => s + ((b.id && bdSoldByid.get(b.id)) ?? 0), 0);
-    const fromGate = gateLotSold.get(lot.id) ?? 0;
-    const want = Math.min(lot.originalBags ?? (fromBreakdowns + fromGate), fromBreakdowns + fromGate);
+    let want: number;
+    if (lotBds.length > 0) {
+      want = lotBds
+        .filter(b => b.size !== "Wastage")
+        .reduce((s, b) => s + ((b.id && bdSoldByid.get(b.id)) ?? 0), 0);
+    } else {
+      want = gateLotSold.get(lot.id) ?? 0;
+    }
+    want = Math.min(lot.originalBags ?? want, want);
     if ((lot.soldBags ?? 0) !== want) {
       await db.update(lots)
         .set({ soldBags: want })

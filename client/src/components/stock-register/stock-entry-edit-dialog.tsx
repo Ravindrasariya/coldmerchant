@@ -390,6 +390,22 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
 
   const handleRemoveBreakdown = (lotIndex: number, breakdownIndex: number) => {
     const newLots = [...lots];
+    const bd = newLots[lotIndex].bagBreakdowns[breakdownIndex];
+    // Block deletion of a row that has sold history — same reasoning as the
+    // numberOfBags floor: dropping the row would orphan transaction_items and
+    // silently erase sold bags from the lot total.
+    const sold = (bd as any)?.soldBags ?? Math.max(0, (bd?.numberOfBags || 0) - (bd?.remainingBags ?? bd?.numberOfBags ?? 0));
+    if (sold > 0 && bd?.size !== "Wastage") {
+      toast({
+        title: t("Cannot delete row", "पंक्ति हटा नहीं सकते"),
+        description: t(
+          `${sold} bags from this row have already been sold. Reduce sold bags via the transactions tab first.`,
+          `इस पंक्ति से ${sold} बोरी पहले ही बिक चुकी हैं। पहले लेन-देन टैब से बिक्री हटाएँ।`,
+        ),
+        variant: "destructive",
+      });
+      return;
+    }
     newLots[lotIndex].bagBreakdowns.splice(breakdownIndex, 1);
     setLots(newLots);
   };

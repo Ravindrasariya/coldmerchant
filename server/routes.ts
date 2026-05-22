@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError, StockEntryDeletionBlockedError } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers, seedLots } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -1635,6 +1635,14 @@ export async function registerRoutes(
               const idsToDelete = Array.from(existingIds);
               for (const oldId of idsToDelete) {
                 const deletedBd = existingBreakdowns.find((b: any) => b.id === oldId);
+                // Block deletion of a row with sold history — would orphan
+                // transaction_items.breakdownId and silently lose sold bags
+                // from the lot total.
+                if (deletedBd && deletedBd.size !== "Wastage" && ((deletedBd as any).soldBags ?? 0) > 0) {
+                  return res.status(400).json({
+                    message: `Cannot delete ${deletedBd.size} row — ${(deletedBd as any).soldBags} bags have already been sold via transactions.`,
+                  });
+                }
                 if (deletedBd) {
                   changes.push({
                     scope: 'breakdown',
@@ -1712,26 +1720,12 @@ export async function registerRoutes(
         });
       }
 
-      // Update the breakdown
+      // Use adjustInventory so remainingBags AND soldBags both move (the
+      // helper applies the inverse to soldBags, which is what we want for
+      // a sell — bagsDelta is negative). This keeps the persistent
+      // soldBags column in sync with these ad-hoc sell endpoints.
+      await storage.adjustInventory(breakdown.lotId, breakdownId, merchantId, -quantity);
       const newRemaining = currentRemaining - quantity;
-      await storage.updateBagBreakdown(breakdownId, merchantId, {
-        remainingBags: newRemaining,
-      });
-
-      // Update the lot's remaining bags
-      const lot = await storage.getLotById(breakdown.lotId, merchantId);
-      if (lot) {
-        const allBreakdowns = await storage.getBagBreakdownsByLot(breakdown.lotId, merchantId);
-        const totalRemaining = allBreakdowns.reduce((sum, bd) => {
-          if (bd.size === "Wastage") return sum;
-          if (bd.id === breakdownId) return sum + newRemaining;
-          return sum + (bd.remainingBags ?? bd.numberOfBags);
-        }, 0);
-        
-        await storage.updateLot(breakdown.lotId, merchantId, {
-          remainingBags: totalRemaining,
-        });
-      }
 
       res.json({ success: true, remainingBags: newRemaining });
     } catch (error) {
@@ -1762,10 +1756,9 @@ export async function registerRoutes(
         });
       }
 
+      // Same as above — go through adjustInventory so soldBags is updated.
+      await storage.adjustInventory(lotId, null, merchantId, -quantity);
       const newRemaining = lot.remainingBags - quantity;
-      await storage.updateLot(lotId, merchantId, {
-        remainingBags: newRemaining,
-      });
 
       res.json({ success: true, remainingBags: newRemaining });
     } catch (error) {
@@ -6723,7 +6716,19 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const lotId = parseInt(req.params.lotId);
-      
+
+      // Block deletion of a seed lot with sold history — would orphan
+      // seed_transaction_items.seedLotId and silently lose sold bags.
+      const [existingLot] = await db
+        .select()
+        .from(seedLots)
+        .where(and(eq(seedLots.id, lotId), eq(seedLots.merchantId, merchantId)));
+      if (existingLot && (existingLot.soldBags ?? 0) > 0) {
+        return res.status(400).json({
+          message: `Cannot delete seed lot — ${existingLot.soldBags} bags have already been sold via seed transactions.`,
+        });
+      }
+
       await storage.deleteSeedLot(lotId, merchantId);
       res.json({ message: "Seed lot deleted successfully" });
     } catch (error) {
