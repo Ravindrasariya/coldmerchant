@@ -908,6 +908,12 @@ export default function AdminPage() {
                     description: "For each harvest/seed stock entry already marked 'paid' but whose amountPaid is below the current Σ lot.netPayable (the card display basis), bumps amountPaid up so the stock register card shows Due ₹0. Skips entries still showing real outstanding due. Run AFTER Backfill Harvest Breakdowns. Idempotent.",
                     endpoint: "/api/admin/reconcile-amount-paid",
                   },
+                  {
+                    id: "backfill-sold-bags",
+                    name: "Backfill Sold Bags",
+                    description: "Recomputes the persistent soldBags column on bag_breakdowns, lots, and seed_lots from live transaction_items and seed_transaction_items across all merchants. Run once after deploying the soldBags column; safe to re-run. Protects edit dialogs from silently erasing sold history when numberOfBags is reduced.",
+                    endpoint: "/api/admin/backfill-sold-bags",
+                  },
                 ].map((utility) => {
                   const result = utilityResults[utility.id] || { status: "idle" };
                   return (

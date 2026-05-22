@@ -474,10 +474,27 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Input
                         type="number"
                         value={lot.originalBags || ""}
-                        onChange={(e) => handleLotChange(lotIndex, "originalBags", parseInt(e.target.value) || 0)}
+                        min={(lot as any).soldBags ?? 0}
+                        onChange={(e) => {
+                          const requested = parseInt(e.target.value) || 0;
+                          const sold = (lot as any).soldBags ?? Math.max(0, (lot.originalBags || 0) - (lot.remainingBags || 0));
+                          // Floor at soldBags — capacity can never drop below sold history.
+                          handleLotChange(lotIndex, "originalBags", Math.max(requested, sold));
+                        }}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-original-bags`}
                       />
+                      {(() => {
+                        const sold = (lot as any).soldBags ?? Math.max(0, (lot.originalBags || 0) - (lot.remainingBags || 0));
+                        return sold > 0 ? (
+                          <div
+                            className="text-[10px] text-muted-foreground"
+                            data-testid={`text-seed-lot-${lotIndex}-sold`}
+                          >
+                            {sold} {t("sold", "बेची")} / {lot.remainingBags || 0} {t("remaining", "शेष")}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">{t("Remaining Bags", "बचे बोरी")}</Label>

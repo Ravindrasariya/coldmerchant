@@ -405,9 +405,16 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     if (field === "numberOfBags" && typeof value === "number") {
       const oldNumberOfBags = bd.numberOfBags || 0;
       const oldRemaining = bd.remainingBags ?? oldNumberOfBags;
-      const soldBags = Math.max(0, oldNumberOfBags - oldRemaining);
-      bd.numberOfBags = value;
-      bd.remainingBags = Math.max(0, value - soldBags);
+      // Prefer the persistent soldBags column when available; fall back to
+      // derived (oldNumberOfBags - oldRemaining) for legacy rows.
+      const persistedSold = (bd as any).soldBags;
+      const soldBags = typeof persistedSold === "number"
+        ? persistedSold
+        : Math.max(0, oldNumberOfBags - oldRemaining);
+      // Don't let users reduce capacity below what's already sold.
+      const next = Math.max(value, soldBags);
+      bd.numberOfBags = next;
+      bd.remainingBags = Math.max(0, next - soldBags);
     } else {
       (bd as any)[field] = value;
     }
@@ -974,6 +981,17 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                   <span className="text-primary">{remaining}</span>
                                   <span className="text-muted-foreground">/{bd.numberOfBags}</span>
                                 </div>
+                                {(() => {
+                                  const sold = (bd as any).soldBags ?? Math.max(0, (bd.numberOfBags || 0) - (bd.remainingBags ?? bd.numberOfBags ?? 0));
+                                  return sold > 0 ? (
+                                    <div
+                                      className="text-[10px] text-muted-foreground mt-0.5"
+                                      data-testid={`edit-breakdown-sold-${lotIndex}-${bdIndex}`}
+                                    >
+                                      {sold} {t("sold", "बेची")} / {remaining} {t("remaining", "शेष")}
+                                    </div>
+                                  ) : null;
+                                })()}
                               </div>
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Total Wt", "कुल वजन")}</label>

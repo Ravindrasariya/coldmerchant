@@ -128,6 +128,10 @@ export const lots = pgTable("lots", {
   totalCharges: decimal("total_charges", { precision: 12, scale: 2 }),
   netPayable: decimal("net_payable", { precision: 12, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),
+  // Persistent sold-bag history (Σ bag_breakdowns.soldBags for non-wastage).
+  // Independent of remainingBags so reducing numberOfBags via edit can be
+  // blocked when it would erase real transaction history.
+  soldBags: integer("sold_bags").notNull().default(0),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -140,6 +144,9 @@ export const bagBreakdowns = pgTable("bag_breakdowns", {
   size: text("size").notNull(), // Large, Medium, Small, Wastage
   numberOfBags: integer("number_of_bags").notNull(),
   remainingBags: integer("remaining_bags"), // tracks remaining per size, initially equals numberOfBags
+  // Persistent count of bags moved out via transactions. numberOfBags can
+  // never be reduced below this without violating sold history.
+  soldBags: integer("sold_bags").notNull().default(0),
   weight: decimal("weight", { precision: 10, scale: 2 }),
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
@@ -511,6 +518,9 @@ export const seedLots = pgTable("seed_lots", {
   netPayable: decimal("net_payable", { precision: 12, scale: 2 }),
   avgCostPerBag: decimal("avg_cost_per_bag", { precision: 10, scale: 2 }),
   remainingBags: integer("remaining_bags").notNull(),
+  // Persistent count of bags moved out via seed transactions. Seed has no
+  // per-breakdown table — soldBags lives directly on seed_lots.
+  soldBags: integer("sold_bags").notNull().default(0),
   remarks: text("remarks"),
   createdAt: timestamp("created_at").defaultNow(),
 });

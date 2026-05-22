@@ -1568,6 +1568,19 @@ export async function registerRoutes(
                   const existingBd = existingBreakdowns.find((b: any) => b.id === bdData.id);
                   const bdLabel = `Breakdown ${bdData.size} in ${existingLot?.coldStoreName || 'Unknown'}`;
 
+                  // Guard: never let numberOfBags drop below soldBags. Sold
+                  // history is persistent — shrinking capacity below what's
+                  // already gone out via transactions would silently corrupt
+                  // FIFO and COGS.
+                  if (existingBd && bdData.size !== "Wastage") {
+                    const sold = (existingBd as any).soldBags ?? 0;
+                    if ((bdData.numberOfBags ?? 0) < sold) {
+                      return res.status(400).json({
+                        message: `Cannot reduce ${existingBd.size} bags below ${sold} — that many bags have already been sold via transactions.`,
+                      });
+                    }
+                  }
+
                   // Track breakdown changes
                   if (existingBd) {
                     compareField('size', existingBd.size, bdData.size, bdLabel, 'breakdown', bdData.id);
@@ -1763,6 +1776,21 @@ export async function registerRoutes(
 
   // ============= ADMIN ROUTES =============
   
+  // POST /api/admin/backfill-sold-bags - Recompute soldBags from live transactions
+  app.post("/api/admin/backfill-sold-bags", requireSystemAdmin, async (_req, res) => {
+    try {
+      const { backfillSoldBags } = await import("./storage");
+      const result = await backfillSoldBags();
+      res.json({
+        message: `Backfilled sold bags across all merchants`,
+        ...result,
+      });
+    } catch (err: any) {
+      console.error("backfill-sold-bags error:", err);
+      res.status(500).json({ message: err?.message || "Failed to backfill sold bags" });
+    }
+  });
+
   // GET /api/admin/merchants - Get all merchants (admin only)
   app.get("/api/admin/merchants", requireSystemAdmin, async (req, res) => {
     try {
@@ -6551,6 +6579,15 @@ export async function registerRoutes(
             const lotChanges: FieldChange[] = [];
             
             if (existingLot) {
+              // Guard: never let originalBags fall below soldBags. Sold
+              // history is persistent; reducing capacity below what has
+              // already been sold via seed transactions would corrupt FIFO.
+              const sold = (existingLot as any).soldBags ?? 0;
+              if (lotData.originalBags !== undefined && (lotData.originalBags ?? 0) < sold) {
+                return res.status(400).json({
+                  message: `Cannot reduce original bags below ${sold} — that many bags have already been sold via seed transactions.`,
+                });
+              }
               // Track field changes with proper normalization
               if (lotData.coldStoreName !== undefined && lotData.coldStoreName !== existingLot.coldStoreName) {
                 lotChanges.push({ field: "Cold Store", oldValue: existingLot.coldStoreName, newValue: lotData.coldStoreName });

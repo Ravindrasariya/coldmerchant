@@ -57,6 +57,88 @@ import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
 
+// ---------------------------------------------------------------------------
+// Persistent sold-bag tracking helpers.
+//
+// `soldBags` lives on bag_breakdowns (per-size, for harvest lots) and on
+// lots/seed_lots (aggregate). It mirrors the cumulative bagsMoved out via
+// transactions and is intentionally independent of remainingBags so that
+// editing numberOfBags cannot silently erase real sold history. Every site
+// that mutates remainingBags from a transaction (create/update/delete on
+// both harvest and seed) must also call the matching helper here so the
+// invariant
+//   lot.soldBags = Σ bag_breakdowns.soldBags (non-wastage)
+// (or for legacy gate-cut lots with no breakdown row, the lot-level value)
+// stays true.
+// ---------------------------------------------------------------------------
+async function applyHarvestSoldDelta(
+  client: any,
+  merchantId: number,
+  lotId: number,
+  breakdownId: number | null,
+  delta: number,
+): Promise<void> {
+  if (breakdownId) {
+    const [bd] = await client.select().from(bagBreakdowns)
+      .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+    if (bd) {
+      const cap = bd.numberOfBags ?? 0;
+      const cur = bd.soldBags ?? 0;
+      // Clamp into [0, numberOfBags]. We never let soldBags exceed capacity;
+      // a transaction that would do so should have already been rejected
+      // upstream by the remainingBags decrement guard.
+      const next = Math.max(0, Math.min(cap, cur + delta));
+      await client.update(bagBreakdowns)
+        .set({ soldBags: next })
+        .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+    }
+  }
+  // Always recompute lot.soldBags from the breakdown rows when any exist —
+  // this keeps the invariant tight even for legacy gate-cut items that
+  // pass breakdownId=null but whose lot does actually have a synthetic
+  // breakdown row (every lot created via the current create route has one).
+  const allBd = await client.select().from(bagBreakdowns)
+    .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+  if (allBd.length > 0) {
+    const lotSold = allBd
+      .filter((b: any) => b.size !== "Wastage")
+      .reduce((s: number, b: any) => s + (b.soldBags ?? 0), 0);
+    await client.update(lots)
+      .set({ soldBags: lotSold })
+      .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+  } else if (!breakdownId) {
+    // Pure-legacy: gate-cut lot with no breakdown rows at all. Apply the
+    // delta directly to the lot's soldBags, clamped to its capacity.
+    const [lot] = await client.select().from(lots)
+      .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+    if (lot) {
+      const cap = lot.originalBags ?? 0;
+      const cur = lot.soldBags ?? 0;
+      const next = Math.max(0, Math.min(cap, cur + delta));
+      await client.update(lots)
+        .set({ soldBags: next })
+        .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+    }
+  }
+}
+
+async function applySeedSoldDelta(
+  client: any,
+  merchantId: number,
+  seedLotId: number,
+  delta: number,
+): Promise<void> {
+  const [lot] = await client.select().from(seedLots)
+    .where(and(eq(seedLots.id, seedLotId), eq(seedLots.merchantId, merchantId)));
+  if (!lot) return;
+  const cap = lot.originalBags ?? 0;
+  const cur = lot.soldBags ?? 0;
+  const next = Math.max(0, Math.min(cap, cur + delta));
+  await client.update(seedLots)
+    .set({ soldBags: next })
+    .where(and(eq(seedLots.id, seedLotId), eq(seedLots.merchantId, merchantId)));
+}
+
 // Helper function to normalize names for case-insensitive, space-trimmed matching
 function normalizeName(name: string | null | undefined): string {
   if (!name) return "";
@@ -1156,6 +1238,9 @@ export class DatabaseStorage implements IStorage {
           await this.updateLot(item.lotId, item.merchantId, { remainingBags: newRemaining });
         }
       }
+      // Mirror the remainingBags decrement into the persistent soldBags column
+      // so editing numberOfBags later cannot silently erase sold history.
+      await applyHarvestSoldDelta(db, item.merchantId, item.lotId, item.breakdownId ?? null, item.bagsMoved);
     }
     
     return { ...created, items: createdItems };
@@ -1707,6 +1792,9 @@ export class DatabaseStorage implements IStorage {
           .set({ remainingBags: next })
           .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
         touchedLots.add(bd.lotId);
+        // Mirror into soldBags so deleting a transaction also undoes the
+        // sold-history bump it created.
+        await applyHarvestSoldDelta(tx, merchantId, bd.lotId, breakdownId, -delta);
       }
 
       // Gate cuts: bump lot.remainingBags directly (capped at originalBags).
@@ -1718,6 +1806,7 @@ export class DatabaseStorage implements IStorage {
         await tx.update(lots)
           .set({ remainingBags: next })
           .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+        await applyHarvestSoldDelta(tx, merchantId, lotId, null, -delta);
       }
 
       // Recompute lot totals from breakdowns for any lot whose breakdowns moved.
@@ -1769,6 +1858,9 @@ export class DatabaseStorage implements IStorage {
         await this.updateLot(lotId, merchantId, { remainingBags: newRemaining });
       }
     }
+    // bagsDelta is the change applied to remainingBags. The matching sold
+    // delta is its inverse (returning bags = unselling, taking bags = selling).
+    await applyHarvestSoldDelta(db, merchantId, lotId, breakdownId, -bagsDelta);
   }
 
   // Cash Entry operations
@@ -4084,6 +4176,8 @@ export class DatabaseStorage implements IStorage {
         await this.updateSeedLot(oldItem.seedLotId, merchantId, {
           remainingBags: seedLot.remainingBags + oldItem.bagsMoved,
         });
+        // Unwind sold history for the items we're about to delete.
+        await applySeedSoldDelta(db, merchantId, oldItem.seedLotId, -oldItem.bagsMoved);
       }
     }
 
@@ -4109,6 +4203,7 @@ export class DatabaseStorage implements IStorage {
         await this.updateSeedLot(item.seedLotId, merchantId, {
           remainingBags: seedLot.remainingBags - item.bagsMoved,
         });
+        await applySeedSoldDelta(db, merchantId, item.seedLotId, item.bagsMoved);
       }
     }
 
@@ -4207,6 +4302,7 @@ export class DatabaseStorage implements IStorage {
         await this.updateSeedLot(item.seedLotId, transaction.merchantId, {
           remainingBags: seedLot.remainingBags - item.bagsMoved,
         });
+        await applySeedSoldDelta(db, transaction.merchantId, item.seedLotId, item.bagsMoved);
       }
     }
 
@@ -6163,3 +6259,94 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+// ---------------------------------------------------------------------------
+// One-shot backfill: recompute soldBags on bag_breakdowns, lots, and
+// seed_lots from the live transaction_items / seed_transaction_items tables.
+// Idempotent. Runs across ALL merchants (no merchantId scoping) — intended
+// for the system-admin utilities panel.
+// ---------------------------------------------------------------------------
+export async function backfillSoldBags(): Promise<{
+  bagBreakdownsUpdated: number;
+  lotsUpdated: number;
+  seedLotsUpdated: number;
+}> {
+  let bagBreakdownsUpdated = 0;
+  let lotsUpdated = 0;
+  let seedLotsUpdated = 0;
+
+  // 1. Per-breakdown sums for harvest items that reference a breakdown.
+  const bdSums = await db.execute(sql`
+    SELECT breakdown_id, COALESCE(SUM(bags_moved), 0)::int AS sold
+    FROM transaction_items
+    WHERE breakdown_id IS NOT NULL
+    GROUP BY breakdown_id
+  `);
+  const bdSoldByid = new Map<number, number>();
+  for (const row of (bdSums as any).rows ?? bdSums) {
+    bdSoldByid.set(Number(row.breakdown_id), Number(row.sold));
+  }
+
+  const allBreakdowns = await db.select().from(bagBreakdowns);
+  for (const bd of allBreakdowns) {
+    const want = bdSoldByid.get(bd.id) ?? 0;
+    if ((bd.soldBags ?? 0) !== want) {
+      await db.update(bagBreakdowns)
+        .set({ soldBags: want })
+        .where(eq(bagBreakdowns.id, bd.id));
+      bagBreakdownsUpdated++;
+    }
+  }
+
+  // 2. Per-lot sums for harvest items without a breakdown (pure gate-cut legacy).
+  const gateLotSums = await db.execute(sql`
+    SELECT lot_id, COALESCE(SUM(bags_moved), 0)::int AS sold
+    FROM transaction_items
+    WHERE breakdown_id IS NULL
+    GROUP BY lot_id
+  `);
+  const gateLotSold = new Map<number, number>();
+  for (const row of (gateLotSums as any).rows ?? gateLotSums) {
+    gateLotSold.set(Number(row.lot_id), Number(row.sold));
+  }
+
+  const allLots = await db.select().from(lots);
+  for (const lot of allLots) {
+    // Lot soldBags = sum of non-wastage breakdown soldBags + gate-cut leftover.
+    const lotBds = allBreakdowns.filter(b => b.lotId === lot.id);
+    const fromBreakdowns = lotBds
+      .filter(b => b.size !== "Wastage")
+      .reduce((s, b) => s + ((b.id && bdSoldByid.get(b.id)) ?? 0), 0);
+    const fromGate = gateLotSold.get(lot.id) ?? 0;
+    const want = Math.min(lot.originalBags ?? (fromBreakdowns + fromGate), fromBreakdowns + fromGate);
+    if ((lot.soldBags ?? 0) !== want) {
+      await db.update(lots)
+        .set({ soldBags: want })
+        .where(eq(lots.id, lot.id));
+      lotsUpdated++;
+    }
+  }
+
+  // 3. Seed lots: sum bagsMoved from seed_transaction_items.
+  const seedSums = await db.execute(sql`
+    SELECT seed_lot_id, COALESCE(SUM(bags_moved), 0)::int AS sold
+    FROM seed_transaction_items
+    GROUP BY seed_lot_id
+  `);
+  const seedSold = new Map<number, number>();
+  for (const row of (seedSums as any).rows ?? seedSums) {
+    seedSold.set(Number(row.seed_lot_id), Number(row.sold));
+  }
+  const allSeedLots = await db.select().from(seedLots);
+  for (const sl of allSeedLots) {
+    const want = Math.min(sl.originalBags ?? 0, seedSold.get(sl.id) ?? 0);
+    if ((sl.soldBags ?? 0) !== want) {
+      await db.update(seedLots)
+        .set({ soldBags: want })
+        .where(eq(seedLots.id, sl.id));
+      seedLotsUpdated++;
+    }
+  }
+
+  return { bagBreakdownsUpdated, lotsUpdated, seedLotsUpdated };
+}
