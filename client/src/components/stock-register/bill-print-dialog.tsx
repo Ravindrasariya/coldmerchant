@@ -164,10 +164,53 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const totalOriginalBags = entry.lots.reduce((sum, lot) => sum + lot.originalBags, 0);
   const totalRemainingBags = entry.lots.reduce((sum, lot) => sum + lot.remainingBags, 0);
   
+  // For Gate Cut lots, the buyer takes the whole lot (incl. Wastage) at a
+  // lump-sum rate, so the farmer must be paid for every bag — Wastage is NOT
+  // excluded. For Bilty Cut lots, Wastage is filtered out (current behavior).
+  const isPayableBreakdown = (bd: { size: string | null; numberOfBags: number }, cutType: string) => {
+    if (!bd || bd.numberOfBags <= 0) return false;
+    if (cutType === "gate_cut") return true;
+    return bd.size !== "Wastage";
+  };
+
+  const SIZE_TIE_ORDER = ["Large", "Medium", "Small", "Wastage"];
+
+  // Build a single consolidated row for a Gate Cut lot that has bag breakdowns.
+  // Size = the size with the highest bag count (ties broken by the order above).
+  // Rate = the rate of the dominant-size row. Amount = sum across all rows so it
+  // still reconciles with the bill total even when rates differ.
+  const buildGateCutConsolidatedRow = (lot: StockEntryWithLots["lots"][0]) => {
+    let totalBags = 0;
+    let totalNetWeight = 0;
+    let totalGrossWeight = 0;
+    let totalAmount = 0;
+    const bySize: Record<string, number> = {};
+    lot.bagBreakdowns.forEach(bd => {
+      if (!bd.numberOfBags || bd.numberOfBags <= 0) return;
+      const weight = bd.weight ? parseFloat(bd.weight) : 0;
+      const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
+      const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+      totalBags += bd.numberOfBags;
+      totalNetWeight += netWeight;
+      totalGrossWeight += weight;
+      totalAmount += netWeight * price;
+      bySize[bd.size || ""] = (bySize[bd.size || ""] || 0) + bd.numberOfBags;
+    });
+    let dominantSize = "Large";
+    let maxBags = -1;
+    for (const s of SIZE_TIE_ORDER) {
+      const c = bySize[s] || 0;
+      if (c > maxBags) { maxBags = c; dominantSize = s; }
+    }
+    const dominantBd = lot.bagBreakdowns.find(bd => bd.size === dominantSize && (bd.numberOfBags || 0) > 0);
+    const dominantPrice = dominantBd?.pricePerKg ? parseFloat(dominantBd.pricePerKg) : 0;
+    return { totalBags, totalNetWeight, totalGrossWeight, totalAmount, dominantSize, dominantPrice };
+  };
+
   const totalBagsExcludingWastage = entry.lots.reduce((sum, lot) => {
     if (lot.bagBreakdowns.length > 0) {
       return sum + lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0)
+        .filter(bd => isPayableBreakdown(bd, lot.cutType))
         .reduce((bdSum, bd) => bdSum + (bd.numberOfBags || 0), 0);
     }
     return sum + lot.originalBags;
@@ -178,7 +221,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     entry.lots.forEach(lot => {
       if (lot.bagBreakdowns.length > 0) {
         lot.bagBreakdowns.forEach(bd => {
-          if (bd.size === "Wastage" || bd.numberOfBags === 0) return;
+          if (!isPayableBreakdown(bd, lot.cutType)) return;
           if (bd.weight && bd.pricePerKg) {
             const weight = parseFloat(bd.weight);
             const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
@@ -213,7 +256,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
     if (lot.bagBreakdowns.length > 0) {
       totalPayable = lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0)
+        .filter(bd => isPayableBreakdown(bd, lot.cutType))
         .reduce((sum, bd) => {
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
@@ -221,7 +264,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           return sum + (netWeight * price);
         }, 0);
       totalBagsForMandi = lot.bagBreakdowns
-        .filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0)
+        .filter(bd => isPayableBreakdown(bd, lot.cutType))
         .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
     } else {
       const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
@@ -319,11 +362,18 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   })();
 
   const allTableRows = (() => {
-    const rows: Array<{ crop: string; bags: number; grossWeight: number; netWeight: number; price: number; amount: number }> = [];
+    const rows: Array<{ crop: string; bags: number; grossWeight: number; netWeight: number; price: number; amount: number; size?: string }> = [];
     entry.lots.forEach(lot => {
       if (lot.bagBreakdowns.length > 0) {
+        if (lot.cutType === "gate_cut") {
+          const c = buildGateCutConsolidatedRow(lot);
+          if (c.totalBags > 0) {
+            rows.push({ crop: lot.crop || "potato", bags: c.totalBags, grossWeight: c.totalGrossWeight, netWeight: c.totalNetWeight, price: c.dominantPrice, amount: c.totalAmount, size: c.dominantSize });
+          }
+          return;
+        }
         lot.bagBreakdowns.forEach(bd => {
-          if (bd.size === "Wastage" || bd.numberOfBags === 0) return;
+          if (!isPayableBreakdown(bd, lot.cutType)) return;
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
@@ -374,21 +424,33 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       let breakdownHtml = "";
       
       if (lot.bagBreakdowns.length > 0) {
-        const rows = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0).map((bd) => {
-          const weight = bd.weight ? parseFloat(bd.weight) : 0;
-          const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
-          const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-          const amount = netWeight * price;
-          return `
+        const renderRow = (cropLabel: string, bags: number, netWeight: number, price: number, amount: number) => `
             <tr>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}</td>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bd.numberOfBags}</td>
+              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${cropLabel}</td>
+              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bags}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${netWeight > 0 ? netWeight.toFixed(2) : "—"}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
               <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
             </tr>
           `;
-        }).join("");
+        let rows = "";
+        if (lot.cutType === "gate_cut") {
+          const c = buildGateCutConsolidatedRow(lot);
+          if (c.totalBags > 0) {
+            const cropLabel = `${getCropBilingual(lot.crop)} <span style="color:#666;">(${getSizeBilingual(c.dominantSize)})</span>`;
+            rows = renderRow(cropLabel, c.totalBags, c.totalNetWeight, c.dominantPrice, c.totalAmount);
+          }
+        } else {
+          rows = lot.bagBreakdowns
+            .filter(bd => isPayableBreakdown(bd, lot.cutType))
+            .map((bd) => {
+              const weight = bd.weight ? parseFloat(bd.weight) : 0;
+              const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
+              const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+              const amount = netWeight * price;
+              return renderRow(getCropBilingual(lot.crop), bd.numberOfBags, netWeight, price, amount);
+            }).join("");
+        }
         
         breakdownHtml = `
           <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
@@ -828,7 +890,21 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                     </tr>
                   </thead>
                   <tbody>
-                    {lot.bagBreakdowns.filter(bd => bd.size !== "Wastage" && bd.numberOfBags > 0).map((bd, bdIndex) => {
+                    {lot.cutType === "gate_cut" ? (() => {
+                      const c = buildGateCutConsolidatedRow(lot);
+                      if (c.totalBags <= 0) return null;
+                      return (
+                        <tr className="border-b border-gray-200">
+                          <td className="py-1 px-2">
+                            {getCropBilingual(lot.crop)} <span className="text-gray-500">({getSizeBilingual(c.dominantSize)})</span>
+                          </td>
+                          <td className="py-1 px-2 text-right font-mono">{c.totalBags}</td>
+                          <td className="py-1 px-2 text-right font-mono">{c.totalNetWeight > 0 ? c.totalNetWeight.toFixed(2) : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono">{c.dominantPrice > 0 ? `₹${parseFloat((Math.trunc(c.dominantPrice * 100) / 100).toFixed(2))}` : "—"}</td>
+                          <td className="py-1 px-2 text-right font-mono font-medium">{c.totalAmount > 0 ? `₹${parseFloat(c.totalAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
+                        </tr>
+                      );
+                    })() : lot.bagBreakdowns.filter(bd => isPayableBreakdown(bd, lot.cutType)).map((bd, bdIndex) => {
                       const weight = bd.weight ? parseFloat(bd.weight) : 0;
                       const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
                       const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
