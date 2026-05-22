@@ -9291,7 +9291,7 @@ export async function registerRoutes(
         const amt = parseFloat(e.amount);
         if (e.direction === "inward" && e.revenueType && e.revenueType !== "raw_potato" && e.revenueType !== "seed_sale" && e.revenueType !== "sundry_pay") {
           revenueByType[e.revenueType] = (revenueByType[e.revenueType] || 0) + amt;
-        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense" && e.expenseType !== "aadhtiya" && e.expenseType !== "supplier" && e.expenseType !== "cold_store_charge" && e.expenseType !== "warehouse_charges" && e.expenseType !== "sundry_pay" && e.expenseType !== "mandi_commission" && e.expenseType !== "hammali" && e.expenseType !== "farmer" && e.expenseType !== "farmer_advance" && e.expenseType !== "farmer_freight" && e.expenseType !== "farmer_others") {
+        } else if (e.direction === "outflow" && e.expenseType && e.expenseType !== "capital_expense" && e.expenseType !== "aadhtiya" && e.expenseType !== "supplier" && e.expenseType !== "cold_store_charge" && e.expenseType !== "warehouse_charges" && e.expenseType !== "sundry_pay" && e.expenseType !== "mandi_commission" && e.expenseType !== "hammali" && e.expenseType !== "grading" && e.expenseType !== "kata_charges" && e.expenseType !== "farmer" && e.expenseType !== "farmer_advance" && e.expenseType !== "farmer_freight" && e.expenseType !== "farmer_others") {
           expenseByType[e.expenseType] = (expenseByType[e.expenseType] || 0) + amt;
         }
       }
