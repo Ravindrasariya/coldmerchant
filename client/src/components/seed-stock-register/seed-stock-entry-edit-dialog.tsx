@@ -489,9 +489,10 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Remaining Bags", "बचे बोरी")}</Label>
                       <Input
                         type="number"
-                        value={Math.max(0, (lot.originalBags || 0) - ((lot as any).soldBags ?? 0)) || ""}
-                        onChange={(e) => handleLotChange(lotIndex, "remainingBags", parseInt(e.target.value) || 0)}
-                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        value={Math.max(0, (lot.originalBags || 0) - ((lot as any).soldBags ?? 0))}
+                        readOnly
+                        disabled
+                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-muted/50 cursor-not-allowed"
                         data-testid={`input-seed-lot-${lotIndex}-remaining-bags`}
                       />
                     </div>
