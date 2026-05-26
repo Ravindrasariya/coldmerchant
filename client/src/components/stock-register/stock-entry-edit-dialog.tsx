@@ -156,20 +156,11 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     adjustedAmountEffectiveDate: lot.adjustedAmountEffectiveDate || null,
     adjustedAmountRemark: lot.adjustedAmountRemark || "",
     bagBreakdowns: (() => {
-      // For any lot with no breakdowns (gate_cut or bilty_cut legacy), auto-create
-      // one row from lot-level data so the user can edit it directly and saving
-      // produces a real bag_breakdowns row (no 50 kg/bag fallback).
-      if (lot.bagBreakdowns.length === 0) {
-        return [{
-          id: 0,
-          size: lot.size || "Large",
-          numberOfBags: lot.originalBags,
-          remainingBags: lot.remainingBags,
-          weight: lot.totalWeight !== null && lot.totalWeight !== "0" && lot.totalWeight !== "0.00" ? parseFloat(lot.totalWeight) : null,
-          pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : 0,
-          totalAmount: null,
-        }];
-      }
+      // Keep state mirror of server data. Legacy lots with zero breakdowns stay
+      // empty here; handleSave validates lot-level Size + Original Bags and
+      // synthesizes a single row from lot-level fields right before mutating
+      // (see lotsForCleaning). This preserves the intended "synthesize on save"
+      // behavior and prevents a silent "Large" fallback masking missing data.
       return lot.bagBreakdowns.map(bd => ({
         ...bd,
         remainingBags: bd.remainingBags ?? bd.numberOfBags,
@@ -611,11 +602,14 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     // lot.originalBags are populated in this case.
     const lotsForCleaning = lots.map(lot => {
       if (lot.bagBreakdowns.length === 0) {
+        // handleSave's zero-row branch already validated lot.size and
+        // lot.originalBags are present, so mirror them exactly here — no
+        // implicit fallbacks that would hide missing data.
         return {
           ...lot,
           bagBreakdowns: [{
             id: 0,
-            size: lot.size || "",
+            size: lot.size,
             numberOfBags: lot.originalBags,
             remainingBags: lot.remainingBags ?? lot.originalBags,
             weight: lot.totalWeight,
