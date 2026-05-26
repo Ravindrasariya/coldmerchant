@@ -156,8 +156,10 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     adjustedAmountEffectiveDate: lot.adjustedAmountEffectiveDate || null,
     adjustedAmountRemark: lot.adjustedAmountRemark || "",
     bagBreakdowns: (() => {
-      // For gate cut with no breakdowns, auto-create one row from lot-level data
-      if (lot.cutType === "gate_cut" && lot.bagBreakdowns.length === 0) {
+      // For any lot with no breakdowns (gate_cut or bilty_cut legacy), auto-create
+      // one row from lot-level data so the user can edit it directly and saving
+      // produces a real bag_breakdowns row (no 50 kg/bag fallback).
+      if (lot.bagBreakdowns.length === 0) {
         return [{
           id: 0,
           size: lot.size || "Large",
@@ -483,18 +485,55 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
   };
 
   const handleSave = () => {
-    // Validate bag breakdown totals equal original bags
+    // Validate bag breakdowns: every row must have a non-empty Size AND
+    // Σ row.numberOfBags must equal lot.originalBags. Lots with zero
+    // breakdown rows get one synthesized from lot-level fields just before
+    // mutation (see cleanedLots below), so we only enforce strict rules
+    // when rows are present.
     for (let i = 0; i < lots.length; i++) {
       const lot = lots[i];
       if (lot.bagBreakdowns.length > 0) {
+        for (let j = 0; j < lot.bagBreakdowns.length; j++) {
+          const bd = lot.bagBreakdowns[j];
+          if (!bd.size || String(bd.size).trim() === "") {
+            toast({
+              title: t("Validation Error", "सत्यापन त्रुटि"),
+              description: t(
+                `Lot ${i + 1} > Breakdown ${j + 1}: Size is required`,
+                `लॉट ${i + 1} > विवरण ${j + 1}: साइज़ आवश्यक है`
+              ),
+              variant: "destructive"
+            });
+            return;
+          }
+        }
         const breakdownTotal = lot.bagBreakdowns.reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
         if (breakdownTotal !== lot.originalBags) {
           toast({
             title: t("Validation Error", "सत्यापन त्रुटि"),
             description: t(
-              `Lot ${i + 1}: Breakdown total (${breakdownTotal}) must equal Original Bags (${lot.originalBags})`,
-              `लॉट ${i + 1}: विवरण योग (${breakdownTotal}) मूल बोरी (${lot.originalBags}) के बराबर होना चाहिए`
+              `Lot ${i + 1}: Sum of breakdown bags (${breakdownTotal}) must equal Original # Bags (${lot.originalBags})`,
+              `लॉट ${i + 1}: विवरण बोरी का योग (${breakdownTotal}) मूल बोरी (${lot.originalBags}) के बराबर होना चाहिए`
             ),
+            variant: "destructive"
+          });
+          return;
+        }
+      } else {
+        // Zero breakdowns: require lot-level Size and Original Bags so the
+        // synthesized row downstream is valid.
+        if (!lot.size || String(lot.size).trim() === "") {
+          toast({
+            title: t("Validation Error", "सत्यापन त्रुटि"),
+            description: t(`Lot ${i + 1}: Size is required`, `लॉट ${i + 1}: साइज़ आवश्यक है`),
+            variant: "destructive"
+          });
+          return;
+        }
+        if (!lot.originalBags || lot.originalBags < 1) {
+          toast({
+            title: t("Validation Error", "सत्यापन त्रुटि"),
+            description: t(`Lot ${i + 1}: Original # Bags is required`, `लॉट ${i + 1}: मूल बोरी आवश्यक है`),
             variant: "destructive"
           });
           return;
@@ -566,7 +605,28 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     
     // Clean up charges before saving - remove empty entries and Early Pay/Bataw (handled via earlyPayPercent)
     // For gate_cut, sync lot-level fields from breakdowns (sum of weights, weighted avg price, first size)
-    const cleanedLots = lots.map(lot => {
+    // Safety net: if a lot somehow reaches save with zero breakdowns (e.g. user deleted
+    // all rows), synthesize one from lot-level fields so the backend doesn't fall back
+    // to the 50 kg/bag heuristic. handleSave's validation already ensured lot.size and
+    // lot.originalBags are populated in this case.
+    const lotsForCleaning = lots.map(lot => {
+      if (lot.bagBreakdowns.length === 0) {
+        return {
+          ...lot,
+          bagBreakdowns: [{
+            id: 0,
+            size: lot.size || "",
+            numberOfBags: lot.originalBags,
+            remainingBags: lot.remainingBags ?? lot.originalBags,
+            weight: lot.totalWeight,
+            pricePerKg: lot.pricePerKg ?? 0,
+            totalAmount: null,
+          }],
+        };
+      }
+      return lot;
+    });
+    const cleanedLots = lotsForCleaning.map(lot => {
       const earlyPayCharge = (lot.charges || []).find(c => c.type === "Early Pay/Bataw");
       const earlyPayPctFromCharge = earlyPayCharge
         ? (typeof earlyPayCharge.amount === 'string' ? parseFloat(earlyPayCharge.amount) : (earlyPayCharge.amount || 0))

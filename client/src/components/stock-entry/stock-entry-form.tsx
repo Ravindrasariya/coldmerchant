@@ -55,16 +55,14 @@ function getDefaultFormValues(selectedCrop: "potato" | "onion" | "garlic", selec
         hammaliPerBag: undefined,
         mandiExtraCharges: undefined,
         remarks: "",
-        // Always seed one breakdown row so every lot persists a real
-        // bag_breakdowns entry. FIFO due basis = Σ lot.netPayable, which is
-        // derived from breakdown weights × prices; an empty breakdown list
-        // would force a 50kg/bag fallback and produce a phantom Due.
-        bagBreakdowns: [{
-          size: "",
-          numberOfBags: 0,
-          weight: undefined,
-          pricePerKg: undefined,
-        }],
+        // Start empty. If the user never opens the Final Bags Breakdown table
+        // (or for Gate Cut where it's hidden), the submit handler synthesizes
+        // one row from lot-level size / originalBags / totalWeight / pricePerKg
+        // so the lot still persists a real bag_breakdowns entry (avoiding the
+        // 50kg/bag server fallback). If the user adds explicit rows via
+        // "Add Row", submit enforces non-empty Size on every row AND
+        // Σ row.numberOfBags === lot.originalBags.
+        bagBreakdowns: [],
       },
     ],
   };
@@ -319,18 +317,67 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
       ...mandiChargesFromPrev,
       mandiExtraCharges: undefined,
       remarks: "",
-      // Seed one breakdown row — see comment in getDefaultFormValues.
-      bagBreakdowns: [{
-        size: "",
-        numberOfBags: 0,
-        weight: undefined,
-        pricePerKg: undefined,
-      }],
+      // Start empty — see comment in getDefaultFormValues.
+      bagBreakdowns: [],
     });
   };
 
   const onSubmit = (data: StockEntryFormType) => {
-    createMutation.mutate(data);
+    // Walk each lot: if the user didn't add any explicit breakdown rows,
+    // synthesize one row from lot-level size/originalBags/totalWeight/pricePerKg.
+    // If the user added one or more rows, enforce strict rules: every row must
+    // have a non-empty Size, and Σ row.numberOfBags === lot.originalBags.
+    const flatErrors: string[] = [];
+    const lotLabel = (i: number) => `${t("Lot", "लॉट")} ${i + 1}`;
+
+    const processedLots = data.lots.map((lot, i) => {
+      const bds = lot.bagBreakdowns || [];
+      if (bds.length === 0) {
+        // Synthesize. Require lot-level Size and Total Bags to be present.
+        if (!lot.size || String(lot.size).trim() === "") {
+          flatErrors.push(`${lotLabel(i)} > ${t("Size", "साइज़")}`);
+        }
+        if (!lot.originalBags || Number(lot.originalBags) < 1) {
+          flatErrors.push(`${lotLabel(i)} > ${t("Total Bags", "कुल बोरी")}`);
+        }
+        return {
+          ...lot,
+          bagBreakdowns: [{
+            size: lot.size || "",
+            numberOfBags: Number(lot.originalBags) || 0,
+            weight: lot.totalWeight,
+            pricePerKg: lot.pricePerKg,
+          }],
+        };
+      }
+      // Strict mode — user added rows explicitly.
+      bds.forEach((bd, j) => {
+        if (!bd.size || String(bd.size).trim() === "") {
+          flatErrors.push(`${lotLabel(i)} > ${t("Breakdown", "ब्रेकडाउन")} ${j + 1} > ${t("Size", "साइज़")}`);
+        }
+      });
+      const sumBags = bds.reduce((s, bd) => s + (Number(bd.numberOfBags) || 0), 0);
+      const orig = Number(lot.originalBags) || 0;
+      if (sumBags !== orig) {
+        flatErrors.push(t(
+          `${lotLabel(i)}: Sum of breakdown bags (${sumBags}) must equal Original # Bags (${orig})`,
+          `${lotLabel(i)}: विवरण बोरी का योग (${sumBags}) मूल बोरी (${orig}) के बराबर होना चाहिए`
+        ));
+      }
+      return lot;
+    });
+
+    if (flatErrors.length > 0) {
+      toast({
+        title: t("Please fill required fields", "कृपया आवश्यक फ़ील्ड भरें"),
+        description: flatErrors.slice(0, 6).join(" • "),
+        variant: "destructive",
+        duration: 8000,
+      });
+      return;
+    }
+
+    createMutation.mutate({ ...data, lots: processedLots });
   };
 
   const fieldLabels: Record<string, string> = {

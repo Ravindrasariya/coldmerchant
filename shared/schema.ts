@@ -1109,7 +1109,11 @@ export type ChangeSet = ChangeItem[];
 
 // Extended types for frontend use
 export const bagBreakdownFormSchema = z.object({
-  size: z.string().min(1, "Size is required"),
+  // Size is enforced at submit time in stock-entry-form.tsx / stock-entry-edit-dialog.tsx
+  // (strict only when the user has explicitly added breakdown rows; otherwise the row
+  // is synthesized from lot-level fields). Keeping it optional here avoids spurious
+  // "Size is required" toasts on the auto-synthesized row.
+  size: z.string().optional(),
   numberOfBags: z.coerce.number().min(0, "Number of bags must be positive"),
   weight: z.coerce.number().optional(),
   pricePerKg: z.coerce.number().optional(),
