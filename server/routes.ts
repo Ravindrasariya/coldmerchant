@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError, StockEntryDeletionBlockedError } from "./storage";
 import { setupAuth } from "./auth";
-import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers, seedLots } from "@shared/schema";
+import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers, seedLots, validateLotBagBreakdowns } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -798,6 +798,20 @@ export async function registerRoutes(
 
       const data = validationResult.data;
 
+      // Strict server-side guard: every lot's bag breakdowns (when sent) must
+      // have a non-blank Size on every row and Σ numberOfBags must equal
+      // originalBags. Empty arrays are still allowed — the route synthesizes
+      // a single row from lot-level fields below.
+      for (const lotData of data.lots) {
+        const check = validateLotBagBreakdowns(
+          lotData.bagBreakdowns as any,
+          lotData.originalBags,
+        );
+        if (!check.ok) {
+          return res.status(400).json({ message: check.message });
+        }
+      }
+
       // Optional client-supplied Sr# override. When present, validate it is
       // a positive integer and that it is not already used by another entry
       // in the same merchant + same calendar year of purchase_date.
@@ -1380,6 +1394,27 @@ export async function registerRoutes(
       const existingEntry = await storage.getStockEntryById(id, merchantId);
       if (!existingEntry) {
         return res.status(404).json({ message: "Stock entry not found" });
+      }
+
+      // Strict server-side guard: when the client sends bagBreakdowns for a
+      // lot, every row must have a non-blank Size and Σ numberOfBags must
+      // equal the lot's originalBags (payload value if provided, else the
+      // existing lot's value). Empty/missing arrays are still allowed — the
+      // route synthesizes a single row from lot-level fields below.
+      if (lots && Array.isArray(lots)) {
+        for (const lotData of lots) {
+          if (!lotData?.bagBreakdowns) continue;
+          const existingLot = lotData.id
+            ? existingEntry.lots.find((l: any) => l.id === lotData.id)
+            : undefined;
+          const targetBags = Number(
+            lotData.originalBags ?? existingLot?.originalBags ?? 0,
+          );
+          const check = validateLotBagBreakdowns(lotData.bagBreakdowns, targetBags);
+          if (!check.ok) {
+            return res.status(400).json({ message: check.message });
+          }
+        }
       }
 
       // Track changes

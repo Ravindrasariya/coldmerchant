@@ -1206,6 +1206,41 @@ export type BagBreakdownForm = z.infer<typeof bagBreakdownFormSchema>;
 export type LotForm = z.infer<typeof lotFormSchema>;
 export type StockEntryForm = z.infer<typeof stockEntryFormSchema>;
 
+// Strict server-side guard for bag breakdowns. The client enforces the same
+// rules at submit time in stock-entry-form.tsx and stock-entry-edit-dialog.tsx,
+// but a script or stale tab posting directly to /api/stock-entries could
+// otherwise sneak in rows with empty Size or a wrong Σ — which silently
+// corrupts COGS and FIFO dues downstream.
+//
+// An empty/missing bagBreakdowns array is still allowed: the route layer
+// auto-synthesizes a single row from lot-level fields in that case.
+export function validateLotBagBreakdowns(
+  bagBreakdowns: Array<{ size?: string | null; numberOfBags?: number | null }> | null | undefined,
+  originalBags: number,
+): { ok: true } | { ok: false; message: string } {
+  if (!bagBreakdowns || bagBreakdowns.length === 0) return { ok: true };
+  let sum = 0;
+  for (const row of bagBreakdowns) {
+    const size = (row?.size ?? "").toString().trim();
+    if (!size) {
+      return { ok: false, message: "Every bag breakdown row must have a Size." };
+    }
+    const n = Number(row?.numberOfBags ?? 0);
+    if (!Number.isFinite(n) || n < 0) {
+      return { ok: false, message: "Bag breakdown row has invalid number of bags." };
+    }
+    sum += n;
+  }
+  const target = Number(originalBags);
+  if (!Number.isFinite(target) || sum !== target) {
+    return {
+      ok: false,
+      message: `Sum of bag breakdown bags (${sum}) must equal original bags (${target}).`,
+    };
+  }
+  return { ok: true };
+}
+
 // Transaction form schemas for frontend
 export const transactionItemFormSchema = z.object({
   lotId: z.coerce.number().min(1, "Lot is required"),
