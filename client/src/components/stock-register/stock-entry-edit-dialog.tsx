@@ -511,16 +511,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           return;
         }
       } else {
-        // Zero breakdowns: require lot-level Size and Original Bags so the
-        // synthesized row downstream is valid.
-        if (!lot.size || String(lot.size).trim() === "") {
-          toast({
-            title: t("Validation Error", "सत्यापन त्रुटि"),
-            description: t(`Lot ${i + 1}: Size is required`, `लॉट ${i + 1}: साइज़ आवश्यक है`),
-            variant: "destructive"
-          });
-          return;
-        }
+        // Zero breakdowns: Size is optional. The lot is saved with an empty
+        // breakdown array and the server synthesizes a single row from
+        // lot-level fields. Only Original Bags is required for that synthesis.
         if (!lot.originalBags || lot.originalBags < 1) {
           toast({
             title: t("Validation Error", "सत्यापन त्रुटि"),
@@ -596,31 +589,11 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     
     // Clean up charges before saving - remove empty entries and Early Pay/Bataw (handled via earlyPayPercent)
     // For gate_cut, sync lot-level fields from breakdowns (sum of weights, weighted avg price, first size)
-    // Safety net: if a lot somehow reaches save with zero breakdowns (e.g. user deleted
-    // all rows), synthesize one from lot-level fields so the backend doesn't fall back
-    // to the 50 kg/bag heuristic. handleSave's validation already ensured lot.size and
-    // lot.originalBags are populated in this case.
-    const lotsForCleaning = lots.map(lot => {
-      if (lot.bagBreakdowns.length === 0) {
-        // handleSave's zero-row branch already validated lot.size and
-        // lot.originalBags are present, so mirror them exactly here — no
-        // implicit fallbacks that would hide missing data.
-        return {
-          ...lot,
-          bagBreakdowns: [{
-            id: 0,
-            size: lot.size,
-            numberOfBags: lot.originalBags,
-            remainingBags: lot.remainingBags ?? lot.originalBags,
-            weight: lot.totalWeight,
-            pricePerKg: lot.pricePerKg ?? 0,
-            totalAmount: null,
-          }],
-        };
-      }
-      return lot;
-    });
-    const cleanedLots = lotsForCleaning.map(lot => {
+    // Zero-row lots keep their empty breakdown array; the server synthesizes a
+    // single row from lot-level fields (Size optional). We never fabricate a
+    // blank-Size row client-side, since the server's strict guard rejects a
+    // non-empty array that contains a blank Size.
+    const cleanedLots = lots.map(lot => {
       const earlyPayCharge = (lot.charges || []).find(c => c.type === "Early Pay/Bataw");
       const earlyPayPctFromCharge = earlyPayCharge
         ? (typeof earlyPayCharge.amount === 'string' ? parseFloat(earlyPayCharge.amount) : (earlyPayCharge.amount || 0))

@@ -333,22 +333,15 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     const processedLots = data.lots.map((lot, i) => {
       const bds = lot.bagBreakdowns || [];
       if (bds.length === 0) {
-        // Synthesize. Require lot-level Size and Total Bags to be present.
-        if (!lot.size || String(lot.size).trim() === "") {
-          flatErrors.push(`${lotLabel(i)} > ${t("Size", "साइज़")}`);
-        }
+        // No explicit breakdown rows: Size is optional here (Gate Cut hides
+        // the breakdown table; Bilty Cut doesn't require adding one). Send an
+        // empty array — the server synthesizes a single row from lot-level
+        // fields. We do NOT fabricate a blank-Size row client-side, since the
+        // server's strict guard would reject a non-empty array with a blank Size.
         if (!lot.originalBags || Number(lot.originalBags) < 1) {
           flatErrors.push(`${lotLabel(i)} > ${t("Total Bags", "कुल बोरी")}`);
         }
-        return {
-          ...lot,
-          bagBreakdowns: [{
-            size: lot.size || "",
-            numberOfBags: Number(lot.originalBags) || 0,
-            weight: lot.totalWeight,
-            pricePerKg: lot.pricePerKg,
-          }],
-        };
+        return { ...lot, bagBreakdowns: [] };
       }
       // Strict mode — user added rows explicitly.
       bds.forEach((bd, j) => {
