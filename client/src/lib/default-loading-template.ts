@@ -40,13 +40,13 @@ export const defaultLoadingTemplate = `<!DOCTYPE html>
   <div class="header">
     <h1>{{merchantName}}</h1>
     <p>{{merchantAddress}}</p>
-    <p>Phone : Mobile&nbsp; AP &ndash; {{merchantContact}}</p>
+    <p>Phone : Mobile&nbsp; &ndash; {{merchantContact}}</p>
     <p class="tagline">Commission Agent &amp; Order Suppliers of Potato, Onion, Garlic, Ginger &amp; Arbi</p>
   </div>
 
   <table class="buyer-table">
     <tr>
-      <td class="buyer-name-cell" rowspan="4">{{buyerName}}</td>
+      <td class="buyer-name-cell" rowspan="4"><div style="display:flex;flex-direction:column;height:100%;min-height:90px"><div>{{buyerName}}</div>{{buyerContact}}</div></td>
       <td style="width:100px">Quantity</td>
       <td>{{totalBags}}</td>
     </tr>

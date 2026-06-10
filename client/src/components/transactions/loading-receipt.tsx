@@ -22,6 +22,7 @@ interface TransactionItem {
   amount: string | null;
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
+  marka: string | null;
 }
 
 interface LoadingTransaction {
@@ -234,7 +235,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
     const itemsDataRows = transaction.items.map((item) =>
-      `<tr><td>${escHtml(cropLabel)}</td><td></td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
+      `<tr><td>${escHtml(cropLabel)}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
     ).join("");
     const blankCount = Math.max(0, minRows - transaction.items.length);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
@@ -297,6 +298,9 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       "{{receiptNumber}}": String(transaction.transactionNumber),
       "{{date}}": dateStr,
       "{{buyerName}}": escHtml(transaction.partyName || buyer?.name || ""),
+      "{{buyerContact}}": buyer?.contact && buyer.contact.trim()
+        ? `<div style="margin-top:auto;font-weight:normal;font-size:13px">Mobile: ${escHtml(buyer.contact)}</div>`
+        : "",
       "{{buyerAddress}}": escHtml(buyer?.address || transaction.partyAddress || ""),
       "{{driverContact}}": escHtml(transaction.driverContact || ""),
       "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),

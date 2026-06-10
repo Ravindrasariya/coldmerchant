@@ -1599,13 +1599,16 @@ export class DatabaseStorage implements IStorage {
       let lotSourceWeight = 0;
       let lotSourceBags = 0;
       let costPerBag = 0;
+      let marka: string | null = null;
       if (lot.length > 0) {
+        marka = (lot[0].marka && lot[0].marka.trim()) ? lot[0].marka : null;
         if (item.breakdownId) {
           const [bd] = await db.select().from(bagBreakdowns).where(and(eq(bagBreakdowns.id, item.breakdownId), eq(bagBreakdowns.merchantId, merchantId))).limit(1);
           if (bd) {
             lotSourceWeight = bd.weight ? parseFloat(bd.weight) : (lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0);
             lotSourceBags = bd.numberOfBags || 0;
             costPerBag = bd.costPerBag ? parseFloat(bd.costPerBag) : 0;
+            if (bd.marka && bd.marka.trim()) marka = bd.marka;
           }
         }
         if (lotSourceBags === 0) {
@@ -1620,6 +1623,7 @@ export class DatabaseStorage implements IStorage {
       }
       return {
         ...item,
+        marka,
         place: lot.length > 0 ? lot[0].place : undefined,
         lotSourceWeight,
         lotSourceBags,
