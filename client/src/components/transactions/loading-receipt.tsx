@@ -216,6 +216,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
         parseFloat(transaction.salesCommission || "0"),
         parseFloat(transaction.totalMandiCommission || "0"),
         parseFloat(transaction.totalAadhatCommission || "0"),
+        parseFloat(transaction.totalMandiExtraCharges || "0"),
         parseFloat(transaction.tulai || "0"),
         parseFloat(transaction.majduri || "0"),
         parseFloat(transaction.thelaBhada || "0"),
@@ -261,10 +262,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
 
     const chargesList: [string, number][] = [
-      ["Hammali", hamm],
       ["Pur. Comm.", salesComm],
       ["Mandi Tax", mandiComm],
       ["Aadhat Comm.", aadhatComm],
+      ["Hammali", hamm],
+      ["Extra Charges", extra],
       ["Tulai", tl],
       ["Bharai", mj],
       ["Khadi Karai", tb],
@@ -275,12 +277,13 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Debit", dbt],
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
+    const salesBillInner = `<div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div>`;
     let chargesRowsHtml: string;
     const isDeduction = (label: string) => label === "Advance Amount" || label === "Debit";
     if (nonZeroCharges.length > 0) {
       chargesRowsHtml = nonZeroCharges
         .map(([name, v], i) => {
-          const labelCell = i === 0 ? `<td colspan="3" rowspan="${nonZeroCharges.length}" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td>` : "";
+          const labelCell = i === 0 ? `<td colspan="3" rowspan="${nonZeroCharges.length}" style="vertical-align:top;border:1px solid #000">${salesBillInner}</td>` : "";
           const dedu = isDeduction(name);
           const valStyle = dedu ? "text-align:right;border:1px solid #000;color:#dc2626" : "text-align:right;border:1px solid #000";
           const valText = dedu ? `-${fmtInr(v)}` : fmtInr(v);
@@ -288,7 +291,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
         })
         .join("");
     } else {
-      chargesRowsHtml = `<tr><td colspan="3" style="font-weight:bold;vertical-align:top;border:1px solid #000">SALES BILL</td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
+      chargesRowsHtml = `<tr><td colspan="3" style="vertical-align:top;border:1px solid #000">${salesBillInner}</td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
     }
 
     const replacements: Record<string, string> = {
@@ -324,9 +327,9 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       "{{driverAdvance}}": fmtInr(drvAdv),
       "{{advanceAmount}}": fmtInr(advAmt),
       "{{debit}}": fmtInr(dbt),
-      "{{grandTotal}}": fmtInr(gt),
+      "{{grandTotal}}": `₹${Math.round(gt).toLocaleString("en-IN")}`,
       "{{grandTotalRaw}}": gt.toFixed(1),
-      "{{amountInWords}}": numberToIndianWords(gt),
+      "{{amountInWords}}": numberToIndianWords(Math.round(gt)),
     };
     for (const [key, val] of Object.entries(replacements)) {
       html = html.split(key).join(val);
