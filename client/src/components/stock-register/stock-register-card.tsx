@@ -778,7 +778,16 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           lot.quality,
           cutTypeDisplay,
           metrics.originalBags.toString(),
-          lot.marka || "",
+          (() => {
+            const lotMarka = (lot.marka || "").trim();
+            if (lotMarka) return lotMarka;
+            const distinct = Array.from(new Set(
+              (lot.bagBreakdowns || [])
+                .map(bd => (bd.marka || "").trim())
+                .filter(m => m.length > 0)
+            ));
+            return distinct.join(" | ");
+          })(),
           metrics.actualSellableBags.toString(),
           largeBags.toString(),
           mediumBags.toString(),
