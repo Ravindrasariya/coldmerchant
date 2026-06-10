@@ -779,11 +779,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           cutTypeDisplay,
           metrics.originalBags.toString(),
           (() => {
-            const lotMarka = (lot.marka || "").trim();
-            if (lotMarka) return lotMarka;
+            // Combine lot-level and per-breakdown Marka values. Export the
+            // single value when they agree, or join distinct values when they
+            // differ (realistic after edits to individual breakdown rows).
             const distinct = Array.from(new Set(
-              (lot.bagBreakdowns || [])
-                .map(bd => (bd.marka || "").trim())
+              [lot.marka, ...(lot.bagBreakdowns || []).map(bd => bd.marka)]
+                .map(m => (m || "").trim())
                 .filter(m => m.length > 0)
             ));
             return distinct.join(" | ");

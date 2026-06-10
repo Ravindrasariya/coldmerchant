@@ -1694,7 +1694,7 @@ export async function registerRoutes(
                   }
                   await storage.updateBagBreakdown(bdData.id, merchantId, {
                     size: bdData.size,
-                    marka: bdData.marka ?? null,
+                    marka: bdData.marka || null,
                     numberOfBags: bdData.numberOfBags,
                     remainingBags: newRemaining,
                     weight: weight > 0 ? weight.toString() : null,
@@ -1715,7 +1715,7 @@ export async function registerRoutes(
                     lotId: lotData.id,
                     merchantId,
                     size: bdData.size,
-                    marka: bdData.marka ?? null,
+                    marka: bdData.marka || null,
                     numberOfBags: bdData.numberOfBags,
                     remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
                     weight: weight > 0 ? weight.toString() : null,
