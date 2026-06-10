@@ -46,6 +46,7 @@ interface StockEntryWithLots {
     quality: string;
     cutType: string;
     size: string | null;
+    marka?: string | null;
     pricePerKg: string | null;
     totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
@@ -72,6 +73,7 @@ interface StockEntryWithLots {
       weight: string | null;
       pricePerKg: string | null;
       totalAmount: string | null;
+      marka?: string | null;
     }>;
   }>;
 }
@@ -362,13 +364,13 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   })();
 
   const allTableRows = (() => {
-    const rows: Array<{ crop: string; bags: number; grossWeight: number; netWeight: number; price: number; amount: number; size?: string }> = [];
+    const rows: Array<{ crop: string; bags: number; grossWeight: number; netWeight: number; price: number; amount: number; size?: string; marka?: string }> = [];
     entry.lots.forEach(lot => {
       if (lot.bagBreakdowns.length > 0) {
         if (lot.cutType === "gate_cut") {
           const c = buildGateCutConsolidatedRow(lot);
           if (c.totalBags > 0) {
-            rows.push({ crop: lot.crop || "potato", bags: c.totalBags, grossWeight: c.totalGrossWeight, netWeight: c.totalNetWeight, price: c.dominantPrice, amount: c.totalAmount, size: c.dominantSize });
+            rows.push({ crop: lot.crop || "potato", bags: c.totalBags, grossWeight: c.totalGrossWeight, netWeight: c.totalNetWeight, price: c.dominantPrice, amount: c.totalAmount, size: c.dominantSize, marka: getLotMarkaValue(lot) });
           }
           return;
         }
@@ -377,13 +379,13 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-          rows.push({ crop: lot.crop || "potato", bags: bd.numberOfBags, grossWeight: weight, netWeight, price, amount: netWeight * price });
+          rows.push({ crop: lot.crop || "potato", bags: bd.numberOfBags, grossWeight: weight, netWeight, price, amount: netWeight * price, marka: (bd.marka || "").trim() || getLotMarkaValue(lot) });
         });
       } else if (lot.originalBags > 0) {
         const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
         const netWeight = computeNetWeight(weight, lot.originalBags, lot.place);
         const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-        rows.push({ crop: lot.crop || "potato", bags: lot.originalBags, grossWeight: weight, netWeight, price, amount: netWeight * price });
+        rows.push({ crop: lot.crop || "potato", bags: lot.originalBags, grossWeight: weight, netWeight, price, amount: netWeight * price, marka: getLotMarkaValue(lot) });
       }
     });
     return rows;
@@ -406,6 +408,23 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       "onion": "Onion / प्याज",
     };
     return cropMap[crop || "potato"] || crop || "Potato / आलू";
+  };
+
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+  const formatMarkaSuffix = (val?: string | null) => {
+    const m = (val || "").trim();
+    return m ? ` <span style="color:#666; white-space:nowrap;">(Marka -${escapeHtml(m)})</span>` : "";
+  };
+
+  const getLotMarkaValue = (lot: StockEntryWithLots["lots"][0]) => {
+    const distinct = Array.from(new Set(
+      [lot.marka, ...(lot.bagBreakdowns || []).map((bd) => bd.marka)]
+        .map((m) => (m || "").trim())
+        .filter((m) => m.length > 0)
+    ));
+    return distinct.join(", ");
   };
 
   const getPlaceBilingual = (lot: StockEntryWithLots["lots"][0]) => {
@@ -437,7 +456,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         if (lot.cutType === "gate_cut") {
           const c = buildGateCutConsolidatedRow(lot);
           if (c.totalBags > 0) {
-            const cropLabel = `${getCropBilingual(lot.crop)} <span style="color:#666;">(${getSizeBilingual(c.dominantSize)})</span>`;
+            const cropLabel = `${getCropBilingual(lot.crop)} <span style="color:#666;">(${getSizeBilingual(c.dominantSize)})</span>${formatMarkaSuffix(getLotMarkaValue(lot))}`;
             rows = renderRow(cropLabel, c.totalBags, c.totalNetWeight, c.dominantPrice, c.totalAmount);
           }
         } else {
@@ -448,7 +467,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
               const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
               const amount = netWeight * price;
-              return renderRow(getCropBilingual(lot.crop), bd.numberOfBags, netWeight, price, amount);
+              return renderRow(`${getCropBilingual(lot.crop)}${formatMarkaSuffix((bd.marka || "").trim() || getLotMarkaValue(lot))}`, bd.numberOfBags, netWeight, price, amount);
             }).join("");
         }
         
@@ -486,7 +505,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             </thead>
             <tbody>
               <tr>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}</td>
+                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}${formatMarkaSuffix(getLotMarkaValue(lot))}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lot.originalBags}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotNetWeight > 0 ? lotNetWeight.toFixed(2) : "—"}</td>
                 <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
@@ -566,7 +585,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     if (isMandi) {
       const tableRowsHtml = allTableRows.map(r => `
         <tr>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(r.crop)}</td>
+          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(r.crop)}${formatMarkaSuffix(r.marka)}</td>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.bags}</td>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.grossWeight > 0 ? r.grossWeight.toFixed(2) : "—"}</td>
           <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.netWeight > 0 ? r.netWeight.toFixed(2) : "—"}</td>
