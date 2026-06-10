@@ -33,7 +33,7 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
   const totalAmount = weight * pricePerKg;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 p-3 bg-muted/30 rounded-md items-end">
+    <div className="grid grid-cols-2 md:grid-cols-7 gap-3 p-3 bg-muted/30 rounded-md items-end">
       <FormField
         control={form.control}
         name={`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.size`}
@@ -54,6 +54,25 @@ export function BagBreakdownRow({ form, lotIndex, breakdownIndex, onRemove }: Ba
                 ))}
               </SelectContent>
             </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name={`lots.${lotIndex}.bagBreakdowns.${breakdownIndex}.marka`}
+        render={({ field }) => (
+          <FormItem className="col-span-1">
+            <FormLabel className="md:hidden text-xs">{t("Marka", "मार्का")}</FormLabel>
+            <FormControl>
+              <Input
+                placeholder={t("Marka", "मार्का")}
+                {...field}
+                value={field.value ?? ""}
+                data-testid={`input-breakdown-marka-${lotIndex}-${breakdownIndex}`}
+              />
+            </FormControl>
             <FormMessage />
           </FormItem>
         )}

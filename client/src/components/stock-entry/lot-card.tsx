@@ -210,6 +210,7 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
   const handleAddBreakdown = () => {
     appendBreakdown({
       size: "",
+      marka: "",
       numberOfBags: 0,
       weight: undefined,
       pricePerKg: undefined,
@@ -346,6 +347,25 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
                       field.onChange(val === "" ? undefined : parseInt(val));
                     }}
                     data-testid={`input-original-bags-${lotIndex}`}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name={`lots.${lotIndex}.marka`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("Marka", "मार्का")}</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder=""
+                    {...field}
+                    value={field.value ?? ""}
+                    data-testid={`input-marka-${lotIndex}`}
                   />
                 </FormControl>
                 <FormMessage />
@@ -927,8 +947,9 @@ export function LotCard({ form, lotIndex, onRemove, canRemove }: LotCardProps) {
 
             {breakdownFields.length > 0 && (
               <div className="space-y-3">
-                <div className="hidden md:grid md:grid-cols-5 gap-4 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <div className="hidden md:grid md:grid-cols-7 gap-4 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   <div>{t("Size", "आकार")}</div>
+                  <div>{t("Marka", "मार्का")}</div>
                   <div>{t("# Bags", "बोरी")}</div>
                   <div>{t("Weight (kg)", "वजन (किलो)")}</div>
                   <div>{t("Price/kg", "मूल्य/किलो")}</div>

@@ -106,6 +106,7 @@ export const lots = pgTable("lots", {
   quality: text("quality"), // Poor, Medium, Good (made nullable)
   cutType: text("cut_type").notNull(), // gate_cut, bilty_cut (now called Delivery Type in UI)
   size: text("size"), // Large, Medium, Small - for gate cut only
+  marka: text("marka"), // optional bag mark/identifier (free-form: null, number, or text)
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalWeight: decimal("total_weight", { precision: 12, scale: 2 }), // Total weight in kg (optional)
   charges: jsonb("charges"), // Dynamic charges array: [{ type: string, amount: number }]
@@ -142,6 +143,7 @@ export const bagBreakdowns = pgTable("bag_breakdowns", {
   lotId: integer("lot_id").notNull().references(() => lots.id, { onDelete: "cascade" }),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
   size: text("size").notNull(), // Large, Medium, Small, Wastage
+  marka: text("marka"), // optional bag mark/identifier (free-form: null, number, or text)
   numberOfBags: integer("number_of_bags").notNull(),
   remainingBags: integer("remaining_bags"), // tracks remaining per size, initially equals numberOfBags
   // Persistent count of bags moved out via transactions. numberOfBags can
@@ -1114,6 +1116,7 @@ export const bagBreakdownFormSchema = z.object({
   // is synthesized from lot-level fields). Keeping it optional here avoids spurious
   // "Size is required" toasts on the auto-synthesized row.
   size: z.string().optional(),
+  marka: z.string().nullish(),
   numberOfBags: z.coerce.number().min(0, "Number of bags must be positive"),
   weight: z.coerce.number().optional(),
   pricePerKg: z.coerce.number().optional(),
@@ -1142,6 +1145,7 @@ export const lotFormSchema = z.object({
   quality: z.string().optional().default(""),
   cutType: z.enum(["gate_cut", "bilty_cut"]),
   size: z.string().optional(),
+  marka: z.string().nullish(),
   pricePerKg: z.coerce.number().optional(),
   totalWeight: z.coerce.number().optional(),
   charges: z.preprocess(

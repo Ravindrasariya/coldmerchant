@@ -81,6 +81,7 @@ interface StockEntryWithLots {
     quality: string;
     cutType: string;
     size: string | null;
+    marka: string | null;
     pricePerKg: string | null;
     totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
@@ -104,6 +105,7 @@ interface StockEntryWithLots {
     bagBreakdowns: Array<{
       id: number;
       size: string;
+      marka: string | null;
       numberOfBags: number;
       remainingBags: number | null;
       weight: string | null;
@@ -634,6 +636,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Quality", "गुणवत्ता"),
       t("Cut Type", "कट प्रकार"),
       t("Original Bags", "मूल बैग"),
+      t("Marka", "मार्का"),
       t("Actual Bags", "वास्तविक बैग"),
       t("Large", "बड़ा"),
       t("Medium", "मध्यम"),
@@ -775,6 +778,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           lot.quality,
           cutTypeDisplay,
           metrics.originalBags.toString(),
+          lot.marka || "",
           metrics.actualSellableBags.toString(),
           largeBags.toString(),
           mediumBags.toString(),

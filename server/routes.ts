@@ -909,6 +909,7 @@ export async function registerRoutes(
           quality: lotData.quality,
           cutType: lotData.cutType,
           size: lotData.cutType === "gate_cut" ? (lotData.size || null) : null,
+          marka: lotData.marka || null,
           pricePerKg: lotData.cutType === "gate_cut" && lotData.pricePerKg 
             ? lotData.pricePerKg.toString() 
             : null,
@@ -933,6 +934,7 @@ export async function registerRoutes(
         if (!hasRealRow && lotData.originalBags > 0) {
           bdInput = [{
             size: lotData.size || "Large",
+            marka: lotData.marka || null,
             numberOfBags: lotData.originalBags,
             weight: lotData.totalWeight || 0,
             pricePerKg: lotData.pricePerKg || 0,
@@ -949,6 +951,7 @@ export async function registerRoutes(
             lotId: lot.id,
             merchantId,
             size: bdData.size,
+            marka: bdData.marka || null,
             numberOfBags: bdData.numberOfBags,
             remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
             weight: weight > 0 ? weight.toString() : null,
@@ -1517,6 +1520,9 @@ export async function registerRoutes(
             if (existingLot && lotData.mandiExtraCharges !== undefined) {
               compareField('mandiExtraCharges', existingLot.mandiExtraCharges, lotData.mandiExtraCharges, lotLabel, 'lot', lotData.id);
             }
+            if (existingLot && lotData.marka !== undefined) {
+              compareField('marka', existingLot.marka, lotData.marka, lotLabel, 'lot', lotData.id);
+            }
 
             // Track charges array changes
             if (existingLot && lotData.charges !== undefined) {
@@ -1613,6 +1619,9 @@ export async function registerRoutes(
               earlyPayPercent: lotData.earlyPayPercent !== undefined
                 ? (lotData.earlyPayPercent != null ? lotData.earlyPayPercent.toString() : null)
                 : undefined,
+              marka: lotData.marka !== undefined
+                ? (lotData.marka || null)
+                : undefined,
             });
 
             // Handle bag breakdowns for both cut types. Mirror the create
@@ -1630,9 +1639,11 @@ export async function registerRoutes(
                 const fallbackWeight = lotData.totalWeight ?? (existingLot?.totalWeight ? parseFloat(existingLot.totalWeight) : 0);
                 const fallbackPrice = lotData.pricePerKg ?? (existingLot?.pricePerKg ? parseFloat(existingLot.pricePerKg) : 0);
                 const fallbackSize = lotData.size || existingLot?.size || "Large";
+                const fallbackMarka = lotData.marka ?? existingLot?.marka ?? null;
                 bdInput = [{
                   id: 0,
                   size: fallbackSize,
+                  marka: fallbackMarka,
                   numberOfBags: targetBags,
                   weight: fallbackWeight,
                   pricePerKg: fallbackPrice,
@@ -1665,6 +1676,7 @@ export async function registerRoutes(
                   // Track breakdown changes
                   if (existingBd) {
                     compareField('size', existingBd.size, bdData.size, bdLabel, 'breakdown', bdData.id);
+                    compareField('marka', (existingBd as any).marka, bdData.marka, bdLabel, 'breakdown', bdData.id);
                     compareField('numberOfBags', existingBd.numberOfBags, bdData.numberOfBags, bdLabel, 'breakdown', bdData.id);
                     let cappedRemaining = bdData.remainingBags !== undefined ? bdData.remainingBags : bdData.numberOfBags;
                     if (bdData.size !== "Wastage") {
@@ -1682,6 +1694,7 @@ export async function registerRoutes(
                   }
                   await storage.updateBagBreakdown(bdData.id, merchantId, {
                     size: bdData.size,
+                    marka: bdData.marka ?? null,
                     numberOfBags: bdData.numberOfBags,
                     remainingBags: newRemaining,
                     weight: weight > 0 ? weight.toString() : null,
@@ -1702,6 +1715,7 @@ export async function registerRoutes(
                     lotId: lotData.id,
                     merchantId,
                     size: bdData.size,
+                    marka: bdData.marka ?? null,
                     numberOfBags: bdData.numberOfBags,
                     remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
                     weight: weight > 0 ? weight.toString() : null,

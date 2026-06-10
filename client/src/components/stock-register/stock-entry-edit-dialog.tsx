@@ -72,6 +72,7 @@ interface StockEntryWithLots {
     quality: string;
     cutType: string;
     size: string | null;
+    marka: string | null;
     pricePerKg: string | null;
     totalWeight: string | null;
     charges: Array<{ type: string; amount: number | string; coldStoreName?: string; coldStoreDbId?: number | null }> | null;
@@ -92,6 +93,7 @@ interface StockEntryWithLots {
     bagBreakdowns: Array<{
       id: number;
       size: string;
+      marka: string | null;
       numberOfBags: number;
       remainingBags: number | null;
       weight: string | null;
@@ -133,6 +135,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     potatoType: lot.potatoType || "",
     harvestPotatoType: lot.harvestPotatoType || "",
     size: lot.size || "",
+    marka: lot.marka || "",
     pricePerKg: lot.pricePerKg !== null ? parseFloat(lot.pricePerKg) : null,
     totalWeight: lot.totalWeight !== null ? parseFloat(lot.totalWeight) : null,
     charges: (() => {
@@ -372,6 +375,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
     newLots[lotIndex].bagBreakdowns.push({
       id: 0,
       size: "",
+      marka: "",
       numberOfBags: 0,
       remainingBags: 0,
       weight: null,
@@ -636,6 +640,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         
         // Use first non-empty size, fallback to existing lot.size
         const firstSize = completeBreakdowns.find(bd => bd.size)?.size || lot.size;
+        // Mirror size handling: derive lot-level marka from breakdowns,
+        // fallback to existing lot.marka.
+        const firstMarka = completeBreakdowns.find(bd => bd.marka)?.marka ?? lot.marka;
         
         return {
           ...baseCleanedLot,
@@ -643,6 +650,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
           totalWeight: totalWeight,
           pricePerKg: avgPrice,
           size: firstSize || lot.size,
+          marka: firstMarka ?? lot.marka,
         };
       }
       
@@ -983,8 +991,9 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     {/* Editable breakdown rows for all cut types */}
                     {lot.bagBreakdowns.length > 0 && (
                       <div className="space-y-2">
-                        <div className="hidden md:grid md:grid-cols-8 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
+                        <div className="hidden md:grid md:grid-cols-9 gap-2 px-2 text-xs font-semibold text-muted-foreground uppercase">
                           <div>{t("Size", "आकार")}</div>
+                          <div>{t("Marka", "मार्का")}</div>
                           <div>{t("# Bags", "बोरी")}</div>
                           <div>{t("Remaining", "शेष")}</div>
                           <div>{t("Total Wt", "कुल वजन")}</div>
@@ -1000,7 +1009,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           const total = netWeight > 0 ? netWeight * (bd.pricePerKg || 0) : 0;
                           return (
                             <div key={bd.id || bdIndex} className="p-2 bg-muted/30 rounded-md space-y-1">
-                            <div className="grid grid-cols-2 md:grid-cols-8 gap-2 items-end md:items-center">
+                            <div className="grid grid-cols-2 md:grid-cols-9 gap-2 items-end md:items-center">
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Size", "आकार")}</label>
                                 <Select
@@ -1016,6 +1025,17 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                                     ))}
                                   </SelectContent>
                                 </Select>
+                              </div>
+                              <div>
+                                <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("Marka", "मार्का")}</label>
+                                <Input
+                                  type="text"
+                                  className="h-8"
+                                  placeholder={t("Marka", "मार्का")}
+                                  value={bd.marka ?? ""}
+                                  onChange={(e) => handleBreakdownChange(lotIndex, bdIndex, "marka", e.target.value)}
+                                  data-testid={`edit-breakdown-marka-${lotIndex}-${bdIndex}`}
+                                />
                               </div>
                               <div>
                                 <label className="md:hidden text-xs text-muted-foreground mb-1 block">{t("# Bags", "बोरी")}</label>
@@ -1093,8 +1113,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                               </div>
                             </div>
                             {bd.weight && bd.numberOfBags && bd.numberOfBags > 0 && netWeight > 0 && (
-                              <div className="grid grid-cols-2 md:grid-cols-8 gap-2">
-                                <div className="hidden md:block col-span-3" />
+                              <div className="grid grid-cols-2 md:grid-cols-9 gap-2">
+                                <div className="hidden md:block col-span-4" />
                                 <div className="col-span-2 text-xs font-semibold text-orange-600" data-testid={`edit-breakdown-avgwt-${lotIndex}-${bdIndex}`}>
                                   {t("Avg Net Weight", "औसत नेट वजन")} {parseFloat((netWeight / bd.numberOfBags).toFixed(1))} Kg
                                 </div>

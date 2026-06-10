@@ -46,6 +46,7 @@ The system isolates data by merchant:
   - **Potato Fields**: Variety (potatoType), Harvest Potato Type (only visible when Crop=Potato)
   - **Delivery Type**: Gate Cut or Full Truck
   - **Expected Cold Charges**: Total amount that feeds into cold store dues
+  - **Marka**: Optional free-form bag mark/identifier; mirrors Size — stored nullable on both `lots` and `bag_breakdowns`; included in harvest CSV export right after "Original Bags"
 - **Bag Breakdowns**: Granular tracking of bags by size within lots
 - **Attachment Image**: Optional image attachment per stock entry (stored as filename in `attachment_image` column, files in `uploads/` directory, 500KB max, merchant-scoped API routes)
 - **Edit History**: Audit trail of all modifications to stock entries after initial creation
