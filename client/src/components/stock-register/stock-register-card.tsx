@@ -1556,6 +1556,22 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                                   {lot.size}
                                 </Badge>
                               )}
+                              {(() => {
+                                const distinctMarka = Array.from(new Set(
+                                  [lot.marka, ...(lot.bagBreakdowns || []).map((bd: any) => bd.marka)]
+                                    .map((m: any) => (m || "").trim())
+                                    .filter((m: string) => m.length > 0)
+                                )).join(", ");
+                                if (!distinctMarka) return null;
+                                return (
+                                  <Badge
+                                    className="text-[11px] px-2 py-0.5 font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border-0"
+                                    data-testid={`badge-marka-${lot.id}`}
+                                  >
+                                    {t("Marka -", "मार्का -")}{distinctMarka}
+                                  </Badge>
+                                );
+                              })()}
                               <Badge className={`text-[11px] px-2 py-0.5 font-medium border-0 ${
                                 lot.cutType === "bilty_cut"
                                   ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300"
