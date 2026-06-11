@@ -9346,13 +9346,31 @@ export async function registerRoutes(
       }
 
       const harvestTxns = await storage.getTransactionsByMerchant(merchantId);
+      const num = (v: any) => (v ? parseFloat(v) : 0) || 0;
       const harvestCOGS = harvestTxns
         .filter(tx => tx.dateOfLoading && tx.dateOfLoading >= fyStartDate && tx.dateOfLoading <= fyEndDate)
         .reduce((sum, tx) => {
-          const cost = tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0;
-          const transport = tx.transportationCharges ? parseFloat(tx.transportationCharges) : 0;
-          const other = tx.otherCharges ? parseFloat(tx.otherCharges) : 0;
-          return sum + cost + transport + other;
+          // Mirror the transaction table's "Total Cost" per row so Books reconciles
+          // exactly with the transaction register (revenue - cost = stored profitLoss).
+          const cost = num(tx.totalCostOfGoods);
+          if (tx.transactionType === "loading") {
+            return sum + cost
+              + num(tx.totalMandiCommission)
+              + num(tx.totalAadhatCommission)
+              + num(tx.totalHammali)
+              + num(tx.totalMandiExtraCharges)
+              + num(tx.tulai)
+              + num(tx.majduri)
+              + num(tx.thelaBhada)
+              + num(tx.palaKarai)
+              + num(tx.bardan)
+              + num(tx.advancePayment);
+          }
+          return sum + cost
+            + num(tx.totalMandiCommission)
+            + num(tx.totalHammali)
+            + num(tx.transportationCharges)
+            + num(tx.otherCharges);
         }, 0);
 
       const seedTxns = await storage.getSeedTransactionsByMerchant(merchantId);

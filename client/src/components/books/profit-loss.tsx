@@ -13,7 +13,7 @@ function fmt(n: number) {
 }
 
 const REVENUE_LABELS: Record<string, [string, string]> = {
-  raw_potato: ["Raw Potato Sales", "कच्चे आलू की बिक्री"],
+  raw_potato: ["Sales Revenue", "बिक्री राजस्व"],
   seed_sale: ["Seed Sales", "बीज की बिक्री"],
   commission: ["Commission Income", "कमीशन आय"],
   other: ["Other Income", "अन्य आय"],
