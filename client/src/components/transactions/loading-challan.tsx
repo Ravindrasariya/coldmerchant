@@ -40,6 +40,7 @@ interface LoadingTransaction {
   totalFreight: string | null;
   advancePayment: string | null;
   totalBags: number;
+  totalNetWeight: string | null;
   crop: string | null;
   createdAt: string;
   items: TransactionItem[];
@@ -126,22 +127,15 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
         <head>
           <title>${printTitle}</title>
           <style>
+            * { box-sizing: border-box; }
             body {
               font-family: Arial, sans-serif;
               padding: 20px;
               max-width: 800px;
               margin: 0 auto;
+              color: #000;
             }
-            .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
-            .header h1 { margin: 0; font-size: 24px; }
-            .header p { margin: 5px 0; color: #555; }
-            .info-row { display: flex; justify-content: space-between; margin-bottom: 20px; line-height: 1.4; }
-            .info-row > div { text-align: left; }
-            .info-row .right { text-align: right; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; }
-            th { background-color: #f5f5f5; }
-            .hindi { font-size: 0.9em; color: #666; }
+            table { width: 100%; border-collapse: collapse; }
             @media print { body { padding: 0; } button { display: none; } }
           </style>
         </head>
@@ -149,17 +143,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
       </html>
     `);
     printWindow.document.close();
-    const imgs = printWindow.document.querySelectorAll('img');
-    if (imgs.length > 0) {
-      let loaded = 0;
-      const tryPrint = () => { loaded++; if (loaded >= imgs.length) printWindow.print(); };
-      imgs.forEach(img => {
-        if (img.complete) tryPrint();
-        else { img.onload = tryPrint; img.onerror = tryPrint; }
-      });
-    } else {
-      printWindow.print();
-    }
+    printWindow.print();
   };
 
   if (!open) return null;
@@ -168,16 +152,23 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
 
   const totalFreight = parseFloat(transaction?.totalFreight || "0");
   const driverAdvance = parseFloat(transaction?.advancePayment || "0");
-  const remainingFreight = Math.max(0, totalFreight - driverAdvance);
+  const netFreight = Math.max(0, totalFreight - driverAdvance);
+  const totalBags = transaction?.totalBags || 0;
+  const totalWeight = parseFloat(transaction?.totalNetWeight || "0");
+  const freightRate = totalBags > 0 ? totalFreight / totalBags : 0;
 
   const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString('en-IN')}`;
+
+  const border = "1px solid #000";
+  const labelCell: React.CSSProperties = { border, padding: "4px 8px", fontSize: 13, textAlign: "left", verticalAlign: "top" };
+  const valueCell: React.CSSProperties = { border, padding: "4px 8px", fontSize: 13, textAlign: "right", verticalAlign: "top", whiteSpace: "nowrap" };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
-            <DialogTitle>Loading Challan</DialogTitle>
+            <DialogTitle>{t("Loading Challan", "लोडिंग चालान")}</DialogTitle>
             <div className="flex gap-2">
               <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-loading-challan">
                 {sharing ? (
@@ -185,16 +176,16 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
                 ) : (
                   <Share2 className="h-4 w-4 mr-2" />
                 )}
-                {sharing ? "..." : "Share"}
+                {sharing ? "..." : t("Share", "साझा करें")}
               </Button>
               <Button onClick={handlePrint} size="sm" data-testid="button-print-loading-challan">
                 <Printer className="h-4 w-4 mr-2" />
-                Print
+                {t("Print", "प्रिंट करें")}
               </Button>
             </div>
           </div>
           <DialogDescription>
-            Preview and print the loading challan
+            {t("Preview and print the loading challan", "लोडिंग चालान देखें और प्रिंट करें")}
           </DialogDescription>
         </DialogHeader>
 
@@ -206,97 +197,127 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
           </div>
         ) : transaction && merchant ? (
           <div className="overflow-x-auto -mx-4 px-4">
-          <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
-            <div className="header text-center border-b-2 border-black pb-4">
-              {merchant.receiptHeaderImage ? (
-                <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
-              ) : (
-                <div>
-                  <h1 className="text-2xl font-bold">{merchant.name}</h1>
-                  {merchant.address && <p className="text-gray-600">{merchant.address}</p>}
-                  {merchant.contactNumber && <p className="text-gray-600">{merchant.contactNumber}</p>}
-                </div>
-              )}
+          <div ref={printRef} style={{ background: "#fff", color: "#000", minWidth: 650, fontFamily: "Arial, sans-serif", padding: 8 }}>
+            {/* Header — always text, no header image for challan */}
+            <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 10, marginBottom: 12 }}>
+              <h1 style={{ margin: 0, fontSize: 26, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 1 }}>{merchant.name}</h1>
+              {merchant.address && <p style={{ margin: "2px 0", fontSize: 13 }}>{merchant.address}</p>}
+              {merchant.contactNumber && <p style={{ margin: "2px 0", fontSize: 13 }}>{t("Phone", "फ़ोन")}: {merchant.contactNumber}</p>}
+              <p style={{ margin: "6px 0 0", fontSize: 12 }}>
+                {t("Commission Agent & Order Suppliers of Potato, Onion, Garlic, Ginger & Arbi", "आलू, प्याज, लहसुन, अदरक एवं अरबी के कमीशन एजेंट एवं ऑर्डर सप्लायर")}
+              </p>
             </div>
 
-            <div className="text-center">
-              <h2 className="text-xl font-semibold">
-                Loading Challan / लोडिंग चालान
-              </h2>
+            <div style={{ textAlign: "center", marginBottom: 10 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{t("Loading Challan", "लोडिंग चालान")}</h2>
             </div>
 
-            <div className="info-row flex justify-between text-sm" style={{ lineHeight: "1.4" }}>
-              <div>
-                <div><strong>Challan No / चालान नं:</strong> #{transaction.transactionNumber}</div>
-                <div><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}</div>
-                {transaction.vehicleNumber && (
-                  <div><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</div>
-                )}
-              </div>
-              <div className="text-right right">
-                {transaction.partyName && (
-                  <div><strong>Buyer / खरीदार:</strong> {transaction.partyName}</div>
-                )}
-                {(buyer?.address || transaction.partyAddress) && (
-                  <div className="text-gray-600">{buyer?.address || transaction.partyAddress}</div>
-                )}
-              </div>
+            <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 6 }}>
+              {t("Challan No", "चालान नं")}: #{transaction.transactionNumber}
             </div>
 
-            <div className="info-row flex justify-between text-sm border-t border-b border-gray-300 py-3" style={{ lineHeight: "1.6" }}>
-              <div>
-                <div><strong>Transporter Name / ट्रांसपोर्टर नाम:</strong> {transaction.transporterName ? ` ${transaction.transporterName}` : " ___________"}</div>
-                <div><strong>Driver Name / ड्राइवर नाम:</strong> ___________</div>
-                <div><strong>Driver Contact / ड्राइवर संपर्क:</strong> {transaction.driverContact ? ` ${transaction.driverContact}` : " ___________"}</div>
-              </div>
-              <div className="text-right right">
-                <div><strong>Total Freight / कुल भाड़ा:</strong> {fmtInr(totalFreight)}</div>
-                <div><strong>Driver Advance / ड्राइवर अग्रिम:</strong> {fmtInr(driverAdvance)}</div>
-                <div><strong>Remaining Freight / शेष भाड़ा:</strong> {fmtInr(remainingFreight)}</div>
-              </div>
+            {/* Buyer "To" block (left) + freight info box (right) */}
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <tbody>
+                <tr>
+                  <td rowSpan={8} style={{ border, padding: "6px 8px", width: "52%", verticalAlign: "top" }}>
+                    <div style={{ fontWeight: "bold", fontSize: 13 }}>{t("To", "सेवा में")}:</div>
+                    <div style={{ fontWeight: "bold", fontSize: 15, marginTop: 2 }}>{transaction.partyName || buyer?.name || ""}</div>
+                    {(buyer?.address || transaction.partyAddress) && (
+                      <div style={{ fontSize: 13, marginTop: 2 }}>{buyer?.address || transaction.partyAddress}</div>
+                    )}
+                    {buyer?.contact && buyer.contact.trim() && (
+                      <div style={{ fontSize: 13, marginTop: 2 }}>{t("Mobile", "मोबाइल")}: {buyer.contact}</div>
+                    )}
+                    <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.8 }}>
+                      <div><strong>{t("Transporter", "ट्रांसपोर्टर")}:</strong> {transaction.transporterName || ""}</div>
+                      <div><strong>{t("Driver Name", "ड्राइवर नाम")}:</strong> </div>
+                      <div><strong>{t("Driver Mobile", "ड्राइवर मोबाइल")}:</strong> {transaction.driverContact || ""}</div>
+                    </div>
+                  </td>
+                  <td style={labelCell}>{t("Date", "दिनांक")}</td>
+                  <td style={valueCell}>{new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
+                </tr>
+                <tr>
+                  <td style={labelCell}>{t("Total Bags", "कुल बोरी")}</td>
+                  <td style={valueCell}>{totalBags}</td>
+                </tr>
+                <tr>
+                  <td style={labelCell}>{t("Total Weight", "कुल वजन")}</td>
+                  <td style={valueCell}>{totalWeight > 0 ? totalWeight.toFixed(1) : ""}</td>
+                </tr>
+                <tr>
+                  <td style={labelCell}>{t("Freight Rate", "भाड़ा दर")}</td>
+                  <td style={valueCell}>{freightRate > 0 ? `₹${freightRate.toFixed(2)} ${t("per Bag", "प्रति बोरी")}` : ""}</td>
+                </tr>
+                <tr>
+                  <td style={labelCell}>{t("Lorry No.", "लॉरी नं")}</td>
+                  <td style={valueCell}>{transaction.vehicleNumber || ""}</td>
+                </tr>
+                <tr>
+                  <td style={labelCell}>{t("Total Freight", "कुल भाड़ा")}</td>
+                  <td style={valueCell}>{fmtInr(totalFreight)}</td>
+                </tr>
+                <tr>
+                  <td style={labelCell}>{t("Advance Paid", "अग्रिम भुगतान")}</td>
+                  <td style={valueCell}>{fmtInr(driverAdvance)}</td>
+                </tr>
+                <tr>
+                  <td style={{ ...labelCell, fontWeight: "bold", borderTop: "2px solid #000" }}>{t("Net Freight", "शेष भाड़ा")}</td>
+                  <td style={{ ...valueCell, fontWeight: "bold", borderTop: "2px solid #000" }}>{fmtInr(netFreight)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* One-liner between transport/info block and item details */}
+            <div style={{ fontSize: 13, margin: "12px 0 6px", fontStyle: "italic" }}>
+              {t("Item Details (given below) being sent to you — On Order", "नीचे दिए गए माल का विवरण आपको भेजा जा रहा है — ऑर्डर पर")}
             </div>
 
-            <table className="w-full border-collapse">
+            {/* Items table — Item Name, No. of Bags, Marka (no weight/rate/amount) */}
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 2 }}>
               <thead>
-                <tr className="bg-gray-100">
-                  <th className="border px-2 py-1 text-center">Item Name / वस्तु का नाम</th>
-                  <th className="border px-2 py-1 text-center">Marka / मार्का</th>
-                  <th className="border px-2 py-1 text-center">No. of Bags / बोरियों की संख्या</th>
+                <tr>
+                  <th style={{ border, padding: "6px 8px", fontSize: 13, textAlign: "left", background: "#f5f5f5" }}>{t("Item Name", "वस्तु का नाम")}</th>
+                  <th style={{ border, padding: "6px 8px", fontSize: 13, textAlign: "center", background: "#f5f5f5" }}>{t("No. of Bags", "बोरियों की संख्या")}</th>
+                  <th style={{ border, padding: "6px 8px", fontSize: 13, textAlign: "center", background: "#f5f5f5" }}>{t("Marka", "मार्का")}</th>
                 </tr>
               </thead>
               <tbody>
                 {transaction.items.map((item) => (
                   <tr key={item.id}>
-                    <td className="border px-2 py-1 text-center">{cropToLabel(item.crop || txnCropForView)}{item.potatoType ? ` (${item.potatoType})` : ""}</td>
-                    <td className="border px-2 py-1 text-center">{item.marka || ""}</td>
-                    <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
+                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "left" }}>{cropToLabel(item.crop || txnCropForView)}{item.potatoType ? ` (${item.potatoType})` : ""}</td>
+                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{item.bagsMoved}</td>
+                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{item.marka || ""}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-gray-50 font-semibold">
-                  <td className="border px-2 py-1 text-center" colSpan={2}>Total / कुल</td>
-                  <td className="border px-2 py-1 text-center">{transaction.totalBags}</td>
+                <tr style={{ fontWeight: "bold" }}>
+                  <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "left" }}>{t("Total", "कुल")}</td>
+                  <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{totalBags}</td>
+                  <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}></td>
                 </tr>
               </tfoot>
             </table>
 
-            <div className="text-sm">
-              <strong>Remaining Freight in words / शेष भाड़ा शब्दों में:</strong> {numberToIndianWords(Math.round(remainingFreight))}
+            {/* Net freight in words */}
+            <div style={{ fontSize: 13, marginTop: 12 }}>
+              <strong>{t("Net Freight in words", "शेष भाड़ा शब्दों में")}:</strong> {numberToIndianWords(Math.round(netFreight))}
             </div>
 
-            <div className="border-t pt-6 mt-6 flex justify-between">
-              <div className="text-center" style={{ minWidth: "180px" }}>
-                <div className="border-b border-gray-400 mb-1" style={{ height: "40px" }}></div>
-                <p className="text-sm text-gray-600">Driver's Signature / ड्राइवर के हस्ताक्षर</p>
+            {/* Note */}
+            <div style={{ fontSize: 13, marginTop: 10 }}>
+              <strong>{t("Note", "नोट")}:</strong>
+            </div>
+
+            {/* Signatures */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 48 }}>
+              <div style={{ textAlign: "center", minWidth: 180 }}>
+                <div style={{ borderTop: "1px solid #000", paddingTop: 4, fontSize: 13 }}>{t("Driver's Signature", "ड्राइवर के हस्ताक्षर")}</div>
               </div>
-              <div className="text-center" style={{ minWidth: "180px" }}>
-                <div className="border-b border-gray-400 mb-1" style={{ height: "40px" }}></div>
-                <p className="text-sm text-gray-600">For {merchant.name}</p>
+              <div style={{ textAlign: "center", minWidth: 180 }}>
+                <div style={{ borderTop: "1px solid #000", paddingTop: 4, fontSize: 13, fontWeight: "bold" }}>{t("For", "के लिए")} {merchant.name}</div>
               </div>
             </div>
           </div>
