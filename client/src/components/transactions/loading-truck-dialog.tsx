@@ -1099,8 +1099,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     value={totalFreight ?? ""}
                     onChange={(e) => {
                       const v = e.target.value;
-                      const n = Math.floor(Number(v));
-                      setTotalFreight(v === "" || !Number.isFinite(n) || n < 1 ? null : n);
+                      const n = Number(v);
+                      setTotalFreight(v === "" || !Number.isInteger(n) || n < 1 ? null : n);
                     }}
                     placeholder="0"
                     data-testid="input-loading-total-freight"

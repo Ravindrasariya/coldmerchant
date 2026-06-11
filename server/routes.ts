@@ -92,8 +92,8 @@ function titleCaseKeep(str: string): string {
 // Sanitize optional "Total Freight": accept only positive whole numbers, else null.
 function sanitizeFreight(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;
-  const n = Math.floor(Number(value));
-  return Number.isFinite(n) && n >= 1 ? n.toString() : null;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 ? n.toString() : null;
 }
 
 // Compute totalCharges and netPayable for a harvest lot based on its breakdowns and charge data

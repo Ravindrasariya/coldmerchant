@@ -991,8 +991,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         value={field.value ?? ""}
                         onChange={(e) => {
                           const v = e.target.value;
-                          const n = Math.floor(Number(v));
-                          field.onChange(v === "" || !Number.isFinite(n) || n < 1 ? null : n);
+                          const n = Number(v);
+                          field.onChange(v === "" || !Number.isInteger(n) || n < 1 ? null : n);
                         }}
                         data-testid="input-total-freight"
                       />

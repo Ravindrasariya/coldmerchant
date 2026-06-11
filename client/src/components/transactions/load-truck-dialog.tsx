@@ -993,9 +993,9 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                               value={section.totalFreight ?? ""}
                               onChange={(e) => {
                                 const v = e.target.value;
-                                const n = Math.floor(Number(v));
+                                const n = Number(v);
                                 updateBuyerSection(section.id, {
-                                  totalFreight: v === "" || !Number.isFinite(n) || n < 1 ? null : n,
+                                  totalFreight: v === "" || !Number.isInteger(n) || n < 1 ? null : n,
                                 });
                               }}
                               placeholder="0"
