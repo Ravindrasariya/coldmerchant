@@ -23,6 +23,13 @@ interface TransactionItem {
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
   marka: string | null;
+  crop: string | null;
+}
+
+function cropToLabel(crop: string | null | undefined): string {
+  if (crop === "onion") return "Onion / प्याज";
+  if (crop === "garlic") return "Garlic / लहसुन";
+  return "Potato / आलू";
 }
 
 interface LoadingTransaction {
@@ -190,6 +197,13 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
 
   const totalAmount = transaction?.items.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0) || 0;
 
+  const txnCropForView = transaction?.crop || cropType || "potato";
+  const distinctCropsView = transaction && transaction.items.length > 0
+    ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCropForView)))
+    : [txnCropForView];
+  const hasMultipleCrops = distinctCropsView.length > 1;
+  const cropHeaderLabel = distinctCropsView.map(cropToLabel).join(", ");
+
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const buildCustomHtml = () => {
@@ -232,11 +246,14 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24));
     }
     const txnCrop = transaction.crop || cropType || "potato";
-    const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
+    const distinctCrops = transaction.items.length > 0
+      ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCrop)))
+      : [txnCrop];
+    const cropLabel = distinctCrops.map(cropToLabel).join(", ");
     const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
     const itemsDataRows = transaction.items.map((item) =>
-      `<tr><td>${escHtml(cropLabel)}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
+      `<tr><td>${escHtml(cropToLabel(item.crop || txnCrop))}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
     ).join("");
     const blankCount = Math.max(0, minRows - transaction.items.length);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
@@ -414,7 +431,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.vehicleNumber && (
                   <div><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</div>
                 )}
-                <div><strong>Crop / फसल:</strong> {(transaction.crop || cropType) === "potato" ? "Potato / आलू" : (transaction.crop || cropType) === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</div>
+                <div><strong>Crop / फसल:</strong> {cropHeaderLabel}</div>
               </div>
               <div className="text-right right">
                 {transaction.partyName && (
@@ -442,7 +459,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
                 {transaction.items.map((item, idx) => (
                   <tr key={item.id}>
                     <td className="border px-2 py-1 text-center">{idx + 1}</td>
-                    <td className="border px-2 py-1 text-center">{item.potatoType || ""}</td>
+                    <td className="border px-2 py-1 text-center">{hasMultipleCrops ? `${cropToLabel(item.crop || txnCropForView)}${item.potatoType ? ` (${item.potatoType})` : ""}` : (item.potatoType || "")}</td>
                     <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
                     <td className="border px-2 py-1 text-center">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
                     <td className="border px-2 py-1 text-center">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
