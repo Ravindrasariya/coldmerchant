@@ -1592,12 +1592,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
-                      const totalItemPL = activeItems.reduce((sum, i) => {
-                        const cogs = (i.costPerBag > 0 && i.bagsMoved > 0)
-                          ? i.costPerBag * i.bagsMoved
-                          : i.costOfGoods;
-                        return sum + (i.loadingAmount - cogs);
-                      }, 0);
+                      // Mirror the transaction card / backend loading P&L exactly:
+                      // P&L = (Σ lot amount − Σ cost of goods) + Sales Commission − Debit.
+                      // Use the stored/live `costOfGoods` (base goods cost that ties out to
+                      // the backend `totalCostOfGoods`), NOT the stock-register `costPerBag`
+                      // which bakes in purchase-side mandi charges. Mandi/aadhat/hammali/
+                      // extra and other charges are buyer-reimbursed, appearing on both
+                      // revenue and cost, so they cancel and are excluded here.
+                      const totalItemPL = activeItems.reduce(
+                        (sum, i) => sum + (i.loadingAmount - i.costOfGoods),
+                        0
+                      );
                       const sc = Number(form.watch("salesCommission")) || 0;
                       const dbt = Number(form.watch("debit")) || 0;
                       const totalPL = totalItemPL + sc - dbt;
@@ -1607,7 +1612,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             <div>
                               <p className="text-sm font-medium">{t("Total P&L", "कुल लाभ/हानि")}</p>
                               <p className="text-xs text-muted-foreground">
-                                {t("Sum of lot P&L", "लॉट P&L का योग")} + {t("Sales Commission", "बिक्री कमीशन")}
+                                {t("Revenue − Cost", "राजस्व − लागत")}
                               </p>
                             </div>
                             <p className={`text-xl font-bold ${totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
