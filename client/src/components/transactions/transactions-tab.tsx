@@ -32,6 +32,7 @@ import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
 import { SalesReceiptDialog } from "./sales-receipt";
 import { LoadingReceiptDialog } from "./loading-receipt";
+import { LoadingChallanDialog } from "./loading-challan";
 import { TransactionNakalDialog } from "./transaction-nakal";
 import { MonthFilter } from "@/components/ui/month-filter";
 import { DateFilter } from "@/components/ui/date-filter";
@@ -106,6 +107,8 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [printTransactionId, setPrintTransactionId] = useState<number | null>(null);
   const [printLoadingTransactionId, setPrintLoadingTransactionId] = useState<number | null>(null);
+  const [printChallanTransactionId, setPrintChallanTransactionId] = useState<number | null>(null);
+  const [printTypeChooserId, setPrintTypeChooserId] = useState<number | null>(null);
   
   const [txnCropFilter, setTxnCropFilterState] = useState<CropValue | "all">(() => {
     const saved = localStorage.getItem("vyapar_txn_crop_filter");
@@ -741,7 +744,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               onEdit={(id) => setEditTransactionId(id)}
               onPrint={(txn) => {
                 if (txn.transactionType === "loading") {
-                  setPrintLoadingTransactionId(txn.id);
+                  setPrintTypeChooserId(txn.id);
                 } else {
                   setPrintTransactionId(txn.id);
                 }
@@ -816,11 +819,60 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         cropType={selectedCrop}
       />
 
+      <Dialog open={printTypeChooserId !== null} onOpenChange={(open) => !open && setPrintTypeChooserId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Printer className="h-5 w-5" />
+              {t("Choose Print Type", "प्रिंट प्रकार चुनें")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <button
+              className="group h-28 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100 text-amber-700 shadow-sm transition-all hover:border-amber-400 hover:shadow-md hover:scale-[1.03] active:scale-[0.98] dark:border-amber-800 dark:from-amber-950 dark:to-amber-900 dark:text-amber-300 dark:hover:border-amber-600"
+              onClick={() => {
+                const id = printTypeChooserId;
+                setPrintTypeChooserId(null);
+                setPrintChallanTransactionId(id);
+              }}
+              data-testid="button-choose-challan"
+            >
+              <div className="rounded-full bg-amber-200/60 p-2.5 group-hover:bg-amber-200 transition-colors dark:bg-amber-800/60 dark:group-hover:bg-amber-800">
+                <Truck className="h-6 w-6" />
+              </div>
+              <span className="text-base font-semibold">{t("Challan", "चालान")}</span>
+            </button>
+            <button
+              className="group h-28 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100 text-blue-700 shadow-sm transition-all hover:border-blue-400 hover:shadow-md hover:scale-[1.03] active:scale-[0.98] dark:border-blue-800 dark:from-blue-950 dark:to-blue-900 dark:text-blue-300 dark:hover:border-blue-600"
+              onClick={() => {
+                const id = printTypeChooserId;
+                setPrintTypeChooserId(null);
+                setPrintLoadingTransactionId(id);
+              }}
+              data-testid="button-choose-receipt"
+            >
+              <div className="rounded-full bg-blue-200/60 p-2.5 group-hover:bg-blue-200 transition-colors dark:bg-blue-800/60 dark:group-hover:bg-blue-800">
+                <Receipt className="h-6 w-6" />
+              </div>
+              <span className="text-base font-semibold">{t("Receipt", "रसीद")}</span>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <LoadingReceiptDialog
         transactionId={printLoadingTransactionId}
         merchantId={user?.merchantId || 0}
         open={printLoadingTransactionId !== null}
         onOpenChange={(open) => !open && setPrintLoadingTransactionId(null)}
+        cropType={selectedCrop}
+      />
+
+      <LoadingChallanDialog
+        transactionId={printChallanTransactionId}
+        merchantId={user?.merchantId || 0}
+        open={printChallanTransactionId !== null}
+        onOpenChange={(open) => !open && setPrintChallanTransactionId(null)}
         cropType={selectedCrop}
       />
 
