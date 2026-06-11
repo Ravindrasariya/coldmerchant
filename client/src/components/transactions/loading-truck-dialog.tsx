@@ -130,6 +130,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     const stored = localStorage.getItem("vyapar_sales_comm_pct");
     return stored ? Number(stored) || 0 : 0;
   });
+  const [totalFreight, setTotalFreight] = useState<number | null>(null);
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
@@ -384,6 +385,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         buyerId,
         partyName,
         partyAddress,
+        totalFreight,
         advancePayment: driverAdvance,
         items: validItems,
         revenue: totals.totalAmount,
@@ -1066,7 +1068,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 </Popover>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div>
                   <Label className="text-xs">{t("Sales Comm. %", "बिक्री कमीशन %")}</Label>
                   <div className="relative">
@@ -1086,6 +1088,22 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                   </div>
                   <p className="text-xs text-orange-500 font-mono mt-0.5">₹{computedSalesComm.toLocaleString('en-IN')}</p>
+                </div>
+                <div>
+                  <Label className="text-xs">{t("Total Freight", "कुल भाड़ा")}</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={totalFreight ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const n = Math.floor(Number(v));
+                      setTotalFreight(v === "" || !Number.isFinite(n) || n < 1 ? null : n);
+                    }}
+                    placeholder="0"
+                    data-testid="input-loading-total-freight"
+                  />
                 </div>
                 <div>
                   <Label className="text-xs">{t("Driver Advance", "ड्राइवर अग्रिम")}</Label>

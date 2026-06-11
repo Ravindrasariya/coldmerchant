@@ -141,6 +141,7 @@ interface TransactionWithHistory {
   partyAddress: string | null;
   vehicleNumber: string | null;
   driverContact: string | null;
+  totalFreight: string | null;
   advancePayment: string | null;
   amountReceived: string | null;
   transportationCharges: string | null;
@@ -173,6 +174,7 @@ const editTransactionSchema = z.object({
   partyName: z.string().optional(),
   vehicleNumber: z.string().optional(),
   driverContact: z.string().optional(),
+  totalFreight: z.number().int().positive().nullable().optional(),
   advancePayment: z.coerce.number().optional(),
   amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
@@ -307,6 +309,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       partyName: "",
       vehicleNumber: "",
       driverContact: "",
+      totalFreight: undefined,
       advancePayment: undefined,
       amountReceived: undefined,
       transportationCharges: undefined,
@@ -333,6 +336,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         partyName: transaction.partyName || "",
         vehicleNumber: transaction.vehicleNumber || "",
         driverContact: transaction.driverContact || "",
+        totalFreight: transaction.totalFreight ? parseFloat(transaction.totalFreight) : null,
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges && parseFloat(transaction.transportationCharges) !== 0 ? parseFloat(transaction.transportationCharges) : undefined,
@@ -817,6 +821,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       partyName: t("Buyer Name", "खरीदार का नाम"),
       vehicleNumber: t("Vehicle #", "वाहन नं"),
       driverContact: t("Driver Contact", "ड्राइवर संपर्क"),
+      totalFreight: t("Total Freight", "कुल भाड़ा"),
       advancePayment: t("Advance Payment", "अग्रिम भुगतान"),
       transportationCharges: t("Transportation", "परिवहन"),
       otherCharges: t("Other Charges", "अन्य शुल्क"),
@@ -966,6 +971,31 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <FormLabel>{t("Driver Contact", "ड्राइवर संपर्क")}</FormLabel>
                     <FormControl>
                       <Input placeholder={t("Enter driver contact", "ड्राइवर संपर्क दर्ज करें")} {...field} data-testid="input-driver-contact" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="totalFreight"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Total Freight", "कुल भाड़ा")} (₹)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="0"
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const n = Math.floor(Number(v));
+                          field.onChange(v === "" || !Number.isFinite(n) || n < 1 ? null : n);
+                        }}
+                        data-testid="input-total-freight"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

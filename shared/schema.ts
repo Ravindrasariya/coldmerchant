@@ -188,6 +188,7 @@ export const transactions = pgTable("transactions", {
   partyAddress: text("party_address"),
   vehicleNumber: text("vehicle_number"), // optional truck/vehicle number
   buyerId: integer("buyer_id").references(() => buyers.id), // optional reference to buyer
+  totalFreight: decimal("total_freight", { precision: 12, scale: 2 }), // optional total truck freight (whole number, nullable)
   advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }), // advance given to driver/transporter
   amountReceived: decimal("amount_received", { precision: 12, scale: 2 }), // payment received from buyer
   transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
@@ -1254,6 +1255,7 @@ export const transactionItemFormSchema = z.object({
 
 export const transactionFormSchema = z.object({
   partyName: z.string().optional(),
+  totalFreight: z.coerce.number().int().positive().optional().nullable(),
   advancePayment: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),

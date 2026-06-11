@@ -71,6 +71,7 @@ interface BuyerSection {
   items: LotItem[];
   mandiCommissionPct: number;
   hammaliPerBag: number;
+  totalFreight: number | null;
   advancePayment: number;
   transportationCharges: number;
   otherCharges: number;
@@ -91,6 +92,7 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   items: [{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0 }],
   mandiCommissionPct: 0,
   hammaliPerBag: 0,
+  totalFreight: null,
   advancePayment: 0,
   transportationCharges: 0,
   otherCharges: 0,
@@ -388,6 +390,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           partyAddress: section.partyAddress,
           totalMandiCommission: 0,
           totalHammali: 0,
+          totalFreight: section.totalFreight,
           advancePayment: section.advancePayment,
           transportationCharges: section.transportationCharges,
           otherCharges: section.otherCharges,
@@ -978,7 +981,27 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                         <Separator />
 
                         {/* Charges */}
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
+                            <Label className="text-xs">
+                              {t("Total Freight", "कुल भाड़ा")}
+                            </Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={section.totalFreight ?? ""}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const n = Math.floor(Number(v));
+                                updateBuyerSection(section.id, {
+                                  totalFreight: v === "" || !Number.isFinite(n) || n < 1 ? null : n,
+                                });
+                              }}
+                              placeholder="0"
+                              data-testid={`input-total-freight-${sectionIndex}`}
+                            />
+                          </div>
                           <div>
                             <Label className="text-xs">
                               {t("Advance to Driver", "ड्राइवर को अग्रिम")}

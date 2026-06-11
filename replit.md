@@ -251,6 +251,7 @@ The Books feature provides simplified accounting views:
 - **Loading Dialog** (`loading-truck-dialog.tsx`): Single buyer, lot picker with ₹/Kg (pre-filled from stock register), Net Weight (proportionate), Amount (₹/Kg × Net Weight), P&L per lot, auto-aggregated mandi charges (commission %, aadhat %, hammali/bag, extra charges), Sales Commission, Advance Amount, Driver Advance, Grand Total
 - **Loading Receipt** (`loading-receipt.tsx`): Displays lot details with ₹/Kg and Amount columns, mandi charge breakdown, grand total
 - **DB Fields**: `transactions.transactionType`, `salesCommission`, `totalMandiCommission`, `totalAadhatCommission`, `totalHammali`, `totalMandiExtraCharges`; `transactionItems.pricePerKg`, `amount`
+- **Total Freight**: optional `transactions.totalFreight` (nullable numeric) — display/storage-only field captured just before the driver-advance input in the Loading create, Bikri/Sale create (per buyer section), and Edit Transaction dialogs. Accepts positive whole numbers only (empty → null); server `sanitizeFreight()` enforces this. Included as a "Total Freight" column in the transactions CSV export (blank when null). Does NOT affect Grand Total / P&L / charge math.
 - **P&L Formula**: Loading P&L = Revenue - COGS - salesCommission - mandiCharges (vs Sale P&L = Revenue - COGS - transport - other)
 - **Edit**: Loading transactions show loading-specific fields (sales commission, advance, mandi charges) instead of transport/other charges
 

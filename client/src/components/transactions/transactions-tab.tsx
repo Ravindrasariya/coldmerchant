@@ -63,6 +63,7 @@ interface Transaction {
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
+  totalFreight: string | null;
   advancePayment: string | null;
   amountReceived: string | null;
   transportationCharges: string | null;
@@ -345,6 +346,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       t("Thela Bhada", "ठेला भाड़ा"),
       t("Pala Karai", "पाला कराई"),
       t("Bardan", "बरदान"),
+      t("Total Freight", "कुल भाड़ा"),
       t("Debit", "डेबिट"),
       t("Amount Received", "प्राप्त राशि"),
       t("Due Amount", "बकाया राशि"),
@@ -399,6 +401,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         fmt(thelaBhada),
         fmt(palaKarai),
         fmt(bardan),
+        txn.totalFreight ? parseFloat(parseFloat(txn.totalFreight).toFixed(0)).toLocaleString('en-IN') : "",
         fmt(debit),
         parseFloat(amountReceived.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN'),

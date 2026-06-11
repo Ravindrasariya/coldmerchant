@@ -89,6 +89,13 @@ function titleCaseKeep(str: string): string {
   return str.trim().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Sanitize optional "Total Freight": accept only positive whole numbers, else null.
+function sanitizeFreight(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) && n >= 1 ? n.toString() : null;
+}
+
 // Compute totalCharges and netPayable for a harvest lot based on its breakdowns and charge data
 function computeHarvestLotCharges(lot: any) {
   const place = lot.place || "cold_store";
@@ -2671,7 +2678,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -2899,6 +2906,7 @@ export async function registerRoutes(
           partyAddress: partyAddress || null,
           vehicleNumber: vehicleNumber || null,
           buyerId: buyerId ? parseInt(buyerId) : null,
+          totalFreight: sanitizeFreight(totalFreight),
           advancePayment: advancePayment ? advancePayment.toString() : null,
           transportationCharges: transportationCharges ? transportationCharges.toString() : null,
           otherCharges: otherCharges ? otherCharges.toString() : null,
@@ -3093,7 +3101,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -3116,6 +3124,10 @@ export async function registerRoutes(
       }
       if (driverContact !== undefined && (driverContact || null) !== (existingTxn.driverContact || null)) {
         changes.push({ field: "driverContact", oldValue: existingTxn.driverContact, newValue: driverContact || null });
+      }
+      const sanitizedFreight = sanitizeFreight(totalFreight);
+      if (totalFreight !== undefined && !decimalEqual(sanitizedFreight, existingTxn.totalFreight)) {
+        changes.push({ field: "totalFreight", oldValue: existingTxn.totalFreight, newValue: sanitizedFreight });
       }
       if (advancePayment !== undefined && !decimalEqual(advancePayment, existingTxn.advancePayment)) {
         changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
@@ -3226,6 +3238,7 @@ export async function registerRoutes(
         partyAddress: partyAddress || null,
         vehicleNumber: vehicleNumber || null,
         driverContact: driverContact !== undefined ? (driverContact || null) : existingTxn.driverContact,
+        totalFreight: totalFreight !== undefined ? sanitizedFreight : existingTxn.totalFreight,
         advancePayment: advancePayment ? advancePayment.toString() : null,
         amountReceived: amountReceived ? amountReceived.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,
