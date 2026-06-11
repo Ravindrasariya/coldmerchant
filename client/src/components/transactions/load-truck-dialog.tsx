@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -113,6 +114,33 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
   // Buyer sections
   const [buyerSections, setBuyerSections] = useState<BuyerSection[]>([createEmptyBuyerSection()]);
+
+  // Crops to include in this truck. Defaults to the active register crop filter,
+  // or all crops when the filter is "All". Multi-crop trucks are allowed.
+  const cropOptions: { value: string; label: [string, string] }[] = [
+    { value: "potato", label: ["Potato", "आलू"] },
+    { value: "onion", label: ["Onion", "प्याज"] },
+    { value: "garlic", label: ["Garlic", "लहसुन"] },
+  ];
+  const [selectedCrops, setSelectedCrops] = useState<Set<string>>(
+    () => selectedCrop === "all" ? new Set(["potato", "onion", "garlic"]) : new Set([selectedCrop]),
+  );
+  useEffect(() => {
+    if (open) {
+      setSelectedCrops(selectedCrop === "all" ? new Set(["potato", "onion", "garlic"]) : new Set([selectedCrop]));
+    }
+  }, [open, selectedCrop]);
+  const toggleCrop = (crop: string) => {
+    setSelectedCrops(prev => {
+      const next = new Set(prev);
+      if (next.has(crop)) {
+        if (next.size > 1) next.delete(crop);
+      } else {
+        next.add(crop);
+      }
+      return next;
+    });
+  };
 
   // Tnx# preview + shared group id. The tnxGroupId is generated once per
   // dialog open so every per-buyer POST in this loading session shares the
@@ -586,6 +614,19 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
             </CardContent>
           </Card>
 
+          {/* Crops in this truck */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t("Crops in this truck", "इस ट्रक की फसलें")}</Label>
+            <div className="flex flex-wrap gap-3">
+              {cropOptions.map((co) => (
+                <label key={co.value} className="flex items-center gap-1.5 cursor-pointer text-sm" data-testid={`checkbox-crop-${co.value}`}>
+                  <Checkbox checked={selectedCrops.has(co.value)} onCheckedChange={() => toggleCrop(co.value)} />
+                  {t(co.label[0], co.label[1])}
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* Buyer Sections */}
           <div className="space-y-4">
             {buyerSections.map((section, sectionIndex) => {
@@ -792,9 +833,9 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                           <CommandGroup>
                                             {inventory
                                               .filter((inv) => {
-                                                if (selectedCrop && inv.crop !== selectedCrop) return false;
                                                 const key = getInventoryKey(inv);
                                                 const availableBags = getAvailableBagsForLot(key, section.id, itemIndex);
+                                                if (key !== item.inventoryKey && !selectedCrops.has(inv.crop || "potato")) return false;
                                                 return key === item.inventoryKey || availableBags > 0;
                                               })
                                               .map((inv) => {

@@ -1167,11 +1167,11 @@ export class DatabaseStorage implements IStorage {
         if (lot.length > 0) {
           const entry = await db.select().from(stockEntries).where(and(eq(stockEntries.id, lot[0].stockEntryId), eq(stockEntries.merchantId, merchantId))).limit(1);
           if (entry.length > 0) {
-            return { ...item, place: lot[0].place, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
+            return { ...item, crop: lot[0].crop || "potato", place: lot[0].place, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
           }
-          return { ...item, place: lot[0].place, farmerName: undefined, farmerVillage: undefined };
+          return { ...item, crop: lot[0].crop || "potato", place: lot[0].place, farmerName: undefined, farmerVillage: undefined };
         }
-        return { ...item, place: undefined, farmerName: undefined, farmerVillage: undefined };
+        return { ...item, crop: undefined, place: undefined, farmerName: undefined, farmerVillage: undefined };
       }));
       
       return { ...txn, items: enrichedItems };
@@ -1624,6 +1624,7 @@ export class DatabaseStorage implements IStorage {
       return {
         ...item,
         marka,
+        crop: lot.length > 0 ? (lot[0].crop || "potato") : undefined,
         place: lot.length > 0 ? lot[0].place : undefined,
         lotSourceWeight,
         lotSourceBags,

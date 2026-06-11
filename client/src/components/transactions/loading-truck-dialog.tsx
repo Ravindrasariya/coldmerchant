@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -89,6 +90,33 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const [partyAddress, setPartyAddress] = useState("");
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
   const [lotPopoverOpen, setLotPopoverOpen] = useState<Record<string, boolean>>({});
+
+  // Crops to include in this truck. Defaults to the active register crop filter,
+  // or all crops when the filter is "All". Multi-crop trucks are allowed.
+  const cropOptions: { value: string; label: [string, string] }[] = [
+    { value: "potato", label: ["Potato", "आलू"] },
+    { value: "onion", label: ["Onion", "प्याज"] },
+    { value: "garlic", label: ["Garlic", "लहसुन"] },
+  ];
+  const [selectedCrops, setSelectedCrops] = useState<Set<string>>(
+    () => selectedCrop === "all" ? new Set(["potato", "onion", "garlic"]) : new Set([selectedCrop]),
+  );
+  useEffect(() => {
+    if (open) {
+      setSelectedCrops(selectedCrop === "all" ? new Set(["potato", "onion", "garlic"]) : new Set([selectedCrop]));
+    }
+  }, [open, selectedCrop]);
+  const toggleCrop = (crop: string) => {
+    setSelectedCrops(prev => {
+      const next = new Set(prev);
+      if (next.has(crop)) {
+        if (next.size > 1) next.delete(crop);
+      } else {
+        next.add(crop);
+      }
+      return next;
+    });
+  };
 
   const [items, setItems] = useState<LoadingLotItem[]>([
     { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 },
@@ -661,6 +689,18 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 </div>
               )}
 
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("Crops in this truck", "इस ट्रक की फसलें")}</Label>
+                <div className="flex flex-wrap gap-3">
+                  {cropOptions.map((co) => (
+                    <label key={co.value} className="flex items-center gap-1.5 cursor-pointer text-sm" data-testid={`checkbox-crop-${co.value}`}>
+                      <Checkbox checked={selectedCrops.has(co.value)} onCheckedChange={() => toggleCrop(co.value)} />
+                      {t(co.label[0], co.label[1])}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">{t("Select Inventory Lots", "इन्वेंटरी लॉट चुनें")}</Label>
@@ -740,9 +780,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                 <CommandGroup>
                                   {inventory
                                     .filter((inv) => {
-                                      if (selectedCrop && inv.crop !== selectedCrop) return false;
                                       const key = getInventoryKey(inv);
                                       const available = getAvailableBags(key, itemIndex);
+                                      if (key !== item.inventoryKey && !selectedCrops.has(inv.crop || "potato")) return false;
                                       return key === item.inventoryKey || available > 0;
                                     })
                                     .map((inv) => {

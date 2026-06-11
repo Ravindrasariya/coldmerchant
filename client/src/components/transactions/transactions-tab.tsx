@@ -167,10 +167,15 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
     if (!transactions) return [];
     
     return transactions.filter(txn => {
-      // Filter by crop - check if transaction or any item has matching crop
+      // Filter by crop - show the transaction if its primary crop OR any of its
+      // item crops matches the selected crop (multi-crop trucks appear under each
+      // of their crops).
       if (txnCropFilter !== "all") {
-        const txnCrop = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
-        if (txnCrop !== txnCropFilter) return false;
+        const cropsInTxn = new Set<string>();
+        if (txn.crop) cropsInTxn.add(txn.crop);
+        for (const it of txn.items) cropsInTxn.add(it.crop || txn.crop || "potato");
+        if (cropsInTxn.size === 0) cropsInTxn.add("potato");
+        if (!cropsInTxn.has(txnCropFilter)) return false;
       }
 
       // Filter by year
@@ -512,7 +517,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       {/* Filters Row */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         {/* Mobile: Button at top, full width */}
-        <Button onClick={() => setShowChooser(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile" disabled={txnCropFilter === "all"}>
+        <Button onClick={() => setShowChooser(true)} className="w-full md:hidden" data-testid="button-load-truck-mobile">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
@@ -608,7 +613,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         </Card>
 
         {/* Desktop: Button on right */}
-        <Button onClick={() => setShowChooser(true)} className="hidden md:flex" data-testid="button-load-truck" disabled={txnCropFilter === "all"}>
+        <Button onClick={() => setShowChooser(true)} className="hidden md:flex" data-testid="button-load-truck">
           <Truck className="h-4 w-4 mr-2" />
           {t("Load A Truck", "ट्रक लोड करें")}
         </Button>
@@ -785,13 +790,13 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       <LoadTruckDialog 
         open={showLoadDialog} 
         onOpenChange={setShowLoadDialog}
-        selectedCrop={txnCropFilter === "all" ? selectedCrop : txnCropFilter}
+        selectedCrop={txnCropFilter}
       />
 
       <LoadingTruckDialog
         open={showLoadingDialog}
         onOpenChange={setShowLoadingDialog}
-        selectedCrop={txnCropFilter === "all" ? selectedCrop : txnCropFilter}
+        selectedCrop={txnCropFilter}
       />
 
       <EditTransactionDialog
@@ -1026,7 +1031,8 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
             <tbody>
               {group.txns.map((txn) => {
                 const { cost, revenue, due, profitLoss } = computeRow(txn);
-                const c = txn.crop || (txn.items.length > 0 ? (txn.items[0].crop || "potato") : "potato");
+                const itemCrops = Array.from(new Set(txn.items.map(it => it.crop || txn.crop || "potato")));
+                const txnCrops = itemCrops.length > 0 ? itemCrops : [txn.crop || "potato"];
                 const isExpanded = expandedTxnId === txn.id;
                 return (
                   <Fragment key={txn.id}>
@@ -1067,9 +1073,13 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                         )}
                       </td>
                       <td className="px-2 py-2 whitespace-nowrap">
-                        <Badge variant="outline" className={`text-[10px] h-5 ${cropBadgeClasses(c)}`} data-testid={`badge-crop-${txn.id}`}>
-                          {cropLabel(c)}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {txnCrops.map((tc) => (
+                            <Badge key={tc} variant="outline" className={`text-[10px] h-5 ${cropBadgeClasses(tc)}`} data-testid={`badge-crop-${txn.id}-${tc}`}>
+                              {cropLabel(tc)}
+                            </Badge>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-2 py-2 text-right font-mono whitespace-nowrap">{txn.totalBags}</td>
                       <td className="px-2 py-2 text-right font-mono whitespace-nowrap">{parseFloat(txn.totalNetWeight || "0").toFixed(1)}</td>

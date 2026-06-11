@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -30,6 +31,7 @@ interface TransactionItem {
   lotId: number;
   breakdownId: number | null;
   serialNumber: number;
+  crop?: string;
   place?: string;
   coldStoreName: string;
   potatoType: string | null;
@@ -55,6 +57,7 @@ interface UnsoldInventoryItem {
   breakdownId: number | null;
   lotId: number;
   serialNumber: number;
+  crop?: string;
   place?: string;
   coldStoreName: string;
   farmerName: string;
@@ -82,6 +85,7 @@ interface EditableItem {
   lotId: number;
   breakdownId: number | null;
   serialNumber: number;
+  crop?: string;
   place?: string;
   coldStoreName: string;
   potatoType: string | null;
@@ -383,6 +387,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         lotId: item.lotId,
         breakdownId: item.breakdownId,
         serialNumber: item.serialNumber,
+        crop: item.crop || "potato",
         place: item.place,
         coldStoreName: item.coldStoreName,
         potatoType: item.potatoType,
@@ -737,6 +742,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       lotId: inv.lotId,
       breakdownId: inv.breakdownId,
       serialNumber: inv.serialNumber,
+      crop: inv.crop || "potato",
       place: inv.place,
       coldStoreName: inv.coldStoreName,
       potatoType: inv.potatoType,
@@ -767,6 +773,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (isLoadingType) {
       const newItem: EditableItem = {
         lotId: inv.lotId, breakdownId: inv.breakdownId, serialNumber: inv.serialNumber,
+        crop: inv.crop || "potato",
         place: inv.place, coldStoreName: inv.coldStoreName, potatoType: inv.potatoType, size: inv.size,
         bagsMoved: newItemBags, originalBags: 0, netWeight: newItemWeight, originalNetWeight: 0,
         pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag, costOfGoods, originalCostOfGoods: costOfGoods,
@@ -1155,9 +1162,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   <div key={item.id || `new-${index}`}>
                     {/* Desktop row */}
                     <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
-                      <span className="truncate text-xs" title={`S#${item.serialNumber} - ${lotPlaceLabel(item.place, item.coldStoreName)}${item.potatoType ? ` - ${item.potatoType}` : ""}${item.size ? ` - ${item.size}` : ""}`}>
-                        S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
-                      </span>
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        {(() => {
+                          const c = item.crop || "potato";
+                          const cls = c === "onion" ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400" : c === "garlic" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+                          const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
+                          return <Badge className={`text-[10px] px-1.5 py-0 font-medium border-0 w-fit ${cls}`}>{label}</Badge>;
+                        })()}
+                        <span className="truncate text-xs" title={`S#${item.serialNumber} - ${lotPlaceLabel(item.place, item.coldStoreName)}${item.potatoType ? ` - ${item.potatoType}` : ""}${item.size ? ` - ${item.size}` : ""}`}>
+                          S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
+                        </span>
+                      </div>
                       <Input
                         type="number"
                         min="1"
@@ -1231,9 +1246,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     {/* Mobile card */}
                     <div className="md:hidden border rounded-md p-3 space-y-2 mb-2">
                       <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs font-medium flex-1 truncate" title={`S#${item.serialNumber} - ${lotPlaceLabel(item.place, item.coldStoreName)}${item.potatoType ? ` - ${item.potatoType}` : ""}${item.size ? ` - ${item.size}` : ""}`}>
-                          S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
-                        </span>
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          {(() => {
+                            const c = item.crop || "potato";
+                            const cls = c === "onion" ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400" : c === "garlic" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+                            const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
+                            return <Badge className={`text-[10px] px-1.5 py-0 font-medium border-0 w-fit ${cls}`}>{label}</Badge>;
+                          })()}
+                          <span className="text-xs font-medium truncate" title={`S#${item.serialNumber} - ${lotPlaceLabel(item.place, item.coldStoreName)}${item.potatoType ? ` - ${item.potatoType}` : ""}${item.size ? ` - ${item.size}` : ""}`}>
+                            S#{item.serialNumber} - {lotPlaceLabel(item.place, item.coldStoreName)}{item.potatoType ? ` - ${item.potatoType}` : ""}{item.size ? ` - ${item.size}` : ""}
+                          </span>
+                        </div>
                         <Button 
                           type="button" 
                           variant="ghost" 
