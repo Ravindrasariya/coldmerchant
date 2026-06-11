@@ -267,9 +267,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   }, [additionalCharges]);
 
   const computedSalesComm = useMemo(() => {
-    const base = totalItemAmount + computedMandiComm + computedAadhatComm;
+    const base = totalItemAmount;
     return Math.round(base * salesCommissionPct / 100 * 100) / 100;
-  }, [totalItemAmount, computedMandiComm, computedAadhatComm, salesCommissionPct]);
+  }, [totalItemAmount, salesCommissionPct]);
 
   const totals = useMemo(() => {
     let totalBags = 0;

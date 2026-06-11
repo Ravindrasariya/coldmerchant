@@ -3594,9 +3594,9 @@ export async function registerRoutes(
         const additionalTotal = tulaiVal + majduriVal + thelaBhadaVal + palaKaraiVal + bardanVal;
         const oldSalesComm = parseFloat(existingTxn.salesCommission || "0");
         const oldLotAmounts = (existingTxn.items || []).reduce((sum: number, item: any) => sum + parseFloat(item.amount || item.revenue || "0"), 0);
-        const oldBase = oldLotAmounts + mandiTotal + additionalTotal;
+        const oldBase = oldLotAmounts;
         const commPct = oldBase > 0 ? (oldSalesComm / oldBase) * 100 : 0;
-        const newBase = newTotalRevenue + mandiTotal + additionalTotal;
+        const newBase = newTotalRevenue;
         const salesCommission = Math.round(newBase * commPct / 100 * 100) / 100;
         recalcSalesComm = salesCommission;
         const advancePaymentNum = parseFloat(existingTxn.advancePayment || "0");

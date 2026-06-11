@@ -375,7 +375,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         setAadhatPct(0);
         setHammaliRate(0);
       }
-      const scBase = txnRevenue + storedMC + storedAC;
+      const scBase = txnRevenue;
       setSalesCommPct(scBase > 0 ? Math.round((storedSC / scBase) * 10000) / 100 : 0);
 
       setEditableItems(transaction.items.map(item => ({
@@ -503,7 +503,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       form.setValue("totalMandiCommission", Math.round(totalLotAmount * mandiPct / 100 * 100) / 100 || undefined);
       form.setValue("totalAadhatCommission", Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100 || undefined);
       form.setValue("totalHammali", Math.round(totalEditBags * hammaliRate * 100) / 100 || undefined);
-      const scBase = totalLotAmount + (Math.round(totalLotAmount * mandiPct / 100 * 100) / 100) + (Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100);
+      const scBase = totalLotAmount;
       form.setValue("salesCommission", Math.round(scBase * salesCommPct / 100 * 100) / 100 || undefined);
     } else {
       form.setValue("totalMandiCommission", Math.round(totalMandiSaleCOGS * mandiPct / 100 * 100) / 100 || 0);
@@ -1473,14 +1473,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             onChange={(e) => {
                               const pct = Number(e.target.value) || 0;
                               setSalesCommPct(pct);
-                              const scBase = totalLotAmount + (Math.round(totalLotAmount * mandiPct / 100 * 100) / 100) + (Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100);
+                              const scBase = totalLotAmount;
                               form.setValue("salesCommission", Math.round(scBase * pct / 100 * 100) / 100 || undefined);
                             }}
                             data-testid="input-edit-sales-commission"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(() => { const scBase = totalLotAmount + (Math.round(totalLotAmount * mandiPct / 100 * 100) / 100) + (Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100); return (Math.round(scBase * salesCommPct / 100 * 100) / 100).toLocaleString('en-IN'); })()}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(() => { const scBase = totalLotAmount; return (Math.round(scBase * salesCommPct / 100 * 100) / 100).toLocaleString('en-IN'); })()}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
