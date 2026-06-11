@@ -447,6 +447,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     // Roll a fresh group id for the next loading session.
     setTnxGroupId(crypto.randomUUID());
     setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
+    setTotalFreight(null);
     setDriverAdvance(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
