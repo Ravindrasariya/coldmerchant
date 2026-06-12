@@ -187,7 +187,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
               <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 6px; margin-top: 6px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span style="font-size: 13px; font-weight: 600;">Grand Total / कुल योग</span>
-                  <span style="font-size: 16px; font-weight: 700; font-family: monospace;">₹${grandTotal.toLocaleString('en-IN')}</span>
+                  <span style="font-size: 16px; font-weight: 700; font-family: monospace;">₹${Math.round(grandTotal).toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -282,7 +282,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
         <Separator />
         <div className="flex justify-between font-semibold">
           <span>Grand Total / कुल योग</span>
-          <span className="font-mono">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+          <span className="font-mono">₹{Math.round(grandTotal).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
         </div>
       </div>
     </>

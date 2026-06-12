@@ -2061,10 +2061,10 @@ export class DatabaseStorage implements IStorage {
       // Buyer" for Farm Gate, and includes adjustment interest. Do NOT fall
       // back to bags*50*pricePerKg; that hides the actual recorded weight
       // and creates a phantom Due after a full payment.
-      const entryTotalCost = entryLots.reduce(
+      const entryTotalCost = Math.round(entryLots.reduce(
         (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
         0
-      );
+      ));
 
       const amountPaid = parseFloat(entry.amountPaid || "0");
       const entryDue = Math.max(0, entryTotalCost - amountPaid);

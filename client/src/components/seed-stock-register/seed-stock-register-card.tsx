@@ -189,9 +189,10 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
         totalExtraCost += metrics.totalExtraCost;
         totalColdStoreDue += metrics.coldStoreDue;
       });
-      totalValue += entryTotalValue;
+      const roundedEntryTotalValue = Math.round(entryTotalValue);
+      totalValue += roundedEntryTotalValue;
       const amountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-      totalSupplierDue += Math.max(entryTotalValue - amountPaid, 0);
+      totalSupplierDue += Math.max(roundedEntryTotalValue - amountPaid, 0);
     });
 
     return { bagsTotal, bagsRemaining, totalValue, coldStoreTotal, totalExtraCost, totalColdStoreDue, totalSupplierDue };
@@ -694,6 +695,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
               entryTotalAmount += metrics.totalAmount;
               entryColdStoreTotal += metrics.coldStoreTotal;
             });
+            entryTotalAmount = Math.round(entryTotalAmount);
             
             return (
               <Card key={entry.id} className="border border-green-300 dark:border-green-700 shadow-sm hover-elevate" data-testid={`seed-entry-card-${entry.id}`}>
