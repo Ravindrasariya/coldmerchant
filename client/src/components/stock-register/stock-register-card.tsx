@@ -1332,7 +1332,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             });
             
             const farmerAmountPaid = entry.amountPaid ? parseFloat(entry.amountPaid) : 0;
-            const adjustedEntryTotal = entry.lots.reduce((sum, lot) => sum + (lot.netPayable ? parseFloat(lot.netPayable) : 0), 0);
+            const adjustedEntryTotal = Math.round(entry.lots.reduce((sum, lot) => sum + (lot.netPayable ? parseFloat(lot.netPayable) : 0), 0));
             const farmerRemainingDue = Math.max(adjustedEntryTotal - farmerAmountPaid, 0);
             const coldStoreRemainingDue = entryColdStoreTotalCharges - entryColdStorePaid;
             

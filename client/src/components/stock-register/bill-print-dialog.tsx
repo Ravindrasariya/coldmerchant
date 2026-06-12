@@ -733,7 +733,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                 </div>` : ""}
                 <div style="background: #0d9488; padding: 8px; border-radius: 6px; margin: -8px;">
                   <p style="font-size: 10px; color: #fff; margin: 0 0 4px 0; opacity: 0.9;">${netDueLabel}</p>
-                  <p style="font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;">₹${overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+                  <p style="font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;">₹${Math.round(overallTotals.netPayable).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
                 </div>
               </div>
             </div>
@@ -1092,7 +1092,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           )}
           <div className="bg-teal-600 text-white rounded-md p-2 -m-1">
             <p className="text-xs opacity-90 mb-1">{isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय"}</p>
-            <p className="font-mono font-bold text-sm">₹{overallTotals.netPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
+            <p className="font-mono font-bold text-sm">₹{Math.round(overallTotals.netPayable).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
           </div>
         </div>
       </div>

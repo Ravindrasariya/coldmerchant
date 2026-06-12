@@ -159,7 +159,7 @@ function computeHarvestLotCharges(lot: any) {
     const hammaliTotal = actualBags * hammaliRate;
     const totalCharges = mandiCommission + aadhatCommission + hammaliTotal + extraCharges;
     const netPayable = costOfGoods + totalCharges;
-    return { totalCharges: totalCharges.toFixed(2), netPayable: roundRupee(netPayable).toFixed(2), earlyPayAmount: "0.00" };
+    return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: "0.00" };
   }
   
   // Farm Gate and Cold Store
@@ -188,7 +188,7 @@ function computeHarvestLotCharges(lot: any) {
   
   const totalCharges = totalDeductions;
   const netPayable = costOfGoods - totalDeductions + signedAdj;
-  return { totalCharges: totalCharges.toFixed(2), netPayable: roundRupee(netPayable).toFixed(2), earlyPayAmount: earlyPayAmount.toFixed(2) };
+  return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: earlyPayAmount.toFixed(2) };
 }
 
 // After creating/updating lots and breakdowns, recompute and store totalCharges and netPayable
@@ -225,14 +225,11 @@ function computeSeedLotCharges(lot: any) {
   const totalCharges = hammali + grading + transport;
   const coldStoreTotal = bags * coldStorePerBag;
   const netPayable = costOfGoods + totalCharges;
-  // avgCostPerBag is a per-bag COGS basis (intermediate) — keep full precision,
-  // derived from the unrounded netPayable. Only the final supplier payable
-  // (netPayable) is rounded to the nearest whole rupee.
   const avgCostPerBag = bags > 0 ? (netPayable + coldStoreTotal) / bags : 0;
   
   return {
     totalCharges: totalCharges.toFixed(2),
-    netPayable: roundRupee(netPayable).toFixed(2),
+    netPayable: netPayable.toFixed(2),
     avgCostPerBag: avgCostPerBag.toFixed(2),
   };
 }
@@ -3999,6 +3996,7 @@ export async function registerRoutes(
             netPayable += parseFloat(lot.netPayable || "0");
             totalBags += lot.originalBags;
           }
+          netPayable = roundRupee(netPayable);
           const amountPaid = parseFloat(se.amountPaid || "0");
           const dueAmount = Math.max(0, netPayable - amountPaid);
           if (dueAmount <= 0) return null;
@@ -4108,6 +4106,7 @@ export async function registerRoutes(
         for (const lot of entryLots) {
           entryNetPayable += parseFloat(lot.netPayable || "0");
         }
+        entryNetPayable = roundRupee(entryNetPayable);
         const amountPaid = parseFloat(entry.amountPaid || "0");
         const entryDue = Math.max(0, entryNetPayable - amountPaid);
         aadhatDuesMap.set(entry.aadhatDbId, (aadhatDuesMap.get(entry.aadhatDbId) || 0) + entryDue);
@@ -5607,6 +5606,7 @@ export async function registerRoutes(
                 coldDue += lotColdCharges;
               }
               
+              entryNetPayable = roundRupee(entryNetPayable);
               const amountPaid = parseFloat(entry.amountPaid || "0");
               const entryDue = Math.max(0, entryNetPayable - amountPaid);
               harvestDue += entryDue;
@@ -5655,10 +5655,10 @@ export async function registerRoutes(
         
         return {
           ...farmer,
-          harvestDue,
+          harvestDue: roundRupee(harvestDue),
           seedDue,
-          netDue,
-          coldDue,
+          netDue: roundRupee(netDue),
+          coldDue: roundRupee(coldDue),
           pyReceivableWithInterest,
         };
       });
@@ -9247,6 +9247,7 @@ export async function registerRoutes(
         for (const lot of entryLots) {
           entryNetPayable += parseFloat(lot.netPayable || "0");
         }
+        entryNetPayable = roundRupee(entryNetPayable);
         const amountPaid = parseFloat(entry.amountPaid || "0");
         const entryDue = Math.max(0, entryNetPayable - amountPaid);
         aadhatDuesMap.set(entry.aadhatDbId, (aadhatDuesMap.get(entry.aadhatDbId) || 0) + entryDue);

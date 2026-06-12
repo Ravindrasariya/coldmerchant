@@ -1,33 +1,45 @@
 ---
 name: Whole-rupee rounding of final monetary values
-description: Where/how final amounts are rounded, and why rounding must live inside the shared compute functions
+description: Which monetary values are rounded to whole rupees, where the rounding belongs, and the constraints that dictate that placement
 ---
 
-# Final monetary values round to whole rupees (Math.round), intermediates do not
+# Rule: round only FINAL monetary values; never per-lot/per-bag/per-charge
 
-The app rounds only FINAL computed money values to the nearest whole rupee via a
-`roundRupee(n)=Math.round(n)` helper in `server/routes.ts`. Rounded finals:
-harvest transaction revenue/totalCostOfGoods/profitLoss (POST, PATCH, PUT-items);
-seed transaction totalCost/totalRevenue/totalProfitLoss/totalDueToFarmer (POST, PATCH);
-harvest lot `netPayable` and seed lot `netPayable` (the party dues). Each final value
-is rounded independently — Revenue − Cost need NOT equal P&L.
+Final values are rounded to the nearest whole rupee (`Math.round`); intermediates stay
+full precision. Finals = sale transaction revenue/cost/profit, seed transaction
+totals/dueToFarmer, and the party DUES (to farmer, aadhtiya, seed supplier, cold store).
+Intermediates = each lot's `netPayable`, `bag_breakdowns` cost-per-bag, seed
+`avgCostPerBag`, individual charge amounts.
 
-Intermediates stay full precision: `transaction_items` costOfGoods/revenue, seed
-`avgCostPerBag` (a per-bag COGS basis — derived from the UNROUNDED netPayable before
-netPayable is rounded), per-lot `totalCharges`, charge amounts.
+**Multi-lot rule:** a stock entry / transaction can have many lots. Sum the lots at full
+precision, then round the ONE per-entry total. Party totals are sums of those rounded
+per-entry values. Each final value is rounded independently — Revenue − Cost need NOT
+equal stored P&L.
 
-**Why it matters / gotcha:** `computeHarvestLotCharges` and `computeSeedLotCharges`
-are reused by BOTH the create/update recompute paths AND the server-startup backfills.
-So rounding had to be placed INSIDE those compute functions — otherwise a startup
-backfill (which recomputes from scratch and overwrites when it differs by >0.01) would
-revert any rounding done only in the recompute/route layer on the next restart.
-Consequence: historical purchase dues (lot netPayable) get rounded automatically on the
-next restart via the existing backfill, not only on re-save. Sales-transaction totals
-have NO startup backfill, so those stay untouched for old rows until the entry is
-re-saved (matching the "new entries only" intent).
+## Constraint 1 — stored vs computed values (why placement matters)
+- Sale-side transaction figures (revenue/cost/P&L, seed totals) are STORED columns:
+  round them only on create/edit, NEVER via a bulk/startup migration. Scope is "new &
+  re-saved entries forward"; historical stored rows stay until re-saved.
+- Lot `netPayable` is also stored, but is reused as an INTERMEDIATE — do NOT round it
+  (and do NOT round it inside the shared `computeHarvest/SeedLotCharges` helpers,
+  because those helpers are also run by server-startup backfills; rounding there would
+  silently rewrite historical lot values on every restart).
+- Party DUES are always COMPUTED live from lot values (never stored). Round them at the
+  aggregation point: sum unrounded lot `netPayable` per entry → round per entry → the
+  ledger/dashboard/dialog totals are sums of those whole per-entry dues. This applies
+  uniformly to old and new data because nothing historical is being mutated.
 
-**How to apply:** When changing the *output* of these compute functions, remember the
-change propagates to ALL historical rows on restart via the backfills (routes.ts startup
-IIFEs). For multi-lot purchases, party dues are the sum of per-lot rounded netPayables
-(can differ by up to ~₹1 from rounding the exact sum) — flagged as accepted; sales
-transaction totals round the single combined figure so they have no multi-lot drift.
+## Constraint 2 — payment dialogs must match displayed dues
+Manual-allocation dialogs (aadhtiya, cold store, buyer) validate payment ≤ displayed
+due. Round the per-entry due IDENTICALLY in the dialog endpoint and in the
+ledger/dues-list endpoint, or the user cannot fully settle (off-by-paise residue).
+
+## Constraint 3 — seed supplier basis is intentional
+Seed supplier dues are `Σ(bags × pricePerBag)` by design (charges flow to COGS, not
+supplier deductions). Keep that basis; only wrap the final sum in `Math.round`.
+
+**How to apply:** When you change the OUTPUT of `computeHarvest/SeedLotCharges`, remember
+startup backfills propagate it to all historical rows on restart — keep those helpers
+precise. Put new rounding at the final aggregate (per-entry sum, party total, or the
+stored transaction total on create/edit), and mirror it in every consumer of the same
+due (ledger, dashboard, bill/receipt grand total, payment dialog).

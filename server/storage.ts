@@ -2193,7 +2193,7 @@ export class DatabaseStorage implements IStorage {
       .map(data => ({
         coldStoreName: data.displayName,
         coldStoreDbId: data.coldStoreDbId,
-        totalDue: data.totalDue,
+        totalDue: Math.round(data.totalDue),
         lotCount: data.lotCount,
       }));
   }
@@ -2300,11 +2300,11 @@ export class DatabaseStorage implements IStorage {
     for (const entry of entries) {
       // Calculate total cost for this entry from its lots
       const entryLots = allLots.filter(lot => lot.seedEntryId === entry.id);
-      const totalCost = entryLots.reduce((sum, lot) => {
+      const totalCost = Math.round(entryLots.reduce((sum, lot) => {
         const bags = lot.originalBags || 0;
         const pricePerBag = parseFloat(lot.pricePerBag || "0");
         return sum + (bags * pricePerBag);
-      }, 0);
+      }, 0));
       
       const amountPaid = parseFloat(entry.amountPaid || "0");
       const dueAmount = totalCost - amountPaid;
@@ -2565,10 +2565,10 @@ export class DatabaseStorage implements IStorage {
           
           // Per-entry due = Σ lot.netPayable − amountPaid (matches stock
           // register card display; see helper at line ~1964 for rationale).
-          const entryTotalCost = entryLots.reduce(
+          const entryTotalCost = Math.round(entryLots.reduce(
             (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
             0
-          );
+          ));
 
           const currentPaid = parseFloat(stockEntry.amountPaid || "0");
           const due = entryTotalCost - currentPaid;
@@ -2787,11 +2787,11 @@ export class DatabaseStorage implements IStorage {
           
           // Calculate total cost for this entry from its lots
           const entryLots = allSeedLots.filter(lot => lot.seedEntryId === se.id);
-          const totalCost = entryLots.reduce((sum, lot) => {
+          const totalCost = Math.round(entryLots.reduce((sum, lot) => {
             const bags = lot.originalBags || 0;
             const pricePerBag = parseFloat(lot.pricePerBag || "0");
             return sum + (bags * pricePerBag);
-          }, 0);
+          }, 0));
           
           const amountPaid = parseFloat(se.amountPaid || "0");
           return totalCost > amountPaid;
@@ -2802,11 +2802,11 @@ export class DatabaseStorage implements IStorage {
           
           // Calculate total cost for this entry from its lots
           const entryLots = allSeedLots.filter(lot => lot.seedEntryId === seedEntry.id);
-          const totalCost = entryLots.reduce((sum, lot) => {
+          const totalCost = Math.round(entryLots.reduce((sum, lot) => {
             const bags = lot.originalBags || 0;
             const pricePerBag = parseFloat(lot.pricePerBag || "0");
             return sum + (bags * pricePerBag);
-          }, 0);
+          }, 0));
           
           const currentPaid = parseFloat(seedEntry.amountPaid || "0");
           const due = totalCost - currentPaid;
@@ -4799,11 +4799,11 @@ export class DatabaseStorage implements IStorage {
         const entriesWithDue = allSeedEntries.filter(se => {
           if (normalizeName(se.supplierName) !== normalizedSupplierName) return false;
           const entryLots = allSeedLots.filter(lot => lot.seedEntryId === se.id);
-          const totalCost = entryLots.reduce((sum, lot) => {
+          const totalCost = Math.round(entryLots.reduce((sum, lot) => {
             const bags = lot.originalBags || 0;
             const pricePerBag = parseFloat(lot.pricePerBag || "0");
             return sum + (bags * pricePerBag);
-          }, 0);
+          }, 0));
           const amountPaid = parseFloat(se.amountPaid || "0");
           return totalCost > amountPaid;
         });
@@ -4812,11 +4812,11 @@ export class DatabaseStorage implements IStorage {
           if (remainingAmount <= 0) break;
           
           const entryLots = allSeedLots.filter(lot => lot.seedEntryId === seedEntry.id);
-          const totalCost = entryLots.reduce((sum, lot) => {
+          const totalCost = Math.round(entryLots.reduce((sum, lot) => {
             const bags = lot.originalBags || 0;
             const pricePerBag = parseFloat(lot.pricePerBag || "0");
             return sum + (bags * pricePerBag);
-          }, 0);
+          }, 0));
           
           const currentPaid = parseFloat(seedEntry.amountPaid || "0");
           const due = totalCost - currentPaid;
