@@ -96,6 +96,14 @@ function sanitizeFreight(value: unknown): string | null {
   return Number.isInteger(n) && n >= 1 ? n.toString() : null;
 }
 
+// Round a FINAL monetary value to the nearest whole rupee. Applied only to
+// final computed totals (revenue, cost of goods, profit/loss, and party dues),
+// never to intermediate per-lot / per-bag / per-charge values. Each final value
+// is rounded independently (Revenue - Cost need not equal P&L).
+function roundRupee(n: number): number {
+  return Math.round(n);
+}
+
 // Compute totalCharges and netPayable for a harvest lot based on its breakdowns and charge data
 function computeHarvestLotCharges(lot: any) {
   const place = lot.place || "cold_store";
@@ -151,7 +159,7 @@ function computeHarvestLotCharges(lot: any) {
     const hammaliTotal = actualBags * hammaliRate;
     const totalCharges = mandiCommission + aadhatCommission + hammaliTotal + extraCharges;
     const netPayable = costOfGoods + totalCharges;
-    return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: "0.00" };
+    return { totalCharges: totalCharges.toFixed(2), netPayable: roundRupee(netPayable).toFixed(2), earlyPayAmount: "0.00" };
   }
   
   // Farm Gate and Cold Store
@@ -180,7 +188,7 @@ function computeHarvestLotCharges(lot: any) {
   
   const totalCharges = totalDeductions;
   const netPayable = costOfGoods - totalDeductions + signedAdj;
-  return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: earlyPayAmount.toFixed(2) };
+  return { totalCharges: totalCharges.toFixed(2), netPayable: roundRupee(netPayable).toFixed(2), earlyPayAmount: earlyPayAmount.toFixed(2) };
 }
 
 // After creating/updating lots and breakdowns, recompute and store totalCharges and netPayable
@@ -217,11 +225,14 @@ function computeSeedLotCharges(lot: any) {
   const totalCharges = hammali + grading + transport;
   const coldStoreTotal = bags * coldStorePerBag;
   const netPayable = costOfGoods + totalCharges;
+  // avgCostPerBag is a per-bag COGS basis (intermediate) — keep full precision,
+  // derived from the unrounded netPayable. Only the final supplier payable
+  // (netPayable) is rounded to the nearest whole rupee.
   const avgCostPerBag = bags > 0 ? (netPayable + coldStoreTotal) / bags : 0;
   
   return {
     totalCharges: totalCharges.toFixed(2),
-    netPayable: netPayable.toFixed(2),
+    netPayable: roundRupee(netPayable).toFixed(2),
     avgCostPerBag: avgCostPerBag.toFixed(2),
   };
 }
@@ -2910,11 +2921,11 @@ export async function registerRoutes(
           advancePayment: advancePayment ? advancePayment.toString() : null,
           transportationCharges: transportationCharges ? transportationCharges.toString() : null,
           otherCharges: otherCharges ? otherCharges.toString() : null,
-          revenue: revenueNum ? revenueNum.toString() : null,
+          revenue: revenueNum ? roundRupee(revenueNum).toString() : null,
           totalBags,
           totalNetWeight: totalNetWeight.toString(),
-          totalCostOfGoods: totalCostOfGoods.toString(),
-          profitLoss: profitLoss.toString(),
+          totalCostOfGoods: roundRupee(totalCostOfGoods).toString(),
+          profitLoss: roundRupee(profitLoss).toString(),
           salesCommission: salesCommission ? salesCommission.toString() : null,
           totalMandiCommission: totalMandiCommission ? totalMandiCommission.toString() : null,
           totalAadhatCommission: totalAadhatCommission ? totalAadhatCommission.toString() : null,
@@ -3185,14 +3196,18 @@ export async function registerRoutes(
         const saleRevenueNum = revenue !== undefined ? parseFloat(revenue) || 0 : parseFloat(existingTxn.revenue || "0");
         if (revenue !== undefined) {
           newRevenue = saleRevenueNum;
-          if (!decimalEqual(revenue, existingTxn.revenue)) {
-            changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: saleRevenueNum.toString() });
+          if (!decimalEqual(roundRupee(saleRevenueNum), existingTxn.revenue)) {
+            changes.push({ field: "revenue", oldValue: existingTxn.revenue, newValue: roundRupee(saleRevenueNum).toString() });
           }
         }
         const mcNum = parseFloat(totalMandiCommission !== undefined ? totalMandiCommission : existingTxn.totalMandiCommission) || 0;
         const hNum = parseFloat(totalHammali !== undefined ? totalHammali : existingTxn.totalHammali) || 0;
         newProfitLoss = saleRevenueNum - totalCostOfGoods - transportNum - otherNum - mcNum - hNum;
       }
+
+      // Round only the FINAL revenue and profit/loss to whole rupees.
+      if (newRevenue !== null) newRevenue = roundRupee(newRevenue);
+      newProfitLoss = roundRupee(newProfitLoss);
       
       if (!decimalEqual(newProfitLoss, existingTxn.profitLoss)) {
         changes.push({ field: "profitLoss", oldValue: existingTxn.profitLoss, newValue: newProfitLoss.toString() });
@@ -3245,6 +3260,7 @@ export async function registerRoutes(
         otherCharges: otherCharges ? otherCharges.toString() : null,
         remarks: remarks !== undefined ? (remarks || null) : existingTxn.remarks,
         profitLoss: newProfitLoss.toString(),
+        totalCostOfGoods: roundRupee(totalCostOfGoods).toString(),
         ...(newRevenue !== null ? { revenue: newRevenue.toString() } : {}),
         ...(buyerId !== undefined ? { buyerId } : {}),
         ...(salesCommission !== undefined ? { salesCommission: salesCommission ? salesCommission.toString() : null } : {}),
@@ -3629,9 +3645,9 @@ export async function registerRoutes(
       const txnUpdateFields: Record<string, string | number> = {
         totalBags: newTotalBags,
         totalNetWeight: newTotalNetWeight.toString(),
-        totalCostOfGoods: newTotalCostOfGoods.toString(),
-        revenue: finalRevenue.toString(),
-        profitLoss: newProfitLoss.toString(),
+        totalCostOfGoods: roundRupee(newTotalCostOfGoods).toString(),
+        revenue: roundRupee(finalRevenue).toString(),
+        profitLoss: roundRupee(newProfitLoss).toString(),
       };
       if (recalcSalesComm !== null) {
         txnUpdateFields.salesCommission = recalcSalesComm.toString();
@@ -7261,10 +7277,10 @@ export async function registerRoutes(
           otherCharges: otherTotal.toString(),
           otherChargesRemarks: otherChargesRemarks || null,
           totalBags,
-          totalCost: totalCost.toString(),
-          totalRevenue: totalRevenue.toString(),
-          totalProfitLoss: totalProfitLoss.toString(),
-          totalDueToFarmer: totalDueToFarmer.toFixed(2),
+          totalCost: roundRupee(totalCost).toString(),
+          totalRevenue: roundRupee(totalRevenue).toString(),
+          totalProfitLoss: roundRupee(totalProfitLoss).toString(),
+          totalDueToFarmer: roundRupee(totalDueToFarmer).toFixed(2),
           adjustmentType: adjustmentType || null,
           adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
           adjustmentAmountFinal: computedAdjFinal,
@@ -7542,10 +7558,10 @@ export async function registerRoutes(
           otherCharges: otherTotal.toString(),
           otherChargesRemarks: otherChargesRemarks || null,
           totalBags,
-          totalCost: totalCost.toString(),
-          totalRevenue: totalRevenue.toString(),
-          totalProfitLoss: totalProfitLoss.toString(),
-          totalDueToFarmer: totalDueToFarmer.toFixed(2),
+          totalCost: roundRupee(totalCost).toString(),
+          totalRevenue: roundRupee(totalRevenue).toString(),
+          totalProfitLoss: roundRupee(totalProfitLoss).toString(),
+          totalDueToFarmer: roundRupee(totalDueToFarmer).toFixed(2),
           adjustmentType: adjustmentType || null,
           adjustmentAmount: adjustmentAmount ? adjustmentAmount.toString() : null,
           adjustmentAmountFinal: computedAdjFinal,
