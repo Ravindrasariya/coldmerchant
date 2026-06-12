@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,6 +36,50 @@ import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES, ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
+
+type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
+  value: number;
+  onValueChange: (value: number) => void;
+};
+
+function DecimalInput({ value, onValueChange, ...props }: DecimalInputProps) {
+  const [text, setText] = useState<string>(value ? String(value) : "");
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) {
+      setText(value ? String(value) : "");
+    }
+  }, [value]);
+
+  return (
+    <Input
+      {...props}
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onBlur={() => {
+        focused.current = false;
+        const n = parseFloat(text);
+        if (isNaN(n) || n === 0) {
+          setText("");
+        } else {
+          setText(String(n));
+        }
+      }}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+        setText(raw);
+        const n = parseFloat(raw);
+        onValueChange(isNaN(n) ? 0 : n);
+      }}
+    />
+  );
+}
 
 interface CashEntry {
   id: number;
@@ -2871,22 +2915,17 @@ export function CashManagementTab() {
                                   <div className="grid grid-cols-2 gap-2">
                                     <div>
                                       <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")} (₹)</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        value={alloc.amount || ""}
-                                        onChange={(e) => updateBuyerAllocation(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.amount}
+                                        onValueChange={(v) => updateBuyerAllocation(idx, 'amount', v)}
                                         data-testid={`input-buyer-alloc-amount-${idx}`}
                                       />
                                     </div>
                                     <div>
                                       <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 50 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 1 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        value={alloc.pettyAdjustment || ""}
-                                        onChange={(e) => updateBuyerAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.pettyAdjustment}
+                                        onValueChange={(v) => updateBuyerAllocation(idx, 'pettyAdjustment', v)}
                                         className={cn((alloc.pettyAdjustment || 0) > 50 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 1 ? "border-orange-400 text-orange-600" : "")}
                                         data-testid={`input-buyer-alloc-petty-${idx}`}
                                       />
@@ -3556,24 +3595,17 @@ export function CashManagementTab() {
                                   <div className="grid grid-cols-3 gap-2">
                                     <div>
                                       <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")} (₹)</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        value={alloc.amount || ""}
-                                        onChange={(e) => updateAadhatAllocation(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.amount}
+                                        onValueChange={(v) => updateAadhatAllocation(idx, 'amount', v)}
                                         data-testid={`input-alloc-amount-${idx}`}
                                       />
                                     </div>
                                     <div>
                                       <Label className="text-xs text-muted-foreground">{t("Discount", "छूट")} %</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        max="100"
-                                        value={alloc.discountPercent || ""}
-                                        onChange={(e) => updateAadhatAllocation(idx, 'discountPercent', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.discountPercent}
+                                        onValueChange={(v) => updateAadhatAllocation(idx, 'discountPercent', v)}
                                         data-testid={`input-alloc-discount-${idx}`}
                                       />
                                       {alloc.discountAmount > 0 && (
@@ -3582,11 +3614,9 @@ export function CashManagementTab() {
                                     </div>
                                     <div>
                                       <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 50 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 1 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        value={alloc.pettyAdjustment || ""}
-                                        onChange={(e) => updateAadhatAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.pettyAdjustment}
+                                        onValueChange={(v) => updateAadhatAllocation(idx, 'pettyAdjustment', v)}
                                         className={cn((alloc.pettyAdjustment || 0) > 50 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 1 ? "border-orange-400 text-orange-600" : "")}
                                         data-testid={`input-alloc-petty-${idx}`}
                                       />
@@ -3884,22 +3914,17 @@ export function CashManagementTab() {
                                   <div className="grid grid-cols-2 gap-2">
                                     <div>
                                       <Label className="text-xs text-muted-foreground">{t("Amount", "राशि")} (₹)</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        value={alloc.amount || ""}
-                                        onChange={(e) => updateColdStoreAllocation(idx, 'amount', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.amount}
+                                        onValueChange={(v) => updateColdStoreAllocation(idx, 'amount', v)}
                                         data-testid={`input-cs-alloc-amount-${idx}`}
                                       />
                                     </div>
                                     <div>
                                       <Label className={cn("text-xs", (alloc.pettyAdjustment || 0) > 50 ? "text-red-600 font-semibold" : (alloc.pettyAdjustment || 0) > 1 ? "text-orange-600 font-semibold" : "text-muted-foreground")}>{t("Petty Adj", "पेटी")} (₹)</Label>
-                                      <Input
-                                        type="number"
-                                        step="any"
-                                        value={alloc.pettyAdjustment || ""}
-                                        onChange={(e) => updateColdStoreAllocation(idx, 'pettyAdjustment', parseFloat(e.target.value) || 0)}
+                                      <DecimalInput
+                                        value={alloc.pettyAdjustment}
+                                        onValueChange={(v) => updateColdStoreAllocation(idx, 'pettyAdjustment', v)}
                                         className={cn((alloc.pettyAdjustment || 0) > 50 ? "border-red-400 text-red-600" : (alloc.pettyAdjustment || 0) > 1 ? "border-orange-400 text-orange-600" : "")}
                                         data-testid={`input-cs-alloc-petty-${idx}`}
                                       />
