@@ -174,6 +174,16 @@ export class StockEntryDeletionBlockedError extends Error {
   }
 }
 
+// Thrown by storage.deleteTransaction when an ACTIVE (non-reversed) payment
+// link is created between the route precheck and the cascade delete.
+// Route catches this and returns 409.
+export class TransactionDeletionBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TransactionDeletionBlockedError';
+  }
+}
+
 function isStockSerialYearUniqueViolation(error: any): boolean {
   return (
     error?.code === '23505' &&
@@ -1729,10 +1739,16 @@ export class DatabaseStorage implements IStorage {
       };
     }
 
-    const buyerAllocs = await db.select().from(buyerPaymentAllocations)
+    // Only ACTIVE (non-reversed) allocations block deletion. Reversed
+    // payments leave their allocation rows behind (no FK cascade on the
+    // transaction link); those are cleaned up in deleteTransaction.
+    const buyerAllocs = await db.select({ appliedAmount: buyerPaymentAllocations.appliedAmount })
+      .from(buyerPaymentAllocations)
+      .innerJoin(cashEntries, eq(buyerPaymentAllocations.cashEntryId, cashEntries.id))
       .where(and(
         eq(buyerPaymentAllocations.transactionId, id),
         eq(buyerPaymentAllocations.merchantId, merchantId),
+        eq(cashEntries.isReversed, false),
       ));
     if (buyerAllocs.length > 0) {
       const total = buyerAllocs.reduce((s, a) => s + parseFloat(a.appliedAmount || "0"), 0);
@@ -1742,10 +1758,13 @@ export class DatabaseStorage implements IStorage {
       };
     }
 
-    const fifoAllocs = await db.select().from(cashEntryAllocations)
+    const fifoAllocs = await db.select({ appliedAmount: cashEntryAllocations.appliedAmount })
+      .from(cashEntryAllocations)
+      .innerJoin(cashEntries, eq(cashEntryAllocations.cashEntryId, cashEntries.id))
       .where(and(
         eq(cashEntryAllocations.transactionId, id),
         eq(cashEntryAllocations.merchantId, merchantId),
+        eq(cashEntries.isReversed, false),
       ));
     if (fifoAllocs.length > 0) {
       const total = fifoAllocs.reduce((s, a) => s + parseFloat(a.appliedAmount || "0"), 0);
@@ -1826,6 +1845,59 @@ export class DatabaseStorage implements IStorage {
           .set({ remainingBags: totalRemaining })
           .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
       }
+
+      // Re-check inside the transaction so a payment created after the
+      // route-level precheck still aborts cleanly with a 409 instead of
+      // raising a 500. Only ACTIVE (non-reversed) allocations block.
+      const blockingBuyer = await tx.select({ id: buyerPaymentAllocations.id })
+        .from(buyerPaymentAllocations)
+        .innerJoin(cashEntries, eq(buyerPaymentAllocations.cashEntryId, cashEntries.id))
+        .where(and(
+          eq(buyerPaymentAllocations.merchantId, merchantId),
+          eq(buyerPaymentAllocations.transactionId, id),
+          eq(cashEntries.isReversed, false),
+        ))
+        .limit(1);
+      if (blockingBuyer.length > 0) {
+        throw new TransactionDeletionBlockedError("A buyer payment has been allocated to this transaction. Reverse the payment allocation first, then delete.");
+      }
+
+      const blockingFifo = await tx.select({ id: cashEntryAllocations.id })
+        .from(cashEntryAllocations)
+        .innerJoin(cashEntries, eq(cashEntryAllocations.cashEntryId, cashEntries.id))
+        .where(and(
+          eq(cashEntryAllocations.merchantId, merchantId),
+          eq(cashEntryAllocations.transactionId, id),
+          eq(cashEntries.isReversed, false),
+        ))
+        .limit(1);
+      if (blockingFifo.length > 0) {
+        throw new TransactionDeletionBlockedError("A cash inward has been auto-applied (FIFO) to this transaction. Reverse the cash entry first, then delete.");
+      }
+
+      // Clean up ONLY reversed allocations referencing this transaction.
+      // The reversal flow leaves these rows behind, and neither allocation
+      // table has an ON DELETE cascade on its transaction link, so they
+      // would otherwise FK-fail the delete below.
+      const reversedCashIds = tx
+        .select({ id: cashEntries.id })
+        .from(cashEntries)
+        .where(and(
+          eq(cashEntries.merchantId, merchantId),
+          eq(cashEntries.isReversed, true),
+        ));
+      await tx.delete(buyerPaymentAllocations)
+        .where(and(
+          eq(buyerPaymentAllocations.merchantId, merchantId),
+          eq(buyerPaymentAllocations.transactionId, id),
+          inArray(buyerPaymentAllocations.cashEntryId, reversedCashIds),
+        ));
+      await tx.delete(cashEntryAllocations)
+        .where(and(
+          eq(cashEntryAllocations.merchantId, merchantId),
+          eq(cashEntryAllocations.transactionId, id),
+          inArray(cashEntryAllocations.cashEntryId, reversedCashIds),
+        ));
 
       await tx.delete(transactions)
         .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)));

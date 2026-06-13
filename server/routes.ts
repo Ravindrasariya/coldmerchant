@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError, StockEntryDeletionBlockedError } from "./storage";
+import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError, StockEntryDeletionBlockedError, TransactionDeletionBlockedError } from "./storage";
 import { setupAuth } from "./auth";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers, seedLots, validateLotBagBreakdowns } from "@shared/schema";
 import { db } from "./db";
@@ -3312,7 +3312,21 @@ export async function registerRoutes(
         return res.status(409).json({ message: blocker.reason });
       }
 
-      await storage.deleteTransaction(transactionId, merchantId);
+      try {
+        await storage.deleteTransaction(transactionId, merchantId);
+      } catch (err: any) {
+        // In-transaction recheck inside storage.deleteTransaction surfaces
+        // race-condition links as a typed error → 409.
+        if (err instanceof TransactionDeletionBlockedError) {
+          return res.status(409).json({ message: err.message });
+        }
+        // Belt-and-suspenders: any remaining FK violation (23503) also
+        // becomes a 409 instead of a 500.
+        if (err && (err.code === "23503" || /foreign key/i.test(String(err.message)))) {
+          return res.status(409).json({ message: "This transaction was just linked from another record. Reverse the new payment and try again." });
+        }
+        throw err;
+      }
       res.json({
         message: "Transaction deleted",
         transactionNumber: existingTxn.transactionNumber,
