@@ -689,7 +689,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
               <div style="flex: 1;">
                 <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">Bill Details / बिल विवरण</h3>
-                <p style="margin: 0 0 4px 0;"><span style="color: #666;">Bill No / बिल नंबर:</span> <span style="font-family: monospace; font-weight: 600;">#${entry.serialNumber}</span></p>
+                <p style="margin: 0 0 4px 0;"><span style="color: #666;">Bill No / बिल नंबर:</span> <span style="font-family: monospace; font-weight: 600;">#${entry.serialNumber}</span><span style="display: inline-block; width: 24px;"></span><span style="color: #666;">Total Bags / कुल बोरी:</span> <span style="font-family: monospace; font-weight: 600;">${totalOriginalBags}</span></p>
                 <p style="margin: 0 0 4px 0;"><span style="color: #666;">Date / दिनांक:</span> <span style="font-weight: 500;">${new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
                 <p style="margin: 0;"><span style="color: #666;">Place / स्थान:</span> <span style="font-weight: 500;">${entry.lots[0] ? getPlaceBilingual(entry.lots[0]) : "—"}</span></p>
               </div>
@@ -784,7 +784,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <div>
           <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Bill Details / बिल विवरण</h3>
           <div className="space-y-1 text-sm">
-            <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span></p>
+            <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span><span className="inline-block w-6" /><span className="text-gray-600">Total Bags / कुल बोरी:</span> <span className="font-mono font-semibold">{totalOriginalBags}</span></p>
             <p><span className="text-gray-600">Date / दिनांक:</span> <span className="font-medium">{new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
             <p><span className="text-gray-600">Place / स्थान:</span> <span className="font-medium">{entry.lots[0] ? getPlaceBilingual(entry.lots[0]) : "—"}</span></p>
           </div>
