@@ -364,6 +364,15 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return { mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalHammali, totalAdjustedValue, totalEarlyPayAmt, chargesByType, mandiPctLabel, aadhatPctLabel };
   })();
 
+  const getLotMarkaValue = (lot: StockEntryWithLots["lots"][0]) => {
+    const distinct = Array.from(new Set(
+      [lot.marka, ...(lot.bagBreakdowns || []).map((bd) => bd.marka)]
+        .map((m) => (m || "").trim())
+        .filter((m) => m.length > 0)
+    ));
+    return distinct.join(", ");
+  };
+
   const allTableRows = (() => {
     const rows: Array<{ crop: string; bags: number; grossWeight: number; netWeight: number; price: number; amount: number; size?: string; marka?: string }> = [];
     entry.lots.forEach(lot => {
@@ -417,15 +426,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const formatMarkaSuffix = (val?: string | null) => {
     const m = (val || "").trim();
     return m ? ` <span style="color:#666; white-space:nowrap;">(Marka -${escapeHtml(m)})</span>` : "";
-  };
-
-  const getLotMarkaValue = (lot: StockEntryWithLots["lots"][0]) => {
-    const distinct = Array.from(new Set(
-      [lot.marka, ...(lot.bagBreakdowns || []).map((bd) => bd.marka)]
-        .map((m) => (m || "").trim())
-        .filter((m) => m.length > 0)
-    ));
-    return distinct.join(", ");
   };
 
   const getPlaceBilingual = (lot: StockEntryWithLots["lots"][0]) => {
