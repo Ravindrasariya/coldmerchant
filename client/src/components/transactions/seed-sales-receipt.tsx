@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Printer, Share2 } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
 
 interface TransactionItem {
@@ -103,10 +104,7 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
     if (!printRef.current) return;
     
     const printContent = printRef.current.innerHTML;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    
-    printWindow.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -225,19 +223,8 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
           ${printContent}
         </body>
       </html>
-    `);
-    printWindow.document.close();
-    const imgs = printWindow.document.querySelectorAll('img');
-    if (imgs.length > 0) {
-      let loaded = 0;
-      const tryPrint = () => { loaded++; if (loaded >= imgs.length) printWindow.print(); };
-      imgs.forEach(img => {
-        if (img.complete) tryPrint();
-        else { img.onload = tryPrint; img.onerror = tryPrint; }
-      });
-    } else {
-      printWindow.print();
-    }
+    `;
+    printHtmlDocument(html);
   };
 
   useEffect(() => {

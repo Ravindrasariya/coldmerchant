@@ -12,6 +12,7 @@ import { Printer, Share2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { SeedStockEntryWithLots } from "@shared/schema";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
 
 interface SeedBillPrintDialogProps {
@@ -96,8 +97,6 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
 
   const handlePrint = () => {
     if (merchantLoading || (merchantData?.receiptHeaderImage && !headerImageDataUri)) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
 
     const address = [entry.address, entry.district, entry.state].filter(Boolean).join(", ");
 
@@ -123,7 +122,7 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
       `;
     }).join("");
 
-    printWindow.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -205,11 +204,9 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
           </div>
         </body>
       </html>
-    `);
+    `;
 
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 250);
+    printHtmlDocument(html);
   };
 
   const renderBillContent = () => (

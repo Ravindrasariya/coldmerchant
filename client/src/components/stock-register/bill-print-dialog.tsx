@@ -13,6 +13,7 @@ import { Printer, Share2, Download } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
 import krashuvedLogo from "@assets/Gemini_Generated_Image_lu75dlu75dlu75dl(1)_1777315339846.png";
 
@@ -436,8 +437,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const handlePrint = () => {
     if (isMandi && entry.aadhatDbId && aadhatLoading) return;
     if (merchantLoading || (merchantData?.receiptHeaderImage && !headerImageDataUri)) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
 
     const lotsHtml = entry.lots.map((lot) => {
       let breakdownHtml = "";
@@ -655,7 +654,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       `;
     }
 
-    printWindow.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -756,9 +755,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           </div>
         </body>
       </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    `;
+    printHtmlDocument(html);
   };
 
   const renderBillContent = () => (

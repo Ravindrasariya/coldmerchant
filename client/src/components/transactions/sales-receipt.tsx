@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Printer, Share2 } from "lucide-react";
 import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
 
@@ -102,16 +103,14 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
 
   const handlePrint = () => {
     if (!printRef.current) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
 
     const printTitle = receiptFilename();
+    let html: string;
     if (customHtml) {
-      const htmlWithTitle = customHtml.replace(/<head>/i, `<head><title>${printTitle}</title>`);
-      printWindow.document.write(htmlWithTitle);
+      html = customHtml.replace(/<head>/i, `<head><title>${printTitle}</title>`);
     } else {
     const printContent = printRef.current.innerHTML;
-    printWindow.document.write(`
+    html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -198,20 +197,9 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
           ${printContent}
         </body>
       </html>
-    `);
+    `;
     }
-    printWindow.document.close();
-    const imgs = printWindow.document.querySelectorAll('img');
-    if (imgs.length > 0) {
-      let loaded = 0;
-      const tryPrint = () => { loaded++; if (loaded >= imgs.length) printWindow.print(); };
-      imgs.forEach(img => {
-        if (img.complete) tryPrint();
-        else { img.onload = tryPrint; img.onerror = tryPrint; }
-      });
-    } else {
-      printWindow.print();
-    }
+    printHtmlDocument(html);
   };
 
   useEffect(() => {
