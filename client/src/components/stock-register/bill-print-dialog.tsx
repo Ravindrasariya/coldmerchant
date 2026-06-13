@@ -784,7 +784,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <div>
           <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">Bill Details / बिल विवरण</h3>
           <div className="space-y-1 text-sm">
-            <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span><span className="text-gray-600 ml-8">Total Bags / कुल बोरी:</span> <span className="font-mono font-semibold">{totalOriginalBags}</span></p>
+            <p><span className="text-gray-600">Bill No / बिल नंबर:</span> <span className="font-mono font-semibold">#{entry.serialNumber}</span><span className="text-gray-600" style={{ marginLeft: "32px" }}>Total Bags / कुल बोरी:</span> <span className="font-mono font-semibold">{totalOriginalBags}</span></p>
             <p><span className="text-gray-600">Date / दिनांक:</span> <span className="font-medium">{new Date(entry.purchaseDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}</span></p>
             <p><span className="text-gray-600">Place / स्थान:</span> <span className="font-medium">{entry.lots[0] ? getPlaceBilingual(entry.lots[0]) : "—"}</span></p>
           </div>
