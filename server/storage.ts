@@ -712,7 +712,8 @@ export class DatabaseStorage implements IStorage {
 
     const result = await Promise.all(entries.map(async (entry) => {
       const entryLots = await db.select().from(lots)
-        .where(and(eq(lots.stockEntryId, entry.id), eq(lots.merchantId, merchantId)));
+        .where(and(eq(lots.stockEntryId, entry.id), eq(lots.merchantId, merchantId)))
+        .orderBy(asc(lots.id));
       
       const lotsWithBreakdowns = await Promise.all(entryLots.map(async (lot) => {
         const breakdowns = await db.select().from(bagBreakdowns)
@@ -734,7 +735,8 @@ export class DatabaseStorage implements IStorage {
     if (!entry) return undefined;
 
     const entryLots = await db.select().from(lots)
-      .where(and(eq(lots.stockEntryId, entry.id), eq(lots.merchantId, merchantId)));
+      .where(and(eq(lots.stockEntryId, entry.id), eq(lots.merchantId, merchantId)))
+      .orderBy(asc(lots.id));
     
     const lotsWithBreakdowns = await Promise.all(entryLots.map(async (lot) => {
       const breakdowns = await db.select().from(bagBreakdowns)
