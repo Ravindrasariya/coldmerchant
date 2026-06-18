@@ -1770,7 +1770,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       const dbt = Number(form.watch("debit")) || 0;
                       const displayedRevenue = lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt;
                       const totalCogs = activeItems.reduce((sum, i) => sum + (i.costOfGoods || 0), 0);
-                      const totalPL = displayedRevenue - totalCogs;
+                      // Subtract the additional labour charges + driver advance:
+                      // they are added to Revenue but are buyer-reimbursed
+                      // pass-throughs NOT in COGS, so they must net out (mandi tax
+                      // stays inside COGS and cancels via Revenue − COGS).
+                      const totalPL = displayedRevenue - totalCogs - addlCharges - drvAdv;
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
                           <CardContent className="py-3 px-4 flex items-center justify-between">

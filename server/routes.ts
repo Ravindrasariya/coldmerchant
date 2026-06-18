@@ -241,6 +241,28 @@ function computeTxnItemCost(
   return { cogs: cpb * bagsMoved, snapshot: cpb };
 }
 
+// Recompute a transaction's total live COGS from the CURRENT stock register by
+// summing each item's computeTxnItemCost. Used so save paths and the startup
+// backfill never reuse a stale stored totalCostOfGoods (which leaves the card
+// P&L wrong after a lot is re-priced). Falls back to the item's stored
+// costOfGoods when a lot/breakdown can no longer be priced.
+async function recomputeTxnTotalCogs(
+  items: any[],
+  merchantId: number,
+  isLoading: boolean,
+): Promise<number> {
+  let total = 0;
+  for (const item of items) {
+    const lot = await storage.getLotById(item.lotId, merchantId);
+    if (!lot) { total += parseFloat(item.costOfGoods || "0"); continue; }
+    const breakdowns = await storage.getBagBreakdownsByLot(item.lotId, merchantId);
+    const netWeight = parseFloat(item.netWeight || "0");
+    const { cogs } = computeTxnItemCost(lot, breakdowns, item.breakdownId ?? null, item.bagsMoved, netWeight, isLoading);
+    total += cogs > 0 ? cogs : parseFloat(item.costOfGoods || "0");
+  }
+  return total;
+}
+
 // Compute totalCharges, netPayable, avgCostPerBag for a seed lot
 function computeSeedLotCharges(lot: any) {
   const bags = lot.originalBags || 0;
@@ -408,11 +430,13 @@ export async function registerRoutes(
     }
   })();
 
-  // One-time backfill: recompute loading transaction profit_loss as
-  // revenue − totalCostOfGoods so production self-corrects the legacy formula
-  // (which double-counted mandi tax by adding sales commission / subtracting
-  // debit on top of a COGS that already includes mandi tax). Only updates rows
-  // whose stored profitLoss differs. Sale/bikri transactions are untouched.
+  // One-time backfill: recompute loading transaction COGS LIVE from the stock
+  // register and profit_loss as revenue − liveCOGS − pass-throughs (additional
+  // labour charges + driver advance) so production self-corrects two legacy
+  // bugs: (1) a stale stored COGS that left the card P&L wrong, and (2) the
+  // pass-through charges inflating P&L (they are added to revenue but are not in
+  // COGS). Mandi tax stays inside COGS and cancels via revenue − COGS. Only
+  // updates rows whose stored values differ. Sale/bikri transactions untouched.
   (async () => {
     try {
       const { db } = await import("./db");
@@ -420,26 +444,35 @@ export async function registerRoutes(
       const { eq } = await import("drizzle-orm");
       const loadingTxns = await db.select({
         id: transactions.id,
-        revenue: transactions.revenue,
-        totalCostOfGoods: transactions.totalCostOfGoods,
-        profitLoss: transactions.profitLoss,
+        merchantId: transactions.merchantId,
       })
         .from(transactions)
         .where(eq(transactions.transactionType, "loading"));
       let updated = 0;
-      for (const tx of loadingTxns) {
+      for (const row of loadingTxns) {
+        const tx = await storage.getTransactionById(row.id, row.merchantId);
+        if (!tx) continue;
         const revenue = tx.revenue ? parseFloat(tx.revenue) : 0;
-        const cogs = tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0;
-        const want = roundRupee(revenue - cogs);
-        const existing = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
-        if (Math.abs(want - existing) > 0.01) {
+        const liveCogs = await recomputeTxnTotalCogs(tx.items || [], row.merchantId, true);
+        const additional =
+          (tx.tulai ? parseFloat(tx.tulai) : 0) +
+          (tx.majduri ? parseFloat(tx.majduri) : 0) +
+          (tx.thelaBhada ? parseFloat(tx.thelaBhada) : 0) +
+          (tx.palaKarai ? parseFloat(tx.palaKarai) : 0) +
+          (tx.bardan ? parseFloat(tx.bardan) : 0);
+        const advance = tx.advancePayment ? parseFloat(tx.advancePayment) : 0;
+        const wantPl = roundRupee(revenue - liveCogs - additional - advance);
+        const wantCogs = roundRupee(liveCogs);
+        const existingPl = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
+        const existingCogs = tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0;
+        if (Math.abs(wantPl - existingPl) > 0.01 || Math.abs(wantCogs - existingCogs) > 0.01) {
           await db.update(transactions)
-            .set({ profitLoss: want.toString() })
-            .where(eq(transactions.id, tx.id));
+            .set({ profitLoss: wantPl.toString(), totalCostOfGoods: wantCogs.toString() })
+            .where(eq(transactions.id, row.id));
           updated++;
         }
       }
-      if (updated > 0) console.log(`[backfill] Updated ${updated} loading transaction profitLoss (Revenue − COGS)`);
+      if (updated > 0) console.log(`[backfill] Updated ${updated} loading transaction profitLoss/COGS (Revenue − liveCOGS − pass-throughs)`);
     } catch (err) {
       console.error("[backfill] Error backfilling loading profitLoss:", err);
     }
@@ -2963,10 +2996,13 @@ export async function registerRoutes(
         const advancePaymentNum = parseFloat(advancePayment) || 0;
         const lotAmounts = transactionItems.reduce((sum: number, item: any) => sum + (parseFloat(item.amount || item.revenue || "0")), 0);
         revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
-        // Loading overall P&L = Revenue − COGS. COGS (totalCostOfGoods) already
-        // includes mandi tax for Mandi lots, so do NOT add sales commission /
-        // subtract debit again here — they are already baked into revenueNum.
-        profitLoss = revenueNum - totalCostOfGoods;
+        // Loading overall P&L = Revenue − COGS − pass-throughs. COGS
+        // (totalCostOfGoods) already includes purchase-side mandi tax for Mandi
+        // lots (so mandi cancels via Revenue − COGS), but the additional labour
+        // charges (tulai/majduri/thelaBhada/palaKarai/bardan) and driver advance
+        // are added to Revenue yet are NOT in COGS — they are buyer-reimbursed
+        // pass-throughs, so they must be subtracted back out or they inflate P&L.
+        profitLoss = revenueNum - totalCostOfGoods - additionalCharges - advancePaymentNum;
       }
 
       const transaction = await storage.createTransaction(
@@ -3230,8 +3266,12 @@ export async function registerRoutes(
         }
         changes.push({ field: "buyerId", oldValue: existingTxn.buyerId?.toString() || null, newValue: buyerId?.toString() || null });
       }
-      // Calculate new profit/loss and revenue
+      // Calculate new profit/loss and revenue. `totalCostOfGoods` (stale stored
+      // value) is kept for the sale/bikri branch (metadata edits don't change a
+      // sale's COGS). For loading we recompute COGS LIVE below so a lot re-priced
+      // after creation is reflected, and persist that live value.
       const totalCostOfGoods = parseFloat(existingTxn.totalCostOfGoods || "0");
+      let persistedCostOfGoods = totalCostOfGoods;
       const transportNum = parseFloat(transportationCharges !== undefined ? transportationCharges : existingTxn.transportationCharges) || 0;
       const otherNum = parseFloat(otherCharges !== undefined ? otherCharges : existingTxn.otherCharges) || 0;
       let newProfitLoss: number;
@@ -3257,8 +3297,16 @@ export async function registerRoutes(
         const existingItems = existingTxn.items || [];
         const lotAmounts = existingItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || item.revenue || "0"), 0);
         newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
-        // Loading overall P&L = Revenue − COGS (COGS already includes mandi tax).
-        newProfitLoss = newRevenue - totalCostOfGoods;
+        // Recompute COGS LIVE from the stock register so a lot priced after this
+        // transaction was created is reflected (the stale stored value is what
+        // left the card P&L wrong after a plain metadata save).
+        const liveCogs = await recomputeTxnTotalCogs(existingItems, merchantId, true);
+        persistedCostOfGoods = liveCogs;
+        // Loading overall P&L = Revenue − COGS − pass-throughs. Mandi tax is
+        // already inside COGS for Mandi lots (cancels via Revenue − COGS); the
+        // additional labour charges and driver advance are buyer-reimbursed
+        // pass-throughs added to Revenue but NOT in COGS, so subtract them back.
+        newProfitLoss = newRevenue - liveCogs - additionalCharges - advancePaymentNum;
       } else {
         const saleRevenueNum = revenue !== undefined ? parseFloat(revenue) || 0 : parseFloat(existingTxn.revenue || "0");
         if (revenue !== undefined) {
@@ -3327,7 +3375,7 @@ export async function registerRoutes(
         otherCharges: otherCharges ? otherCharges.toString() : null,
         remarks: remarks !== undefined ? (remarks || null) : existingTxn.remarks,
         profitLoss: newProfitLoss.toString(),
-        totalCostOfGoods: roundRupee(totalCostOfGoods).toString(),
+        totalCostOfGoods: roundRupee(persistedCostOfGoods).toString(),
         ...(newRevenue !== null ? { revenue: newRevenue.toString() } : {}),
         ...(buyerId !== undefined ? { buyerId } : {}),
         ...(salesCommission !== undefined ? { salesCommission: salesCommission ? salesCommission.toString() : null } : {}),
@@ -3835,8 +3883,11 @@ export async function registerRoutes(
         const advancePaymentNum = parseFloat(existingTxn.advancePayment || "0");
         const debitNum = parseFloat(existingTxn.debit || "0");
         finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal + advancePaymentNum - debitNum;
-        // Loading overall P&L = Revenue − COGS (COGS already includes mandi tax).
-        newProfitLoss = finalRevenue - newTotalCostOfGoods;
+        // Loading overall P&L = Revenue − COGS − pass-throughs. Mandi tax is
+        // already inside COGS for Mandi lots (cancels via Revenue − COGS); the
+        // additional labour charges and driver advance are buyer-reimbursed
+        // pass-throughs added to Revenue but NOT in COGS, so subtract them back.
+        newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - advancePaymentNum;
       } else {
         const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
         const otherCharges = parseFloat(existingTxn.otherCharges || "0");
@@ -9592,11 +9643,19 @@ export async function registerRoutes(
           // exactly with the transaction register (revenue - cost = stored profitLoss).
           const cost = num(tx.totalCostOfGoods);
           if (tx.transactionType === "loading") {
-            // Loading P&L = revenue − totalCostOfGoods (mandi tax already baked
-            // into totalCostOfGoods for Mandi lots). Books COGS must equal
-            // totalCostOfGoods alone so revenue − COGS reconciles with the
-            // stored profitLoss; do NOT add mandi/aadhat/hammali/extra/etc again.
-            return sum + cost;
+            // Loading P&L = revenue − totalCostOfGoods − pass-throughs. Mandi tax
+            // is already baked into totalCostOfGoods for Mandi lots (cancels via
+            // revenue − COGS). The additional labour charges and driver advance
+            // are added to revenue but are NOT in COGS, so Books COGS must add
+            // them back for revenue − COGS to reconcile with the stored
+            // profitLoss. Do NOT add mandi/aadhat/hammali/extra again.
+            return sum + cost
+              + num(tx.tulai)
+              + num(tx.majduri)
+              + num(tx.thelaBhada)
+              + num(tx.palaKarai)
+              + num(tx.bardan)
+              + num(tx.advancePayment);
           }
           return sum + cost
             + num(tx.totalMandiCommission)
