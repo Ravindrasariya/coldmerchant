@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { resolveTxnDate } from "@/lib/date-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ interface Transaction {
   totalNetWeight: string | null;
   crop: string | null;
   createdAt: string;
+  dateOfLoading: string | null;
   items: TransactionItem[];
 }
 
@@ -67,7 +69,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const receiptFilename = () => {
     if (!transaction) return "Sales-Receipt";
     const buyerName = transaction.partyName || "Receipt";
-    const date = new Date(transaction.createdAt);
+    const date = resolveTxnDate(transaction);
     const dd = String(date.getDate()).padStart(2, "0");
     const mm = String(date.getMonth() + 1).padStart(2, "0");
     const yyyy = date.getFullYear();
@@ -234,7 +236,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     let html = merchant.salesReceiptHtmlTemplate;
     const txnCrop = transaction.crop || cropType || "potato";
     const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
-    const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const dateStr = resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 4;
     const minRows = 12;
     const itemsRows = transaction.items.map((item, idx) =>
@@ -367,7 +369,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
             <div className="receipt-info flex justify-between text-sm">
               <div>
                 <p><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</p>
-                <p><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
+                <p><strong>Date / तारीख:</strong> {resolveTxnDate(transaction).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",

@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from "react";
+import { resolveTxnDate } from "@/lib/date-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ interface LoadingTransaction {
   debit: string | null;
   crop: string | null;
   createdAt: string;
+  dateOfLoading: string | null;
   items: TransactionItem[];
 }
 
@@ -97,7 +99,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
 
   const receiptFilename = () => {
     const buyerName = (transaction?.partyName || buyer?.name || "Receipt").replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
-    const dateStr = transaction?.createdAt ? new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
+    const dateStr = transaction ? resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
     return `${buyerName}_${dateStr}`;
   };
 
@@ -250,7 +252,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCrop)))
       : [txnCrop];
     const cropLabel = distinctCrops.map(cropToLabel).join(", ");
-    const dateStr = new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+    const dateStr = resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
     const itemsDataRows = transaction.items.map((item) =>
       `<tr><td>${escHtml(cropToLabel(item.crop || txnCrop))}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
@@ -423,7 +425,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
             <div className="receipt-info flex justify-between text-sm" style={{ lineHeight: "1.4" }}>
               <div>
                 <div><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</div>
-                <div><strong>Date / तारीख:</strong> {new Date(transaction.createdAt).toLocaleDateString("en-IN", {
+                <div><strong>Date / तारीख:</strong> {resolveTxnDate(transaction).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",

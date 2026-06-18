@@ -1,4 +1,5 @@
 import { useState, useMemo, Fragment } from "react";
+import { resolveTxnDate } from "@/lib/date-utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ interface Transaction {
   totalCostOfGoods: string | null;
   profitLoss: string | null;
   createdAt: string;
+  dateOfLoading: string | null;
   crop?: string;
   items: TransactionItem[];
 }
@@ -152,7 +154,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   // Get unique years for dropdown
   const availableYears = useMemo(() => {
     if (!transactions) return [new Date().getFullYear().toString()];
-    const years = transactions.map(t => new Date(t.createdAt).getFullYear().toString());
+    const years = transactions.map(t => resolveTxnDate(t).getFullYear().toString());
     const uniqueYears = Array.from(new Set(years)).sort((a, b) => parseInt(b) - parseInt(a));
     return uniqueYears.length > 0 ? uniqueYears : [new Date().getFullYear().toString()];
   }, [transactions]);
@@ -183,7 +185,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       }
 
       // Filter by year
-      const txnDate = new Date(txn.createdAt);
+      const txnDate = resolveTxnDate(txn);
       if (filterYear && txnDate.getFullYear().toString() !== filterYear) {
         return false;
       }
@@ -387,7 +389,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       return [
         txn.transactionNumber.toString(),
         txn.transactionType === "loading" ? t("Loading", "लोडिंग") : t("Bikri", "बिक्री"),
-        format(new Date(txn.createdAt), "dd/MM/yyyy"),
+        format(resolveTxnDate(txn), "dd/MM/yyyy"),
         txn.partyName || "-",
         txn.vehicleNumber || "-",
         itemsDetail || "-",
@@ -1114,7 +1116,7 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                         {txn.transactionNumber}
                       </td>
                       <td className="px-2 py-2 whitespace-nowrap text-muted-foreground">
-                        {new Date(txn.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}
+                        {resolveTxnDate(txn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}
                       </td>
                       <td className="px-2 py-2 whitespace-nowrap">
                         {txn.transactionType === "loading" ? (

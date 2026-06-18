@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { resolveTxnDate } from "@/lib/date-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ interface LoadingTransaction {
   totalNetWeight: string | null;
   crop: string | null;
   createdAt: string;
+  dateOfLoading: string | null;
   items: TransactionItem[];
 }
 
@@ -96,7 +98,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
 
   const challanFilename = () => {
     const buyerName = (transaction?.partyName || buyer?.name || "Challan").replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
-    const dateStr = transaction?.createdAt ? new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
+    const dateStr = transaction ? resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
     return `Challan_${buyerName}_${dateStr}`;
   };
 
@@ -236,7 +238,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
                     </div>
                   </td>
                   <td style={labelCell}>{t("Date", "दिनांक")}</td>
-                  <td style={valueCell}>{new Date(transaction.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
+                  <td style={valueCell}>{resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</td>
                 </tr>
                 <tr>
                   <td style={labelCell}>{t("Total Bags", "कुल बोरी")}</td>
