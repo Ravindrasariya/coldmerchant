@@ -1611,6 +1611,7 @@ export class DatabaseStorage implements IStorage {
       let lotSourceWeight = 0;
       let lotSourceBags = 0;
       let costPerBag = 0;
+      let lotPricePerKg = 0;
       let marka: string | null = null;
       if (lot.length > 0) {
         marka = (lot[0].marka && lot[0].marka.trim()) ? lot[0].marka : null;
@@ -1620,6 +1621,7 @@ export class DatabaseStorage implements IStorage {
             lotSourceWeight = bd.weight ? parseFloat(bd.weight) : (lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0);
             lotSourceBags = bd.numberOfBags || 0;
             costPerBag = bd.costPerBag ? parseFloat(bd.costPerBag) : 0;
+            lotPricePerKg = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
             if (bd.marka && bd.marka.trim()) marka = bd.marka;
           }
         }
@@ -1632,6 +1634,9 @@ export class DatabaseStorage implements IStorage {
           const lotBags = lot[0].originalBags || 0;
           if (lotTotalCogs > 0 && lotBags > 0) costPerBag = lotTotalCogs / lotBags;
         }
+        if (lotPricePerKg === 0) {
+          lotPricePerKg = lot[0].pricePerKg ? parseFloat(lot[0].pricePerKg) : 0;
+        }
       }
       return {
         ...item,
@@ -1641,6 +1646,7 @@ export class DatabaseStorage implements IStorage {
         lotSourceWeight,
         lotSourceBags,
         costPerBag,
+        lotPricePerKg,
         mandiCommissionPercent: lot.length > 0 ? (lot[0].mandiCommissionPercent || null) : null,
         aadhatCommissionPercent: lot.length > 0 ? (lot[0].aadhatCommissionPercent || null) : null,
         hammaliPerBag: lot.length > 0 ? (lot[0].hammaliPerBag || null) : null,
