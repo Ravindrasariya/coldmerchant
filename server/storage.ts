@@ -1423,6 +1423,13 @@ export class DatabaseStorage implements IStorage {
       .reduce((sum: number, c: any) => sum + (parseFloat(String(c.amount)) || 0), 0);
     const extraBuyerShare = actualSellableBags > 0 ? extraBuyerCharges / actualSellableBags : 0;
 
+    // Mandi "Extra Charges" (lot.mandiExtraCharges): a mandi-side charge billed
+    // into revenue when loading. Fold it into COGS for Mandi lots (spread across
+    // sellable bags) so it cancels via revenue − COGS — same treatment as mandi
+    // commission/aadhat/hammali — instead of inflating the loading P&L.
+    const mandiExtraCharges = lot.mandiExtraCharges ? parseFloat(lot.mandiExtraCharges) : 0;
+    const mandiExtraShare = actualSellableBags > 0 ? mandiExtraCharges / actualSellableBags : 0;
+
     const sellableBreakdowns = breakdowns.filter((bd: any) => bd.size !== "Wastage");
     const hasBreakdownData = sellableBreakdowns.some((bd: any) => {
       const w = bd.weight ? parseFloat(bd.weight) : 0;
@@ -1456,7 +1463,7 @@ export class DatabaseStorage implements IStorage {
           // cost that must be recovered at sale, so spread them across sellable
           // bags into COGS — same treatment as farm_gate.
           const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
-          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate + coldShare + extraBuyerShare;
+          cpb = (rowTotal / bags) + (rowCharges / bags) + hammaliRate + coldShare + extraBuyerShare + mandiExtraShare;
         } else if (place === "farm_gate") {
           const coldShare = actualSellableBags > 0 ? coldStoreCharges / actualSellableBags : 0;
           cpb = (rowTotal / bags) + coldShare + extraBuyerShare;
@@ -1486,6 +1493,7 @@ export class DatabaseStorage implements IStorage {
         cpb = actualSellableBags > 0 ? totalPayable / actualSellableBags : 0;
       }
       cpb += extraBuyerShare;
+      if (place === "mandi") cpb += mandiExtraShare;
       result.set(null, cpb);
       return { breakdownCosts: result, totalCogs: cpb * Math.max(actualSellableBags, 0) };
     }

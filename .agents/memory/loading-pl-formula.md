@@ -44,6 +44,15 @@ after Save.
   shared helper so the list and the edit dialog can never diverge.
 - Per-row P&L (the per-lot number) is by-design and intentionally NOT touched —
   only the overall/total P&L follows this rule. Sale/bikri P&L is also untouched.
+- Mandi "Extra Charges" (`lot.mandiExtraCharges`, txn `totalMandiExtraCharges`) is a
+  buyer-reimbursed pass-through baked into loading revenue. It belongs **inside** COGS
+  for Mandi lots only: `computeBreakdownCosts` adds `mandiExtraShare =
+  mandiExtraCharges / actualSellableBags` to cpb in both the per-breakdown and
+  no-breakdown mandi branches (mirrors `coldShare`/`extraBuyerShare`). It then cancels
+  via revenue − COGS — do NOT subtract it separately and do NOT add it back in Books.
+  Wastage caveat (pre-existing, by design): revenue allocates extra by
+  `lotOriginalBags` while COGS spreads it over `actualSellableBags` (original − wastage),
+  so with wastage the cancellation can drift slightly.
 - Reconciliation invariant (verify in DB):
   `profit_loss = revenue − total_cost_of_goods − additional − advance` for every
   `transaction_type='loading'` row.
