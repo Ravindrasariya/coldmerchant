@@ -212,6 +212,35 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
   }
 }
 
+// Compute a transaction item's COGS and cost-per-bag snapshot from the CURRENT
+// stock register. Mirrors the edit dialog display: COGS = costPerBag × bags for
+// sale and cold-store/farm-gate loading (the documented proportionate lot-cost
+// model), falling back to the breakdown's ₹/Kg × netWeight only when the register
+// has no per-bag cost yet. Used so a lot priced after a transaction was created
+// reflects its real cost everywhere (tnx card, registers, bill).
+function computeTxnItemCost(
+  lot: any,
+  breakdowns: any[],
+  breakdownId: number | null,
+  bagsMoved: number,
+  netWeight: number,
+  isLoading: boolean,
+): { cogs: number; snapshot: number } {
+  const { breakdownCosts } = storage.computeBreakdownCosts(lot, breakdowns);
+  const cpb = breakdownCosts.get(breakdownId ?? null) || 0;
+  if (isLoading && lot?.place !== "farm_gate") {
+    if (cpb > 0 && bagsMoved > 0) {
+      return { cogs: cpb * bagsMoved, snapshot: cpb };
+    }
+    const bd = breakdownId ? breakdowns.find((b) => b.id === breakdownId) : null;
+    const bdPpk = bd?.pricePerKg
+      ? parseFloat(bd.pricePerKg)
+      : (lot?.pricePerKg ? parseFloat(lot.pricePerKg) : 0);
+    return { cogs: bdPpk * netWeight, snapshot: bdPpk };
+  }
+  return { cogs: cpb * bagsMoved, snapshot: cpb };
+}
+
 // Compute totalCharges, netPayable, avgCostPerBag for a seed lot
 function computeSeedLotCharges(lot: any) {
   const bags = lot.originalBags || 0;
@@ -3420,19 +3449,15 @@ export async function registerRoutes(
             const newNetWeight = (typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0 && Math.abs(itemChange.netWeight - computedNetWeight) > 0.5)
               ? itemChange.netWeight
               : computedNetWeight;
-            const { breakdownCosts: editBdCosts } = storage.computeBreakdownCosts(editLot, editBreakdowns);
-            const editCostPerBag = editBdCosts.get(existingItem.breakdownId || null) || parseFloat(existingItem.pricePerKgSnapshot || "0");
-            let newCostOfGoods: number;
-            let editBdPpk = 0;
-            if (existingTxn.transactionType === "loading" && editLot?.place !== "farm_gate") {
-              const editBd = existingItem.breakdownId
-                ? editBreakdowns.find(b => b.id === existingItem.breakdownId)
-                : null;
-              editBdPpk = editBd?.pricePerKg ? parseFloat(editBd.pricePerKg) : (editLot?.pricePerKg ? parseFloat(editLot.pricePerKg) : 0);
-              newCostOfGoods = editBdPpk * newNetWeight;
-            } else {
-              newCostOfGoods = editCostPerBag * itemChange.bagsMoved;
-            }
+            const editCost = computeTxnItemCost(
+              editLot,
+              editBreakdowns,
+              existingItem.breakdownId,
+              itemChange.bagsMoved,
+              newNetWeight,
+              existingTxn.transactionType === "loading",
+            );
+            const newCostOfGoods = editCost.cogs;
             
             const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : existingRevenue;
             
@@ -3440,10 +3465,10 @@ export async function registerRoutes(
               bagsMoved: itemChange.bagsMoved,
               netWeight: newNetWeight.toString(),
               costOfGoods: newCostOfGoods.toString(),
+              pricePerKgSnapshot: editCost.snapshot.toString(),
               revenue: itemRevenue.toString()
             };
             if (existingTxn.transactionType === "loading") {
-              updateFields.pricePerKgSnapshot = (editLot?.place === "farm_gate" ? editCostPerBag : editBdPpk).toString();
               if (typeof itemChange.pricePerKg === 'number') updateFields.pricePerKg = itemChange.pricePerKg.toString();
               if (typeof itemChange.amount === 'number') {
                 updateFields.amount = itemChange.amount.toString();
@@ -3471,10 +3496,31 @@ export async function registerRoutes(
             newTotalCostOfGoods += newCostOfGoods;
             newTotalRevenue += itemRevenue;
           } else if (existingItem) {
-            // No change, keep existing values
+            // No structural change: still refresh cost from the current register so
+            // a lot priced after creation reflects its real COGS everywhere.
+            const keepLot = await storage.getLotById(existingItem.lotId, merchantId);
+            const keepBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
+            const keepNetWeight = parseFloat(existingItem.netWeight || "0");
+            const existingCogs = parseFloat(existingItem.costOfGoods || "0");
+            let effectiveCogs = existingCogs;
+            if (keepLot) {
+              const refreshed = computeTxnItemCost(keepLot, keepBreakdowns, existingItem.breakdownId, existingItem.bagsMoved, keepNetWeight, existingTxn.transactionType === "loading");
+              if (refreshed.cogs > 0 && Math.abs(refreshed.cogs - existingCogs) > 0.01) {
+                await storage.updateTransactionItem(existingItem.id, merchantId, {
+                  costOfGoods: refreshed.cogs.toFixed(2),
+                  pricePerKgSnapshot: refreshed.snapshot.toFixed(2),
+                });
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_cogs`,
+                  oldValue: `₹${existingCogs.toFixed(0)}`,
+                  newValue: `₹${refreshed.cogs.toFixed(0)}`,
+                });
+                effectiveCogs = refreshed.cogs;
+              }
+            }
             newTotalBags += existingItem.bagsMoved;
-            newTotalNetWeight += parseFloat(existingItem.netWeight || "0");
-            newTotalCostOfGoods += parseFloat(existingItem.costOfGoods || "0");
+            newTotalNetWeight += keepNetWeight;
+            newTotalCostOfGoods += effectiveCogs;
             newTotalRevenue += parseFloat(existingItem.revenue || "0");
           }
         } else if (itemChange.action === 'add' && itemChange.inventoryKey) {
@@ -3511,26 +3557,14 @@ export async function registerRoutes(
           await storage.adjustInventory(lotId, breakdownId, merchantId, -itemChange.bagsMoved);
           
           const addBreakdowns = await storage.getBagBreakdownsByLot(lotId, merchantId);
-          const { breakdownCosts: addBdCosts } = storage.computeBreakdownCosts(lot, addBreakdowns);
-          const addCostPerBag = addBdCosts.get(breakdownId || null) || 0;
           
           const computedNetWeight = storage.computeProportionateNetWeight(lot, addBreakdowns, breakdownId, itemChange.bagsMoved);
           const netWeight = (typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0 && Math.abs(itemChange.netWeight - computedNetWeight) > 0.5)
             ? itemChange.netWeight
             : computedNetWeight;
-          let costOfGoods: number;
-          let addSnapshotPrice: number;
-          if (existingTxn.transactionType === "loading" && lot.place !== "farm_gate") {
-            const addBd = breakdownId
-              ? addBreakdowns.find(b => b.id === breakdownId)
-              : null;
-            const addBdPpk = addBd?.pricePerKg ? parseFloat(addBd.pricePerKg) : (lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0);
-            costOfGoods = addBdPpk * netWeight;
-            addSnapshotPrice = addBdPpk;
-          } else {
-            costOfGoods = addCostPerBag * itemChange.bagsMoved;
-            addSnapshotPrice = addCostPerBag;
-          }
+          const addCost = computeTxnItemCost(lot, addBreakdowns, breakdownId, itemChange.bagsMoved, netWeight, existingTxn.transactionType === "loading");
+          const costOfGoods = addCost.cogs;
+          const addSnapshotPrice = addCost.snapshot;
           
           // Use provided revenue if given, default to 0
           const itemRevenue = typeof itemChange.revenue === 'number' ? itemChange.revenue : 0;
@@ -3574,10 +3608,12 @@ export async function registerRoutes(
             
             const keepUpdateFields: Partial<TransactionItem> = {};
             let hasKeepChanges = false;
+            let revenueChanged = false;
 
             if (typeof itemChange.revenue === 'number' && itemChange.revenue !== existingRevenue) {
               keepUpdateFields.revenue = newItemRevenue.toString();
               hasKeepChanges = true;
+              revenueChanged = true;
             }
 
             if (existingTxn.transactionType === "loading") {
@@ -3595,12 +3631,37 @@ export async function registerRoutes(
                   keepUpdateFields.revenue = itemChange.amount.toString();
                   newItemRevenue = itemChange.amount;
                   hasKeepChanges = true;
+                  revenueChanged = true;
                 }
+              }
+            }
+
+            // Refresh cost from the current stock register so a lot priced AFTER
+            // this transaction was created reflects its real COGS/cost-per-bag.
+            const keepLot = await storage.getLotById(existingItem.lotId, merchantId);
+            const keepBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
+            const keepNetWeight = parseFloat(existingItem.netWeight || "0");
+            const existingCogs = parseFloat(existingItem.costOfGoods || "0");
+            let effectiveCogs = existingCogs;
+            if (keepLot) {
+              const refreshed = computeTxnItemCost(keepLot, keepBreakdowns, existingItem.breakdownId, existingItem.bagsMoved, keepNetWeight, existingTxn.transactionType === "loading");
+              if (refreshed.cogs > 0 && Math.abs(refreshed.cogs - existingCogs) > 0.01) {
+                keepUpdateFields.costOfGoods = refreshed.cogs.toFixed(2);
+                keepUpdateFields.pricePerKgSnapshot = refreshed.snapshot.toFixed(2);
+                hasKeepChanges = true;
+                effectiveCogs = refreshed.cogs;
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_cogs`,
+                  oldValue: `₹${existingCogs.toFixed(0)}`,
+                  newValue: `₹${refreshed.cogs.toFixed(0)}`
+                });
               }
             }
 
             if (hasKeepChanges) {
               await storage.updateTransactionItem(itemChange.id, merchantId, keepUpdateFields);
+            }
+            if (revenueChanged) {
               changes.push({
                 field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_revenue`,
                 oldValue: `₹${existingRevenue.toFixed(0)}`,
@@ -3609,8 +3670,8 @@ export async function registerRoutes(
             }
             
             newTotalBags += existingItem.bagsMoved;
-            newTotalNetWeight += parseFloat(existingItem.netWeight || "0");
-            newTotalCostOfGoods += parseFloat(existingItem.costOfGoods || "0");
+            newTotalNetWeight += keepNetWeight;
+            newTotalCostOfGoods += effectiveCogs;
             newTotalRevenue += newItemRevenue;
           }
         }

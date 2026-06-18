@@ -388,57 +388,84 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const isOverride = transaction.transactionType !== "loading" && Math.abs(storedRevenue - lotRevenueSum) >= 0.5;
       setRevenueOverridden(isOverride);
 
-      const txnRevenue = transaction.items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
-      const txnBags = transaction.items.reduce((sum, i) => sum + i.bagsMoved, 0);
-      const amtBase = txnRevenue > 0 ? txnRevenue : 1;
-      const bagBase = txnBags > 0 ? txnBags : 1;
-      const storedMC = parseFloat(transaction.totalMandiCommission || "0");
-      const storedAC = parseFloat(transaction.totalAadhatCommission || "0");
-      const storedHM = parseFloat(transaction.totalHammali || "0");
       const storedSC = parseFloat(transaction.salesCommission || "0");
+
+      // Refresh each lot's cost from the CURRENT stock register. getTransactionById
+      // enriches every item with the live per-bag cost (costPerBag) and current lot
+      // mandi rates, so a lot priced AFTER the transaction was created now shows its
+      // real cost/COGS instead of the frozen 0 captured at creation time. We keep the
+      // frozen value only as a fallback when the register still has no cost at all.
+      const mappedItems = transaction.items.map(item => {
+        const bags = item.bagsMoved;
+        const itemNetWeight = parseFloat(item.netWeight || "0");
+        const frozenCogs = parseFloat(item.costOfGoods || "0");
+        const liveCpb = Number(item.costPerBag) || 0;
+        const liveCogs = (liveCpb > 0 && bags > 0)
+          ? parseFloat((liveCpb * bags).toFixed(2))
+          : frozenCogs;
+        const liveCostPerBag = liveCpb > 0 ? liveCpb : (parseFloat(item.pricePerKgSnapshot || "0") || 0);
+        return {
+          id: item.id,
+          lotId: item.lotId,
+          breakdownId: item.breakdownId,
+          serialNumber: item.serialNumber,
+          crop: item.crop || "potato",
+          place: item.place,
+          coldStoreName: item.coldStoreName,
+          potatoType: item.potatoType,
+          size: item.size,
+          bagsMoved: bags,
+          originalBags: bags,
+          netWeight: itemNetWeight,
+          originalNetWeight: itemNetWeight,
+          pricePerKg: liveCostPerBag,
+          costOfGoods: liveCogs,
+          originalCostOfGoods: liveCogs,
+          revenue: parseFloat(item.revenue || "0"),
+          originalRevenue: parseFloat(item.revenue || "0"),
+          loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
+          loadingAmount: parseFloat(item.amount || "0"),
+          lotSourceWeight: item.lotSourceWeight || 0,
+          lotSourceBags: item.lotSourceBags || 0,
+          mandiCommissionPercent: item.mandiCommissionPercent || null,
+          aadhatCommissionPercent: item.aadhatCommissionPercent || null,
+          hammaliPerBag: item.hammaliPerBag || null,
+          mandiExtraCharges: item.mandiExtraCharges || null,
+          lotOriginalBags: item.lotOriginalBags || 0,
+          costPerBag: liveCpb,
+          action: 'keep' as const
+        };
+      });
+      setEditableItems(mappedItems);
+
       if (transaction.transactionType === "loading") {
-        setMandiPct(Math.round((storedMC / amtBase) * 10000) / 100);
-        setAadhatPct(Math.round((storedAC / amtBase) * 10000) / 100);
-        setHammaliRate(Math.round((storedHM / bagBase) * 100) / 100);
+        // Recompute mandi charges from the lots' CURRENT stock-register rates
+        // (mirrors the Create-Loading dialog), so rates entered or changed after
+        // creation are reflected. Falls back to 0 cleanly when a lot has no rate.
+        let aggMC = 0, aggAC = 0, aggHM = 0, aggEC = 0, amtBaseL = 0, bagBaseL = 0;
+        for (const it of mappedItems) {
+          const amt = it.loadingAmount || 0;
+          const b = it.bagsMoved || 0;
+          amtBaseL += amt;
+          bagBaseL += b;
+          if (it.mandiCommissionPercent) aggMC += (amt * parseFloat(it.mandiCommissionPercent)) / 100;
+          if (it.aadhatCommissionPercent) aggAC += (amt * parseFloat(it.aadhatCommissionPercent)) / 100;
+          if (it.hammaliPerBag) aggHM += b * parseFloat(it.hammaliPerBag);
+          if (it.mandiExtraCharges && it.lotOriginalBags > 0) aggEC += parseFloat(it.mandiExtraCharges) * (b / it.lotOriginalBags);
+        }
+        const aBase = amtBaseL > 0 ? amtBaseL : 1;
+        const bBase = bagBaseL > 0 ? bagBaseL : 1;
+        setMandiPct(Math.round((aggMC / aBase) * 10000) / 100);
+        setAadhatPct(Math.round((aggAC / aBase) * 10000) / 100);
+        setHammaliRate(Math.round((aggHM / bBase) * 100) / 100);
+        form.setValue("totalMandiExtraCharges", Math.round(aggEC * 100) / 100 || undefined);
+        setSalesCommPct(amtBaseL > 0 ? Math.round((storedSC / amtBaseL) * 10000) / 100 : 0);
       } else {
         setMandiPct(0);
         setAadhatPct(0);
         setHammaliRate(0);
+        setSalesCommPct(0);
       }
-      const scBase = txnRevenue;
-      setSalesCommPct(scBase > 0 ? Math.round((storedSC / scBase) * 10000) / 100 : 0);
-
-      setEditableItems(transaction.items.map(item => ({
-        id: item.id,
-        lotId: item.lotId,
-        breakdownId: item.breakdownId,
-        serialNumber: item.serialNumber,
-        crop: item.crop || "potato",
-        place: item.place,
-        coldStoreName: item.coldStoreName,
-        potatoType: item.potatoType,
-        size: item.size,
-        bagsMoved: item.bagsMoved,
-        originalBags: item.bagsMoved,
-        netWeight: parseFloat(item.netWeight || "0"),
-        originalNetWeight: parseFloat(item.netWeight || "0"),
-        pricePerKg: parseFloat(item.pricePerKgSnapshot || "0"),
-        costOfGoods: parseFloat(item.costOfGoods || "0"),
-        originalCostOfGoods: parseFloat(item.costOfGoods || "0"),
-        revenue: parseFloat(item.revenue || "0"),
-        originalRevenue: parseFloat(item.revenue || "0"),
-        loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
-        loadingAmount: parseFloat(item.amount || "0"),
-        lotSourceWeight: item.lotSourceWeight || 0,
-        lotSourceBags: item.lotSourceBags || 0,
-        mandiCommissionPercent: item.mandiCommissionPercent || null,
-        aadhatCommissionPercent: item.aadhatCommissionPercent || null,
-        hammaliPerBag: item.hammaliPerBag || null,
-        mandiExtraCharges: item.mandiExtraCharges || null,
-        lotOriginalBags: item.lotOriginalBags || 0,
-        costPerBag: Number(item.costPerBag) || 0,
-        action: 'keep' as const
-      })));
     }
   }, [transaction, form]);
 
@@ -500,7 +527,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const isLoadingType = transaction?.transactionType === "loading";
 
   const computeItemMandiCharges = (item: EditableItem) => {
-    const costBasis = item.costOfGoods || 0;
+    // Loading mandi is charged on the sale amount (mirrors the Create-Loading
+    // dialog); sale mandi is charged on COGS.
+    const costBasis = isLoadingType ? (item.loadingAmount || 0) : (item.costOfGoods || 0);
     const bags = item.bagsMoved || 0;
     const mc = item.mandiCommissionPercent ? (costBasis * parseFloat(item.mandiCommissionPercent)) / 100 : 0;
     const ac = item.aadhatCommissionPercent ? (costBasis * parseFloat(item.aadhatCommissionPercent)) / 100 : 0;
@@ -824,15 +853,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setShowAddItem(false);
   };
 
-  const hasItemChanges = editableItems.some(item => item.action !== 'keep');
-
   const onSubmit = async (data: EditTransactionFormData) => {
     try {
       await updateMutation.mutateAsync({ ...data, buyerId: selectedBuyerId });
-      // Sequence: items recompute reads stored debit/charges, so PATCH must finish first
-      if (hasItemChanges) {
-        await updateItemsMutation.mutateAsync();
-      }
+      // Sequence: items recompute reads stored debit/charges, so PATCH must finish first.
+      // Always run the items update so refreshed stock-register costs (COGS/cost-per-bag)
+      // are recomputed and persisted even when the user made no manual item change.
+      await updateItemsMutation.mutateAsync();
     } catch {
       // Errors surfaced via individual mutation onError toasts
     }
