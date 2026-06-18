@@ -1754,20 +1754,23 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
-                      // Mirror the transaction card / backend loading P&L exactly:
-                      // P&L = (Σ lot amount − Σ cost of goods) + Sales Commission − Debit.
-                      // Use the stored/live `costOfGoods` (base goods cost that ties out to
-                      // the backend `totalCostOfGoods`), NOT the stock-register `costPerBag`
-                      // which bakes in purchase-side mandi charges. Mandi/aadhat/hammali/
-                      // extra and other charges are buyer-reimbursed, appearing on both
-                      // revenue and cost, so they cancel and are excluded here.
-                      const totalItemPL = activeItems.reduce(
-                        (sum, i) => sum + (i.loadingAmount - i.costOfGoods),
-                        0
-                      );
+                      // Loading overall P&L = Revenue − COGS. Revenue here uses the
+                      // exact same basis as the Revenue field above (lot amounts +
+                      // mandi + sales commission + additional charges + driver
+                      // advance − debit). COGS is the live per-row `costOfGoods`
+                      // which ties out to the backend `totalCostOfGoods` (already
+                      // includes purchase-side mandi tax for Mandi lots). Do NOT add
+                      // sales commission / subtract debit again — they are already
+                      // inside the revenue figure.
+                      const lotAmounts = activeItems.reduce((sum, i) => sum + (i.loadingAmount || 0), 0);
+                      const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
                       const sc = Number(form.watch("salesCommission")) || 0;
+                      const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
+                      const drvAdv = Number(form.watch("advancePayment")) || 0;
                       const dbt = Number(form.watch("debit")) || 0;
-                      const totalPL = totalItemPL + sc - dbt;
+                      const displayedRevenue = lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt;
+                      const totalCogs = activeItems.reduce((sum, i) => sum + (i.costOfGoods || 0), 0);
+                      const totalPL = displayedRevenue - totalCogs;
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
                           <CardContent className="py-3 px-4 flex items-center justify-between">
