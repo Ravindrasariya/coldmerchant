@@ -1493,7 +1493,9 @@ export class DatabaseStorage implements IStorage {
         cpb = actualSellableBags > 0 ? totalPayable / actualSellableBags : 0;
       }
       cpb += extraBuyerShare;
-      if (place === "mandi") cpb += mandiExtraShare;
+      // NOTE: no-breakdown mandi lots use `lot.netPayable`, which already
+      // includes mandiExtraCharges (see computeHarvestLotCharges), so do NOT
+      // add mandiExtraShare here — that path counts the extra exactly once.
       result.set(null, cpb);
       return { breakdownCosts: result, totalCogs: cpb * Math.max(actualSellableBags, 0) };
     }

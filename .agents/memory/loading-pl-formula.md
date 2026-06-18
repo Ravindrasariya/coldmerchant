@@ -44,15 +44,19 @@ after Save.
   shared helper so the list and the edit dialog can never diverge.
 - Per-row P&L (the per-lot number) is by-design and intentionally NOT touched —
   only the overall/total P&L follows this rule. Sale/bikri P&L is also untouched.
-- Mandi "Extra Charges" (`lot.mandiExtraCharges`, txn `totalMandiExtraCharges`) is a
-  buyer-reimbursed pass-through baked into loading revenue. It belongs **inside** COGS
-  for Mandi lots only: `computeBreakdownCosts` adds `mandiExtraShare =
-  mandiExtraCharges / actualSellableBags` to cpb in both the per-breakdown and
-  no-breakdown mandi branches (mirrors `coldShare`/`extraBuyerShare`). It then cancels
-  via revenue − COGS — do NOT subtract it separately and do NOT add it back in Books.
-  Wastage caveat (pre-existing, by design): revenue allocates extra by
-  `lotOriginalBags` while COGS spreads it over `actualSellableBags` (original − wastage),
-  so with wastage the cancellation can drift slightly.
+- Mandi "Extra Charges" (`lot.mandiExtraCharges`) is a buyer-reimbursed pass-through
+  baked into loading revenue, so it must sit **inside** COGS for Mandi lots and cancel
+  via revenue − COGS (do NOT subtract it separately, do NOT add it back in Books).
+  CRITICAL: count it exactly ONCE. The two mandi COGS paths derive cost differently —
+  the per-breakdown path builds cost from explicit charge components (so the mandi
+  extra share must be added there), while the no-breakdown path uses the stored
+  `lot.netPayable`, which ALREADY contains the mandi extra (and commission/aadhat/
+  hammali). Adding the extra on top of `netPayable` double-counts it. Rule of thumb:
+  any per-bag charge already folded into `netPayable` must never be re-added wherever
+  `netPayable` is the cost basis.
+  Wastage caveat (pre-existing, by design): revenue allocates extra by original bags
+  while COGS spreads it over sellable bags (original − wastage), so with wastage the
+  cancellation can drift slightly.
 - Reconciliation invariant (verify in DB):
   `profit_loss = revenue − total_cost_of_goods − additional − advance` for every
   `transaction_type='loading'` row.
