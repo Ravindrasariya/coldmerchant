@@ -3500,16 +3500,73 @@ export async function registerRoutes(
             // a lot priced after creation reflects its real COGS everywhere.
             const keepLot = await storage.getLotById(existingItem.lotId, merchantId);
             const keepBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
-            const keepNetWeight = parseFloat(existingItem.netWeight || "0");
+            const noChangeUpdate: Partial<TransactionItem> = {};
+            let noChangeHas = false;
+
+            // One-time backfill (loading only): Net Weight / ₹/Kg / Amount that were
+            // never set (stored 0/empty) are filled from the CURRENT stock register.
+            // A non-zero stored value is the user's deliberate entry and is NEVER
+            // overwritten — backfill, not ongoing sync.
+            let keepNetWeight = parseFloat(existingItem.netWeight || "0");
+            let noChangeRevenue = parseFloat(existingItem.revenue || "0");
+            if (existingTxn.transactionType === "loading" && keepLot) {
+              const storedNw = parseFloat(existingItem.netWeight || "0");
+              const storedPpk = parseFloat(existingItem.pricePerKg || "0");
+              const storedAmt = parseFloat(existingItem.amount || "0");
+              let effNw = storedNw;
+              let effPpk = storedPpk;
+              if (effNw <= 0) {
+                effNw = storage.computeProportionateNetWeight(keepLot, keepBreakdowns, existingItem.breakdownId, existingItem.bagsMoved);
+              }
+              if (effPpk <= 0) {
+                const bd = existingItem.breakdownId ? keepBreakdowns.find((b) => b.id === existingItem.breakdownId) : null;
+                effPpk = bd?.pricePerKg ? parseFloat(bd.pricePerKg) : (keepLot.pricePerKg ? parseFloat(keepLot.pricePerKg) : 0);
+              }
+              // Amount is also a one-time backfill: recompute ONLY when never set.
+              let effAmt = storedAmt;
+              if (storedAmt <= 0) {
+                effAmt = parseFloat((effPpk * effNw).toFixed(2));
+              }
+              if (effNw !== storedNw) {
+                noChangeUpdate.netWeight = effNw.toString();
+                noChangeHas = true;
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_netweight`,
+                  oldValue: `${storedNw.toFixed(1)} Kg`,
+                  newValue: `${effNw.toFixed(1)} Kg`
+                });
+              }
+              if (effPpk !== storedPpk) {
+                noChangeUpdate.pricePerKg = effPpk.toString();
+                noChangeHas = true;
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_ppk`,
+                  oldValue: `₹${storedPpk}`,
+                  newValue: `₹${effPpk}`
+                });
+              }
+              if (effAmt !== storedAmt) {
+                noChangeUpdate.amount = effAmt.toString();
+                noChangeUpdate.revenue = effAmt.toString();
+                noChangeRevenue = effAmt;
+                noChangeHas = true;
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_revenue`,
+                  oldValue: `₹${storedAmt.toFixed(0)}`,
+                  newValue: `₹${effAmt.toFixed(0)}`
+                });
+              }
+              keepNetWeight = effNw;
+            }
+
             const existingCogs = parseFloat(existingItem.costOfGoods || "0");
             let effectiveCogs = existingCogs;
             if (keepLot) {
               const refreshed = computeTxnItemCost(keepLot, keepBreakdowns, existingItem.breakdownId, existingItem.bagsMoved, keepNetWeight, existingTxn.transactionType === "loading");
               if (refreshed.cogs > 0 && Math.abs(refreshed.cogs - existingCogs) > 0.01) {
-                await storage.updateTransactionItem(existingItem.id, merchantId, {
-                  costOfGoods: refreshed.cogs.toFixed(2),
-                  pricePerKgSnapshot: refreshed.snapshot.toFixed(2),
-                });
+                noChangeUpdate.costOfGoods = refreshed.cogs.toFixed(2);
+                noChangeUpdate.pricePerKgSnapshot = refreshed.snapshot.toFixed(2);
+                noChangeHas = true;
                 changes.push({
                   field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_cogs`,
                   oldValue: `₹${existingCogs.toFixed(0)}`,
@@ -3518,10 +3575,13 @@ export async function registerRoutes(
                 effectiveCogs = refreshed.cogs;
               }
             }
+            if (noChangeHas) {
+              await storage.updateTransactionItem(existingItem.id, merchantId, noChangeUpdate);
+            }
             newTotalBags += existingItem.bagsMoved;
             newTotalNetWeight += keepNetWeight;
             newTotalCostOfGoods += effectiveCogs;
-            newTotalRevenue += parseFloat(existingItem.revenue || "0");
+            newTotalRevenue += noChangeRevenue;
           }
         } else if (itemChange.action === 'add' && itemChange.inventoryKey) {
           // Add new item from inventory
@@ -3616,31 +3676,62 @@ export async function registerRoutes(
               revenueChanged = true;
             }
 
-            if (existingTxn.transactionType === "loading") {
-              if (typeof itemChange.pricePerKg === 'number') {
-                const existingPpk = parseFloat(existingItem.pricePerKg || "0");
-                if (itemChange.pricePerKg !== existingPpk) {
-                  keepUpdateFields.pricePerKg = itemChange.pricePerKg.toString();
-                  hasKeepChanges = true;
-                }
+            const keepLot = await storage.getLotById(existingItem.lotId, merchantId);
+            const keepBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
+
+            // One-time backfill (loading only): Net Weight / ₹/Kg / Amount that
+            // were never set (stored 0/empty) are filled from the CURRENT stock
+            // register. A non-zero stored value is the user's deliberate entry and
+            // is NEVER overwritten — this is a backfill, not an ongoing sync.
+            let keepNetWeight = parseFloat(existingItem.netWeight || "0");
+            if (existingTxn.transactionType === "loading" && keepLot) {
+              const storedNw = parseFloat(existingItem.netWeight || "0");
+              const storedPpk = parseFloat(existingItem.pricePerKg || "0");
+              const storedAmt = parseFloat(existingItem.amount || "0");
+              let effNw = storedNw;
+              let effPpk = storedPpk;
+              if (effNw <= 0) {
+                effNw = storage.computeProportionateNetWeight(keepLot, keepBreakdowns, existingItem.breakdownId, existingItem.bagsMoved);
               }
-              if (typeof itemChange.amount === 'number') {
-                const existingAmt = parseFloat(existingItem.amount || "0");
-                if (itemChange.amount !== existingAmt) {
-                  keepUpdateFields.amount = itemChange.amount.toString();
-                  keepUpdateFields.revenue = itemChange.amount.toString();
-                  newItemRevenue = itemChange.amount;
-                  hasKeepChanges = true;
-                  revenueChanged = true;
-                }
+              if (effPpk <= 0) {
+                const bd = existingItem.breakdownId ? keepBreakdowns.find((b) => b.id === existingItem.breakdownId) : null;
+                effPpk = bd?.pricePerKg ? parseFloat(bd.pricePerKg) : (keepLot.pricePerKg ? parseFloat(keepLot.pricePerKg) : 0);
               }
+              // Amount is also a one-time backfill: recompute ONLY when never set.
+              let effAmt = storedAmt;
+              if (storedAmt <= 0) {
+                effAmt = parseFloat((effPpk * effNw).toFixed(2));
+              }
+              if (effNw !== storedNw) {
+                keepUpdateFields.netWeight = effNw.toString();
+                hasKeepChanges = true;
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_netweight`,
+                  oldValue: `${storedNw.toFixed(1)} Kg`,
+                  newValue: `${effNw.toFixed(1)} Kg`
+                });
+              }
+              if (effPpk !== storedPpk) {
+                keepUpdateFields.pricePerKg = effPpk.toString();
+                hasKeepChanges = true;
+                changes.push({
+                  field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_ppk`,
+                  oldValue: `₹${storedPpk}`,
+                  newValue: `₹${effPpk}`
+                });
+              }
+              if (effAmt !== storedAmt) {
+                keepUpdateFields.amount = effAmt.toString();
+                keepUpdateFields.revenue = effAmt.toString();
+                newItemRevenue = effAmt;
+                hasKeepChanges = true;
+                revenueChanged = true;
+              }
+              keepNetWeight = effNw;
             }
 
             // Refresh cost from the current stock register so a lot priced AFTER
             // this transaction was created reflects its real COGS/cost-per-bag.
-            const keepLot = await storage.getLotById(existingItem.lotId, merchantId);
-            const keepBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
-            const keepNetWeight = parseFloat(existingItem.netWeight || "0");
             const existingCogs = parseFloat(existingItem.costOfGoods || "0");
             let effectiveCogs = existingCogs;
             if (keepLot) {

@@ -52,6 +52,7 @@ interface TransactionItem {
   mandiExtraCharges: string | null;
   lotOriginalBags: number;
   costPerBag: number;
+  lotPricePerKg?: number;
 }
 
 interface UnsoldInventoryItem {
@@ -395,15 +396,49 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       // mandi rates, so a lot priced AFTER the transaction was created now shows its
       // real cost/COGS instead of the frozen 0 captured at creation time. We keep the
       // frozen value only as a fallback when the register still has no cost at all.
+      const isLoadingTxn = transaction.transactionType === "loading";
       const mappedItems = transaction.items.map(item => {
         const bags = item.bagsMoved;
-        const itemNetWeight = parseFloat(item.netWeight || "0");
         const frozenCogs = parseFloat(item.costOfGoods || "0");
         const liveCpb = Number(item.costPerBag) || 0;
         const liveCogs = (liveCpb > 0 && bags > 0)
           ? parseFloat((liveCpb * bags).toFixed(2))
           : frozenCogs;
         const liveCostPerBag = liveCpb > 0 ? liveCpb : (parseFloat(item.pricePerKgSnapshot || "0") || 0);
+
+        // One-time backfill (loading only): when Net Weight / ₹/Kg were never set
+        // (stored 0/empty), fill them from the live stock register. A non-zero
+        // stored value is the user's deliberate entry and is NEVER overwritten —
+        // this is a backfill, not an ongoing sync (unlike the COGS refresh above).
+        const storedNetWeight = parseFloat(item.netWeight || "0");
+        const storedLoadingPpk = parseFloat(item.pricePerKg || "0");
+        const storedLoadingAmount = parseFloat(item.amount || "0");
+        const liveLotPpk = Number(item.lotPricePerKg) || 0;
+        const lotSrcWeight = item.lotSourceWeight || 0;
+        const lotSrcBags = item.lotSourceBags || 0;
+
+        let effNetWeight = storedNetWeight;
+        let effLoadingPpk = storedLoadingPpk;
+        if (isLoadingTxn) {
+          if (effNetWeight <= 0 && lotSrcBags > 0) {
+            // Match the server's computeNetWeight: mandi lots use the full weight
+            // (no per-bag deduction); other places deduct 1kg/bag.
+            const lotNetWeight = item.place === "mandi" ? lotSrcWeight : Math.max(0, lotSrcWeight - lotSrcBags);
+            effNetWeight = parseFloat(((bags / lotSrcBags) * lotNetWeight).toFixed(1));
+          }
+          if (effLoadingPpk <= 0 && liveLotPpk > 0) {
+            effLoadingPpk = liveLotPpk;
+          }
+        }
+        // Amount is also a one-time backfill: recompute ONLY when it was never set
+        // (stored 0/empty). A deliberate non-zero amount is never overwritten, even
+        // if netWeight/₹kg were just backfilled.
+        let effLoadingAmount = storedLoadingAmount;
+        if (isLoadingTxn && storedLoadingAmount <= 0) {
+          effLoadingAmount = parseFloat((effLoadingPpk * effNetWeight).toFixed(2));
+        }
+        const itemNetWeight = effNetWeight;
+        const effRevenue = isLoadingTxn ? effLoadingAmount : parseFloat(item.revenue || "0");
         return {
           id: item.id,
           lotId: item.lotId,
@@ -421,10 +456,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           pricePerKg: liveCostPerBag,
           costOfGoods: liveCogs,
           originalCostOfGoods: liveCogs,
-          revenue: parseFloat(item.revenue || "0"),
-          originalRevenue: parseFloat(item.revenue || "0"),
-          loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
-          loadingAmount: parseFloat(item.amount || "0"),
+          revenue: effRevenue,
+          originalRevenue: effRevenue,
+          loadingPricePerKg: effLoadingPpk,
+          loadingAmount: effLoadingAmount,
           lotSourceWeight: item.lotSourceWeight || 0,
           lotSourceBags: item.lotSourceBags || 0,
           mandiCommissionPercent: item.mandiCommissionPercent || null,
