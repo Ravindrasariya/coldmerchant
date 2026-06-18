@@ -92,6 +92,36 @@ interface Transaction {
   items: TransactionItem[];
 }
 
+// Display P&L for a transaction. For LOADING transactions, compute live the
+// same way the edit dialog does (revenue − COGS − additional charges − driver
+// advance) so the card/totals/CSV never show a stale saved profitLoss. Mandi/
+// aadhat/hammali/extra stay inside COGS and cancel via revenue − COGS, so they
+// are NOT subtracted again. Sale/Bikri behavior is unchanged.
+function computeDisplayPL(txn: Transaction): number {
+  const rev = txn.revenue
+    ? parseFloat(txn.revenue)
+    : txn.items.reduce((s, i) => s + parseFloat(i.revenue || "0"), 0);
+  if (txn.transactionType === "loading") {
+    const cogs = parseFloat(txn.totalCostOfGoods || "0");
+    const addl =
+      parseFloat(txn.tulai || "0") +
+      parseFloat(txn.majduri || "0") +
+      parseFloat(txn.thelaBhada || "0") +
+      parseFloat(txn.palaKarai || "0") +
+      parseFloat(txn.bardan || "0");
+    const adv = parseFloat(txn.advancePayment || "0");
+    return rev - cogs - addl - adv;
+  }
+  if (txn.revenue) return parseFloat(txn.profitLoss || "0");
+  const cost =
+    parseFloat(txn.totalCostOfGoods || "0") +
+    parseFloat(txn.totalMandiCommission || "0") +
+    parseFloat(txn.totalHammali || "0") +
+    parseFloat(txn.transportationCharges || "0") +
+    parseFloat(txn.otherCharges || "0");
+  return rev - cost;
+}
+
 type CropValue = "potato" | "onion" | "garlic";
 
 interface TransactionsTabProps {
@@ -273,7 +303,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
             ? parseFloat(txn.revenue)
             : txn.items.reduce((s, i) => s + parseFloat(i.revenue || "0"), 0);
           const recv = parseFloat(txn.amountReceived || "0");
-          const pl = txn.revenue ? parseFloat(txn.profitLoss || "0") : (rev - cost);
+          const pl = computeDisplayPL(txn);
 
           totalBags += txn.totalBags;
           totalCost += cost;
@@ -410,7 +440,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         fmt(debit),
         parseFloat(amountReceived.toFixed(1)).toLocaleString('en-IN'),
         parseFloat(dueAmount.toFixed(1)).toLocaleString('en-IN'),
-        txn.profitLoss || "-",
+        parseFloat(computeDisplayPL(txn).toFixed(1)).toLocaleString('en-IN'),
       ];
     });
 
@@ -666,7 +696,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
             <CardContent className="p-4">
               {(() => {
                 const totalPL = filteredTransactions.reduce((sum, txn) => {
-                  return sum + parseFloat(txn.profitLoss || "0");
+                  return sum + computeDisplayPL(txn);
                 }, 0);
                 return (
                   <>
@@ -989,7 +1019,7 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
       : txn.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
     const amountReceived = parseFloat(txn.amountReceived || "0");
     const due = Math.max(0, revenue - amountReceived);
-    const profitLoss = txn.revenue ? parseFloat(txn.profitLoss || "0") : (revenue - cost);
+    const profitLoss = computeDisplayPL(txn);
     return { cost, revenue, due, profitLoss };
   };
 

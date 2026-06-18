@@ -38,6 +38,10 @@ after Save.
   of `totalCostOfGoods` so Books `revenue − COGS` reconciles with stored `profitLoss`.
 - Client create + edit "Total P&L" cards subtract `additionalCharges + driverAdvance`
   on the same `revenue − ΣcostOfGoods` basis so on-screen matches server.
+- The transactions LIST (card rows, per-party totals, "Total P&L" summary, CSV
+  export) must COMPUTE loading P&L live with the same formula — never display the
+  stored `profit_loss`, which can be stale (old formula or pre-recompute). Use one
+  shared helper so the list and the edit dialog can never diverge.
 - Per-row P&L (the per-lot number) is by-design and intentionally NOT touched —
   only the overall/total P&L follows this rule. Sale/bikri P&L is also untouched.
 - Reconciliation invariant (verify in DB):
