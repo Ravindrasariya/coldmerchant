@@ -288,7 +288,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Extra Charges", extra],
       ["Tulai", tl],
       ["Bharai", mj],
-      ["Khadi Karai", tb],
+      ["Thela Bhada", tb],
       ["Pala Karai", pk],
       ["Bardan", bd],
       ["Driver Advance", drvAdv],
