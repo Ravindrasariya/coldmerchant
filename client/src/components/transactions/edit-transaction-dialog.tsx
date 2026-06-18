@@ -52,7 +52,6 @@ interface TransactionItem {
   mandiExtraCharges: string | null;
   lotOriginalBags: number;
   costPerBag: number;
-  lotPricePerKg?: number;
 }
 
 interface UnsoldInventoryItem {
@@ -389,118 +388,57 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const isOverride = transaction.transactionType !== "loading" && Math.abs(storedRevenue - lotRevenueSum) >= 0.5;
       setRevenueOverridden(isOverride);
 
+      const txnRevenue = transaction.items.reduce((sum, i) => sum + parseFloat(i.amount || "0"), 0);
+      const txnBags = transaction.items.reduce((sum, i) => sum + i.bagsMoved, 0);
+      const amtBase = txnRevenue > 0 ? txnRevenue : 1;
+      const bagBase = txnBags > 0 ? txnBags : 1;
+      const storedMC = parseFloat(transaction.totalMandiCommission || "0");
+      const storedAC = parseFloat(transaction.totalAadhatCommission || "0");
+      const storedHM = parseFloat(transaction.totalHammali || "0");
       const storedSC = parseFloat(transaction.salesCommission || "0");
-
-      // Refresh each lot's cost from the CURRENT stock register. getTransactionById
-      // enriches every item with the live per-bag cost (costPerBag) and current lot
-      // mandi rates, so a lot priced AFTER the transaction was created now shows its
-      // real cost/COGS instead of the frozen 0 captured at creation time. We keep the
-      // frozen value only as a fallback when the register still has no cost at all.
-      const isLoadingTxn = transaction.transactionType === "loading";
-      const mappedItems = transaction.items.map(item => {
-        const bags = item.bagsMoved;
-        const frozenCogs = parseFloat(item.costOfGoods || "0");
-        const liveCpb = Number(item.costPerBag) || 0;
-        const liveCogs = (liveCpb > 0 && bags > 0)
-          ? parseFloat((liveCpb * bags).toFixed(2))
-          : frozenCogs;
-        const liveCostPerBag = liveCpb > 0 ? liveCpb : (parseFloat(item.pricePerKgSnapshot || "0") || 0);
-
-        // One-time backfill (loading only): when Net Weight / ₹/Kg were never set
-        // (stored 0/empty), fill them from the live stock register. A non-zero
-        // stored value is the user's deliberate entry and is NEVER overwritten —
-        // this is a backfill, not an ongoing sync (unlike the COGS refresh above).
-        const storedNetWeight = parseFloat(item.netWeight || "0");
-        const storedLoadingPpk = parseFloat(item.pricePerKg || "0");
-        const storedLoadingAmount = parseFloat(item.amount || "0");
-        const liveLotPpk = Number(item.lotPricePerKg) || 0;
-        const lotSrcWeight = item.lotSourceWeight || 0;
-        const lotSrcBags = item.lotSourceBags || 0;
-
-        let effNetWeight = storedNetWeight;
-        let effLoadingPpk = storedLoadingPpk;
-        if (isLoadingTxn) {
-          if (effNetWeight <= 0 && lotSrcBags > 0) {
-            // Match the server's computeNetWeight: mandi lots use the full weight
-            // (no per-bag deduction); other places deduct 1kg/bag.
-            const lotNetWeight = item.place === "mandi" ? lotSrcWeight : Math.max(0, lotSrcWeight - lotSrcBags);
-            effNetWeight = parseFloat(((bags / lotSrcBags) * lotNetWeight).toFixed(1));
-          }
-          if (effLoadingPpk <= 0 && liveLotPpk > 0) {
-            effLoadingPpk = liveLotPpk;
-          }
-        }
-        // Amount is also a one-time backfill: recompute ONLY when it was never set
-        // (stored 0/empty). A deliberate non-zero amount is never overwritten, even
-        // if netWeight/₹kg were just backfilled.
-        let effLoadingAmount = storedLoadingAmount;
-        if (isLoadingTxn && storedLoadingAmount <= 0) {
-          effLoadingAmount = parseFloat((effLoadingPpk * effNetWeight).toFixed(2));
-        }
-        const itemNetWeight = effNetWeight;
-        const effRevenue = isLoadingTxn ? effLoadingAmount : parseFloat(item.revenue || "0");
-        return {
-          id: item.id,
-          lotId: item.lotId,
-          breakdownId: item.breakdownId,
-          serialNumber: item.serialNumber,
-          crop: item.crop || "potato",
-          place: item.place,
-          coldStoreName: item.coldStoreName,
-          potatoType: item.potatoType,
-          size: item.size,
-          bagsMoved: bags,
-          originalBags: bags,
-          netWeight: itemNetWeight,
-          originalNetWeight: itemNetWeight,
-          pricePerKg: liveCostPerBag,
-          costOfGoods: liveCogs,
-          originalCostOfGoods: liveCogs,
-          revenue: effRevenue,
-          originalRevenue: effRevenue,
-          loadingPricePerKg: effLoadingPpk,
-          loadingAmount: effLoadingAmount,
-          lotSourceWeight: item.lotSourceWeight || 0,
-          lotSourceBags: item.lotSourceBags || 0,
-          mandiCommissionPercent: item.mandiCommissionPercent || null,
-          aadhatCommissionPercent: item.aadhatCommissionPercent || null,
-          hammaliPerBag: item.hammaliPerBag || null,
-          mandiExtraCharges: item.mandiExtraCharges || null,
-          lotOriginalBags: item.lotOriginalBags || 0,
-          costPerBag: liveCpb,
-          action: 'keep' as const
-        };
-      });
-      setEditableItems(mappedItems);
-
       if (transaction.transactionType === "loading") {
-        // Recompute mandi charges from the lots' CURRENT stock-register rates
-        // (mirrors the Create-Loading dialog), so rates entered or changed after
-        // creation are reflected. Falls back to 0 cleanly when a lot has no rate.
-        let aggMC = 0, aggAC = 0, aggHM = 0, aggEC = 0, amtBaseL = 0, bagBaseL = 0;
-        for (const it of mappedItems) {
-          const amt = it.loadingAmount || 0;
-          const b = it.bagsMoved || 0;
-          amtBaseL += amt;
-          bagBaseL += b;
-          if (it.mandiCommissionPercent) aggMC += (amt * parseFloat(it.mandiCommissionPercent)) / 100;
-          if (it.aadhatCommissionPercent) aggAC += (amt * parseFloat(it.aadhatCommissionPercent)) / 100;
-          if (it.hammaliPerBag) aggHM += b * parseFloat(it.hammaliPerBag);
-          if (it.mandiExtraCharges && it.lotOriginalBags > 0) aggEC += parseFloat(it.mandiExtraCharges) * (b / it.lotOriginalBags);
-        }
-        const aBase = amtBaseL > 0 ? amtBaseL : 1;
-        const bBase = bagBaseL > 0 ? bagBaseL : 1;
-        setMandiPct(Math.round((aggMC / aBase) * 10000) / 100);
-        setAadhatPct(Math.round((aggAC / aBase) * 10000) / 100);
-        setHammaliRate(Math.round((aggHM / bBase) * 100) / 100);
-        form.setValue("totalMandiExtraCharges", Math.round(aggEC * 100) / 100 || undefined);
-        setSalesCommPct(amtBaseL > 0 ? Math.round((storedSC / amtBaseL) * 10000) / 100 : 0);
+        setMandiPct(Math.round((storedMC / amtBase) * 10000) / 100);
+        setAadhatPct(Math.round((storedAC / amtBase) * 10000) / 100);
+        setHammaliRate(Math.round((storedHM / bagBase) * 100) / 100);
       } else {
         setMandiPct(0);
         setAadhatPct(0);
         setHammaliRate(0);
-        setSalesCommPct(0);
       }
+      const scBase = txnRevenue;
+      setSalesCommPct(scBase > 0 ? Math.round((storedSC / scBase) * 10000) / 100 : 0);
+
+      setEditableItems(transaction.items.map(item => ({
+        id: item.id,
+        lotId: item.lotId,
+        breakdownId: item.breakdownId,
+        serialNumber: item.serialNumber,
+        crop: item.crop || "potato",
+        place: item.place,
+        coldStoreName: item.coldStoreName,
+        potatoType: item.potatoType,
+        size: item.size,
+        bagsMoved: item.bagsMoved,
+        originalBags: item.bagsMoved,
+        netWeight: parseFloat(item.netWeight || "0"),
+        originalNetWeight: parseFloat(item.netWeight || "0"),
+        pricePerKg: parseFloat(item.pricePerKgSnapshot || "0"),
+        costOfGoods: parseFloat(item.costOfGoods || "0"),
+        originalCostOfGoods: parseFloat(item.costOfGoods || "0"),
+        revenue: parseFloat(item.revenue || "0"),
+        originalRevenue: parseFloat(item.revenue || "0"),
+        loadingPricePerKg: parseFloat(item.pricePerKg || "0"),
+        loadingAmount: parseFloat(item.amount || "0"),
+        lotSourceWeight: item.lotSourceWeight || 0,
+        lotSourceBags: item.lotSourceBags || 0,
+        mandiCommissionPercent: item.mandiCommissionPercent || null,
+        aadhatCommissionPercent: item.aadhatCommissionPercent || null,
+        hammaliPerBag: item.hammaliPerBag || null,
+        mandiExtraCharges: item.mandiExtraCharges || null,
+        lotOriginalBags: item.lotOriginalBags || 0,
+        costPerBag: Number(item.costPerBag) || 0,
+        action: 'keep' as const
+      })));
     }
   }, [transaction, form]);
 
@@ -562,9 +500,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const isLoadingType = transaction?.transactionType === "loading";
 
   const computeItemMandiCharges = (item: EditableItem) => {
-    // Loading mandi is charged on the sale amount (mirrors the Create-Loading
-    // dialog); sale mandi is charged on COGS.
-    const costBasis = isLoadingType ? (item.loadingAmount || 0) : (item.costOfGoods || 0);
+    const costBasis = item.costOfGoods || 0;
     const bags = item.bagsMoved || 0;
     const mc = item.mandiCommissionPercent ? (costBasis * parseFloat(item.mandiCommissionPercent)) / 100 : 0;
     const ac = item.aadhatCommissionPercent ? (costBasis * parseFloat(item.aadhatCommissionPercent)) / 100 : 0;
@@ -888,13 +824,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setShowAddItem(false);
   };
 
+  const hasItemChanges = editableItems.some(item => item.action !== 'keep');
+
   const onSubmit = async (data: EditTransactionFormData) => {
     try {
       await updateMutation.mutateAsync({ ...data, buyerId: selectedBuyerId });
-      // Sequence: items recompute reads stored debit/charges, so PATCH must finish first.
-      // Always run the items update so refreshed stock-register costs (COGS/cost-per-bag)
-      // are recomputed and persisted even when the user made no manual item change.
-      await updateItemsMutation.mutateAsync();
+      // Sequence: items recompute reads stored debit/charges, so PATCH must finish first
+      if (hasItemChanges) {
+        await updateItemsMutation.mutateAsync();
+      }
     } catch {
       // Errors surfaced via individual mutation onError toasts
     }
@@ -1754,23 +1692,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
-                      // Loading overall P&L = Revenue − COGS. Revenue here uses the
-                      // exact same basis as the Revenue field above (lot amounts +
-                      // mandi + sales commission + additional charges + driver
-                      // advance − debit). COGS is the live per-row `costOfGoods`
-                      // which ties out to the backend `totalCostOfGoods` (already
-                      // includes purchase-side mandi tax for Mandi lots). Do NOT add
-                      // sales commission / subtract debit again — they are already
-                      // inside the revenue figure.
-                      const lotAmounts = activeItems.reduce((sum, i) => sum + (i.loadingAmount || 0), 0);
-                      const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
+                      // Mirror the transaction card / backend loading P&L exactly:
+                      // P&L = (Σ lot amount − Σ cost of goods) + Sales Commission − Debit.
+                      // Use the stored/live `costOfGoods` (base goods cost that ties out to
+                      // the backend `totalCostOfGoods`), NOT the stock-register `costPerBag`
+                      // which bakes in purchase-side mandi charges. Mandi/aadhat/hammali/
+                      // extra and other charges are buyer-reimbursed, appearing on both
+                      // revenue and cost, so they cancel and are excluded here.
+                      const totalItemPL = activeItems.reduce(
+                        (sum, i) => sum + (i.loadingAmount - i.costOfGoods),
+                        0
+                      );
                       const sc = Number(form.watch("salesCommission")) || 0;
-                      const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
-                      const drvAdv = Number(form.watch("advancePayment")) || 0;
                       const dbt = Number(form.watch("debit")) || 0;
-                      const displayedRevenue = lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt;
-                      const totalCogs = activeItems.reduce((sum, i) => sum + (i.costOfGoods || 0), 0);
-                      const totalPL = displayedRevenue - totalCogs;
+                      const totalPL = totalItemPL + sc - dbt;
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
                           <CardContent className="py-3 px-4 flex items-center justify-between">

@@ -330,13 +330,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     });
 
     const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
-    // Loading overall P&L = Revenue − COGS. Revenue uses the same basis the
-    // backend stores on create (lot amounts + mandi + sales commission +
-    // additional charges + driver advance − debit; advance amount/otherCharges
-    // is NOT part of revenue). COGS (totalCostOfGoods) already includes mandi tax
-    // for Mandi lots, so sales commission / debit are not added again here.
-    const revenue = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - debit;
-    const totalPL = revenue - totalCostOfGoods;
+    const totalPL = (totalAmount - totalCostOfGoods) + computedSalesComm - debit;
 
     return {
       totalBags,
