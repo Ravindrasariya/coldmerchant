@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -271,6 +272,24 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
 
+  const cropOptions: { value: string; label: [string, string] }[] = [
+    { value: "potato", label: ["Potato", "आलू"] },
+    { value: "onion", label: ["Onion", "प्याज"] },
+    { value: "garlic", label: ["Garlic", "लहसुन"] },
+  ];
+  const [selectedCrops, setSelectedCrops] = useState<Set<string>>(new Set(["potato"]));
+  const toggleCrop = (crop: string) => {
+    setSelectedCrops(prev => {
+      const next = new Set(prev);
+      if (next.has(crop)) {
+        if (next.size > 1) next.delete(crop);
+      } else {
+        next.add(crop);
+      }
+      return next;
+    });
+  };
+
   const EDIT_CHARGE_OPTIONS = [
     { key: "tulai" as const, label: "Tulai", labelHi: "तुलाई" },
     { key: "majduri" as const, label: "Majduri", labelHi: "मजदूरी" },
@@ -360,6 +379,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       setVisibleEditCharges(activeCharges);
       setSelectedBuyerId(transaction.buyerId || null);
       setPrevItemRevenueFingerprint("");
+
+      const txnCrops = new Set(transaction.items.map(i => i.crop || "potato"));
+      setSelectedCrops(txnCrops.size > 0 ? txnCrops : new Set(["potato"]));
 
       const lotRevenueSum = transaction.items.reduce((sum, i) => sum + parseFloat(i.revenue || "0"), 0);
       const storedRevenue = parseFloat(transaction.revenue || "0");
@@ -1052,6 +1074,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("Crops in this truck", "इस ट्रक की फसलें")}</Label>
+                    <div className="flex flex-wrap gap-3">
+                      {cropOptions.map((co) => (
+                        <label key={co.value} className="flex items-center gap-1.5 cursor-pointer text-sm" data-testid={`checkbox-edit-crop-${co.value}`}>
+                          <Checkbox checked={selectedCrops.has(co.value)} onCheckedChange={() => toggleCrop(co.value)} />
+                          {t(co.label[0], co.label[1])}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                   <Popover open={lotPopoverOpen} onOpenChange={setLotPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -1065,9 +1098,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           if (!inv) return selectedInventory;
                           return (
                             <div className="flex flex-col min-w-0">
-                              <span className="text-sm font-medium break-words">
-                                S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
-                              </span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-medium break-words">
+                                  S#{inv.serialNumber} - {lotPlaceLabel(inv.place, inv.coldStoreName)}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
+                                </span>
+                                {(() => {
+                                  const c = inv.crop || "potato";
+                                  const cls = c === "onion" ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400" : c === "garlic" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+                                  const label = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
+                                  return <Badge className={`text-[10px] px-1.5 py-0 font-medium border-0 shrink-0 ${cls}`}>{label}</Badge>;
+                                })()}
+                              </div>
                               <span className="text-xs text-muted-foreground break-words">
                                 {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
                               </span>
@@ -1083,9 +1124,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         <CommandList>
                           <CommandEmpty>{t("No lot found.", "कोई लॉट नहीं मिला।")}</CommandEmpty>
                           <CommandGroup>
-                            {unsoldInventory?.map((inv) => {
+                            {unsoldInventory?.filter((inv) => selectedCrops.has(inv.crop || "potato")).map((inv) => {
                               const key = `${inv.lotId}-${inv.breakdownId || 'lot'}`;
                               const placeLabel = lotPlaceLabel(inv.place, inv.coldStoreName);
+                              const c = inv.crop || "potato";
+                              const cropCls = c === "onion" ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400" : c === "garlic" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+                              const cropLabel = c === "onion" ? t("Onion", "प्याज") : c === "garlic" ? t("Garlic", "लहसुन") : t("Potato", "आलू");
                               return (
                                 <CommandItem
                                   key={key}
@@ -1097,9 +1141,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                                 >
                                   <Check className={cn("mr-2 h-4 w-4", selectedInventory === key ? "opacity-100" : "opacity-0")} />
                                   <div className="flex flex-col">
-                                    <span className="text-sm font-medium">
-                                      S#{inv.serialNumber} - {placeLabel}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
-                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-sm font-medium">
+                                        S#{inv.serialNumber} - {placeLabel}{inv.potatoType ? ` - ${inv.potatoType}` : ""}{inv.size ? ` - ${inv.size}` : ""}
+                                      </span>
+                                      <Badge className={`text-[10px] px-1.5 py-0 font-medium border-0 shrink-0 ${cropCls}`}>{cropLabel}</Badge>
+                                    </div>
                                     <span className="text-xs text-muted-foreground">
                                       {inv.farmerName}{inv.farmerVillage ? ` (${inv.farmerVillage})` : ""} | {inv.remainingBags} {t("available", "उपलब्ध")}
                                     </span>
