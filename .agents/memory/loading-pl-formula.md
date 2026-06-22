@@ -60,3 +60,12 @@ after Save.
 - Reconciliation invariant (verify in DB):
   `profit_loss = revenue − total_cost_of_goods − additional − advance` for every
   `transaction_type='loading'` row.
+- Cost-display invariant (transactions register): the displayed **Cost** must mirror
+  the P&L helper — loading Cost = `totalCostOfGoods + additional + advance`, so
+  `revenue − Cost == displayed P&L`. NEVER re-add mandi commission/aadhat/hammali/
+  extra to the Cost: for Mandi lots those are ALREADY inside `totalCostOfGoods`
+  (== Stock Register payable), and re-adding them double-counts (~6% inflation).
+  All four surfaces (per-row card, per-party total, grand-total "Total Cost" card,
+  CSV "Total Cost" column) must use ONE shared `computeDisplayCost(txn)` helper next
+  to `computeDisplayPL` so they can't diverge. Sale/Bikri Cost branch is unchanged
+  (`cogs + totalMandiCommission + totalHammali + transport + other`).

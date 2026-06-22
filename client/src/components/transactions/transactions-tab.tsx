@@ -122,6 +122,34 @@ function computeDisplayPL(txn: Transaction): number {
   return rev - cost;
 }
 
+// Display Cost for a transaction. Mirrors computeDisplayPL so the per-row card,
+// party totals, grand total, and CSV never diverge. For LOADING transactions,
+// mandi commission/aadhat/hammali/extra are ALREADY inside totalCostOfGoods
+// (which equals the Stock Register payable), so they are NOT re-added here —
+// re-adding them double-counts and inflates the cost. Only driver advance and
+// loading labour (tulai/majduri/thelaBhada/palaKarai/bardan) are added on top,
+// which keeps Revenue − Cost = computeDisplayPL. Sale/Bikri behavior unchanged.
+function computeDisplayCost(txn: Transaction): number {
+  const cogs = parseFloat(txn.totalCostOfGoods || "0");
+  if (txn.transactionType === "loading") {
+    const addl =
+      parseFloat(txn.tulai || "0") +
+      parseFloat(txn.majduri || "0") +
+      parseFloat(txn.thelaBhada || "0") +
+      parseFloat(txn.palaKarai || "0") +
+      parseFloat(txn.bardan || "0");
+    const adv = parseFloat(txn.advancePayment || "0");
+    return cogs + addl + adv;
+  }
+  return (
+    cogs +
+    parseFloat(txn.totalMandiCommission || "0") +
+    parseFloat(txn.totalHammali || "0") +
+    parseFloat(txn.transportationCharges || "0") +
+    parseFloat(txn.otherCharges || "0")
+  );
+}
+
 type CropValue = "potato" | "onion" | "garlic";
 
 interface TransactionsTabProps {
@@ -296,9 +324,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
         let totalDue = 0;
 
         for (const txn of txns) {
-          const cost = txn.transactionType === "loading"
-            ? parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalAadhatCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.totalMandiExtraCharges || "0") + parseFloat(txn.tulai || "0") + parseFloat(txn.majduri || "0") + parseFloat(txn.thelaBhada || "0") + parseFloat(txn.palaKarai || "0") + parseFloat(txn.bardan || "0") + parseFloat(txn.advancePayment || "0")
-            : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+          const cost = computeDisplayCost(txn);
           const rev = txn.revenue
             ? parseFloat(txn.revenue)
             : txn.items.reduce((s, i) => s + parseFloat(i.revenue || "0"), 0);
@@ -410,9 +436,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
       const bardan = parseFloat(txn.bardan || "0");
       const debit = parseFloat(txn.debit || "0");
 
-      const totalCost = txn.transactionType === "loading"
-        ? parseFloat(txn.totalCostOfGoods || "0") + mandiComm + aadhatComm + hammali + extraCharges + tulai + majduri + thelaBhada + palaKarai + bardan + parseFloat(txn.advancePayment || "0")
-        : parseFloat(txn.totalCostOfGoods || "0") + mandiComm + hammali + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+      const totalCost = computeDisplayCost(txn);
 
       const fmt = (n: number) => n > 0 ? parseFloat(n.toFixed(1)).toLocaleString('en-IN') : "-";
 
@@ -683,12 +707,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
                 {t("Total Cost", "कुल लागत")}
               </div>
               <p className="text-sm sm:text-lg font-bold">
-                ₹{filteredTransactions.reduce((sum, t) => {
-                  if (t.transactionType === "loading") {
-                    return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.totalMandiCommission || "0") + parseFloat(t.totalAadhatCommission || "0") + parseFloat(t.totalHammali || "0") + parseFloat(t.totalMandiExtraCharges || "0") + parseFloat(t.tulai || "0") + parseFloat(t.majduri || "0") + parseFloat(t.thelaBhada || "0") + parseFloat(t.palaKarai || "0") + parseFloat(t.bardan || "0") + parseFloat(t.advancePayment || "0");
-                  }
-                  return sum + parseFloat(t.totalCostOfGoods || "0") + parseFloat(t.totalMandiCommission || "0") + parseFloat(t.totalHammali || "0") + parseFloat(t.transportationCharges || "0") + parseFloat(t.otherCharges || "0");
-                }, 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                ₹{filteredTransactions.reduce((sum, t) => sum + computeDisplayCost(t), 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
               </p>
             </CardContent>
           </Card>
@@ -1011,9 +1030,7 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
   };
 
   const computeRow = (txn: Transaction) => {
-    const cost = txn.transactionType === "loading"
-      ? parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalAadhatCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.totalMandiExtraCharges || "0") + parseFloat(txn.tulai || "0") + parseFloat(txn.majduri || "0") + parseFloat(txn.thelaBhada || "0") + parseFloat(txn.palaKarai || "0") + parseFloat(txn.bardan || "0") + parseFloat(txn.advancePayment || "0")
-      : parseFloat(txn.totalCostOfGoods || "0") + parseFloat(txn.totalMandiCommission || "0") + parseFloat(txn.totalHammali || "0") + parseFloat(txn.transportationCharges || "0") + parseFloat(txn.otherCharges || "0");
+    const cost = computeDisplayCost(txn);
     const revenue = txn.revenue
       ? parseFloat(txn.revenue)
       : txn.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0);
