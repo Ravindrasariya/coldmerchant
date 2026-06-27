@@ -23,10 +23,13 @@ export function isSettled(due: number): boolean {
   return due < RUPEE_TOLERANCE;
 }
 
-// Reject a payment only when the settled amount overpays the (whole-rupee) due
-// by ₹1 or more. Accept anything up to and including ₹0.99 over.
+// Reject a payment only when the settled amount overpays the ACTUAL (raw) due by
+// ₹1 or more. Compare against the un-rounded due: rounding the due first would let
+// an extra rupee slip through on legacy paise rows (e.g. due 100.60, settled 101.70
+// is a ₹1.10 overpay and must be rejected). Paying the rounded-for-display due is
+// still accepted because |roundRupee(due) - due| < ₹1.
 export function exceedsDue(settled: number, due: number): boolean {
-  return settled - roundRupee(due) >= RUPEE_TOLERANCE;
+  return settled - due >= RUPEE_TOLERANCE;
 }
 
 // Round each charge amount in a lot.charges array to whole rupees at write time,

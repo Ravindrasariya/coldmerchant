@@ -4600,10 +4600,10 @@ export class DatabaseStorage implements IStorage {
             }
             const currentReceived = parseFloat(txnRow.amountReceived || "0");
             const txnRevenue = parseFloat(txnRow.revenue || "0");
-            const dueAmount = Math.round(txnRevenue - currentReceived);
+            const dueAmount = txnRevenue - currentReceived;
             const totalSettled = appliedAmount + pettyAdj;
             if (exceedsDue(totalSettled, dueAmount)) {
-              throw new Error(`Allocation (₹${totalSettled}) exceeds due amount (₹${dueAmount.toFixed(2)}) for transaction #${txnRow.transactionNumber}`);
+              throw new Error(`Allocation (₹${totalSettled}) exceeds due amount (₹${roundRupee(dueAmount)}) for transaction #${txnRow.transactionNumber}`);
             }
             const newReceived = roundRupee(currentReceived + totalSettled);
             await tx.update(transactions)
@@ -4825,9 +4825,9 @@ export class DatabaseStorage implements IStorage {
               totalCharges = getColdStoreCharges(lot.charges, entry.coldStoreDbId!);
             }
             const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-            const due = Math.round(totalCharges - currentPaid);
+            const due = totalCharges - currentPaid;
             if (exceedsDue(totalSettled, due)) {
-              throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for lot ${alloc.lotId}`);
+              throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${roundRupee(due)} for lot ${alloc.lotId}`);
             }
 
             const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
@@ -4856,9 +4856,9 @@ export class DatabaseStorage implements IStorage {
             const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
             const totalCharges = chargesPerBag * (sLot.originalBags || 0);
             const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
-            const due = Math.round(totalCharges - currentPaid);
+            const due = totalCharges - currentPaid;
             if (exceedsDue(totalSettled, due)) {
-              throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for seed lot ${alloc.seedLotId}`);
+              throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${roundRupee(due)} for seed lot ${alloc.seedLotId}`);
             }
 
             const [allocation] = await tx.insert(coldStoreChargeAllocations).values({
@@ -4983,16 +4983,17 @@ export class DatabaseStorage implements IStorage {
             for (const lot of entryLots) {
               entryNetPayable += parseFloat(lot.netPayable || "0");
             }
-            entryNetPayable = Math.round(entryNetPayable);
+            const entryNetPayableRounded = Math.round(entryNetPayable);
             
             const currentPaid = parseFloat(se.amountPaid || "0");
+            // Overpay check uses the RAW due so an extra rupee can't slip in.
             const due = entryNetPayable - currentPaid;
             if (exceedsDue(totalSettled, due)) {
-              throw new Error(`Allocation total ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for stock entry ${alloc.stockEntryId}`);
+              throw new Error(`Allocation total ₹${totalSettled.toFixed(2)} exceeds due ₹${roundRupee(due)} for stock entry ${alloc.stockEntryId}`);
             }
             
             const newPaid = roundRupee(currentPaid + totalSettled);
-            const newDue = entryNetPayable - newPaid;
+            const newDue = entryNetPayableRounded - newPaid;
             const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
             await tx.update(stockEntries)

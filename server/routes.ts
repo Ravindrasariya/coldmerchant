@@ -4264,10 +4264,13 @@ export async function registerRoutes(
             netPayable += parseFloat(lot.netPayable || "0");
             totalBags += lot.originalBags;
           }
-          netPayable = roundRupee(netPayable);
           const amountPaid = parseFloat(se.amountPaid || "0");
-          const dueAmount = roundRupee(Math.max(0, netPayable - amountPaid));
-          if (dueAmount < 1) return null;
+          // Filter on the RAW remaining due so sub-₹1 residue is treated as settled,
+          // then round only for display.
+          const rawDue = Math.max(0, netPayable - amountPaid);
+          if (rawDue < RUPEE_TOLERANCE) return null;
+          netPayable = roundRupee(netPayable);
+          const dueAmount = roundRupee(rawDue);
 
           const purchaseDate = se.purchaseDate;
           const daysSince = Math.floor((Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24));

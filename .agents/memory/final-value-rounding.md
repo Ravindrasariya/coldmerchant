@@ -42,9 +42,12 @@ restart. Only real corrections (≥ ₹1, e.g. the Gate Cut Wastage fix) rewrite
 ## Constraint — tolerance helpers, used in lockstep across ALL five payment categories
 (aadhtiya, cold store, seed supplier, buyer, farmer) in BOTH `createCashEntry` and
 `createCashEntryWithFIFO`, plus `reverseCashEntry`:
-- Overpay validation rejects via `exceedsDue(settled, due)` = `settled - roundRupee(due) >= 1`
-  (rejects an exact ₹1 overpay, accepts < ₹1). This replaced the buggy `> due + 1` which
-  let exactly +₹1 through.
+- Overpay validation rejects via `exceedsDue(settled, due)` = `settled - due >= 1` using the
+  RAW (un-rounded) due — NOT `roundRupee(due)`. Rounding the due first lets an extra rupee
+  slip in on legacy paise rows (due 100.60, settled 101.70 = ₹1.10 overpay must reject). All
+  callsites must pass the raw due (do not `Math.round` it before validation); paying the
+  rounded-for-display due is still accepted since `|roundRupee(due) - due| < 1`. This replaced
+  the buggy `> due + 1` which let exactly +₹1 through.
 - Status checks mark "paid"/"due" when the remaining due/paid `< RUPEE_TOLERANCE`.
 - FIFO allocation loops AND dues-listing loops skip when the due `< RUPEE_TOLERANCE`, so a
   sub-rupee residue is treated as settled and never sticks an item at "partial".
