@@ -31,3 +31,21 @@ export function isSettled(due: number): boolean {
 export function exceedsDue(settled: number, due: number): boolean {
   return settled - due >= RUPEE_TOLERANCE;
 }
+
+// Round ONLY the settlement-facing cold-store charge amounts ("Cold Charges" and
+// "Ware House Charges") to whole rupees at write time. Every other charge type is
+// left untouched on purpose — non-cold charges (e.g. "Extra Charges to Buyer") feed
+// the per-bag cost / COGS pipeline, which must stay precise.
+const COLD_STORE_CHARGE_TYPES = ["Cold Charges", "Ware House Charges"];
+export function roundColdStoreChargeAmounts<
+  T extends { type?: string; amount?: number | string },
+>(charges: T[] | null | undefined): T[] | null | undefined {
+  if (!charges) return charges;
+  return charges.map((c) => {
+    if (!c || typeof c.type !== "string" || !COLD_STORE_CHARGE_TYPES.includes(c.type)) {
+      return c;
+    }
+    const n = parseFloat(String(c.amount));
+    return Number.isFinite(n) ? { ...c, amount: roundRupee(n) } : c;
+  });
+}

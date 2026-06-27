@@ -25,10 +25,15 @@ shared definition; never redeclare the constant locally (it silently drifts out 
 - Party dues at the per-entry aggregate (`round(Σ lot netPayable) − paid`), mirrored
   IDENTICALLY in the dues-list/ledger endpoint and the payment-dialog endpoint.
 
+## Charge-amount rounding is TYPE-SCOPED (the subtle one)
+- Round ONLY the cold-store charge types — `"Cold Charges"` and `"Ware House Charges"` — at lot
+  create/update write time (they ARE settlement-facing: cold-store dues derive from them).
+- Leave EVERY other charge type precise, especially `"Extra Charges to Buyer"` — those feed
+  `computeBreakdownCosts` (per-bag cost / COGS), which must stay precise. Rounding all charge
+  amounts indiscriminately corrupts COGS; rounding none fails the task's cold-charge rounding
+  requirement. The reconciliation is a single TYPE-filtered helper used on both write paths.
+
 ## Keep these PRECISE — never round (carve-outs)
-- `lot.charges[].amount` — these are RAW inputs to the per-bag cost / COGS pipeline; rounding
-  them at write time corrupts COGS. Cold-store dues derived from charges are rounded only at
-  the compute/display/validation layer, so the stored charges themselves stay precise.
 - Farmer `remainingReceivable` / `pyReceivable` / `pyReceivableFinalAmount` + daily interest.
 - bag-breakdown cost-per-bag and the whole COGS pipeline; seed avg-cost-per-bag.
 
