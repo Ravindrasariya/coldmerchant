@@ -31,15 +31,3 @@ export function isSettled(due: number): boolean {
 export function exceedsDue(settled: number, due: number): boolean {
   return settled - due >= RUPEE_TOLERANCE;
 }
-
-// Round each charge amount in a lot.charges array to whole rupees at write time,
-// leaving the charge type and any non-numeric fields intact.
-export function roundChargeAmounts<T extends { amount?: number | string }>(
-  charges: T[] | null | undefined,
-): T[] | null | undefined {
-  if (!charges) return charges;
-  return charges.map((c) => {
-    const n = parseFloat(String(c.amount));
-    return Number.isFinite(n) ? { ...c, amount: roundRupee(n) } : c;
-  });
-}

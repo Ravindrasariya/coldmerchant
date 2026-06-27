@@ -8,7 +8,7 @@ import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
-import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, roundChargeAmounts } from "@shared/utils";
+import { computeNetWeight, roundRupee, RUPEE_TOLERANCE } from "@shared/utils";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1039,7 +1039,7 @@ export async function registerRoutes(
           totalWeight: lotData.cutType === "gate_cut" && lotData.totalWeight 
             ? lotData.totalWeight.toString() 
             : null,
-          charges: lotData.charges && lotData.charges.length > 0 ? roundChargeAmounts(lotData.charges) : null,
+          charges: lotData.charges && lotData.charges.length > 0 ? lotData.charges : null,
           mandiCommissionPercent: lotData.mandiCommissionPercent ? lotData.mandiCommissionPercent.toString() : null,
           aadhatCommissionPercent: lotData.aadhatCommissionPercent ? lotData.aadhatCommissionPercent.toString() : null,
           hammaliPerBag: lotData.hammaliPerBag ? lotData.hammaliPerBag.toString() : null,
@@ -1725,7 +1725,7 @@ export async function registerRoutes(
                 ? (lotData.coldStoreLotNumber || null)
                 : undefined,
               charges: lotData.charges !== undefined
-                ? (lotData.charges && lotData.charges.length > 0 ? roundChargeAmounts(lotData.charges) : null)
+                ? (lotData.charges && lotData.charges.length > 0 ? lotData.charges : null)
                 : undefined,
               mandiCommissionPercent: lotData.mandiCommissionPercent !== undefined
                 ? (lotData.mandiCommissionPercent ? lotData.mandiCommissionPercent.toString() : null)
