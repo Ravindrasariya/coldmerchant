@@ -43,14 +43,16 @@ shared definition; never redeclare the constant locally (it silently drifts out 
   rupee slip through on paise rows (due 100.60, settled 101.70 = ₹1.10 overpay must reject).
   Paying the rounded-for-display due is still accepted since `|round(due) - due| < 1`. Do not
   pre-round the due at any callsite before this check.
-- **Sub-₹1 residue counts as settled:** status checks, FIFO allocation loops, dues-listing
-  loops, and pending-list filters all treat a remaining due `< RUPEE_TOLERANCE` as paid/hidden.
-  Filter pending lists on the RAW due first, then round only for display. This applies to ALL
-  five `get*WithDue` listing functions (parties/aadhtiya, harvest farmers, cold stores, seed
-  farmers, seed suppliers): per-item `< RUPEE_TOLERANCE` skip + final-list `>= RUPEE_TOLERANCE`
-  filter + `roundRupee` on the displayed `totalDue`. Easy to miss: seed-farmer dues also fold
-  in `farmers.remainingReceivable` — apply the tolerance to that inclusion too (but the STORED
-  receivable value itself stays precise; this is only a visibility/display decision).
+- **Sub-₹1 residue counts as settled — always compare the RAW due, never a pre-rounded one.**
+  Status checks, FIFO allocation loops, dues-listing loops, and pending-list filters all treat a
+  remaining due `< RUPEE_TOLERANCE` as paid/hidden. In FIFO loops this is the easy trap: compute
+  the skip-and-allocate due from the UNROUNDED basis (`Σ netPayable − paid`); a pre-rounded basis
+  turns a ₹0.60 residue into ₹1.00 and allocates a phantom rupee. Keep the rounded basis only for
+  the post-payment paid/partial status decision. Round dues only for DISPLAY.
+- Apply this uniformly to every dues-listing path (aadhtiya, harvest farmers, cold stores, seed
+  farmers, seed suppliers): per-item raw skip + final-list tolerance filter + display rounding.
+  Seed-farmer dues also fold in the farmer's receivable balance — apply the tolerance to that
+  inclusion for visibility, but the STORED receivable stays precise (display-only decision).
 - **Startup backfill must not mass-rewrite legacy rows:** since the lot-charge helpers now
   round their output, the backfill "needs update" threshold must be `>= RUPEE_TOLERANCE` so
   pure sub-rupee rounding deltas don't rewrite every historical lot on every restart — only

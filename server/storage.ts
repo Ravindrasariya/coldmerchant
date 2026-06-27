@@ -4756,13 +4756,16 @@ export class DatabaseStorage implements IStorage {
             
             // Per-entry due = Σ lot.netPayable − amountPaid (matches stock
             // register card display; see helper at line ~1964 for rationale).
-            const entryTotalCost = Math.round(entryLots.reduce(
+            const entryNetPayableRaw = entryLots.reduce(
               (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
               0
-            ));
+            );
+            const entryTotalCost = Math.round(entryNetPayableRaw);
 
             const currentPaid = parseFloat(stockEntry.amountPaid || "0");
-            const due = entryTotalCost - currentPaid;
+            // Skip on the RAW remaining due so a sub-₹1 residue is treated as
+            // settled and never consumes an extra rupee from the payment pool.
+            const due = entryNetPayableRaw - currentPaid;
             
             if (due < RUPEE_TOLERANCE) continue;
             
@@ -5059,14 +5062,16 @@ export class DatabaseStorage implements IStorage {
             const entryLots = await tx.select().from(lots)
               .where(eq(lots.stockEntryId, se.id));
             
-            let entryNetPayable = 0;
+            let entryNetPayableRaw = 0;
             for (const lot of entryLots) {
-              entryNetPayable += parseFloat(lot.netPayable || "0");
+              entryNetPayableRaw += parseFloat(lot.netPayable || "0");
             }
-            entryNetPayable = Math.round(entryNetPayable);
+            const entryNetPayable = Math.round(entryNetPayableRaw);
             
             const currentPaid = parseFloat(se.amountPaid || "0");
-            const due = entryNetPayable - currentPaid;
+            // Skip on the RAW remaining due so a sub-₹1 residue is treated as
+            // settled and never consumes an extra rupee from the payment pool.
+            const due = entryNetPayableRaw - currentPaid;
             
             if (due < RUPEE_TOLERANCE) continue;
             
