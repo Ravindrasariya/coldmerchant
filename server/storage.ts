@@ -57,6 +57,11 @@ import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
 
+// Sub-rupee rounding gaps are ignored when settling payments. Dues and sale
+// figures are whole rupees, but legacy stored values can carry paise; treat any
+// remaining difference under ₹1 as fully settled (mirrors roundRupee on display).
+const RUPEE_TOLERANCE = 1;
+
 // ---------------------------------------------------------------------------
 // Persistent sold-bag tracking helpers.
 //
@@ -2671,7 +2676,7 @@ export class DatabaseStorage implements IStorage {
           // Update stock entry's amountPaid and paymentStatus
           const newPaid = currentPaid + toApply;
           const newDue = entryTotalCost - newPaid;
-          const newStatus = newDue <= 0 ? "paid" : "partial";
+          const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
           
           await tx.update(stockEntries)
             .set({ 
@@ -2909,7 +2914,7 @@ export class DatabaseStorage implements IStorage {
           // Update seed stock entry's amountPaid and paymentStatus
           const newPaid = currentPaid + toApply;
           const newDue = totalCost - newPaid;
-          const newStatus = newDue <= 0 ? "paid" : "partial";
+          const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
           
           await tx.update(seedStockEntries)
             .set({ 
@@ -4567,7 +4572,7 @@ export class DatabaseStorage implements IStorage {
               if (buyerRow) {
                 const currentReceivable = parseFloat(buyerRow.receivableBalance || "0");
                 const totalSettled = appliedAmount + pettyAdj;
-                if (totalSettled > currentReceivable + 0.01) {
+                if (totalSettled > Math.round(currentReceivable) + RUPEE_TOLERANCE) {
                   throw new Error(`PY allocation (₹${totalSettled}) exceeds receivable balance (₹${currentReceivable})`);
                 }
                 actualApplied = Math.min(appliedAmount, currentReceivable);
@@ -4595,9 +4600,9 @@ export class DatabaseStorage implements IStorage {
             }
             const currentReceived = parseFloat(txnRow.amountReceived || "0");
             const txnRevenue = parseFloat(txnRow.revenue || "0");
-            const dueAmount = txnRevenue - currentReceived;
+            const dueAmount = Math.round(txnRevenue - currentReceived);
             const totalSettled = appliedAmount + pettyAdj;
-            if (totalSettled > dueAmount + 0.01) {
+            if (totalSettled > dueAmount + RUPEE_TOLERANCE) {
               throw new Error(`Allocation (₹${totalSettled}) exceeds due amount (₹${dueAmount.toFixed(2)}) for transaction #${txnRow.transactionNumber}`);
             }
             const newReceived = currentReceived + totalSettled;
@@ -4743,10 +4748,10 @@ export class DatabaseStorage implements IStorage {
             
             // Per-entry due = Σ lot.netPayable − amountPaid (matches stock
             // register card display; see helper at line ~1964 for rationale).
-            const entryTotalCost = entryLots.reduce(
+            const entryTotalCost = Math.round(entryLots.reduce(
               (sum, lot) => sum + parseFloat(lot.netPayable || "0"),
               0
-            );
+            ));
 
             const currentPaid = parseFloat(stockEntry.amountPaid || "0");
             const due = entryTotalCost - currentPaid;
@@ -4756,7 +4761,7 @@ export class DatabaseStorage implements IStorage {
             const toApply = Math.min(remainingAmount, due);
             const newPaid = currentPaid + toApply;
             const newDue = entryTotalCost - newPaid;
-            const newStatus = newDue <= 0 ? "paid" : "partial";
+            const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
             await tx.update(stockEntries)
               .set({ 
@@ -4781,7 +4786,7 @@ export class DatabaseStorage implements IStorage {
 
             if (csRecord) {
               const currentPyPayable = parseFloat(csRecord.pyPayable || "0");
-              if (totalSettled > currentPyPayable + 0.01) {
+              if (totalSettled > Math.round(currentPyPayable) + RUPEE_TOLERANCE) {
                 throw new Error(`PY Payable allocation ₹${totalSettled.toFixed(2)} exceeds current PY payable ₹${currentPyPayable.toFixed(2)}`);
               }
               const newPyPayable = Math.max(0, currentPyPayable - totalSettled);
@@ -4820,8 +4825,8 @@ export class DatabaseStorage implements IStorage {
               totalCharges = getColdStoreCharges(lot.charges, entry.coldStoreDbId!);
             }
             const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-            const due = totalCharges - currentPaid;
-            if (totalSettled > due + 0.01) {
+            const due = Math.round(totalCharges - currentPaid);
+            if (totalSettled > due + RUPEE_TOLERANCE) {
               throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for lot ${alloc.lotId}`);
             }
 
@@ -4851,8 +4856,8 @@ export class DatabaseStorage implements IStorage {
             const chargesPerBag = parseFloat(sLot.coldStoreChargesPerBag || "0");
             const totalCharges = chargesPerBag * (sLot.originalBags || 0);
             const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
-            const due = totalCharges - currentPaid;
-            if (totalSettled > due + 0.01) {
+            const due = Math.round(totalCharges - currentPaid);
+            if (totalSettled > due + RUPEE_TOLERANCE) {
               throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for seed lot ${alloc.seedLotId}`);
             }
 
@@ -4916,7 +4921,7 @@ export class DatabaseStorage implements IStorage {
           const toApply = Math.min(remainingAmount, due);
           const newPaid = currentPaid + toApply;
           const newDue = totalCost - newPaid;
-          const newStatus = newDue <= 0 ? "paid" : "partial";
+          const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
           
           await tx.update(seedStockEntries)
             .set({ 
@@ -4940,7 +4945,7 @@ export class DatabaseStorage implements IStorage {
             
             if (aadhat) {
               const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
-              if (totalSettled > currentPyPayable + 0.01) {
+              if (totalSettled > Math.round(currentPyPayable) + RUPEE_TOLERANCE) {
                 throw new Error(`PY Payable allocation ₹${totalSettled.toFixed(2)} exceeds current PY payable ₹${currentPyPayable.toFixed(2)}`);
               }
               const newPyPayable = Math.max(0, currentPyPayable - totalSettled);
@@ -4978,16 +4983,17 @@ export class DatabaseStorage implements IStorage {
             for (const lot of entryLots) {
               entryNetPayable += parseFloat(lot.netPayable || "0");
             }
+            entryNetPayable = Math.round(entryNetPayable);
             
             const currentPaid = parseFloat(se.amountPaid || "0");
             const due = entryNetPayable - currentPaid;
-            if (totalSettled > due + 0.01) {
+            if (totalSettled > due + RUPEE_TOLERANCE) {
               throw new Error(`Allocation total ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for stock entry ${alloc.stockEntryId}`);
             }
             
             const newPaid = currentPaid + totalSettled;
             const newDue = entryNetPayable - newPaid;
-            const newStatus = newDue <= 0.01 ? "paid" : "partial";
+            const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
             await tx.update(stockEntries)
               .set({ 
@@ -5048,6 +5054,7 @@ export class DatabaseStorage implements IStorage {
             for (const lot of entryLots) {
               entryNetPayable += parseFloat(lot.netPayable || "0");
             }
+            entryNetPayable = Math.round(entryNetPayable);
             
             const currentPaid = parseFloat(se.amountPaid || "0");
             const due = entryNetPayable - currentPaid;
@@ -5057,7 +5064,7 @@ export class DatabaseStorage implements IStorage {
             const toApply = Math.min(remainingAmount, due);
             const newPaid = currentPaid + toApply;
             const newDue = entryNetPayable - newPaid;
-            const newStatus = newDue <= 0 ? "paid" : "partial";
+            const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
             await tx.update(stockEntries)
               .set({ 

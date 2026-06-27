@@ -4178,13 +4178,13 @@ export async function registerRoutes(
         } else {
           continue;
         }
-        if (due <= 0.01) continue;
+        if (due < 1) continue;
         const seInfo = seMap.get(lot.stockEntryId);
         pendingCharges.push({
           lotId: lot.id,
           sourceType: "Harvest",
           serialNumber: seInfo?.serialNumber || 0,
-          dueAmount: Math.round(due * 100) / 100,
+          dueAmount: roundRupee(due),
           lotNumber: lot.lotNumber ? `Lot #${lot.lotNumber}` : undefined,
         });
       }
@@ -4196,13 +4196,13 @@ export async function registerRoutes(
         if (totalCharges <= 0) continue;
         const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
         const due = totalCharges - paidAmount;
-        if (due <= 0.01) continue;
+        if (due < 1) continue;
         const seedSeInfo = seedSeMap.get(sLot.seedEntryId);
         pendingCharges.push({
           seedLotId: sLot.id,
           sourceType: "Seed",
           serialNumber: seedSeInfo?.serialNumber || 0,
-          dueAmount: Math.round(due * 100) / 100,
+          dueAmount: roundRupee(due),
           lotNumber: sLot.lotNumber ? `Lot #${sLot.lotNumber}` : undefined,
         });
       }
@@ -4212,7 +4212,7 @@ export async function registerRoutes(
       const csRecord = allColdStoreRecords.find(cs => cs.id === coldStoreDbId);
       const pyPayable = parseFloat(csRecord?.pyPayable || "0");
 
-      res.json({ pendingCharges, pyPayable });
+      res.json({ pendingCharges, pyPayable: roundRupee(pyPayable) });
     } catch (error) {
       console.error("Error fetching cold store pending charges:", error);
       res.status(500).json({ message: "Failed to fetch cold store pending charges" });
@@ -4257,8 +4257,8 @@ export async function registerRoutes(
           }
           netPayable = roundRupee(netPayable);
           const amountPaid = parseFloat(se.amountPaid || "0");
-          const dueAmount = Math.max(0, netPayable - amountPaid);
-          if (dueAmount <= 0) return null;
+          const dueAmount = roundRupee(Math.max(0, netPayable - amountPaid));
+          if (dueAmount < 1) return null;
 
           const purchaseDate = se.purchaseDate;
           const daysSince = Math.floor((Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
@@ -4281,7 +4281,7 @@ export async function registerRoutes(
 
       res.json({
         pendingEntries,
-        pyPayable: parseFloat(pyPayable.toFixed(2)),
+        pyPayable: roundRupee(pyPayable),
       });
     } catch (error) {
       console.error("Error fetching aadhat pending entries:", error);
@@ -4309,13 +4309,13 @@ export async function registerRoutes(
         .filter(txn => {
           const revenue = parseFloat(txn.revenue || "0");
           const received = parseFloat(txn.amountReceived || "0");
-          return revenue > received;
+          return revenue - received >= 1;
         })
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
         .map(txn => {
           const revenue = parseFloat(txn.revenue || "0");
           const received = parseFloat(txn.amountReceived || "0");
-          const dueAmount = revenue - received;
+          const dueAmount = roundRupee(revenue - received);
           const daysSince = Math.floor((Date.now() - new Date(txn.createdAt).getTime()) / (1000 * 60 * 60 * 24));
           return {
             transactionId: txn.id,
@@ -4334,7 +4334,7 @@ export async function registerRoutes(
 
       res.json({
         pendingEntries,
-        pyBalance: parseFloat(pyBalance.toFixed(2)),
+        pyBalance: roundRupee(pyBalance),
       });
     } catch (error) {
       console.error("Error fetching buyer pending transactions:", error);

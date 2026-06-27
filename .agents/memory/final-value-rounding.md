@@ -34,6 +34,25 @@ Manual-allocation dialogs (aadhtiya, cold store, buyer) validate payment ≤ dis
 due. Round the per-entry due IDENTICALLY in the dialog endpoint and in the
 ledger/dues-list endpoint, or the user cannot fully settle (off-by-paise residue).
 
+## Constraint 2b — ₹1 settlement tolerance (the safety net)
+Legacy stored rows carry paise (amountPaid/amountReceived/coldStorageChargesPaid and
+charge amounts are NOT migrated — prod is on an external VPS). So exact display↔validation
+rounding is not enough on its own. `server/storage.ts` defines `RUPEE_TOLERANCE = 1`:
+- Every cash-allocation validation rejects only when `totalSettled > due + RUPEE_TOLERANCE`
+  (was `+0.01`), and the compared `due`/balance is `Math.round`ed to match the whole-rupee
+  dialog display.
+- Every paid-vs-due status check (manual aadhtiya + all FIFO: farmer, seed supplier in both
+  `createCashEntry` and `createCashEntryWithFIFO`) marks "paid" when `newDue < RUPEE_TOLERANCE`
+  (was `<=0`/`<=0.01`), so sub-rupee residue never sticks an entry at "partial".
+- Pending-list endpoints (`cold-store-pending-charges`, `aadhat-pending-entries`,
+  `buyer-pending-transactions`) round each due + PY balance with `roundRupee` and hide dues
+  `< 1` so dropdowns show whole rupees and never offer an unsettleable paise sliver.
+**Why:** the reported bug was payments failing with `… exceeds due …` 500s and FIFO leaving
+items stuck "partial" because validation summed raw (paise) `netPayable` while the dialog
+showed `roundRupee(netPayable)`. **How to apply:** keep tolerance + status checks in lockstep
+across all five payment categories (aadhtiya, cold store, seed supplier, buyer, farmer) in
+BOTH cash-entry methods; never round stored `netPayable`/charges (backfill rewrite risk).
+
 ## Constraint 3 — seed supplier basis is intentional
 Seed supplier dues are `Σ(bags × pricePerBag)` by design (charges flow to COGS, not
 supplier deductions). Keep that basis; only wrap the final sum in `Math.round`.
