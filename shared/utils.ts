@@ -3,3 +3,40 @@ export function computeNetWeight(weight: number, bags: number, place?: string | 
   if (place === "mandi") return weight;
   return Math.max(0, weight - bags);
 }
+
+// ---------------------------------------------------------------------------
+// Shared rupee-rounding + ₹1 settlement tolerance helpers.
+// Dues and payments are rounded to whole rupees at write time (going forward),
+// and a ₹1 tolerance absorbs sub-rupee drift on existing (pre-fix) paise rows
+// without any data migration. Use these everywhere a payment is validated,
+// settled, or a status is decided so all categories behave identically.
+// ---------------------------------------------------------------------------
+export const RUPEE_TOLERANCE = 1;
+
+// Round a money value to a whole rupee.
+export function roundRupee(n: number): number {
+  return Math.round(n);
+}
+
+// A remaining due under ₹1 counts as fully settled ("paid"); clamp residue to 0.
+export function isSettled(due: number): boolean {
+  return due < RUPEE_TOLERANCE;
+}
+
+// Reject a payment only when the settled amount overpays the (whole-rupee) due
+// by ₹1 or more. Accept anything up to and including ₹0.99 over.
+export function exceedsDue(settled: number, due: number): boolean {
+  return settled - roundRupee(due) >= RUPEE_TOLERANCE;
+}
+
+// Round each charge amount in a lot.charges array to whole rupees at write time,
+// leaving the charge type and any non-numeric fields intact.
+export function roundChargeAmounts<T extends { amount?: number | string }>(
+  charges: T[] | null | undefined,
+): T[] | null | undefined {
+  if (!charges) return charges;
+  return charges.map((c) => {
+    const n = parseFloat(String(c.amount));
+    return Number.isFinite(n) ? { ...c, amount: roundRupee(n) } : c;
+  });
+}

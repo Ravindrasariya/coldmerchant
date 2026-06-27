@@ -50,17 +50,17 @@ import {
 import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, isNotNull, inArray } from "drizzle-orm";
-import { computeNetWeight } from "@shared/utils";
+import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, exceedsDue } from "@shared/utils";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
 
-// Sub-rupee rounding gaps are ignored when settling payments. Dues and sale
-// figures are whole rupees, but legacy stored values can carry paise; treat any
-// remaining difference under ₹1 as fully settled (mirrors roundRupee on display).
-const RUPEE_TOLERANCE = 1;
+// RUPEE_TOLERANCE / roundRupee / exceedsDue are imported from @shared/utils so
+// the server (routes + storage) shares one definition. Sub-rupee gaps are ignored
+// when settling payments: dues/sale figures are whole rupees, but legacy stored
+// values can carry paise; any remaining difference under ₹1 is fully settled.
 
 // ---------------------------------------------------------------------------
 // Persistent sold-bag tracking helpers.
@@ -2098,7 +2098,7 @@ export class DatabaseStorage implements IStorage {
       const received = parseFloat(txn.amountReceived || "0");
       const due = Math.max(0, revenue - received);
       
-      if (due <= 0) continue;
+      if (due < RUPEE_TOLERANCE) continue;
       
       const existing = partyMap.get(key);
       if (existing) {
@@ -2164,7 +2164,7 @@ export class DatabaseStorage implements IStorage {
       const amountPaid = parseFloat(entry.amountPaid || "0");
       const entryDue = Math.max(0, entryTotalCost - amountPaid);
       
-      if (entryDue <= 0) continue;
+      if (entryDue < RUPEE_TOLERANCE) continue;
       
       const existing = farmerMap.get(key);
       if (existing) {
@@ -2239,7 +2239,7 @@ export class DatabaseStorage implements IStorage {
         if (totalCharges <= 0) continue;
         const paidAmount = parseFloat(lot.coldStorageChargesPaid || "0");
         const due = totalCharges - paidAmount;
-        if (due <= 0) continue;
+        if (due < RUPEE_TOLERANCE) continue;
         const existing = coldStoreMap.get(lot.coldStoreDbId);
         if (existing) {
           existing.totalDue += due;
@@ -2258,7 +2258,7 @@ export class DatabaseStorage implements IStorage {
           const paidKey = `${lot.id}-${csId}`;
           const paidAmount = farmGatePaidMap.get(paidKey) || 0;
           const due = totalCharge - paidAmount;
-          if (due <= 0) continue;
+          if (due < RUPEE_TOLERANCE) continue;
           const existing = coldStoreMap.get(csId);
           if (existing) {
             existing.totalDue += due;
@@ -2275,7 +2275,7 @@ export class DatabaseStorage implements IStorage {
       if (totalCharges <= 0) continue;
       const paidAmount = parseFloat(sLot.coldStoreChargesPaid || "0");
       const due = totalCharges - paidAmount;
-      if (due <= 0) continue;
+      if (due < RUPEE_TOLERANCE) continue;
       const existing = coldStoreMap.get(sLot.coldStoreDbId);
       if (existing) {
         existing.totalDue += due;
@@ -2404,7 +2404,7 @@ export class DatabaseStorage implements IStorage {
       const amountPaid = parseFloat(entry.amountPaid || "0");
       const dueAmount = totalCost - amountPaid;
       
-      if (dueAmount <= 0) continue; // Skip fully paid
+      if (dueAmount < RUPEE_TOLERANCE) continue; // Skip fully paid (sub-₹1 residue counts as settled)
       
       const key = normalizeName(entry.supplierName);
       if (!key) continue;
@@ -2513,7 +2513,7 @@ export class DatabaseStorage implements IStorage {
             const currentReceived = parseFloat(txn.amountReceived || "0");
             const due = revenue - currentReceived;
             
-            if (due <= 0) continue;
+            if (due < RUPEE_TOLERANCE) continue;
             
             const toApply = Math.min(remainingAmount, due);
             
@@ -2526,7 +2526,7 @@ export class DatabaseStorage implements IStorage {
             
             allocations.push(allocation);
             
-            const newReceived = currentReceived + toApply;
+            const newReceived = roundRupee(currentReceived + toApply);
             await tx.update(transactions)
               .set({ amountReceived: newReceived.toString() })
               .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, entry.merchantId)));
@@ -2599,11 +2599,11 @@ export class DatabaseStorage implements IStorage {
             
             const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
             
-            if (currentDue <= 0) continue;
+            if (currentDue < RUPEE_TOLERANCE) continue;
             
             const toApply = Math.min(remainingAmount, currentDue);
             
-            const newDue = currentDue - toApply;
+            const newDue = roundRupee(currentDue - toApply);
             await tx.update(seedTransactions)
               .set({ totalDueToFarmer: newDue.toString() })
               .where(and(eq(seedTransactions.id, seedTxn.id), eq(seedTransactions.merchantId, entry.merchantId)));
@@ -2668,13 +2668,13 @@ export class DatabaseStorage implements IStorage {
           const currentPaid = parseFloat(stockEntry.amountPaid || "0");
           const due = entryTotalCost - currentPaid;
           
-          if (due <= 0) continue;
+          if (due < RUPEE_TOLERANCE) continue;
           
           // Calculate how much to apply to this stock entry
           const toApply = Math.min(remainingAmount, due);
           
           // Update stock entry's amountPaid and paymentStatus
-          const newPaid = currentPaid + toApply;
+          const newPaid = roundRupee(currentPaid + toApply);
           const newDue = entryTotalCost - newPaid;
           const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
           
@@ -2787,7 +2787,7 @@ export class DatabaseStorage implements IStorage {
             due = csCharges - paid;
           }
           
-          if (due <= 0) continue;
+          if (due < RUPEE_TOLERANCE) continue;
           
           const toApply = Math.min(remainingAmount, due);
           
@@ -2803,7 +2803,7 @@ export class DatabaseStorage implements IStorage {
           
           if (lot.coldStoreDbId) {
             const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-            const newPaid = currentPaid + toApply;
+            const newPaid = roundRupee(currentPaid + toApply);
             await tx.update(lots)
               .set({ coldStorageChargesPaid: newPaid.toString() })
               .where(and(eq(lots.id, lot.id), eq(lots.merchantId, entry.merchantId)));
@@ -2834,7 +2834,7 @@ export class DatabaseStorage implements IStorage {
             const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
             const due = totalCharges - currentPaid;
 
-            if (due <= 0) continue;
+            if (due < RUPEE_TOLERANCE) continue;
 
             const toApply = Math.min(remainingAmount, due);
 
@@ -2847,7 +2847,7 @@ export class DatabaseStorage implements IStorage {
 
             coldStoreAllocations.push(allocation);
 
-            const newPaid = currentPaid + toApply;
+            const newPaid = roundRupee(currentPaid + toApply);
             await tx.update(seedLots)
               .set({ coldStoreChargesPaid: newPaid.toString() })
               .where(eq(seedLots.id, sLot.id));
@@ -2906,13 +2906,13 @@ export class DatabaseStorage implements IStorage {
           const currentPaid = parseFloat(seedEntry.amountPaid || "0");
           const due = totalCost - currentPaid;
           
-          if (due <= 0) continue;
+          if (due < RUPEE_TOLERANCE) continue;
           
           // Calculate how much to apply to this seed stock entry
           const toApply = Math.min(remainingAmount, due);
           
           // Update seed stock entry's amountPaid and paymentStatus
-          const newPaid = currentPaid + toApply;
+          const newPaid = roundRupee(currentPaid + toApply);
           const newDue = totalCost - newPaid;
           const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
           
@@ -4572,7 +4572,7 @@ export class DatabaseStorage implements IStorage {
               if (buyerRow) {
                 const currentReceivable = parseFloat(buyerRow.receivableBalance || "0");
                 const totalSettled = appliedAmount + pettyAdj;
-                if (totalSettled > Math.round(currentReceivable) + RUPEE_TOLERANCE) {
+                if (exceedsDue(totalSettled, currentReceivable)) {
                   throw new Error(`PY allocation (₹${totalSettled}) exceeds receivable balance (₹${currentReceivable})`);
                 }
                 actualApplied = Math.min(appliedAmount, currentReceivable);
@@ -4602,10 +4602,10 @@ export class DatabaseStorage implements IStorage {
             const txnRevenue = parseFloat(txnRow.revenue || "0");
             const dueAmount = Math.round(txnRevenue - currentReceived);
             const totalSettled = appliedAmount + pettyAdj;
-            if (totalSettled > dueAmount + RUPEE_TOLERANCE) {
+            if (exceedsDue(totalSettled, dueAmount)) {
               throw new Error(`Allocation (₹${totalSettled}) exceeds due amount (₹${dueAmount.toFixed(2)}) for transaction #${txnRow.transactionNumber}`);
             }
-            const newReceived = currentReceived + totalSettled;
+            const newReceived = roundRupee(currentReceived + totalSettled);
             await tx.update(transactions)
               .set({ amountReceived: newReceived.toString() })
               .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, entry.merchantId)));
@@ -4686,10 +4686,10 @@ export class DatabaseStorage implements IStorage {
               if (remainingAmount <= 0) break;
               
               const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-              if (currentDue <= 0) continue;
+              if (currentDue < RUPEE_TOLERANCE) continue;
               
               const toApply = Math.min(remainingAmount, currentDue);
-              const newDue = currentDue - toApply;
+              const newDue = roundRupee(currentDue - toApply);
               await tx.update(seedTransactions)
                 .set({ totalDueToFarmer: newDue.toString() })
                 .where(eq(seedTransactions.id, seedTxn.id));
@@ -4756,10 +4756,10 @@ export class DatabaseStorage implements IStorage {
             const currentPaid = parseFloat(stockEntry.amountPaid || "0");
             const due = entryTotalCost - currentPaid;
             
-            if (due <= 0) continue;
+            if (due < RUPEE_TOLERANCE) continue;
             
             const toApply = Math.min(remainingAmount, due);
-            const newPaid = currentPaid + toApply;
+            const newPaid = roundRupee(currentPaid + toApply);
             const newDue = entryTotalCost - newPaid;
             const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
@@ -4786,7 +4786,7 @@ export class DatabaseStorage implements IStorage {
 
             if (csRecord) {
               const currentPyPayable = parseFloat(csRecord.pyPayable || "0");
-              if (totalSettled > Math.round(currentPyPayable) + RUPEE_TOLERANCE) {
+              if (exceedsDue(totalSettled, currentPyPayable)) {
                 throw new Error(`PY Payable allocation ₹${totalSettled.toFixed(2)} exceeds current PY payable ₹${currentPyPayable.toFixed(2)}`);
               }
               const newPyPayable = Math.max(0, currentPyPayable - totalSettled);
@@ -4826,7 +4826,7 @@ export class DatabaseStorage implements IStorage {
             }
             const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
             const due = Math.round(totalCharges - currentPaid);
-            if (totalSettled > due + RUPEE_TOLERANCE) {
+            if (exceedsDue(totalSettled, due)) {
               throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for lot ${alloc.lotId}`);
             }
 
@@ -4842,7 +4842,7 @@ export class DatabaseStorage implements IStorage {
             coldStoreAllocations.push(allocation);
 
             if (lot.coldStoreDbId) {
-              const newPaid = currentPaid + totalSettled;
+              const newPaid = roundRupee(currentPaid + totalSettled);
               await tx.update(lots)
                 .set({ coldStorageChargesPaid: newPaid.toFixed(2) })
                 .where(eq(lots.id, lot.id));
@@ -4857,7 +4857,7 @@ export class DatabaseStorage implements IStorage {
             const totalCharges = chargesPerBag * (sLot.originalBags || 0);
             const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
             const due = Math.round(totalCharges - currentPaid);
-            if (totalSettled > due + RUPEE_TOLERANCE) {
+            if (exceedsDue(totalSettled, due)) {
               throw new Error(`Allocation ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for seed lot ${alloc.seedLotId}`);
             }
 
@@ -4871,7 +4871,7 @@ export class DatabaseStorage implements IStorage {
             }).returning();
             coldStoreAllocations.push(allocation);
 
-            const newPaid = currentPaid + totalSettled;
+            const newPaid = roundRupee(currentPaid + totalSettled);
             await tx.update(seedLots)
               .set({ coldStoreChargesPaid: newPaid.toFixed(2) })
               .where(eq(seedLots.id, sLot.id));
@@ -4916,10 +4916,10 @@ export class DatabaseStorage implements IStorage {
           const currentPaid = parseFloat(seedEntry.amountPaid || "0");
           const due = totalCost - currentPaid;
           
-          if (due <= 0) continue;
+          if (due < RUPEE_TOLERANCE) continue;
           
           const toApply = Math.min(remainingAmount, due);
-          const newPaid = currentPaid + toApply;
+          const newPaid = roundRupee(currentPaid + toApply);
           const newDue = totalCost - newPaid;
           const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
           
@@ -4945,7 +4945,7 @@ export class DatabaseStorage implements IStorage {
             
             if (aadhat) {
               const currentPyPayable = parseFloat(aadhat.pyPayable || "0");
-              if (totalSettled > Math.round(currentPyPayable) + RUPEE_TOLERANCE) {
+              if (exceedsDue(totalSettled, currentPyPayable)) {
                 throw new Error(`PY Payable allocation ₹${totalSettled.toFixed(2)} exceeds current PY payable ₹${currentPyPayable.toFixed(2)}`);
               }
               const newPyPayable = Math.max(0, currentPyPayable - totalSettled);
@@ -4987,11 +4987,11 @@ export class DatabaseStorage implements IStorage {
             
             const currentPaid = parseFloat(se.amountPaid || "0");
             const due = entryNetPayable - currentPaid;
-            if (totalSettled > due + RUPEE_TOLERANCE) {
+            if (exceedsDue(totalSettled, due)) {
               throw new Error(`Allocation total ₹${totalSettled.toFixed(2)} exceeds due ₹${due.toFixed(2)} for stock entry ${alloc.stockEntryId}`);
             }
             
-            const newPaid = currentPaid + totalSettled;
+            const newPaid = roundRupee(currentPaid + totalSettled);
             const newDue = entryNetPayable - newPaid;
             const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
@@ -5059,10 +5059,10 @@ export class DatabaseStorage implements IStorage {
             const currentPaid = parseFloat(se.amountPaid || "0");
             const due = entryNetPayable - currentPaid;
             
-            if (due <= 0) continue;
+            if (due < RUPEE_TOLERANCE) continue;
             
             const toApply = Math.min(remainingAmount, due);
-            const newPaid = currentPaid + toApply;
+            const newPaid = roundRupee(currentPaid + toApply);
             const newDue = entryNetPayable - newPaid;
             const newStatus = newDue < RUPEE_TOLERANCE ? "paid" : "partial";
             
@@ -5204,7 +5204,7 @@ export class DatabaseStorage implements IStorage {
                 .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
               if (txn) {
                 const currentReceived = parseFloat(txn.amountReceived || "0");
-                const newReceived = Math.max(0, currentReceived - totalSettled);
+                const newReceived = roundRupee(Math.max(0, currentReceived - totalSettled));
                 await tx.update(transactions)
                   .set({ amountReceived: newReceived.toString() })
                   .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
@@ -5223,7 +5223,7 @@ export class DatabaseStorage implements IStorage {
                 .where(and(eq(transactions.id, alloc.transactionId), eq(transactions.merchantId, merchantId)));
               if (txn) {
                 const currentReceived = parseFloat(txn.amountReceived || "0");
-                const newReceived = Math.max(0, currentReceived - allocAmt);
+                const newReceived = roundRupee(Math.max(0, currentReceived - allocAmt));
                 await tx.update(transactions)
                   .set({ amountReceived: newReceived.toString() })
                   .where(and(eq(transactions.id, txn.id), eq(transactions.merchantId, merchantId)));
@@ -5276,7 +5276,7 @@ export class DatabaseStorage implements IStorage {
           const toRestore = Math.min(amountToRestore, alreadyPaid);
           
           if (toRestore > 0) {
-            const newDue = currentDue + toRestore;
+            const newDue = roundRupee(currentDue + toRestore);
             
             await tx.update(seedTransactions)
               .set({ totalDueToFarmer: newDue.toString() })
@@ -5323,8 +5323,8 @@ export class DatabaseStorage implements IStorage {
           if (currentPaid <= 0) continue;
           
           const toReverse = Math.min(amountToReverse, currentPaid);
-          const newPaid = currentPaid - toReverse;
-          const newStatus = newPaid <= 0 ? "due" : "partial";
+          const newPaid = roundRupee(currentPaid - toReverse);
+          const newStatus = newPaid < RUPEE_TOLERANCE ? "due" : "partial";
           
           await tx.update(stockEntries)
             .set({ 
@@ -5359,8 +5359,8 @@ export class DatabaseStorage implements IStorage {
           if (currentPaid <= 0) continue;
           
           const toReverse = Math.min(amountToReverse, currentPaid);
-          const newPaid = currentPaid - toReverse;
-          const newStatus = newPaid <= 0 ? "due" : "partial";
+          const newPaid = roundRupee(currentPaid - toReverse);
+          const newStatus = newPaid < RUPEE_TOLERANCE ? "due" : "partial";
           
           await tx.update(seedStockEntries)
             .set({ 
@@ -5402,8 +5402,8 @@ export class DatabaseStorage implements IStorage {
               
               if (se) {
                 const currentPaid = parseFloat(se.amountPaid || "0");
-                const newPaid = Math.max(0, currentPaid - totalSettled);
-                const newStatus = newPaid <= 0 ? "due" : "partial";
+                const newPaid = roundRupee(Math.max(0, currentPaid - totalSettled));
+                const newStatus = newPaid < RUPEE_TOLERANCE ? "due" : "partial";
                 
                 await tx.update(stockEntries)
                   .set({ 
@@ -5431,8 +5431,8 @@ export class DatabaseStorage implements IStorage {
             if (currentPaid <= 0) continue;
             
             const toReverse = Math.min(amountToReverse, currentPaid);
-            const newPaid = currentPaid - toReverse;
-            const newStatus = newPaid <= 0 ? "due" : "partial";
+            const newPaid = roundRupee(currentPaid - toReverse);
+            const newStatus = newPaid < RUPEE_TOLERANCE ? "due" : "partial";
             
             await tx.update(stockEntries)
               .set({ 
@@ -5481,7 +5481,7 @@ export class DatabaseStorage implements IStorage {
             
             if (lot) {
               const currentPaid = parseFloat(lot.coldStorageChargesPaid || "0");
-              const newPaid = Math.max(0, currentPaid - parseFloat(alloc.appliedAmount));
+              const newPaid = roundRupee(Math.max(0, currentPaid - parseFloat(alloc.appliedAmount)));
               
               await tx.update(lots)
                 .set({ coldStorageChargesPaid: newPaid.toString() })
@@ -5493,7 +5493,7 @@ export class DatabaseStorage implements IStorage {
             
             if (sLot) {
               const currentPaid = parseFloat(sLot.coldStoreChargesPaid || "0");
-              const newPaid = Math.max(0, currentPaid - parseFloat(alloc.appliedAmount));
+              const newPaid = roundRupee(Math.max(0, currentPaid - parseFloat(alloc.appliedAmount)));
               
               await tx.update(seedLots)
                 .set({ coldStoreChargesPaid: newPaid.toString() })

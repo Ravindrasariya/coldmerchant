@@ -8,7 +8,7 @@ import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
-import { computeNetWeight } from "@shared/utils";
+import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, roundChargeAmounts } from "@shared/utils";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -100,9 +100,8 @@ function sanitizeFreight(value: unknown): string | null {
 // final computed totals (revenue, cost of goods, profit/loss, and party dues),
 // never to intermediate per-lot / per-bag / per-charge values. Each final value
 // is rounded independently (Revenue - Cost need not equal P&L).
-function roundRupee(n: number): number {
-  return Math.round(n);
-}
+// roundRupee + the ₹1 settlement helpers live in @shared/utils so the server
+// (routes + storage) and any other consumer share one definition.
 
 // Compute totalCharges and netPayable for a harvest lot based on its breakdowns and charge data
 function computeHarvestLotCharges(lot: any) {
@@ -159,7 +158,9 @@ function computeHarvestLotCharges(lot: any) {
     const hammaliTotal = actualBags * hammaliRate;
     const totalCharges = mandiCommission + aadhatCommission + hammaliTotal + extraCharges;
     const netPayable = costOfGoods + totalCharges;
-    return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: "0.00" };
+    // Round dues to whole rupees at write time (going forward) — matches the
+    // whole-rupee amount shown in payment dropdowns. Per-bag COGS stays precise.
+    return { totalCharges: roundRupee(totalCharges).toFixed(2), netPayable: roundRupee(netPayable).toFixed(2), earlyPayAmount: "0.00" };
   }
   
   // Farm Gate and Cold Store
@@ -188,7 +189,9 @@ function computeHarvestLotCharges(lot: any) {
   
   const totalCharges = totalDeductions;
   const netPayable = costOfGoods - totalDeductions + signedAdj;
-  return { totalCharges: totalCharges.toFixed(2), netPayable: netPayable.toFixed(2), earlyPayAmount: earlyPayAmount.toFixed(2) };
+  // Round dues to whole rupees at write time (going forward). Per-bag COGS and
+  // interest-bearing balances are rounded elsewhere / left precise by design.
+  return { totalCharges: roundRupee(totalCharges).toFixed(2), netPayable: roundRupee(netPayable).toFixed(2), earlyPayAmount: roundRupee(earlyPayAmount).toFixed(2) };
 }
 
 // After creating/updating lots and breakdowns, recompute and store totalCharges and netPayable
@@ -279,8 +282,10 @@ function computeSeedLotCharges(lot: any) {
   const avgCostPerBag = bags > 0 ? (netPayable + coldStoreTotal) / bags : 0;
   
   return {
-    totalCharges: totalCharges.toFixed(2),
-    netPayable: netPayable.toFixed(2),
+    // netPayable (the supplier/cold-store due) rounds to whole rupees at write
+    // time; avgCostPerBag stays precise (per-bag COGS carve-out).
+    totalCharges: roundRupee(totalCharges).toFixed(2),
+    netPayable: roundRupee(netPayable).toFixed(2),
     avgCostPerBag: avgCostPerBag.toFixed(2),
   };
 }
@@ -384,10 +389,14 @@ export async function registerRoutes(
           const existingNp = lot.netPayable ? parseFloat(lot.netPayable) : 0;
           const existingTc = lot.totalCharges ? parseFloat(lot.totalCharges) : 0;
           const existingEp = lot.earlyPayAmount ? parseFloat(lot.earlyPayAmount) : 0;
+          // Only rewrite when the difference is a real correction (≥ ₹1, e.g. the
+          // legacy Gate Cut Wastage fix). Sub-rupee differences introduced purely
+          // by write-time rounding must NOT mass-rewrite existing production rows
+          // (no backfill/migration policy) — the ₹1 payment tolerance covers those.
           if (
-            Math.abs(parseFloat(netPayable) - existingNp) > 0.01 ||
-            Math.abs(parseFloat(totalCharges) - existingTc) > 0.01 ||
-            Math.abs(parseFloat(earlyPayAmount) - existingEp) > 0.01
+            Math.abs(parseFloat(netPayable) - existingNp) >= RUPEE_TOLERANCE ||
+            Math.abs(parseFloat(totalCharges) - existingTc) >= RUPEE_TOLERANCE ||
+            Math.abs(parseFloat(earlyPayAmount) - existingEp) >= RUPEE_TOLERANCE
           ) {
             await storage.updateLot(lot.id, entry.merchantId, {
               totalCharges,
@@ -1030,7 +1039,7 @@ export async function registerRoutes(
           totalWeight: lotData.cutType === "gate_cut" && lotData.totalWeight 
             ? lotData.totalWeight.toString() 
             : null,
-          charges: lotData.charges && lotData.charges.length > 0 ? lotData.charges : null,
+          charges: lotData.charges && lotData.charges.length > 0 ? roundChargeAmounts(lotData.charges) : null,
           mandiCommissionPercent: lotData.mandiCommissionPercent ? lotData.mandiCommissionPercent.toString() : null,
           aadhatCommissionPercent: lotData.aadhatCommissionPercent ? lotData.aadhatCommissionPercent.toString() : null,
           hammaliPerBag: lotData.hammaliPerBag ? lotData.hammaliPerBag.toString() : null,
@@ -1716,7 +1725,7 @@ export async function registerRoutes(
                 ? (lotData.coldStoreLotNumber || null)
                 : undefined,
               charges: lotData.charges !== undefined
-                ? (lotData.charges && lotData.charges.length > 0 ? lotData.charges : null)
+                ? (lotData.charges && lotData.charges.length > 0 ? roundChargeAmounts(lotData.charges) : null)
                 : undefined,
               mandiCommissionPercent: lotData.mandiCommissionPercent !== undefined
                 ? (lotData.mandiCommissionPercent ? lotData.mandiCommissionPercent.toString() : null)
