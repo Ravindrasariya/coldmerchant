@@ -1,0 +1,24 @@
+root@srv1277141:/var/www/vyapar-vriddhi# pm2 logs vyapar-vriddhi --lines 10
+[TAILING] Tailing last 10 lines for [vyapar-vriddhi] process (change the value with --lines option)
+/root/.pm2/logs/vyapar-vriddhi-error-2.log last 10 lines:
+2|vyapar-v |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2|vyapar-v |     at async t.transaction (/var/www/vyapar-vriddhi/dist/index.cjs:70:29910)
+2|vyapar-v |     at async Ap.createCashEntry (/var/www/vyapar-vriddhi/dist/index.cjs:90:66688)
+2|vyapar-v |     at async /var/www/vyapar-vriddhi/dist/index.cjs:92:170346
+2|vyapar-v | Error creating cash entry: Error: Allocation total ₹224550.00 exceeds due ₹224549.93 for stock entry 172
+2|vyapar-v |     at /var/www/vyapar-vriddhi/dist/index.cjs:90:75043
+2|vyapar-v |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2|vyapar-v |     at async t.transaction (/var/www/vyapar-vriddhi/dist/index.cjs:70:29910)
+2|vyapar-v |     at async Ap.createCashEntry (/var/www/vyapar-vriddhi/dist/index.cjs:90:66688)
+2|vyapar-v |     at async /var/www/vyapar-vriddhi/dist/index.cjs:92:170346
+
+/root/.pm2/logs/vyapar-vriddhi-out-2.log last 10 lines:
+2|vyapar-v | ess] GET /api/books/balance-sheet 200 in 105ms :: {"financialYear":"2026-27","assets":{"fixedAssets":{"gross":0,"depreciation":0,"net":0,"details":[]},"currentAssets":{"cashInHand":228000,"bankBalances":[{"name":"Bank Account","balance":0}],"totalBankBalance":0,"buyerReceivables":959163,"farmerReceivables":0,"sundryPayReceivables":0,"harvestStockValue":0,"seedStockValue":0,"total":1187163},"totalAssets":1187163},"liabilities":{"longTerm":{"total":0,"details":[]},"shortTerm":{"total":0,"details":[]},"currentLiabilities":{"farmerPayables":0,"supplierPayables":0,"aadhtiyaPayables":1165050,"coldStorePayables":0,"sundryPayPayables":0,"limitAccountLiabilities":0,"limitAccountDetails":[]},"totalLiabilities":1165050},"ownersEquity":22113,"balanceCheck":true}
+2|vyapar-v | 4:02:33 PM [express] GET /api/demo-videos/1/stream 206 in 21ms
+2|vyapar-v | 4:02:34 PM [express] GET /api/demo-videos/1/stream 206 in 13ms
+2|vyapar-v | 4:03:28 PM [express] GET /api/stock-entries/next-serial 304 in 20ms :: {"next":5,"year":2026}
+2|vyapar-v | 4:03:28 PM [express] GET /api/seed-stock-entries/next-serial 304 in 24ms :: {"next":1,"year":2026}
+2|vyapar-v | 4:03:35 PM [express] GET /api/cash/aadhat-pending-entries/48 200 in 56ms :: {"pendingEntries":[{"stockEntryId":169,"serialNumber":1,"crop":"garlic","purchaseDate":"2026-06-10","totalBags":66,"netPayable":295400,"amountPaid":0,"dueAmount":295400,"daysSince":17},{"stockEntryId":172,"serialNumber":2,"crop":"garlic","purchaseDate":"2026-06-12","totalBags":63,"netPayable":224550,"amountPaid":0,"dueAmount":224550,"daysSince":15},{"stockEntryId":173,"serialNumber":3,"crop":"garlic","purchaseDate":"2026-06-20","totalBags":67,"netPayable":303750,"amountPaid":0,"dueAmount":303750,"daysSince":7},{"stockEntryId":174,"serialNumber":4,"crop":"garlic","purchaseDate":"2026-06-25","totalBags":93,"netPayable":341350,"amountPaid":0,"dueAmount":341350,"daysSince":2}],"pyPayable":0}
+2|vyapar-v | 4:04:01 PM [express] POST /api/cash/entries 500 in 40ms :: {"message":"Failed to create cash entry"}
+2|vyapar-v | 4:06:09 PM [express] GET /api/user 401 in 4ms
+
