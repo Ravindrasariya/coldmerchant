@@ -2114,12 +2114,14 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(partyMap.entries()).map(([_, data]) => ({
-      partyName: data.displayName,
-      partyAddress: data.partyAddress,
-      totalDue: data.totalDue,
-      transactionCount: data.transactionCount,
-    }));
+    return Array.from(partyMap.entries())
+      .filter(([_, data]) => data.totalDue >= RUPEE_TOLERANCE)
+      .map(([_, data]) => ({
+        partyName: data.displayName,
+        partyAddress: data.partyAddress,
+        totalDue: roundRupee(data.totalDue),
+        transactionCount: data.transactionCount,
+      }));
   }
 
   async getFarmersWithDue(merchantId: number): Promise<{ farmerId: number | null; farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]> {
@@ -2185,14 +2187,16 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(farmerMap.entries()).map(([_, data]) => ({
-      farmerId: data.farmerId,
-      farmerName: data.displayName,
-      farmerContact: data.farmerContact,
-      village: data.village,
-      totalDue: data.totalDue,
-      entryCount: data.entryCount,
-    }));
+    return Array.from(farmerMap.entries())
+      .filter(([_, data]) => data.totalDue >= RUPEE_TOLERANCE)
+      .map(([_, data]) => ({
+        farmerId: data.farmerId,
+        farmerName: data.displayName,
+        farmerContact: data.farmerContact,
+        village: data.village,
+        totalDue: roundRupee(data.totalDue),
+        entryCount: data.entryCount,
+      }));
   }
 
   async getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]> {
@@ -2284,11 +2288,11 @@ export class DatabaseStorage implements IStorage {
     }
     
     return Array.from(coldStoreMap.values())
-      .filter(data => data.totalDue > 0)
+      .filter(data => data.totalDue >= RUPEE_TOLERANCE)
       .map(data => ({
         coldStoreName: data.displayName,
         coldStoreDbId: data.coldStoreDbId,
-        totalDue: Math.round(data.totalDue),
+        totalDue: roundRupee(data.totalDue),
         lotCount: data.lotCount,
       }));
   }
@@ -2320,7 +2324,7 @@ export class DatabaseStorage implements IStorage {
     for (const txn of txns) {
       const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
       
-      if (dueToFarmer <= 0) continue;
+      if (dueToFarmer < RUPEE_TOLERANCE) continue;
       
       const key = getSeedFarmerKey(txn.farmerId, txn.farmerName, txn.farmerContact, txn.village);
       if (!key) continue;
@@ -2347,7 +2351,7 @@ export class DatabaseStorage implements IStorage {
     // Add receivables from farmer ledger (remainingReceivable = finalAmount minus payments)
     for (const farmerRecord of allFarmerRecords) {
       const receivables = parseFloat(farmerRecord.remainingReceivable || "0");
-      if (receivables <= 0) continue;
+      if (receivables < RUPEE_TOLERANCE) continue;
       
       const key = `id:${farmerRecord.id}`;
       
@@ -2367,16 +2371,18 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Return farmers with remaining due (already reduced by FIFO payments)
+    // Return farmers with remaining due (already reduced by FIFO payments).
+    // Hide sub-₹1 residue and round totals for display alignment with the other
+    // pending/dues endpoints (the stored remainingReceivable itself stays precise).
     return Array.from(farmerMap.entries())
-      .filter(([_, data]) => data.totalDue > 0)
+      .filter(([_, data]) => data.totalDue >= RUPEE_TOLERANCE)
       .map(([_, data]) => ({
         farmerName: data.displayName,
         farmerContact: data.farmerContact,
         village: data.village,
-        totalDue: data.totalDue,
+        totalDue: roundRupee(data.totalDue),
         transactionCount: data.transactionCount,
-        receivables: data.receivables,
+        receivables: roundRupee(data.receivables),
       })).sort((a, b) => b.totalDue - a.totalDue);
   }
 
@@ -2423,12 +2429,14 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return Array.from(supplierMap.entries()).map(([_, data]) => ({
-      supplierName: data.displayName,
-      district: data.district,
-      totalDue: data.totalDue,
-      entryCount: data.entryCount,
-    })).sort((a, b) => b.totalDue - a.totalDue);
+    return Array.from(supplierMap.entries())
+      .filter(([_, data]) => data.totalDue >= RUPEE_TOLERANCE)
+      .map(([_, data]) => ({
+        supplierName: data.displayName,
+        district: data.district,
+        totalDue: roundRupee(data.totalDue),
+        entryCount: data.entryCount,
+      })).sort((a, b) => b.totalDue - a.totalDue);
   }
 
   async getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]> {
