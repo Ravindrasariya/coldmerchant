@@ -4317,30 +4317,47 @@ export async function registerRoutes(
 
       const allTransactions = await storage.getTransactionsWithDueByParty(merchantId, buyer.name, buyerId);
 
-      const pendingEntries = allTransactions
+      const filteredTransactions = allTransactions
         .filter(txn => {
           const revenue = parseFloat(txn.revenue || "0");
           const received = parseFloat(txn.amountReceived || "0");
           return revenue - received >= 1;
         })
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .map(txn => {
-          const revenue = parseFloat(txn.revenue || "0");
-          const received = parseFloat(txn.amountReceived || "0");
-          const dueAmount = roundRupee(revenue - received);
-          const daysSince = Math.floor((Date.now() - new Date(txn.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-          return {
-            transactionId: txn.id,
-            transactionNumber: txn.transactionNumber,
-            crop: txn.crop || "potato",
-            dateOfLoading: txn.dateOfLoading,
-            totalBags: txn.totalBags,
-            revenue: parseFloat(revenue.toFixed(2)),
-            amountReceived: parseFloat(received.toFixed(2)),
-            dueAmount: parseFloat(dueAmount.toFixed(2)),
-            daysSince,
-          };
-        });
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      const cropMap = await storage.getDistinctCropsByTransactionIds(
+        merchantId,
+        filteredTransactions.map(txn => txn.id),
+      );
+
+      const pendingEntries = filteredTransactions.map(txn => {
+        const revenue = parseFloat(txn.revenue || "0");
+        const received = parseFloat(txn.amountReceived || "0");
+        const dueAmount = roundRupee(revenue - received);
+        const daysSince = Math.floor((Date.now() - new Date(txn.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+        // # Days for the Buyer Panna is measured from the loading date when
+        // present, falling back to the creation-based daysSince for legacy rows.
+        let daysSinceLoading = daysSince;
+        if (txn.dateOfLoading && /^\d{4}-\d{2}-\d{2}/.test(txn.dateOfLoading)) {
+          const [y, m, d] = txn.dateOfLoading.slice(0, 10).split("-").map(Number);
+          const loadMs = new Date(y, m - 1, d).getTime();
+          daysSinceLoading = Math.max(0, Math.floor((Date.now() - loadMs) / (1000 * 60 * 60 * 24)));
+        }
+        const crops = cropMap[txn.id]?.length ? cropMap[txn.id] : [txn.crop || "potato"];
+        return {
+          transactionId: txn.id,
+          transactionNumber: txn.transactionNumber,
+          crop: txn.crop || "potato",
+          crops,
+          dateOfLoading: txn.dateOfLoading,
+          totalBags: txn.totalBags,
+          revenue: parseFloat(revenue.toFixed(2)),
+          amountReceived: parseFloat(received.toFixed(2)),
+          dueAmount: parseFloat(dueAmount.toFixed(2)),
+          daysSince,
+          daysSinceLoading,
+        };
+      });
 
       const pyBalance = parseFloat(buyer.receivableBalance || "0");
 

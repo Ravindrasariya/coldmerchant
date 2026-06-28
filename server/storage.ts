@@ -317,6 +317,7 @@ export interface IStorage {
   getPartiesWithDue(merchantId: number): Promise<{ partyName: string; partyAddress: string | null; totalDue: number; transactionCount: number }[]>;
   getFarmersWithDue(merchantId: number): Promise<{ farmerId: number | null; farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; entryCount: number }[]>;
   getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]>;
+  getDistinctCropsByTransactionIds(merchantId: number, transactionIds: number[]): Promise<Record<number, string[]>>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]>;
   getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]>;
   getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
@@ -2453,6 +2454,35 @@ export class DatabaseStorage implements IStorage {
       const received = parseFloat(txn.amountReceived || "0");
       return revenue > received;
     });
+  }
+
+  // Returns a map of transactionId -> distinct crop list, derived from the
+  // lots referenced by each transaction's items. A loading/sale transaction
+  // can span lots of different crops (potato/onion/garlic), so the Buyer Panna
+  // shows every crop present in the transaction rather than the single
+  // transactions.crop numbering field.
+  async getDistinctCropsByTransactionIds(merchantId: number, transactionIds: number[]): Promise<Record<number, string[]>> {
+    const result: Record<number, string[]> = {};
+    if (transactionIds.length === 0) return result;
+    const rows = await db.select({
+      transactionId: transactionItems.transactionId,
+      crop: lots.crop,
+    })
+      .from(transactionItems)
+      .innerJoin(lots, eq(transactionItems.lotId, lots.id))
+      .where(and(
+        eq(transactionItems.merchantId, merchantId),
+        inArray(transactionItems.transactionId, transactionIds),
+      ));
+    const sets: Record<number, Set<string>> = {};
+    for (const row of rows) {
+      const crop = row.crop || "potato";
+      (sets[row.transactionId] ||= new Set<string>()).add(crop);
+    }
+    for (const [txnId, set] of Object.entries(sets)) {
+      result[Number(txnId)] = Array.from(set);
+    }
+    return result;
   }
 
   async createCashEntryWithFIFO(

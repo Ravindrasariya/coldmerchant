@@ -29,8 +29,10 @@ import {
   FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { SiWhatsapp } from "react-icons/si";
 import { type Buyer, type BuyerEditHistory } from "@shared/schema";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { buildBuyerPannaElement, type BuyerPannaEntry, type BuyerPannaMerchant } from "@/lib/buyer-panna";
 
 interface LedgerEntry {
   date: string;
@@ -334,6 +336,62 @@ export default function BuyersTab() {
     queryKey: ["/api/buyers"],
     enabled: !!user,
   });
+
+  const { data: merchant } = useQuery<BuyerPannaMerchant>({
+    queryKey: ["/api/merchants", user?.merchantId],
+    enabled: !!user?.merchantId,
+  });
+
+  const [sharingBuyerId, setSharingBuyerId] = useState<number | null>(null);
+
+  const handleShareBuyerPanna = async (buyer: BuyerWithDues) => {
+    if (sharingBuyerId) return;
+    if (user?.merchantId && !merchant) {
+      toast({ title: t("Still loading, please try again", "लोड हो रहा है, कृपया पुनः प्रयास करें") });
+      return;
+    }
+    setSharingBuyerId(buyer.id);
+    try {
+      const res = await fetch(`/api/cash/buyer-pending-transactions/${buyer.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending transactions");
+      const data: { pendingEntries: BuyerPannaEntry[] } = await res.json();
+      const entries = (data.pendingEntries || []).filter(e => e.dueAmount >= 1);
+
+      if (entries.length === 0) {
+        toast({ title: t("No outstanding dues for this buyer", "इस खरीदार का कोई बकाया नहीं है") });
+        return;
+      }
+
+      const merchantData: BuyerPannaMerchant = merchant || {
+        id: user?.merchantId ?? 0,
+        name: "",
+        address: null,
+        contactNumber: null,
+        receiptHeaderImage: null,
+        receiptHtmlTemplate: null,
+      };
+
+      const printDiv = buildBuyerPannaElement({
+        merchant: merchantData,
+        buyerName: buyer.name,
+        buyerAddress: buyer.address ?? null,
+        buyerContact: buyer.contact ?? null,
+        entries,
+        t,
+      });
+      document.body.appendChild(printDiv);
+      try {
+        await shareReceiptAsPdf(printDiv, `${buyer.name}_Buyer_Panna`);
+      } finally {
+        if (printDiv.parentNode) document.body.removeChild(printDiv);
+      }
+    } catch (err) {
+      console.error("Buyer Panna share failed:", err);
+      toast({ title: t("Failed to create Buyer Panna", "खरीदार पन्ना बनाने में विफल"), variant: "destructive" });
+    } finally {
+      setSharingBuyerId(null);
+    }
+  };
 
   const { data: editHistory = [], isLoading: historyLoading } = useQuery<BuyerEditHistory[]>({
     queryKey: ["/api/buyers", editingBuyer?.id, "history"],
@@ -725,7 +783,7 @@ export default function BuyersTab() {
           ) : (
             <div className="space-y-4">
               <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
-                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[900px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr)' }}>
+                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[940px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr) 44px' }}>
                   <div></div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -758,13 +816,14 @@ export default function BuyersTab() {
                     )}
                   </div>
                   <div>{t("Receivables", "प्राप्य")}</div>
+                  <div className="text-center">{t("Share", "साझा")}</div>
                 </div>
                 
                 {filteredBuyers.map((buyer, index) => (
                   <div key={buyer.id}>
                   <div 
-                    className="grid items-center gap-2 px-3 py-2 border-b min-w-[900px] cursor-pointer hover:bg-muted/30 transition-colors"
-                    style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr)' }}
+                    className="grid items-center gap-2 px-3 py-2 border-b min-w-[940px] cursor-pointer hover:bg-muted/30 transition-colors"
+                    style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(80px, 1fr) minmax(120px, 1.5fr) minmax(50px, 0.5fr) minmax(90px, 0.9fr) 55px 48px minmax(80px, 0.8fr) minmax(70px, 0.7fr) 44px' }}
                     data-testid={`buyer-row-${index}`}
                     onClick={() => toggleExpand(buyer.id)}
                   >
@@ -815,6 +874,22 @@ export default function BuyersTab() {
                     <div className="text-xs font-mono text-orange-600 dark:text-orange-400">
                       ₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
                     </div>
+                    <div className="flex items-center justify-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); handleShareBuyerPanna(buyer); }}
+                        disabled={sharingBuyerId === buyer.id}
+                        title={t("Share Buyer Panna", "खरीदार पन्ना साझा करें")}
+                        data-testid={`button-share-panna-${index}`}
+                      >
+                        {sharingBuyerId === buyer.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <SiWhatsapp className="h-4 w-4 text-green-600 dark:text-green-500" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   {expandedBuyerId === buyer.id && (
                     <BuyerLedgerSection buyerId={buyer.id} buyerName={buyer.name} t={t} formatLedgerAmount={formatLedgerAmount} formatDate={formatDate} />
@@ -861,9 +936,25 @@ export default function BuyersTab() {
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                        <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-sm font-mono">₹{buyer.overallDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                          <div className="text-sm font-mono text-orange-600 dark:text-orange-400">₹{buyer.receivables.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); handleShareBuyerPanna(buyer); }}
+                          disabled={sharingBuyerId === buyer.id}
+                          title={t("Share Buyer Panna", "खरीदार पन्ना साझा करें")}
+                          data-testid={`button-share-panna-mobile-${index}`}
+                        >
+                          {sharingBuyerId === buyer.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <SiWhatsapp className="h-4 w-4 text-green-600 dark:text-green-500" />
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
