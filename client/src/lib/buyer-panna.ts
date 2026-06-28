@@ -102,9 +102,9 @@ export function buildBuyerPannaElement(args: BuildBuyerPannaArgs): HTMLElement {
 
   const totalDue = entries.reduce((sum, e) => sum + e.dueAmount, 0);
 
-  const headerCellStyle = "border:1px solid #ffffff;padding:9px 8px;text-align:center;font-weight:600;color:#ffffff;";
+  const headerCellStyle = "border:1px solid #cccccc;padding:9px 8px;text-align:center;font-weight:700;color:#000000;";
   const headerHtml = `
-    <tr style="background:#1a7a3c;">
+    <tr style="background:#e8f5e9;">
       <th style="${headerCellStyle}">${t("Bidding Date", "बोली तिथि")}</th>
       <th style="${headerCellStyle}">${t("Crop", "फसल")}</th>
       <th style="${headerCellStyle}">${t("# Bags", "बैग")}</th>
