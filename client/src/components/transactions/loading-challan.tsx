@@ -157,7 +157,6 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
   const netFreight = Math.max(0, totalFreight - driverAdvance);
   const totalBags = transaction?.totalBags || 0;
   const totalWeight = parseFloat(transaction?.totalNetWeight || "0");
-  const freightRate = totalBags > 0 ? totalFreight / totalBags : 0;
 
   const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString('en-IN')}`;
 
@@ -222,7 +221,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
                 <tr>
-                  <td rowSpan={8} style={{ border, padding: "6px 8px", width: "52%", verticalAlign: "top" }}>
+                  <td rowSpan={7} style={{ border, padding: "6px 8px", width: "52%", verticalAlign: "top" }}>
                     <div style={{ fontWeight: "bold", fontSize: 13 }}>{t("To", "सेवा में")}:</div>
                     <div style={{ fontWeight: "bold", fontSize: 15, marginTop: 2 }}>{transaction.partyName || buyer?.name || ""}</div>
                     {(buyer?.address || transaction.partyAddress) && (
@@ -247,10 +246,6 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
                 <tr>
                   <td style={labelCell}>{t("Total Weight", "कुल वजन")}</td>
                   <td style={valueCell}>{totalWeight > 0 ? totalWeight.toFixed(1) : ""}</td>
-                </tr>
-                <tr>
-                  <td style={labelCell}>{t("Freight Rate", "भाड़ा दर")}</td>
-                  <td style={valueCell}>{freightRate > 0 ? `₹${freightRate.toFixed(2)} ${t("per Bag", "प्रति बोरी")}` : ""}</td>
                 </tr>
                 <tr>
                   <td style={labelCell}>{t("Lorry No.", "लॉरी नं")}</td>
