@@ -268,6 +268,7 @@ interface BuyerPendingEntry {
   amountReceived: number;
   dueAmount: number;
   daysSince: number;
+  daysSinceLoading: number;
 }
 
 interface BuyerPendingResponse {
@@ -1016,7 +1017,7 @@ export function CashManagementTab() {
       } else {
         setBuyerAllocations(prev => [...prev, {
           transactionId: entry.transactionId,
-          label: `Tnx #${entry.transactionNumber} | ${entry.crop} | ${entry.dateOfLoading ? format(new Date(entry.dateOfLoading), "dd/MM/yy") : "?"} | ${entry.totalBags} bags | ${entry.daysSince}d`,
+          label: `Tnx #${entry.transactionNumber} | ${entry.crop} | ${entry.dateOfLoading ? format(new Date(entry.dateOfLoading), "dd/MM/yy") : "?"} | ${entry.totalBags} bags | ${entry.daysSinceLoading ?? entry.daysSince}d`,
           dueAmount: entry.dueAmount,
           amount: 0,
           pettyAdjustment: 0,
@@ -2872,7 +2873,7 @@ export function CashManagementTab() {
                                           <span className="text-muted-foreground">{entry.crop}</span>
                                           <span className="text-muted-foreground">{entry.dateOfLoading ? format(new Date(entry.dateOfLoading), "dd/MM/yy") : "?"}</span>
                                           <span className="text-muted-foreground">{entry.totalBags}B</span>
-                                          <span className="text-muted-foreground">{entry.daysSince}d</span>
+                                          <span className="text-muted-foreground">{entry.daysSinceLoading ?? entry.daysSince}d</span>
                                           <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 shrink-0">
                                             ₹{entry.dueAmount.toLocaleString('en-IN')}
                                           </Badge>
