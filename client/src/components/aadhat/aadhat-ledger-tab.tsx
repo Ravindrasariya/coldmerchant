@@ -27,7 +27,9 @@ import {
   FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { SiWhatsapp } from "react-icons/si";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { buildAadhatPannaElement, type AadhatPannaEntry, type PannaMerchant } from "@/lib/aadhat-panna";
 import { type Aadhat, type AadhatEditHistory } from "@shared/schema";
 
 interface LedgerEntry {
@@ -332,6 +334,64 @@ export default function AadhatLedgerTab() {
     queryKey: ["/api/aadhats"],
     enabled: !!user,
   });
+
+  const { data: merchant } = useQuery<PannaMerchant>({
+    queryKey: ["/api/merchants", user?.merchantId],
+    enabled: !!user?.merchantId,
+  });
+
+  const [sharingAadhatId, setSharingAadhatId] = useState<number | null>(null);
+
+  const handleShareAadhatPanna = async (aadhat: AadhatWithDues) => {
+    if (sharingAadhatId) return;
+    if (user?.merchantId && !merchant) {
+      toast({ title: t("Still loading, please try again", "लोड हो रहा है, कृपया पुनः प्रयास करें") });
+      return;
+    }
+    setSharingAadhatId(aadhat.id);
+    try {
+      const res = await fetch(`/api/cash/aadhat-pending-entries/${aadhat.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending entries");
+      const data: { pendingEntries: AadhatPannaEntry[]; pyPayable: number } = await res.json();
+      const entries = (data.pendingEntries || []).filter(e => e.dueAmount >= 1);
+      const pyPayable = data.pyPayable || 0;
+
+      if (entries.length === 0 && pyPayable < 1) {
+        toast({ title: t("No outstanding dues for this aadhat", "इस आढ़त का कोई बकाया नहीं है") });
+        return;
+      }
+
+      const merchantData: PannaMerchant = merchant || {
+        id: user?.merchantId ?? 0,
+        name: "",
+        address: null,
+        contactNumber: null,
+        receiptHeaderImage: null,
+        receiptHtmlTemplate: null,
+      };
+
+      const printDiv = buildAadhatPannaElement({
+        merchant: merchantData,
+        aadhatName: aadhat.name,
+        aadhatAddress: aadhat.address ?? null,
+        aadhatContact: aadhat.contact ?? null,
+        entries,
+        pyPayable,
+        t,
+      });
+      document.body.appendChild(printDiv);
+      try {
+        await shareReceiptAsPdf(printDiv, `${aadhat.name}_Aadhat_Panna`);
+      } finally {
+        if (printDiv.parentNode) document.body.removeChild(printDiv);
+      }
+    } catch (err) {
+      console.error("Aadhat Panna share failed:", err);
+      toast({ title: t("Failed to create Aadhat Panna", "आढ़त पन्ना बनाने में विफल"), variant: "destructive" });
+    } finally {
+      setSharingAadhatId(null);
+    }
+  };
 
   const { data: editHistory = [], isLoading: historyLoading } = useQuery<AadhatEditHistory[]>({
     queryKey: ["/api/aadhats", editingAadhat?.id, "history"],
@@ -663,7 +723,7 @@ export default function AadhatLedgerTab() {
           ) : (
             <div className="space-y-4">
               <div className="hidden md:block rounded-lg border bg-card overflow-x-auto">
-                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[800px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}>
+                <div className="grid items-center gap-2 px-3 py-2 bg-muted/50 text-xs font-medium border-b min-w-[800px]" style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr) 44px' }}>
                   <div></div>
                   <div 
                     className="flex items-center gap-1 cursor-pointer select-none"
@@ -696,13 +756,14 @@ export default function AadhatLedgerTab() {
                       <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
                     )}
                   </div>
+                  <div></div>
                 </div>
                 
                 {filteredAadhats.map((aadhat, index) => (
                   <div key={aadhat.id}>
                     <div 
                       className="grid items-center gap-2 px-3 py-2 border-b min-w-[800px] cursor-pointer hover:bg-muted/30 transition-colors"
-                      style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr)' }}
+                      style={{ gridTemplateColumns: '36px minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(100px, 1.2fr) minmax(80px, 0.8fr) 55px 48px minmax(80px, 0.8fr) minmax(80px, 0.8fr) minmax(80px, 0.8fr) 44px' }}
                       data-testid={`aadhat-row-${index}`}
                       onClick={() => setExpandedAadhatId(expandedAadhatId === aadhat.id ? null : aadhat.id)}
                     >
@@ -751,6 +812,22 @@ export default function AadhatLedgerTab() {
                       </div>
                       <div className="text-xs font-mono text-green-600 dark:text-green-400 font-semibold">
                         ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); handleShareAadhatPanna(aadhat); }}
+                          disabled={sharingAadhatId === aadhat.id}
+                          title={t("Share Aadhat Panna", "आढ़त पन्ना साझा करें")}
+                          data-testid={`button-share-aadhat-panna-${index}`}
+                        >
+                          {sharingAadhatId === aadhat.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <SiWhatsapp className="h-4 w-4 text-green-600 dark:text-green-500" />
+                          )}
+                        </Button>
                       </div>
                     </div>
                     {expandedAadhatId === aadhat.id && (
@@ -802,10 +879,26 @@ export default function AadhatLedgerTab() {
                           onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: aadhat.id, isActive: checked })}
                         />
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs text-orange-600 dark:text-orange-400">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                        <div className="text-xs text-blue-600 dark:text-blue-400">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
-                        <div className="text-sm font-mono text-green-600 dark:text-green-400 font-semibold">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-xs text-orange-600 dark:text-orange-400">{t("PY Payable", "पीवाय देय")}: ₹{parseFloat(aadhat.pyPayable || "0").toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                          <div className="text-xs text-blue-600 dark:text-blue-400">{t("Stock Due", "स्टॉक बकाया")}: ₹{(aadhat.stockDue || 0).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                          <div className="text-sm font-mono text-green-600 dark:text-green-400 font-semibold">{t("Total Due", "कुल बकाया")}: ₹{aadhat.totalDue.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => { e.stopPropagation(); handleShareAadhatPanna(aadhat); }}
+                          disabled={sharingAadhatId === aadhat.id}
+                          title={t("Share Aadhat Panna", "आढ़त पन्ना साझा करें")}
+                          data-testid={`button-share-aadhat-panna-mobile-${index}`}
+                        >
+                          {sharingAadhatId === aadhat.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <SiWhatsapp className="h-4 w-4 text-green-600 dark:text-green-500" />
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
