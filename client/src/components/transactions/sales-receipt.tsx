@@ -10,6 +10,7 @@ import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
+import { defaultBikriTemplate } from "@/lib/default-bikri-template";
 
 interface TransactionItem {
   id: number;
@@ -19,24 +20,43 @@ interface TransactionItem {
   size: string | null;
   bagsMoved: number;
   netWeight: string | null;
+  revenue: string | null;
+  marka: string | null;
+  crop: string | null;
+}
+
+function cropToLabel(crop: string | null | undefined): string {
+  if (crop === "onion") return "Onion / प्याज";
+  if (crop === "garlic") return "Garlic / लहसुन";
+  return "Potato / आलू";
 }
 
 interface Transaction {
   id: number;
   transactionNumber: number;
   merchantId: number;
+  transactionType: string | null;
   transporterName: string | null;
   driverContact: string | null;
+  buyerId: number | null;
   partyName: string | null;
   partyAddress: string | null;
   vehicleNumber: string | null;
   advancePayment: string | null;
+  revenue: string | null;
   totalBags: number;
   totalNetWeight: string | null;
   crop: string | null;
   createdAt: string;
   dateOfLoading: string | null;
   items: TransactionItem[];
+}
+
+interface Buyer {
+  id: number;
+  name: string;
+  address: string;
+  contact: string | null;
 }
 
 interface Merchant {
@@ -64,11 +84,10 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const printRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
   const autoActionDone = useRef(false);
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const receiptFilename = () => {
-    if (!transaction) return "Sales-Receipt";
-    const buyerName = transaction.partyName || "Receipt";
+    if (!transaction) return "Bikri-Receipt";
+    const buyerName = transaction.partyName || buyer?.name || "Receipt";
     const date = resolveTxnDate(transaction);
     const dd = String(date.getDate()).padStart(2, "0");
     const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -101,6 +120,12 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     enabled: !!merchantId && open,
   });
 
+  const { data: buyers } = useQuery<Buyer[]>({
+    queryKey: ["/api/buyers"],
+    enabled: !!transaction?.buyerId && open,
+  });
+  const buyer = buyers?.find(b => b.id === transaction?.buyerId);
+
   const isLoading = txnLoading || merchantLoading;
 
   const handlePrint = () => {
@@ -111,95 +136,37 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     if (customHtml) {
       html = customHtml.replace(/<head>/i, `<head><title>${printTitle}</title>`);
     } else {
-    const printContent = printRef.current.innerHTML;
-    html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${printTitle}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              max-width: 800px;
-              margin: 0 auto;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #000;
-              padding-bottom: 15px;
-              margin-bottom: 20px;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 24px;
-            }
-            .header p {
-              margin: 5px 0;
-              color: #555;
-            }
-            .receipt-info {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 20px;
-            }
-            .receipt-info div {
-              text-align: left;
-            }
-            .receipt-info .right {
-              text-align: right;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 20px;
-            }
-            th, td {
-              border: 1px solid #ddd;
-              padding: 10px;
-              text-align: left;
-            }
-            th {
-              background-color: #f5f5f5;
-            }
-            .totals {
-              margin-top: 20px;
-              text-align: right;
-            }
-            .totals p {
-              margin: 5px 0;
-              font-size: 16px;
-            }
-            .totals .total {
-              font-size: 18px;
-              font-weight: bold;
-            }
-            .bilingual {
-              display: block;
-            }
-            .hindi {
-              font-size: 0.9em;
-              color: #666;
-            }
-            .disclaimer {
-              margin-top: 30px;
-              padding: 10px;
-              border: 1px dashed #999;
-              text-align: center;
-              font-size: 12px;
-              color: #666;
-            }
-            @media print {
-              body { padding: 0; }
-              button { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-      </html>
-    `;
+      const printContent = printRef.current.innerHTML;
+      html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${printTitle}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                max-width: 800px;
+                margin: 0 auto;
+              }
+              .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
+              .header h1 { margin: 0; font-size: 24px; }
+              .header p { margin: 5px 0; color: #555; }
+              .receipt-info { display: flex; justify-content: space-between; margin-bottom: 20px; line-height: 1.4; }
+              .receipt-info > div { text-align: left; }
+              .receipt-info .right { text-align: right; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+              th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; }
+              th:last-child, td:last-child { text-align: right; }
+              th { background-color: #f5f5f5; }
+              .grand-total { font-size: 20px; font-weight: bold; text-align: right; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
+              .hindi { font-size: 0.9em; color: #666; }
+              @media print { body { padding: 0; } button { display: none; } }
+            </style>
+          </head>
+          <body>${printContent}</body>
+        </html>
+      `;
     }
     printHtmlDocument(html);
   };
@@ -231,41 +198,60 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
 
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+  const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
+
+  // Total Value: overall transaction revenue when set, otherwise the sum of
+  // per-lot revenues (mirrors the register's revenue display convention).
+  const lotRevenueSum = transaction?.items.reduce((sum, item) => sum + parseFloat(item.revenue || "0"), 0) || 0;
+  const storedRevenue = parseFloat(transaction?.revenue || "0");
+  const totalValue = storedRevenue > 0 ? storedRevenue : lotRevenueSum;
+
+  const txnCropForView = transaction?.crop || cropType || "potato";
+  const distinctCropsView = transaction && transaction.items.length > 0
+    ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCropForView)))
+    : [txnCropForView];
+  const hasMultipleCrops = distinctCropsView.length > 1;
+  const cropHeaderLabel = distinctCropsView.map(cropToLabel).join(", ");
+
   const buildCustomHtml = () => {
-    if (!merchant?.salesReceiptHtmlTemplate || !transaction) return null;
-    let html = merchant.salesReceiptHtmlTemplate;
+    if (!transaction || !merchant) return null;
+    // Priority 1: custom per-merchant Bikri/sales HTML template
+    // Priority 2: header image → return null so JSX layout handles it
+    // Priority 3: built-in default Bikri template
+    let html: string;
+    let minRows: number;
+    if (merchant?.salesReceiptHtmlTemplate) {
+      html = merchant.salesReceiptHtmlTemplate;
+      minRows = 18;
+    } else if (merchant?.receiptHeaderImage) {
+      return null;
+    } else {
+      html = defaultBikriTemplate;
+      // Dynamic row count: A4 content height (~1047px) minus fixed elements.
+      // Fixed px: header 91 + buyer-table 107 + items-thead 28 + items-tfoot 28
+      //   + charges block (2 rows ≈ 52) + words-row 28 + signature 17 + buffer 41 = 392px.
+      const _availPx = 1047 - 392;
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24));
+    }
     const txnCrop = transaction.crop || cropType || "potato";
-    const cropLabel = txnCrop === "potato" ? "Potato / आलू" : txnCrop === "onion" ? "Onion / प्याज" : "Garlic / लहसुन";
+    const distinctCrops = transaction.items.length > 0
+      ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCrop)))
+      : [txnCrop];
+    const cropLabel = distinctCrops.map(cropToLabel).join(", ");
     const dateStr = resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
-    const numCols = 4;
-    const minRows = 12;
-    const itemsRows = transaction.items.map((item, idx) =>
-      `<tr><td>${idx + 1}</td><td>${escHtml(item.potatoType || "")}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td></tr>`
-    ).join("");
+    const numCols = 5;
+    const itemsDataRows = transaction.items.map((item) => {
+      const rev = parseFloat(item.revenue || "0");
+      return `<tr><td>${escHtml(cropToLabel(item.crop || txnCrop))}${item.potatoType ? ` (${escHtml(item.potatoType)})` : ""}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td style="text-align:right">${rev > 0 ? fmtInr(rev) : "&nbsp;"}</td></tr>`;
+    }).join("");
     const blankCount = Math.max(0, minRows - transaction.items.length);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
-    const itemRowsHtml = itemsRows + blankRows;
-    const itemsTableHtml = `<table><thead><tr><th>S.No</th><th>Variety</th><th>Bags</th><th>Weight (Kg)</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr><td colspan="2">Total</td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td></tr></tfoot></table>`;
-    const drvAdv = parseFloat(transaction.advancePayment || "0");
-    const totalWeight = parseFloat(transaction.totalNetWeight || "0");
+    const itemRowsHtml = itemsDataRows + blankRows;
+    const fmtFinal = (v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`;
+    const itemsTableHtml = `<table><thead><tr><th>Item Name</th><th>Marka</th><th>Quantity</th><th>Weight</th><th style="text-align:right">Value</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr style="font-weight:bold;border-top:1px solid #000"><td>Total</td><td></td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td style="text-align:right">${fmtFinal(totalValue)}</td></tr></tfoot></table>`;
 
-    const fmtInr = (v: number) => `₹${parseFloat(v.toFixed(1)).toLocaleString("en-IN")}`;
-
-    const chargesList: [string, number][] = [
-      ["Driver Advance", drvAdv],
-    ];
-    const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
-    let chargesRowsHtml: string;
-    if (nonZeroCharges.length > 0) {
-      chargesRowsHtml = nonZeroCharges
-        .map(([name, v], i) => {
-          const labelCell = i === 0 ? `<td style="font-weight:bold;vertical-align:top" rowspan="${nonZeroCharges.length + 1}">SALES BILL</td>` : "";
-          return `<tr>${labelCell}<td>${name}</td><td style="text-align:right">${fmtInr(v)}</td></tr>`;
-        })
-        .join("");
-    } else {
-      chargesRowsHtml = `<tr><td style="font-weight:bold;vertical-align:top" rowspan="2">SALES BILL</td><td>&nbsp;</td><td>&nbsp;</td></tr>`;
-    }
+    // No deductions/additions on the Bikri bill: Net Amount === Total Value.
+    const chargesRowsHtml = `<tr><td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div></td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
 
     const replacements: Record<string, string> = {
       "{{merchantName}}": escHtml(merchant.name || ""),
@@ -273,8 +259,11 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       "{{merchantContact}}": escHtml(merchant.contactNumber || ""),
       "{{receiptNumber}}": String(transaction.transactionNumber),
       "{{date}}": dateStr,
-      "{{buyerName}}": escHtml(transaction.partyName || ""),
-      "{{buyerAddress}}": escHtml(transaction.partyAddress || ""),
+      "{{buyerName}}": escHtml(transaction.partyName || buyer?.name || ""),
+      "{{buyerContact}}": buyer?.contact && buyer.contact.trim()
+        ? `<div style="margin-top:auto;font-weight:normal;font-size:13px">Mobile: ${escHtml(buyer.contact)}</div>`
+        : "",
+      "{{buyerAddress}}": escHtml(buyer?.address || transaction.partyAddress || ""),
       "{{driverContact}}": escHtml(transaction.driverContact || ""),
       "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),
       "{{cropName}}": cropLabel,
@@ -282,9 +271,12 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       "{{itemRowsHtml}}": itemRowsHtml,
       "{{chargesRowsHtml}}": chargesRowsHtml,
       "{{totalBags}}": String(transaction.totalBags),
-      "{{totalWeight}}": totalWeight.toFixed(1),
-      "{{driverAdvance}}": fmtInr(drvAdv),
-      "{{amountInWords}}": numberToIndianWords(drvAdv),
+      "{{totalWeight}}": parseFloat(transaction.totalNetWeight || "0").toFixed(1),
+      "{{totalAmount}}": `₹${Math.round(totalValue).toLocaleString("en-IN")}`,
+      "{{driverAdvance}}": fmtInr(parseFloat(transaction.advancePayment || "0")),
+      "{{grandTotal}}": `₹${Math.round(totalValue).toLocaleString("en-IN")}`,
+      "{{grandTotalRaw}}": totalValue.toFixed(1),
+      "{{amountInWords}}": numberToIndianWords(Math.round(totalValue)),
     };
     for (const [key, val] of Object.entries(replacements)) {
       html = html.split(key).join(val);
@@ -310,7 +302,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
         ) : (
           <DialogHeader>
             <div className="flex items-center justify-between pr-8">
-              <DialogTitle>Sales Receipt</DialogTitle>
+              <DialogTitle>{t("Bikri Receipt", "बिक्री रसीद")}</DialogTitle>
               <div className="flex gap-2">
                 <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-receipt">
                   {sharing ? (
@@ -318,16 +310,16 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
                   ) : (
                     <Share2 className="h-4 w-4 mr-2" />
                   )}
-                  {sharing ? "..." : "Share"}
+                  {sharing ? "..." : t("Share", "साझा करें")}
                 </Button>
                 <Button onClick={handlePrint} size="sm" data-testid="button-print">
                   <Printer className="h-4 w-4 mr-2" />
-                  Print
+                  {t("Print", "प्रिंट करें")}
                 </Button>
               </div>
             </div>
             <DialogDescription>
-              Preview and print the sales receipt
+              {t("Preview and print the Bikri receipt", "बिक्री रसीद देखें और प्रिंट करें")}
             </DialogDescription>
           </DialogHeader>
         )}
@@ -345,83 +337,92 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
           ) : (
           <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
             <div className="header text-center border-b-2 border-black pb-4">
-              {merchant.receiptHeaderImage ? (
-                <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
-              ) : (
-                <>
-                  <h1 className="text-2xl font-bold">{merchant.name}</h1>
-                  {merchant.address && <p className="text-sm text-gray-600 mt-1">{merchant.address}</p>}
-                  {merchant.contactNumber && (
-                    <p className="text-sm text-gray-600">
-                      Phone / फোन: {merchant.contactNumber}
-                    </p>
-                  )}
-                </>
-              )}
+              <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
             </div>
 
             <div className="text-center">
               <h2 className="text-xl font-semibold">
-                Sales Receipt / बिक्री रसीद
+                Bikri Receipt / बिक्री रसीद
               </h2>
             </div>
 
-            <div className="receipt-info flex justify-between text-sm">
+            <div className="receipt-info flex justify-between text-sm" style={{ lineHeight: "1.4" }}>
               <div>
-                <p><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</p>
-                <p><strong>Date / तारीख:</strong> {resolveTxnDate(transaction).toLocaleDateString("en-IN", {
+                <div><strong>Bill No / बिल नं:</strong> #{transaction.transactionNumber}</div>
+                <div><strong>Date / तारीख:</strong> {resolveTxnDate(transaction).toLocaleDateString("en-IN", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
-                })}</p>
+                })}</div>
                 {transaction.vehicleNumber && (
-                  <p><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</p>
+                  <div><strong>Motor No / वाहन नं:</strong> {transaction.vehicleNumber}</div>
                 )}
-                <p><strong>Crop / फसल:</strong> {(transaction.crop || cropType) === "potato" ? "Potato / आलू" : (transaction.crop || cropType) === "onion" ? "Onion / प्याज" : "Garlic / लहसुन"}</p>
+                <div><strong>Crop / फसल:</strong> {cropHeaderLabel}</div>
               </div>
               <div className="text-right right">
-                {transaction.partyName && (
-                  <p><strong>Sent to / भेजा गया:</strong> {transaction.partyName}</p>
+                {(transaction.partyName || buyer?.name) && (
+                  <div><strong>Buyer / खरीदार:</strong> {transaction.partyName || buyer?.name}</div>
                 )}
-                {transaction.partyAddress && (
-                  <p className="text-sm text-gray-600">{transaction.partyAddress}</p>
+                {(buyer?.address || transaction.partyAddress) && (
+                  <div className="text-gray-600">{buyer?.address || transaction.partyAddress}</div>
                 )}
-                <p><strong>Driver Advance:</strong> ₹{parseFloat(parseFloat(transaction.advancePayment || "0").toFixed(1)).toLocaleString('en-IN')}</p>
               </div>
             </div>
 
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border p-2 text-left">S.No / क्र.सं.</th>
-                  <th className="border p-2 text-left">Variety / किस्म</th>
-                  <th className="border p-2 text-right">Bags / बोरी</th>
-                  <th className="border p-2 text-right">Weight (Kg) / वजन (किग्रा)</th>
+                  <th className="border px-2 py-1 text-center">Item Name / वस्तु</th>
+                  <th className="border px-2 py-1 text-center">Marka / मार्का</th>
+                  <th className="border px-2 py-1 text-center">Quantity / बोरी</th>
+                  <th className="border px-2 py-1 text-center">Weight (Kg) / वजन</th>
+                  <th className="border px-2 py-1 text-right">Value / राशि</th>
                 </tr>
               </thead>
               <tbody>
-                {transaction.items.map((item, idx) => (
-                  <tr key={item.id}>
-                    <td className="border p-2">{idx + 1}</td>
-                    <td className="border p-2">{item.potatoType || ""}</td>
-                    <td className="border p-2 text-right">{item.bagsMoved}</td>
-                    <td className="border p-2 text-right">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
-                  </tr>
-                ))}
+                {transaction.items.map((item) => {
+                  const rev = parseFloat(item.revenue || "0");
+                  return (
+                    <tr key={item.id}>
+                      <td className="border px-2 py-1 text-center">{hasMultipleCrops ? `${cropToLabel(item.crop || txnCropForView)}${item.potatoType ? ` (${item.potatoType})` : ""}` : (item.potatoType || cropToLabel(item.crop || txnCropForView))}</td>
+                      <td className="border px-2 py-1 text-center">{item.marka || ""}</td>
+                      <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
+                      <td className="border px-2 py-1 text-center">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
+                      <td className="border px-2 py-1 text-right">{rev > 0 ? `₹${parseFloat(rev.toFixed(1)).toLocaleString('en-IN')}` : ""}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="bg-gray-50 font-semibold">
-                  <td className="border p-2" colSpan={2}>Total / कुल</td>
-                  <td className="border p-2 text-right">{transaction.totalBags}</td>
-                  <td className="border p-2 text-right">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
+                  <td className="border px-2 py-1 text-center" colSpan={2}>Total / कुल</td>
+                  <td className="border px-2 py-1 text-center">{transaction.totalBags}</td>
+                  <td className="border px-2 py-1 text-center">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
+                  <td className="border px-2 py-1 text-right">₹{Math.round(totalValue).toLocaleString('en-IN')}</td>
                 </tr>
               </tfoot>
             </table>
 
+            <div className="text-sm">
+              <div className="grand-total flex justify-between items-center border-t-2 border-black pt-2 mt-2 font-bold text-base">
+                <span>Net Amount / शुद्ध राशि</span>
+                <span>₹{Math.round(totalValue).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="mt-2">
+                <strong>In Words:</strong> {numberToIndianWords(Math.round(totalValue))}
+              </div>
+              <div className="mt-3 text-xs text-gray-600">
+                <div className="font-bold text-black">SALES BILL</div>
+                <div>1. E.&amp; O.E.</div>
+                <div>2. Subject to INDORE Jurisdiction.</div>
+                <div>3. Sunday Closed.</div>
+              </div>
+            </div>
+
             <div className="border-t pt-6 mt-6 flex justify-end">
-              <div className="text-center" style={{ minWidth: "150px" }}>
+              <div className="text-center" style={{ minWidth: "180px" }}>
                 <div className="border-b border-gray-400 mb-1" style={{ height: "40px" }}></div>
-                <p className="text-sm text-gray-600">Signature / हस्ताक्षर</p>
+                <p className="text-sm font-semibold">For {merchant.name}</p>
               </div>
             </div>
           </div>

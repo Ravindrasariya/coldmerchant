@@ -96,6 +96,9 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
 
   const isLoading = txnLoading || merchantLoading;
 
+  const isBikri = !!transaction && transaction.transactionType !== "loading";
+  const challanTitle = isBikri ? t("Bikri Challan", "बिक्री चालान") : t("Loading Challan", "लोडिंग चालान");
+
   const challanFilename = () => {
     const buyerName = (transaction?.partyName || buyer?.name || "Challan").replace(/[^a-zA-Z0-9\s]/g, "").replace(/\s+/g, "_");
     const dateStr = transaction ? resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }).replace(/\//g, "-") : "";
@@ -169,7 +172,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
       <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <div className="flex items-center justify-between pr-8">
-            <DialogTitle>{t("Loading Challan", "लोडिंग चालान")}</DialogTitle>
+            <DialogTitle>{challanTitle}</DialogTitle>
             <div className="flex gap-2">
               <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-loading-challan">
                 {sharing ? (
@@ -186,7 +189,9 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
             </div>
           </div>
           <DialogDescription>
-            {t("Preview and print the loading challan", "लोडिंग चालान देखें और प्रिंट करें")}
+            {isBikri
+              ? t("Preview and print the Bikri challan", "बिक्री चालान देखें और प्रिंट करें")
+              : t("Preview and print the loading challan", "लोडिंग चालान देखें और प्रिंट करें")}
           </DialogDescription>
         </DialogHeader>
 
@@ -210,7 +215,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
             </div>
 
             <div style={{ textAlign: "center", marginBottom: 10 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{t("Loading Challan", "लोडिंग चालान")}</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{challanTitle}</h2>
             </div>
 
             <div style={{ fontWeight: "bold", fontSize: 13, marginBottom: 6 }}>

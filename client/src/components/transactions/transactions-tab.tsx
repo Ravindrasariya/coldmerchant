@@ -169,6 +169,7 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
   const [printLoadingTransactionId, setPrintLoadingTransactionId] = useState<number | null>(null);
   const [printChallanTransactionId, setPrintChallanTransactionId] = useState<number | null>(null);
   const [printTypeChooserId, setPrintTypeChooserId] = useState<number | null>(null);
+  const [printTypeChooserIsLoading, setPrintTypeChooserIsLoading] = useState(false);
   
   const [txnCropFilter, setTxnCropFilterState] = useState<CropValue | "all">(() => {
     const saved = localStorage.getItem("vyapar_txn_crop_filter");
@@ -794,11 +795,8 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               group={group}
               onEdit={(id) => setEditTransactionId(id)}
               onPrint={(txn) => {
-                if (txn.transactionType === "loading") {
-                  setPrintTypeChooserId(txn.id);
-                } else {
-                  setPrintTransactionId(txn.id);
-                }
+                setPrintTypeChooserIsLoading(txn.transactionType === "loading");
+                setPrintTypeChooserId(txn.id);
               }}
             />
           ))}
@@ -898,7 +896,11 @@ export function TransactionsTab({ selectedCrop = "potato", onCropChange }: Trans
               onClick={() => {
                 const id = printTypeChooserId;
                 setPrintTypeChooserId(null);
-                setPrintLoadingTransactionId(id);
+                if (printTypeChooserIsLoading) {
+                  setPrintLoadingTransactionId(id);
+                } else {
+                  setPrintTransactionId(id);
+                }
               }}
               data-testid="button-choose-receipt"
             >
