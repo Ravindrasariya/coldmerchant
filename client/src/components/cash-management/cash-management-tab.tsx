@@ -987,7 +987,7 @@ export function CashManagementTab() {
         isPyBalance: true,
         label: t("PY Balance (Previous Year)", "पीवाई शेष (पिछला वर्ष)"),
         dueAmount: buyerPendingData.pyBalance,
-        amount: 0,
+        amount: buyerPendingData.pyBalance,
         pettyAdjustment: 0,
       }]);
     }
@@ -1006,7 +1006,7 @@ export function CashManagementTab() {
           isPyBalance: true,
           label: t("PY Balance (Previous Year)", "पीवाई शेष (पिछला वर्ष)"),
           dueAmount: entry.dueAmount,
-          amount: 0,
+          amount: entry.dueAmount,
           pettyAdjustment: 0,
         }, ...prev]);
       }
@@ -1019,7 +1019,7 @@ export function CashManagementTab() {
           transactionId: entry.transactionId,
           label: `Tnx #${entry.transactionNumber} | ${entry.crop} | ${entry.dateOfLoading ? format(new Date(entry.dateOfLoading), "dd/MM/yy") : "?"} | ${entry.totalBags} bags | ${entry.daysSinceLoading ?? entry.daysSince}d`,
           dueAmount: entry.dueAmount,
-          amount: 0,
+          amount: entry.dueAmount,
           pettyAdjustment: 0,
         }]);
       }
@@ -1195,7 +1195,7 @@ export function CashManagementTab() {
           isPyPayable: true,
           label: t("PY Payable (Previous Year)", "पीवाई देय (पिछला वर्ष)"),
           dueAmount: entry.dueAmount,
-          amount: 0,
+          amount: entry.dueAmount,
           discountPercent: 0,
           discountAmount: 0,
           pettyAdjustment: 0,
@@ -1211,7 +1211,7 @@ export function CashManagementTab() {
           stockEntryId: entry.stockEntryId,
           label: `SR #${entry.serialNumber} | ${entry.crop} | ${format(new Date(entry.purchaseDate), "dd/MM/yy")} | ${entry.totalBags} bags | ${daysSince}d`,
           dueAmount: entry.dueAmount,
-          amount: 0,
+          amount: entry.dueAmount,
           discountPercent: 0,
           discountAmount: 0,
           pettyAdjustment: 0,
@@ -1228,7 +1228,9 @@ export function CashManagementTab() {
         row.amount = value;
       } else if (field === 'discountPercent') {
         row.discountPercent = value;
-        row.discountAmount = Math.round((value / 100) * row.dueAmount * 100) / 100;
+        // Discount is rounded to whole rupees; the rounded figure feeds
+        // Total Settled and all downstream totals/saving.
+        row.discountAmount = Math.round((value / 100) * row.dueAmount);
       } else if (field === 'pettyAdjustment') {
         row.pettyAdjustment = value;
       }
