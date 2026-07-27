@@ -1251,6 +1251,20 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           </CardContent>
         </Card>
 
+        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi-summary">
+          <CardContent className="p-2.5">
+            <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
+            <div className="text-xs mt-1">
+              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
+              <span className="font-medium" data-testid="text-mandi-total">₹{summaryTotals.mandiTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
+              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-mandi-due">₹{summaryTotals.mandiDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-summary">
           <CardContent className="p-2.5">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer", "किसान")}</div>
@@ -1275,20 +1289,6 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
             <div className="text-xs">
               <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
               <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-cold-due">₹{summaryTotals.coldStoreDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi-summary">
-          <CardContent className="p-2.5">
-            <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
-            <div className="text-xs mt-1">
-              <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
-              <span className="font-medium" data-testid="text-mandi-total">₹{summaryTotals.mandiTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground">{t("Due", "बाकी")}: </span>
-              <span className="font-bold text-red-600 dark:text-red-400" data-testid="text-mandi-due">₹{summaryTotals.mandiDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
             </div>
           </CardContent>
         </Card>
