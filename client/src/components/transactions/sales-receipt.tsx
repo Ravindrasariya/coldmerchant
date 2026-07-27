@@ -231,7 +231,9 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       // Fixed px: header 91 + buyer-table 107 + items-thead 28 + items-tfoot 28
       //   + charges block (2 rows ≈ 52) + words-row 28 + signature 17 + buffer 41 = 392px.
       const _availPx = 1047 - 392;
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24));
+      // Subtract 3 rows so the bill keeps ~3 rows of breathing space at the
+      // bottom and never spills the footer blocks onto a second page.
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - 3);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
