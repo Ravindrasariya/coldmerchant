@@ -174,6 +174,23 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
   
   const sellableBreakdowns = lot.bagBreakdowns.filter(bd => bd.size !== "Wastage");
   const wastageBreakdowns = lot.bagBreakdowns.filter(bd => bd.size === "Wastage");
+
+  // Lot net weight exactly as shown in the stock table: per-breakdown
+  // computeNetWeight over sellable breakdowns; fallback to lot-level totals
+  // when breakdowns carry no weight data.
+  let netWeight = sellableBreakdowns.reduce((sum, bd) => {
+    const w = bd.weight ? parseFloat(bd.weight) : 0;
+    return sum + computeNetWeight(w, bd.numberOfBags, lot.place);
+  }, 0);
+  if (netWeight <= 0) {
+    const lotTotalWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+    netWeight = computeNetWeight(lotTotalWeight, lot.originalBags, lot.place);
+  }
+  // Remaining weight is proportional to remaining sellable bags (sold weight
+  // is not tracked per sale).
+  const netWeightRemaining = actualSellableBags > 0
+    ? netWeight * (remainingToSell / actualSellableBags)
+    : 0;
   
   // Calculate cold store charges from Cold Charges/Ware House Charges in charges array only
   const coldStoreTypes = ["Cold Charges", "Ware House Charges"];
@@ -216,6 +233,8 @@ function computeLotMetrics(lot: StockEntryWithLots['lots'][0]) {
     remainingToSell,
     soldBags,
     totalWeight,
+    netWeight,
+    netWeightRemaining,
     totalAmount,
     pricePerKg: lot.pricePerKg ? parseFloat(lot.pricePerKg) : null,
     coldStoreTotalCharges,
@@ -528,6 +547,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
   const summaryTotals = useMemo(() => {
     let bagsTotal = 0;
     let bagsRemaining = 0;
+    let netWeightTotal = 0;
+    let netWeightRemaining = 0;
     let farmerTotal = 0;
     let farmerDue = 0;
     let coldStoreTotal = 0;
@@ -551,6 +572,8 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         const metrics = getLotMetrics(lot);
         bagsTotal += metrics.actualSellableBags;
         bagsRemaining += metrics.remainingToSell;
+        netWeightTotal += metrics.netWeight;
+        netWeightRemaining += metrics.netWeightRemaining;
         buyerExtraTotal += metrics.extraBuyerCharges;
 
         const storedNetPayable = lot.netPayable ? parseFloat(lot.netPayable) : 0;
@@ -607,7 +630,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       }
     });
 
-    return { bagsTotal, bagsRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions, mandiTotal, mandiDue, buyerExtraTotal };
+    return { bagsTotal, bagsRemaining, netWeightTotal, netWeightRemaining, farmerTotal, farmerDue, coldStoreTotal, coldStoreDue, totalPayable, totalDeductions, mandiTotal, mandiDue, buyerExtraTotal };
   }, [filteredEntries, lotMetricsMap]);
 
   const handleDownloadCSV = () => {
@@ -1191,13 +1214,27 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
         <Card className="border-blue-300 dark:border-blue-700" data-testid="card-bags-summary">
           <CardContent className="p-3">
-            <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
-            <div className="text-sm font-bold mt-1" data-testid="text-bags-total">
-              {summaryTotals.bagsTotal.toLocaleString()} {t("bags", "बैग")}
-            </div>
-            <div className="text-xs">
-              <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
-              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</span>
+            <div className="flex justify-between gap-2 flex-wrap">
+              <div>
+                <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
+                <div className="text-sm font-bold mt-1" data-testid="text-bags-total">
+                  {summaryTotals.bagsTotal.toLocaleString()} {t("bags", "बैग")}
+                </div>
+                <div className="text-xs">
+                  <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground font-medium">{t("Net Wt", "शुद्ध वजन")}</div>
+                <div className="text-sm font-bold mt-1" data-testid="text-netweight-total">
+                  {Math.round(summaryTotals.netWeightTotal).toLocaleString()} {t("kg", "किग्रा")}
+                </div>
+                <div className="text-xs">
+                  <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-netweight-remaining">{Math.round(summaryTotals.netWeightRemaining).toLocaleString()}</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
