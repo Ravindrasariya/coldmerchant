@@ -1211,36 +1211,34 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-1.5">
         <Card className="border-blue-300 dark:border-blue-700" data-testid="card-bags-summary">
-          <CardContent className="p-3">
-            <div className="flex justify-between gap-2 flex-wrap">
-              <div>
-                <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
-                <div className="text-sm font-bold mt-1" data-testid="text-bags-total">
-                  {summaryTotals.bagsTotal.toLocaleString()} {t("bags", "बैग")}
-                </div>
-                <div className="text-xs">
-                  <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
-                  <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground font-medium">{t("Net Wt", "शुद्ध वजन")}</div>
-                <div className="text-sm font-bold mt-1" data-testid="text-netweight-total">
-                  {Math.round(summaryTotals.netWeightTotal).toLocaleString()} {t("kg", "किग्रा")}
-                </div>
-                <div className="text-xs">
-                  <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
-                  <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-netweight-remaining">{Math.round(summaryTotals.netWeightRemaining).toLocaleString()}</span>
-                </div>
-              </div>
+          <CardContent className="p-2.5">
+            <div className="text-xs text-muted-foreground font-medium">{t("Bags", "बैग")}</div>
+            <div className="text-sm font-bold mt-1" data-testid="text-bags-total">
+              {summaryTotals.bagsTotal.toLocaleString()} {t("bags", "बैग")}
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
+              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-bags-remaining">{summaryTotals.bagsRemaining.toLocaleString()}</span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-300 dark:border-blue-700" data-testid="card-netweight-summary">
+          <CardContent className="p-2.5">
+            <div className="text-xs text-muted-foreground font-medium">{t("Net Wt", "शुद्ध वजन")}</div>
+            <div className="text-sm font-bold mt-1" data-testid="text-netweight-total">
+              {Math.round(summaryTotals.netWeightTotal).toLocaleString()} {t("kg", "किग्रा")}
+            </div>
+            <div className="text-xs">
+              <span className="text-muted-foreground">{t("Remaining", "बचे")}: </span>
+              <span className="font-bold text-amber-600 dark:text-amber-400" data-testid="text-netweight-remaining">{Math.round(summaryTotals.netWeightRemaining).toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-orange-300 dark:border-orange-700" data-testid="card-cost-summary">
-          <CardContent className="p-3">
+          <CardContent className="p-2.5">
             <div className="text-xs text-muted-foreground font-medium">{t("Total Cost", "कुल लागत")}</div>
             <div className="text-xs mt-1">
               <span className="text-muted-foreground">{t("Payable", "देय")}: </span>
@@ -1254,7 +1252,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         </Card>
 
         <Card className="border-green-300 dark:border-green-700" data-testid="card-farmer-summary">
-          <CardContent className="p-3">
+          <CardContent className="p-2.5">
             <div className="text-xs text-muted-foreground font-medium">{t("Farmer", "किसान")}</div>
             <div className="text-xs mt-1">
               <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
@@ -1268,7 +1266,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         </Card>
 
         <Card className="border-purple-300 dark:border-purple-700" data-testid="card-cold-store-summary">
-          <CardContent className="p-3">
+          <CardContent className="p-2.5">
             <div className="text-xs text-muted-foreground font-medium">{t("Cold Store", "कोल्ड स्टोर")}</div>
             <div className="text-xs mt-1">
               <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
@@ -1282,7 +1280,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         </Card>
 
         <Card className="border-amber-300 dark:border-amber-700" data-testid="card-mandi-summary">
-          <CardContent className="p-3">
+          <CardContent className="p-2.5">
             <div className="text-xs text-muted-foreground font-medium">{t("Mandi", "मंडी")}</div>
             <div className="text-xs mt-1">
               <span className="text-muted-foreground">{t("Total", "कुल")}: </span>
@@ -1296,7 +1294,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         </Card>
 
         <Card className="border-pink-300 dark:border-pink-700" data-testid="card-buyer-extra-summary">
-          <CardContent className="p-3">
+          <CardContent className="p-2.5">
             <div className="text-xs text-muted-foreground font-medium">{t("Buyer Extra", "खरीदार अतिरिक्त")}</div>
             <div className="text-sm font-bold mt-1 text-pink-600 dark:text-pink-400" data-testid="text-buyer-extra-total">
               ₹{summaryTotals.buyerExtraTotal.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
