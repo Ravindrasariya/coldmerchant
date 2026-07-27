@@ -2861,7 +2861,7 @@ export function CashManagementTab() {
                                       </div>
                                     </CommandItem>
                                   )}
-                                  {buyerPendingData.pendingEntries.map((entry) => {
+                                  {[...buyerPendingData.pendingEntries].sort((a, b) => a.transactionNumber - b.transactionNumber).map((entry) => {
                                     const isSelected = buyerAllocations.some(a => a.transactionId === entry.transactionId);
                                     return (
                                       <CommandItem
@@ -3540,7 +3540,7 @@ export function CashManagementTab() {
                                       </div>
                                     </CommandItem>
                                   )}
-                                  {aadhatPendingData.pendingEntries.map((entry) => {
+                                  {[...aadhatPendingData.pendingEntries].sort((a, b) => a.serialNumber - b.serialNumber).map((entry) => {
                                     const daysSince = Math.floor((Date.now() - new Date(entry.purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
                                     const isSelected = aadhatAllocations.some(a => a.stockEntryId === entry.stockEntryId);
                                     return (
