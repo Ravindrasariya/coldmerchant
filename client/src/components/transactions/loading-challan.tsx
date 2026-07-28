@@ -273,7 +273,9 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
 
             {/* One-liner between transport/info block and item details */}
             <div style={{ fontSize: 13, margin: "12px 0 6px", fontStyle: "italic" }}>
-              {t("Item Details (given below) being sent to you — On Order", "नीचे दिए गए माल का विवरण आपको भेजा जा रहा है — ऑर्डर पर")}
+              {isBikri
+                ? t("Item Details (given below) being sent to you — For Bikri", "नीचे दिए गए माल का विवरण आपको भेजा जा रहा है — बिक्री के लिए")
+                : t("Item Details (given below) being sent to you — On Order", "नीचे दिए गए माल का विवरण आपको भेजा जा रहा है — ऑर्डर पर")}
             </div>
 
             {/* Items table — Item Name, No. of Bags, Marka (no weight/rate/amount) */}
