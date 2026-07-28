@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { printHtmlDocument } from "@/lib/print-receipt";
+import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -2171,7 +2171,13 @@ ${headerHtml}
 </table>
 </body>
 </html>`;
-    printHtmlDocument(html);
+    try {
+      await shareReceiptAsPdf(document.createElement("div"), `Cash_Flow_History_${format(new Date(), "dd-MM-yyyy")}`, html);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        toast({ title: t("PDF generation failed", "PDF बनाने में विफल"), description: t("Please try again", "कृपया पुनः प्रयास करें"), variant: "destructive" });
+      }
+    }
   };
 
   return (
