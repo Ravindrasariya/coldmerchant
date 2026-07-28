@@ -2135,6 +2135,7 @@ export function CashManagementTab() {
 </style>
 </head>
 <body>
+<div style="padding:32px">
 ${headerHtml}
 <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
   <div>
@@ -2169,6 +2170,7 @@ ${headerHtml}
     </tr>
   </tbody>
 </table>
+</div>
 </body>
 </html>`;
     try {
