@@ -5453,13 +5453,34 @@ export async function registerRoutes(
         sourceId: number;
       }
 
+      // Lookup map: transaction.id → transactionNumber (for payment allocation labels)
+      const txnById = new Map<number, { transactionNumber: number }>();
+      for (const txn of allTransactions) {
+        txnById.set(txn.id, { transactionNumber: txn.transactionNumber });
+      }
+
       const buildBuyerEntry = (txn: typeof buyerTxns[number]): LedgerEntry | null => {
         const revenue = parseFloat(txn.revenue || "0");
         if (revenue <= 0) return null;
+        // Build rich particulars: Tnx# N - Crop Lot1: XB, Crop Lot2: YB
+        const items = (txn as Record<string, unknown>).items as Array<Record<string, unknown>> | undefined;
+        let particulars: string;
+        if (items && items.length > 0) {
+          const lotParts = items.map((item, idx) => {
+            const crop = item.crop as string | undefined;
+            const potatoType = item.potatoType as string | undefined;
+            const bagsMoved = (item.bagsMoved as number) ?? 0;
+            const cropLabel = potatoType || (crop === "onion" ? "Onion" : crop === "garlic" ? "Garlic" : "Potato");
+            return `${cropLabel} Lot${idx + 1}: ${bagsMoved}B`;
+          });
+          particulars = `Tnx# ${txn.transactionNumber} - ${lotParts.join(", ")}`;
+        } else {
+          particulars = `Tnx# ${txn.transactionNumber} - Harvest Sale`;
+        }
         return {
           date: txn.dateOfLoading || "",
           tnxCode: `Tnx #${txn.transactionNumber}`,
-          particulars: "Harvest Sale",
+          particulars,
           dr: revenue,
           cr: 0,
           sourceType: "transaction",
@@ -5470,19 +5491,36 @@ export async function registerRoutes(
       const buildBuyerPayment = (entry: typeof buyerCashEntries[number]): LedgerEntry | null => {
         let totalApplied = 0;
         let totalPetty = 0;
+        let totalCashApplied = 0;
+        const allocationParts: string[] = [];
         if (entry.buyerAllocations && Array.isArray(entry.buyerAllocations)) {
           for (const alloc of entry.buyerAllocations) {
-            totalApplied += parseFloat(alloc.appliedAmount || "0");
+            const applied = parseFloat(alloc.appliedAmount || "0");
+            totalApplied += applied;
             totalPetty += parseFloat(alloc.pettyAdjustment || "0");
+            totalCashApplied += applied;
+            const amtStr = `₹${Math.round(applied).toLocaleString("en-IN")}`;
+            if (alloc.isPyBalance) {
+              allocationParts.push(`PY ${amtStr}`);
+            } else {
+              const txnLookup = alloc.transactionId ? txnById.get(alloc.transactionId) : null;
+              const tnxNum = txnLookup?.transactionNumber ?? alloc.transactionId ?? "?";
+              allocationParts.push(`Tnx# ${tnxNum} ${amtStr}`);
+            }
           }
         }
         const totalCr = totalApplied + totalPetty;
         if (totalCr <= 0) return null;
-        const hasPy = entry.buyerAllocations?.some((a: { isPyBalance?: boolean }) => a.isPyBalance);
+        const modeRaw = entry.paymentMode || "cash";
+        const modeLabel = modeRaw === "account_transfer" ? "Account" : modeRaw === "cheque" ? "Cheque" : "Cash";
+        const totalStr = `₹${Math.round(totalCashApplied).toLocaleString("en-IN")}`;
+        const particulars = allocationParts.length > 0
+          ? `Payment (${modeLabel}) - ${allocationParts.join(", ")} - Total ${totalStr}`
+          : `Payment (${modeLabel})`;
         return {
           date: entry.entryDate || "",
           tnxCode: entry.transactionCode || "",
-          particulars: hasPy ? "Payment (incl. PY)" : "Payment (Cash)",
+          particulars,
           dr: 0,
           cr: totalCr,
           sourceType: "payment",

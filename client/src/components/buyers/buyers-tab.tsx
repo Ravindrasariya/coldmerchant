@@ -159,7 +159,6 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
       const headers = [
         { text: t("Sr", "क्र."), align: "center", width: "40px" },
         { text: t("Date", "तारीख"), align: "left" },
-        { text: t("Tnx #", "Tnx #"), align: "left" },
         { text: t("Particulars", "विवरण"), align: "left" },
         { text: t("Dr", "डेबिट"), align: "right" },
         { text: t("Cr", "क्रेडिट"), align: "right" },
@@ -182,7 +181,6 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
         const cellData: { text: string; align: string; bold?: boolean }[] = [
           { text: String(row.kramank), align: "center" },
           { text: formatDate(row.date), align: "left" },
-          { text: row.tnxCode || "—", align: "left" },
           { text: row.particulars, align: "left" },
           { text: row.dr > 0 ? `₹${row.dr.toLocaleString("en-IN")}` : "—", align: "right" },
           { text: row.cr > 0 ? `₹${row.cr.toLocaleString("en-IN")}` : "—", align: "right" },
@@ -262,7 +260,6 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
             <tr className="bg-muted/50">
               <th className="border px-2 py-1.5 text-center w-10">{t("Sr", "क्र.")}</th>
               <th className="border px-2 py-1.5 text-left w-24">{t("Date", "तारीख")}</th>
-              <th className="border px-2 py-1.5 text-left w-20">{t("Tnx #", "Tnx #")}</th>
               <th className="border px-2 py-1.5 text-left">{t("Particulars", "विवरण")}</th>
               <th className="border px-2 py-1.5 text-right w-24">{t("Dr", "डेबिट")}</th>
               <th className="border px-2 py-1.5 text-right w-24">{t("Cr", "क्रेडिट")}</th>
@@ -274,7 +271,6 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
               <tr key={i} className={row.isClosing ? "bg-amber-50/50 dark:bg-amber-950/20 font-semibold border-t-2" : i === 0 ? "bg-blue-50/50 dark:bg-blue-950/20 font-semibold" : row.cr > 0 ? "bg-green-50/30 dark:bg-green-950/10" : ""} data-testid={`ledger-row-${buyerId}-${i}`}>
                 <td className="border px-2 py-1.5 text-center text-muted-foreground">{row.isClosing ? "" : row.kramank}</td>
                 <td className="border px-2 py-1.5">{formatDate(row.date)}</td>
-                <td className="border px-2 py-1.5 font-mono">{row.tnxCode || "—"}</td>
                 <td className="border px-2 py-1.5">{row.particulars}</td>
                 <td className="border px-2 py-1.5 text-right">{row.isClosing ? "" : formatLedgerAmount(row.dr)}</td>
                 <td className="border px-2 py-1.5 text-right text-green-700 dark:text-green-400">{row.isClosing ? "" : formatLedgerAmount(row.cr)}</td>
@@ -293,7 +289,6 @@ function BuyerLedgerSection({ buyerId, buyerName, t, formatLedgerAmount, formatD
           >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-muted-foreground">{row.isClosing ? "" : `#${row.kramank} · `}{formatDate(row.date)}</span>
-              {row.tnxCode && <span className="font-mono text-muted-foreground">{row.tnxCode}</span>}
             </div>
             <div className="mb-1.5">{row.particulars}</div>
             <div className="flex items-center justify-between">
