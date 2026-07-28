@@ -5701,7 +5701,7 @@ export async function registerRoutes(
         const cropRaw = se.crop || "potato";
         const cropLabel = cropRaw === "onion" ? "Onion" : cropRaw === "garlic" ? "Garlic" : "Potato";
         const lotParts = entryLots.map(lot => {
-          const bags = (lot as Record<string, unknown>).bagsMoved ?? 0;
+          const bags = (lot as Record<string, unknown>).originalBags ?? 0;
           const pType = (lot as Record<string, unknown>).potatoType as string | null | undefined;
           return pType ? `${pType}: ${bags}B` : `${bags}B`;
         });
