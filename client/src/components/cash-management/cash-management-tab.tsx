@@ -1866,8 +1866,9 @@ export function CashManagementTab() {
   };
 
   const handleDownloadCSV = () => {
-    // Use filteredEntries if filters are applied, otherwise use all entries
-    const entriesToDownload = hasActiveFilters ? filteredEntries : entries;
+    // Use filteredEntries if filters are applied, otherwise use all entries.
+    // Reversed entries are excluded from the export.
+    const entriesToDownload = (hasActiveFilters ? filteredEntries : entries).filter(e => !e.isReversed);
 
     if (entriesToDownload.length === 0) {
       toast({
@@ -2013,7 +2014,8 @@ export function CashManagementTab() {
   };
 
   const handlePrintPDF = async () => {
-    const entriesToPrint = hasActiveFilters ? filteredEntries : entries;
+    // Reversed entries are excluded from the printed report.
+    const entriesToPrint = (hasActiveFilters ? filteredEntries : entries).filter(e => !e.isReversed);
 
     if (entriesToPrint.length === 0) {
       toast({
@@ -2063,18 +2065,14 @@ export function CashManagementTab() {
       const isOut = entry.direction === "outflow";
       const isIn = entry.direction === "inward";
       const isTransfer = entry.direction === "transfer";
-      const reversed = !!entry.isReversed;
-      if (!reversed) {
-        if (isOut || isTransfer) totalDr += amt;
-        if (isIn || isTransfer) totalCr += amt;
-      }
+      if (isOut || isTransfer) totalDr += amt;
+      if (isIn || isTransfer) totalCr += amt;
       const dr = (isOut || isTransfer) ? fmtAmt(amt) : "-";
       const cr = (isIn || isTransfer) ? fmtAmt(amt) : "-";
       const mode = isTransfer ? t("Transfer", "ट्रांसफर") : (entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "");
-      const remarks = `${entry.remarks ? esc(entry.remarks) : ""}${reversed ? `${entry.remarks ? " " : ""}(${t("Reversed", "उलट दिया गया")})` : ""}`;
-      const bg = idx % 2 === 0 ? "#fafafa" : "#f2f2f2";
-      const strike = reversed ? "text-decoration:line-through;color:#999;" : "";
-      return `<tr style="background:${bg};${strike}">
+      const remarks = entry.remarks ? esc(entry.remarks) : "";
+      const bg = idx % 2 === 0 ? "#fafafa" : "#f0f0f0";
+      return `<tr style="background:${bg}">
         <td>${format(new Date(entry.entryDate), "dd/MM/yyyy")}</td>
         <td>${esc(buildParty(entry))}</td>
         <td>${esc(mode)}</td>
@@ -2126,7 +2124,8 @@ export function CashManagementTab() {
 <head>
 <title>Cash Flow History ${generated}</title>
 <style>
-  body { font-family: Arial, sans-serif; padding: 16px; color: #111; }
+  body { font-family: Arial, sans-serif; padding: 16px; color: #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { background: #1e8a3c; color: #fff; text-align: left; padding: 7px 8px; }
   td { padding: 6px 8px; vertical-align: top; }
