@@ -5618,7 +5618,7 @@ export async function registerRoutes(
       const allLots = await storage.getAllLotsByMerchant(merchantId);
       const allCashEntries = await storage.getCashEntriesByMerchant(merchantId);
 
-      type StockEntryRecord = { id: number; aadhatDbId?: number | null; purchaseDate?: string | null; amountPaid?: string | null; uniqueId?: string | null; serialNumber?: number | null };
+      type StockEntryRecord = { id: number; aadhatDbId?: number | null; purchaseDate?: string | null; amountPaid?: string | null; uniqueId?: string | null; serialNumber?: number | null; crop?: string | null };
       type LotRecord = typeof allLots[number];
 
       const aadhatStockEntries = (allStockEntries as StockEntryRecord[]).filter(se => se.aadhatDbId === aadhatId);
@@ -5634,6 +5634,12 @@ export async function registerRoutes(
         const arr = lotsByEntryId.get(lot.stockEntryId) || [];
         arr.push(lot);
         lotsByEntryId.set(lot.stockEntryId, arr);
+      }
+
+      // Lookup map: stockEntry.id → serialNumber (for payment allocation labels)
+      const stockEntryById = new Map<number, StockEntryRecord>();
+      for (const se of allStockEntries as StockEntryRecord[]) {
+        stockEntryById.set(se.id, se);
       }
 
       interface LedgerEntry {
@@ -5653,10 +5659,20 @@ export async function registerRoutes(
           netPayable += parseFloat(lot.netPayable || "0");
         }
         if (netPayable <= 0) return null;
+        // Build rich particulars: SR#N - Crop - Jyoti: 50B | Pukhraj: 30B
+        const cropRaw = se.crop || "potato";
+        const cropLabel = cropRaw === "onion" ? "Onion" : cropRaw === "garlic" ? "Garlic" : "Potato";
+        const lotParts = entryLots.map(lot => {
+          const bags = (lot as Record<string, unknown>).bagsMoved ?? 0;
+          const pType = (lot as Record<string, unknown>).potatoType as string | null | undefined;
+          return pType ? `${pType}: ${bags}B` : `${bags}B`;
+        });
+        const lotsStr = lotParts.length > 0 ? ` - ${lotParts.join(" | ")}` : "";
+        const particulars = `SR#${se.serialNumber ?? ""} - ${cropLabel}${lotsStr}`;
         return {
           date: se.purchaseDate || "",
           tnxCode: se.uniqueId || `SE #${se.serialNumber}`,
-          particulars: "Harvest Purchase",
+          particulars,
           dr: 0,
           cr: netPayable,
           sourceType: "stock_entry",
@@ -5668,20 +5684,37 @@ export async function registerRoutes(
         let totalApplied = 0;
         let totalDiscount = 0;
         let totalPetty = 0;
+        let totalCashApplied = 0;
+        const allocationParts: string[] = [];
         if (entry.aadhatAllocations && Array.isArray(entry.aadhatAllocations)) {
           for (const alloc of entry.aadhatAllocations) {
-            totalApplied += parseFloat(alloc.appliedAmount || "0");
+            const applied = parseFloat(alloc.appliedAmount || "0");
+            totalApplied += applied;
             totalDiscount += parseFloat(alloc.discountAmount || "0");
             totalPetty += parseFloat(alloc.pettyAdjustment || "0");
+            totalCashApplied += applied;
+            const amtStr = `₹${Math.round(applied).toLocaleString("en-IN")}`;
+            if (alloc.isPyPayable) {
+              allocationParts.push(`PY ${amtStr}`);
+            } else {
+              const seLookup = alloc.stockEntryId ? stockEntryById.get(alloc.stockEntryId) : null;
+              const srNum = seLookup?.serialNumber ?? alloc.stockEntryId ?? "?";
+              allocationParts.push(`SR# ${srNum} ${amtStr}`);
+            }
           }
         }
         const totalDr = totalApplied + totalDiscount + totalPetty;
         if (totalDr <= 0) return null;
-        const hasPy = entry.aadhatAllocations?.some((a: Record<string, unknown>) => a.isPyPayable);
+        const modeRaw = entry.paymentMode || "cash";
+        const modeLabel = modeRaw === "account_transfer" ? "Account" : modeRaw === "cheque" ? "Cheque" : "Cash";
+        const totalStr = `₹${Math.round(totalCashApplied).toLocaleString("en-IN")}`;
+        const particulars = allocationParts.length > 0
+          ? `Payment (${modeLabel}) - ${allocationParts.join(", ")} - Total ${totalStr}`
+          : `Payment (${modeLabel})`;
         return {
           date: entry.entryDate || "",
           tnxCode: entry.transactionCode || "",
-          particulars: hasPy ? "Payment (incl. PY)" : "Payment",
+          particulars,
           dr: totalDr,
           cr: 0,
           sourceType: "payment",
