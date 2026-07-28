@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { printHtmlDocument } from "@/lib/print-receipt";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -527,6 +529,33 @@ type TransferFormValues = z.infer<typeof transferFormSchema>;
 export function CashManagementTab() {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Merchant header image (for PDF print header) — mirrors bill-print-dialog.
+  const { data: merchantData } = useQuery<{ receiptHeaderImage: string | null }>({
+    queryKey: ["/api/merchants", user?.merchantId],
+    enabled: !!user?.merchantId,
+  });
+  const [headerImageDataUri, setHeaderImageDataUri] = useState<string | null>(null);
+  useEffect(() => {
+    if (!merchantData?.receiptHeaderImage || !user?.merchantId) {
+      setHeaderImageDataUri(null);
+      return;
+    }
+    const fetchImage = async () => {
+      try {
+        const res = await fetch(`/api/merchants/${user.merchantId}/receipt-header`, { credentials: "include" });
+        if (!res.ok) { setHeaderImageDataUri(null); return; }
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setHeaderImageDataUri(reader.result as string);
+        reader.readAsDataURL(blob);
+      } catch {
+        setHeaderImageDataUri(null);
+      }
+    };
+    fetchImage();
+  }, [merchantData?.receiptHeaderImage, user?.merchantId]);
   const [activeTab, setActiveTabState] = useState<"inward" | "outflow" | "transfer">(() => (localStorage.getItem("vyapar_cashActiveTab") as "inward" | "outflow" | "transfer") || "inward");
   const setActiveTab = (tab: "inward" | "outflow" | "transfer") => {
     setActiveTabState(tab);
@@ -1981,6 +2010,169 @@ export function CashManagementTab() {
         : t("All entries downloaded successfully", "सभी प्रविष्टियाँ सफलतापूर्वक डाउनलोड हुई"),
       variant: "success",
     });
+  };
+
+  const handlePrintPDF = async () => {
+    const entriesToPrint = hasActiveFilters ? filteredEntries : entries;
+
+    if (entriesToPrint.length === 0) {
+      toast({
+        title: t("No Data", "कोई डेटा नहीं"),
+        description: t("No entries to print", "प्रिंट करने के लिए कोई प्रविष्टि नहीं"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const fmtAmt = (v: number) => v.toLocaleString("en-IN");
+
+    // Party column: counterparty/category context, e.g.
+    // "Hammali - Sunil Grading hammali", "General Expense - Kamal carpenter",
+    // "Buyer Name (Village)".
+    const buildParty = (entry: CashEntry): string => {
+      const nameParts: string[] = [];
+      if (entry.partyName) nameParts.push(entry.partyVillage ? `${entry.partyName} (${entry.partyVillage})` : entry.partyName);
+      if (entry.farmerName) nameParts.push(entry.farmerVillage ? `${entry.farmerName} (${entry.farmerVillage})` : entry.farmerName);
+      if (entry.aadhatName) nameParts.push(entry.aadhatName);
+      if (entry.supplierName) nameParts.push(entry.supplierName);
+      if (entry.coldStoreName) nameParts.push(entry.coldStoreName);
+      if (entry.sundryPayName) nameParts.push(entry.sundryPayName);
+      if (entry.capitalAssetName) nameParts.push(entry.capitalAssetName);
+      const name = nameParts.join(", ");
+
+      if (entry.direction === "transfer") {
+        const from = entry.fromAccountType === "cash_in_hand" ? t("Cash in Hand", "हाथ में नकद") : (entry.fromBankAccountName || t("Bank Account", "बैंक खाता"));
+        const to = entry.toAccountType === "cash_in_hand" ? t("Cash in Hand", "हाथ में नकद") : (entry.toBankAccountName || t("Bank Account", "बैंक खाता"));
+        return `${t("Transfer", "ट्रांसफर")}: ${from} → ${to}`;
+      }
+      if (entry.direction === "outflow") {
+        const category = entry.expenseType ? getExpenseTypeLabel(entry.expenseType) : (entry.capitalAssetCategory ? getAssetCategoryLabel(entry.capitalAssetCategory) : "");
+        if (category && name) return `${category} - ${name}`;
+        return category || name || "";
+      }
+      // inward
+      if (name) return name;
+      return entry.revenueType ? getRevenueTypeLabel(entry.revenueType) : "";
+    };
+
+    let totalDr = 0;
+    let totalCr = 0;
+    const bodyRows = entriesToPrint.map((entry, idx) => {
+      const amt = parseFloat(entry.amount || "0");
+      const isOut = entry.direction === "outflow";
+      const isIn = entry.direction === "inward";
+      const isTransfer = entry.direction === "transfer";
+      const reversed = !!entry.isReversed;
+      if (!reversed) {
+        if (isOut || isTransfer) totalDr += amt;
+        if (isIn || isTransfer) totalCr += amt;
+      }
+      const dr = (isOut || isTransfer) ? fmtAmt(amt) : "-";
+      const cr = (isIn || isTransfer) ? fmtAmt(amt) : "-";
+      const mode = isTransfer ? t("Transfer", "ट्रांसफर") : (entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "");
+      const remarks = `${entry.remarks ? esc(entry.remarks) : ""}${reversed ? `${entry.remarks ? " " : ""}(${t("Reversed", "उलट दिया गया")})` : ""}`;
+      const bg = idx % 2 === 0 ? "#fafafa" : "#f2f2f2";
+      const strike = reversed ? "text-decoration:line-through;color:#999;" : "";
+      return `<tr style="background:${bg};${strike}">
+        <td>${format(new Date(entry.entryDate), "dd/MM/yyyy")}</td>
+        <td>${esc(buildParty(entry))}</td>
+        <td>${esc(mode)}</td>
+        <td class="num">${dr}</td>
+        <td class="num">${cr}</td>
+        <td>${remarks}</td>
+      </tr>`;
+    }).join("");
+
+    const merchantName = user?.merchantName || "";
+    const merchantAddress = user?.merchantAddress || "";
+    const merchantContact = user?.merchantContact || "";
+
+    // If a header image is configured but the cached data URI isn't ready yet
+    // (fetch still in-flight), fetch it now so the printed header never falls
+    // back to text when an image exists.
+    let headerImg = headerImageDataUri;
+    if (!headerImg && merchantData?.receiptHeaderImage && user?.merchantId) {
+      try {
+        const res = await fetch(`/api/merchants/${user.merchantId}/receipt-header`, { credentials: "include" });
+        if (res.ok) {
+          const blob = await res.blob();
+          headerImg = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          setHeaderImageDataUri(headerImg);
+        }
+      } catch {
+        // fall back to text header
+      }
+    }
+
+    const headerHtml = headerImg
+      ? `<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px"><img src="${headerImg}" style="max-height:110px;max-width:100%;object-fit:contain" /></div>`
+      : `<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px">
+          <div style="font-size:22px;font-weight:bold">${esc(merchantName)}</div>
+          ${merchantAddress ? `<div style="font-size:13px;color:#555;margin-top:2px">${esc(merchantAddress)}</div>` : ""}
+          ${merchantContact ? `<div style="font-size:13px;color:#555">${esc(merchantContact)}</div>` : ""}
+        </div>`;
+
+    const subtitle = hasActiveFilters ? t("Filtered transactions", "फ़िल्टर की गई प्रविष्टियाँ") : t("All transactions", "सभी लेनदेन");
+    const generated = format(new Date(), "dd/MM/yyyy");
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<title>Cash Flow History ${generated}</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 16px; color: #111; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #1e8a3c; color: #fff; text-align: left; padding: 7px 8px; }
+  td { padding: 6px 8px; vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr.total-row td { background: #e6f4ea; font-weight: bold; border-top: 1px solid #1e8a3c; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+${headerHtml}
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px">
+  <div>
+    <div style="font-size:18px;font-weight:bold">${t("Cash Flow History", "नकद प्रवाह इतिहास")}</div>
+    <div style="font-size:12px;margin-top:2px">${esc(subtitle)}</div>
+  </div>
+  <div style="font-size:12px">${t("Generated", "तैयार")}: ${generated}</div>
+</div>
+<table>
+  <colgroup>
+    <col style="width:10%"><col style="width:29%"><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:25%">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>${t("Date", "तिथि")}</th>
+      <th>${t("Party", "पार्टी")}</th>
+      <th>${t("Mode", "माध्यम")}</th>
+      <th class="num">${t("Dr (Outflow)", "डेबिट (जावक)")}</th>
+      <th class="num">${t("Cr (Inflow)", "क्रेडिट (आवक)")}</th>
+      <th>${t("Remarks", "टिप्पणी")}</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${bodyRows}
+    <tr class="total-row">
+      <td></td>
+      <td>${t("Total", "कुल")}</td>
+      <td></td>
+      <td class="num">${fmtAmt(totalDr)}</td>
+      <td class="num">${fmtAmt(totalCr)}</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>`;
+    printHtmlDocument(html);
   };
 
   return (
@@ -4306,15 +4498,26 @@ export function CashManagementTab() {
       <div className="w-full md:w-1/2 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t("Cash Flow History", "नकद प्रवाह इतिहास")}</h2>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleDownloadCSV}
-            title={t("Download CSV", "CSV डाउनलोड करें")}
-            data-testid="button-cash-download"
-          >
-            <Download className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePrintPDF}
+              title={t("Download PDF", "PDF डाउनलोड करें")}
+              data-testid="button-cash-print-pdf"
+            >
+              <Printer className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleDownloadCSV}
+              title={t("Download CSV", "CSV डाउनलोड करें")}
+              data-testid="button-cash-download"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         
         <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
