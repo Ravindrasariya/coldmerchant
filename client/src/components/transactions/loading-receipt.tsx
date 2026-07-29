@@ -251,7 +251,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       const _chargeRows = Math.max(_nonZeroCount, 1) + 1;
       const _fixedPx = 340 + _chargeRows * 26;
       const _availPx = 1047 - _fixedPx;
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24));
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - (headerImageDataUri ? 4 : 0));
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
@@ -320,7 +320,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     }
 
     const headerHtml = headerImageDataUri
-      ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px"><img src="${headerImageDataUri}" style="width:100%;height:auto;display:block"></div>`
+      ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px;margin-left:-8px;margin-right:-8px"><img src="${headerImageDataUri}" style="width:100%;height:auto;display:block"></div>`
       : `<div class="header"><h1>${escHtml(merchant.name || "")}</h1><p>${escHtml(merchant.address || "")}</p><p>Phone : Mobile&nbsp; &ndash; ${escHtml(merchant.contactNumber || "")}</p><p class="tagline">Commission Agent &amp; Order Suppliers of Potato, Onion, Garlic, Ginger &amp; Arbi</p></div>`;
 
     const replacements: Record<string, string> = {

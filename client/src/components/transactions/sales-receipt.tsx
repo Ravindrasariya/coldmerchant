@@ -239,7 +239,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       const _availPx = 1047 - 392;
       // Subtract 3 rows so the bill keeps ~3 rows of breathing space at the
       // bottom and never spills the footer blocks onto a second page.
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - 3);
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - (headerImageDataUri ? 7 : 3));
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
@@ -262,7 +262,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     const chargesRowsHtml = `<tr><td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div></td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
 
     const headerHtml = headerImageDataUri
-      ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px"><img src="${headerImageDataUri}" style="width:100%;height:auto;display:block"></div>`
+      ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px;margin-left:-8px;margin-right:-8px"><img src="${headerImageDataUri}" style="width:100%;height:auto;display:block"></div>`
       : `<div class="header"><h1>${escHtml(merchant.name || "")}</h1><p>${escHtml(merchant.address || "")}</p><p>Phone : Mobile&nbsp; &ndash; ${escHtml(merchant.contactNumber || "")}</p><p class="tagline">Commission Agent &amp; Order Suppliers of Potato, Onion, Garlic, Ginger &amp; Arbi</p></div>`;
 
     const replacements: Record<string, string> = {
