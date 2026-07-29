@@ -1638,7 +1638,8 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                     const { interest: interestOnly } = calculateInterestOnly(
                       principal,
                       lot.adjustedAmountRate || 0,
-                      lot.adjustedAmountEffectiveDate || null
+                      lot.adjustedAmountEffectiveDate || null,
+                      (lot as any).adjustedAmountEndDate || null
                     );
                     
                     let adjustedValue = 0;
