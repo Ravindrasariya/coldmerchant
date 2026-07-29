@@ -50,8 +50,12 @@ export async function accrueInterestForAll(): Promise<void> {
     const rate = parseFloat(lot.adjustedAmountRate || "0");
     if (principal <= 0 || rate <= 0 || !lot.adjustedAmountEffectiveDate) continue;
 
+    // Skip accrual entirely when today is past the end date
+    const endDate = (lot as any).adjustedAmountEndDate as string | null | undefined;
+    if (endDate && today > endDate) continue;
+
     const oldFinal = parseFloat(lot.adjustedAmountFinal || String(principal));
-    const newFinal = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate);
+    const newFinal = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate, endDate || null);
     const interestDelta = newFinal - oldFinal;
     const oldNetPayable = parseFloat(lot.netPayable || "0");
     const adjType = lot.adjustedAmountType;
@@ -80,8 +84,12 @@ export async function accrueInterestForAll(): Promise<void> {
     const rate = parseFloat(txn.adjustmentRate || "0");
     if (principal <= 0 || rate <= 0 || !txn.adjustmentEffectiveDate) continue;
 
+    // Skip accrual entirely when today is past the end date
+    const endDate = (txn as any).adjustmentEndDate as string | null | undefined;
+    if (endDate && today > endDate) continue;
+
     const oldFinal = parseFloat(txn.adjustmentAmountFinal || String(principal));
-    const newFinal = calculateSimpleInterest(principal, rate, txn.adjustmentEffectiveDate);
+    const newFinal = calculateSimpleInterest(principal, rate, txn.adjustmentEffectiveDate, endDate || null);
     const interestDelta = newFinal - oldFinal;
     const oldDue = parseFloat(txn.totalDueToFarmer || "0");
     const adjType = txn.adjustmentType;

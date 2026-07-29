@@ -1688,10 +1688,12 @@ export async function registerRoutes(
                 if (!effectivePrincipal) return lotData.adjustedAmount !== undefined ? null : undefined;
                 const effectiveRate = lotData.adjustedAmountRate !== undefined ? lotData.adjustedAmountRate : existingLot?.adjustedAmountRate;
                 const effectiveDate = lotData.adjustedAmountEffectiveDate !== undefined ? lotData.adjustedAmountEffectiveDate : existingLot?.adjustedAmountEffectiveDate;
+                const effectiveEndDate = lotData.adjustedAmountEndDate !== undefined ? lotData.adjustedAmountEndDate : existingLot?.adjustedAmountEndDate;
                 return calculateSimpleInterest(
                   parseFloat(String(effectivePrincipal)),
                   parseFloat(String(effectiveRate || "0")),
-                  effectiveDate || null
+                  effectiveDate || null,
+                  effectiveEndDate || null,
                 ).toFixed(2);
               })(),
               adjustedAmountType: lotData.adjustedAmountType !== undefined
@@ -1705,6 +1707,9 @@ export async function registerRoutes(
                 : undefined,
               adjustedAmountEffectiveDate: lotData.adjustedAmountEffectiveDate !== undefined
                 ? (lotData.adjustedAmountEffectiveDate || null)
+                : undefined,
+              adjustedAmountEndDate: lotData.adjustedAmountEndDate !== undefined
+                ? (lotData.adjustedAmountEndDate || null)
                 : undefined,
               place: lotData.place !== undefined
                 ? (lotData.place || "cold_store")
@@ -7549,7 +7554,7 @@ export async function registerRoutes(
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
       const id = parseInt(req.params.id);
-      const { vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items } = req.body;
+      const { vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentEndDate, adjustmentReason, items } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ message: "At least one seed lot item is required" });
@@ -7613,12 +7618,13 @@ export async function registerRoutes(
       const effectivePrincipal = adjustmentAmount !== undefined ? adjustmentAmount : existingTxn.adjustmentAmount;
       const effectiveRate = adjustmentRate !== undefined ? adjustmentRate : existingTxn.adjustmentRate;
       const effectiveDate = adjustmentEffectiveDate !== undefined ? adjustmentEffectiveDate : existingTxn.adjustmentEffectiveDate;
+      const effectiveEndDate = adjustmentEndDate !== undefined ? adjustmentEndDate : (existingTxn as any).adjustmentEndDate;
       const effectiveType = adjustmentType !== undefined ? adjustmentType : existingTxn.adjustmentType;
       let computedAdjFinal: string | null = null;
       let interestAdj = 0;
       if (effectivePrincipal) {
         const principal = parseFloat(String(effectivePrincipal));
-        const finalVal = calculateSimpleInterest(principal, parseFloat(String(effectiveRate || "0")), effectiveDate || null);
+        const finalVal = calculateSimpleInterest(principal, parseFloat(String(effectiveRate || "0")), effectiveDate || null, effectiveEndDate || null);
         computedAdjFinal = finalVal.toFixed(2);
         const interestOnly = finalVal - principal;
         if (interestOnly > 0) {
@@ -7646,6 +7652,7 @@ export async function registerRoutes(
           adjustmentAmountFinal: computedAdjFinal,
           adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
           adjustmentEffectiveDate: adjustmentEffectiveDate || null,
+          adjustmentEndDate: adjustmentEndDate || null,
           adjustmentReason: adjustmentReason || null,
         },
         processedItems
@@ -7768,7 +7775,7 @@ export async function registerRoutes(
   app.post("/api/seed-transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentReason, items, transactionDate } = req.body;
+      const { farmerName, farmerContact, village, tehsil, district, state, vehicleNumber, transportCharges, otherCharges, otherChargesRemarks, adjustmentType, adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentEndDate, adjustmentReason, items, transactionDate } = req.body;
 
       if (!farmerName || !items || items.length === 0) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -7858,7 +7865,7 @@ export async function registerRoutes(
       let interestAdj = 0;
       if (adjustmentAmount) {
         const principal = parseFloat(String(adjustmentAmount));
-        const finalVal = calculateSimpleInterest(principal, parseFloat(String(adjustmentRate || "0")), adjustmentEffectiveDate || null);
+        const finalVal = calculateSimpleInterest(principal, parseFloat(String(adjustmentRate || "0")), adjustmentEffectiveDate || null, adjustmentEndDate || null);
         computedAdjFinal = finalVal.toFixed(2);
         const interestOnly = finalVal - principal;
         if (interestOnly > 0) {
@@ -7927,6 +7934,7 @@ export async function registerRoutes(
           adjustmentAmountFinal: computedAdjFinal,
           adjustmentRate: adjustmentRate ? adjustmentRate.toString() : null,
           adjustmentEffectiveDate: adjustmentEffectiveDate || null,
+          adjustmentEndDate: adjustmentEndDate || null,
           adjustmentReason: adjustmentReason || null,
         },
         processedItems

@@ -10,9 +10,9 @@ export function getISTDateYYYYMMDD(): string {
   return getISTDateString().replace(/-/g, '');
 }
 
-export function getISTYear(): number {
-  const now = new Date();
-  return parseInt(new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric' }).format(now));
+export function getISTYear(date?: Date): number {
+  const d = date || new Date();
+  return parseInt(new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric' }).format(d));
 }
 
 export function dateDiffInDaysIST(startDateStr: string, endDateStr?: string): number {
@@ -28,11 +28,28 @@ export function dateToISTString(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: IST_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
-export function calculateSimpleInterest(principal: number, rateOfInterest: number, effectiveDate: string | null): number {
+/**
+ * Compute principal + simple interest accrued from effectiveDate.
+ * When endDate is provided, interest is capped at min(today, endDate) —
+ * interest stops accumulating after the end date even if the amount is still due.
+ */
+export function calculateSimpleInterest(
+  principal: number,
+  rateOfInterest: number,
+  effectiveDate: string | null,
+  endDate?: string | null,
+): number {
   if (!effectiveDate || !rateOfInterest || rateOfInterest <= 0 || principal <= 0) {
     return principal;
   }
-  const days = dateDiffInDaysIST(effectiveDate);
+  // Determine effective "to" date: min(today, endDate) when endDate is provided
+  let toDate: string | undefined;
+  if (endDate) {
+    const today = getISTDateString();
+    // Only cap if endDate is strictly before today (endDate is the last day interest accrues)
+    toDate = endDate < today ? endDate : undefined;
+  }
+  const days = dateDiffInDaysIST(effectiveDate, toDate);
   if (days <= 0) return principal;
   return principal + (principal * rateOfInterest * days / (365 * 100));
 }

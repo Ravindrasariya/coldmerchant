@@ -1144,11 +1144,11 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                 <CardContent className="pt-0 border-t">
                   <div className="p-3 bg-purple-50/50 dark:bg-purple-900/10 rounded-md">
                     <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
                       <div className="space-y-1">
                         <Label className="text-xs">{t("Type", "प्रकार")}</Label>
                         <Input
-                          className="h-8"
+                          className="h-8 text-xs px-2"
                           value={t("Credit (+)", "क्रेडिट (+)")}
                           disabled
                           data-testid={`edit-adjustment-type-${lotIndex}`}
@@ -1197,12 +1197,24 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                           data-testid={`edit-adjustment-date-${lotIndex}`}
                         />
                       </div>
-                      <div className="space-y-1 md:col-span-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("End Date", "अंतिम तिथि")}</Label>
+                        <Input
+                          type="date"
+                          className="h-8"
+                          value={(lot as any).adjustedAmountEndDate || ""}
+                          min={lot.adjustedAmountEffectiveDate || undefined}
+                          placeholder={t("Optional", "वैकल्पिक")}
+                          onChange={(e) => handleLotFieldChange(lotIndex, "adjustedAmountEndDate", e.target.value || null)}
+                          data-testid={`edit-adjustment-end-date-${lotIndex}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
                         <Label className="text-xs">{t("Reason", "कारण")}</Label>
                         <Input
                           type="text"
                           className="h-8"
-                          placeholder={t("Enter reason...", "कारण दर्ज करें...")}
+                          placeholder={t("Reason...", "कारण...")}
                           value={lot.adjustedAmountRemark || ""}
                           onChange={(e) => handleLotFieldChange(lotIndex, "adjustedAmountRemark", e.target.value)}
                           data-testid={`edit-adjustment-remark-${lotIndex}`}
@@ -1213,7 +1225,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
                       (() => {
                         const principal = lot.adjustedAmount;
                         const rate = lot.adjustedAmountRate;
-                        const { interest, days, finalAmount } = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate || null);
+                        const { interest, days, finalAmount } = calculateSimpleInterest(principal, rate, lot.adjustedAmountEffectiveDate || null, (lot as any).adjustedAmountEndDate || null);
                         return (
                           <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">

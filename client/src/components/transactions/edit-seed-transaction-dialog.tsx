@@ -78,6 +78,7 @@ interface SeedTransaction {
   adjustmentAmount: string | null;
   adjustmentRate: string | null;
   adjustmentEffectiveDate: string | null;
+  adjustmentEndDate: string | null;
   adjustmentReason: string | null;
   totalBags: number;
   totalCost: string | null;
@@ -124,6 +125,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [adjustmentRate, setAdjustmentRate] = useState("");
   const [adjustmentEffectiveDate, setAdjustmentEffectiveDate] = useState("");
+  const [adjustmentEndDate, setAdjustmentEndDate] = useState("");
   const [adjustmentReason, setAdjustmentReason] = useState("");
   
   const [selectedLots, setSelectedLots] = useState<SeedLotSelection[]>([]);
@@ -171,6 +173,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     setAdjustmentAmount(transaction.adjustmentAmount || "");
     setAdjustmentRate(transaction.adjustmentRate || "");
     setAdjustmentEffectiveDate(transaction.adjustmentEffectiveDate || "");
+    setAdjustmentEndDate(transaction.adjustmentEndDate || "");
     setAdjustmentReason(transaction.adjustmentReason || "");
 
     // Convert transaction items to lot selections
@@ -281,9 +284,9 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
     
     if (principal <= 0) return { finalAmount: 0, interest: 0, days: 0 };
     
-    const { interest, days } = calculateInterestOnly(principal, rate, adjustmentEffectiveDate || null);
+    const { interest, days } = calculateInterestOnly(principal, rate, adjustmentEffectiveDate || null, adjustmentEndDate || null);
     return { finalAmount: interest, interest, days };
-  }, [adjustmentAmount, adjustmentRate, adjustmentEffectiveDate]);
+  }, [adjustmentAmount, adjustmentRate, adjustmentEffectiveDate, adjustmentEndDate]);
 
   const totals = useMemo(() => {
     let totalBags = 0;
@@ -352,6 +355,7 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
       adjustmentAmount: adjustmentAmount || undefined,
       adjustmentRate: adjustmentRate || undefined,
       adjustmentEffectiveDate: adjustmentEffectiveDate || undefined,
+      adjustmentEndDate: adjustmentEndDate || undefined,
       adjustmentReason: adjustmentReason || undefined,
       items: validLots.map(lot => ({
         seedLotId: lot.seedLotId,
@@ -716,10 +720,11 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
           {/* Farmer Due Adjustment Section */}
           <div className="p-4 bg-purple-50/50 dark:bg-purple-900/10 rounded-md border" data-testid="section-edit-seed-farmer-adjustment">
             <p className="text-sm font-medium text-muted-foreground mb-3">{t("Farmer Due Adjustment", "किसान बकाया समायोजन")}</p>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">{t("Type", "प्रकार")}</Label>
                 <Input
+                  className="text-xs px-2"
                   value={t("Credit (+)", "क्रेडिट (+)")}
                   disabled
                   data-testid="select-edit-seed-adjustment-type"
@@ -765,10 +770,20 @@ export function EditSeedTransactionDialog({ transactionId, open, onOpenChange }:
                 />
               </div>
               <div className="space-y-1">
+                <Label className="text-xs">{t("End Date", "अंतिम तिथि")}</Label>
+                <Input
+                  type="date"
+                  value={adjustmentEndDate}
+                  min={adjustmentEffectiveDate || undefined}
+                  onChange={(e) => setAdjustmentEndDate(e.target.value)}
+                  data-testid="input-edit-seed-adjustment-end-date"
+                />
+              </div>
+              <div className="space-y-1">
                 <Label className="text-xs">{t("Reason", "कारण")}</Label>
                 <Input
                   type="text"
-                  placeholder={t("Enter reason", "कारण दर्ज करें")}
+                  placeholder={t("Reason", "कारण")}
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
                   data-testid="input-edit-seed-adjustment-reason"

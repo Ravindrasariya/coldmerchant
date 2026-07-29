@@ -126,6 +126,7 @@ export const lots = pgTable("lots", {
   adjustedAmountRate: decimal("adjusted_amount_rate", { precision: 6, scale: 2 }), // annual rate % for simple interest
   adjustedAmountEffectiveDate: date("adjusted_amount_effective_date"), // effective date for interest calculation
   adjustedAmountRemark: text("adjusted_amount_remark"), // reason for adjustment
+  adjustedAmountEndDate: date("adjusted_amount_end_date"), // optional cut-off date — interest stops accruing after this date
   totalCogs: decimal("total_cogs", { precision: 12, scale: 2 }).default("0"),
   totalCharges: decimal("total_charges", { precision: 12, scale: 2 }),
   netPayable: decimal("net_payable", { precision: 12, scale: 2 }),
@@ -567,6 +568,7 @@ export const seedTransactions = pgTable("seed_transactions", {
   adjustmentRate: decimal("adjustment_rate", { precision: 6, scale: 2 }), // annual rate % for simple interest
   adjustmentEffectiveDate: date("adjustment_effective_date"), // effective date for interest calculation
   adjustmentReason: text("adjustment_reason"), // reason for adjustment
+  adjustmentEndDate: date("adjustment_end_date"), // optional cut-off date — interest stops accruing after this date
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Database-level guard so two concurrent seed Tnx# overrides/edits can
