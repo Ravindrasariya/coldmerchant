@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { resolveTxnDate } from "@/lib/date-utils";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -9,6 +9,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
+import { printHtmlDocument } from "@/lib/print-receipt";
 
 interface TransactionItem {
   id: number;
@@ -77,6 +78,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
   const { toast } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
+  const [headerImageDataUri, setHeaderImageDataUri] = useState<string | null>(null);
 
   const { data: transaction, isLoading: txnLoading } = useQuery<LoadingTransaction>({
     queryKey: ["/api/transactions", transactionId],
@@ -87,6 +89,26 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
     queryKey: ["/api/merchants", merchantId],
     enabled: !!merchantId && open,
   });
+
+  useEffect(() => {
+    if (!merchant?.receiptHeaderImage) {
+      setHeaderImageDataUri(null);
+      return;
+    }
+    const fetchImage = async () => {
+      try {
+        const res = await fetch(`/api/merchants/${merchantId}/receipt-header`, { credentials: "include" });
+        if (!res.ok) { setHeaderImageDataUri(null); return; }
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setHeaderImageDataUri(reader.result as string);
+        reader.readAsDataURL(blob);
+      } catch {
+        setHeaderImageDataUri(null);
+      }
+    };
+    fetchImage();
+  }, [merchant?.receiptHeaderImage, merchantId]);
 
   const { data: buyers } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers"],
@@ -121,34 +143,22 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
 
   const handlePrint = () => {
     if (!printRef.current) return;
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
     const printTitle = challanFilename();
     const printContent = printRef.current.innerHTML;
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${printTitle}</title>
-          <style>
-            * { box-sizing: border-box; }
-            body {
-              font-family: Arial, sans-serif;
-              padding: 20px;
-              max-width: 800px;
-              margin: 0 auto;
-              color: #000;
-            }
-            table { width: 100%; border-collapse: collapse; }
-            @media print { body { padding: 0; } button { display: none; } }
-          </style>
-        </head>
-        <body>${printContent}</body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>${printTitle}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: #000; }
+      table { width: 100%; border-collapse: collapse; }
+      @media print { body { padding: 0; } button { display: none; } }
+    </style>
+  </head>
+  <body>${printContent}</body>
+</html>`;
+    printHtmlDocument(html);
   };
 
   if (!open) return null;
@@ -204,14 +214,20 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
         ) : transaction && merchant ? (
           <div className="overflow-x-auto -mx-4 px-4">
           <div ref={printRef} style={{ background: "#fff", color: "#000", minWidth: 650, fontFamily: "Arial, sans-serif", padding: 8 }}>
-            {/* Header — always text, no header image for challan */}
+            {/* Header — merchant image if configured, otherwise text */}
             <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 10, marginBottom: 12 }}>
-              <h1 style={{ margin: 0, fontSize: 26, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 1 }}>{merchant.name}</h1>
-              {merchant.address && <p style={{ margin: "2px 0", fontSize: 13 }}>{merchant.address}</p>}
-              {merchant.contactNumber && <p style={{ margin: "2px 0", fontSize: 13 }}>{t("Phone", "फ़ोन")}: {merchant.contactNumber}</p>}
-              <p style={{ margin: "6px 0 0", fontSize: 12 }}>
-                {t("Commission Agent & Order Suppliers of Potato, Onion, Garlic, Ginger & Arbi", "आलू, प्याज, लहसुन, अदरक एवं अरबी के कमीशन एजेंट एवं ऑर्डर सप्लायर")}
-              </p>
+              {headerImageDataUri ? (
+                <img src={headerImageDataUri} alt={merchant.name} style={{ maxHeight: 110, maxWidth: "100%", objectFit: "contain" }} />
+              ) : (
+                <>
+                  <h1 style={{ margin: 0, fontSize: 26, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 1 }}>{merchant.name}</h1>
+                  {merchant.address && <p style={{ margin: "2px 0", fontSize: 13 }}>{merchant.address}</p>}
+                  {merchant.contactNumber && <p style={{ margin: "2px 0", fontSize: 13 }}>{t("Phone", "फ़ोन")}: {merchant.contactNumber}</p>}
+                  <p style={{ margin: "6px 0 0", fontSize: 12 }}>
+                    {t("Commission Agent & Order Suppliers of Potato, Onion, Garlic, Ginger & Arbi", "आलू, प्याज, लहसुन, अदरक एवं अरबी के कमीशन एजेंट एवं ऑर्डर सप्लायर")}
+                  </p>
+                </>
+              )}
             </div>
 
             <div style={{ textAlign: "center", marginBottom: 10 }}>
