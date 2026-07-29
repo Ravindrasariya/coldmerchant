@@ -2058,6 +2058,69 @@ export function CashManagementTab() {
       return entry.revenueType ? getRevenueTypeLabel(entry.revenueType) : "";
     };
 
+    // Summary figures — same classification as the existing useMemo summary block.
+    let sumCashIn = 0, sumCashOut = 0, sumAccIn = 0, sumAccOut = 0;
+    for (const e of entriesToPrint) {
+      const amt = parseFloat(e.amount || "0");
+      if (e.direction === "inward") {
+        if (e.receiptType === "cash_received") sumCashIn += amt;
+        else if (e.receiptType === "account_received" || e.receiptType === "cheque_received") sumAccIn += amt;
+      } else if (e.direction === "outflow") {
+        if (e.paymentMode === "cash") sumCashOut += amt;
+        else if (e.paymentMode === "account_transfer" || e.paymentMode === "cheque") sumAccOut += amt;
+      } else if (e.direction === "transfer") {
+        if (e.toAccountType === "cash_in_hand") sumCashIn += amt;       // account → cash
+        if (e.fromAccountType === "cash_in_hand") sumCashOut += amt;    // cash → account
+        if (e.toAccountType === "bank_account") sumAccIn += amt;        // cash → account
+        if (e.fromAccountType === "bank_account") sumAccOut += amt;     // account → cash
+      }
+    }
+    const netCash = sumCashIn - sumCashOut;
+    const netAcc = sumAccIn - sumAccOut;
+    const fmtSigned = (v: number) => (v >= 0 ? `₹${fmtAmt(v)}` : `−₹${fmtAmt(Math.abs(v))}`);
+    const netCashColor = netCash >= 0 ? "#1e8a3c" : "#c62828";
+    const netAccColor  = netAcc  >= 0 ? "#1e8a3c" : "#c62828";
+
+    const summaryHtml = `
+<div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">
+  <!-- Cash block (left) -->
+  <div style="flex:1;border:1px solid #c8e6c9;border-radius:6px;padding:10px 12px;background:#f1faf3">
+    <div style="font-size:11px;font-weight:bold;color:#1e8a3c;border-bottom:1px solid #c8e6c9;padding-bottom:4px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">
+      ${t("Cash", "नकद")}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+      <span style="color:#555">${t("Total Cash In", "कुल नकद आवक")}</span>
+      <span style="font-weight:600;color:#1e8a3c">₹${fmtAmt(sumCashIn)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+      <span style="color:#555">${t("Total Cash Out", "कुल नकद जावक")}</span>
+      <span style="font-weight:600;color:#c62828">₹${fmtAmt(sumCashOut)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid #c8e6c9;padding-top:6px;margin-top:2px">
+      <span style="font-weight:bold">${t("Net Cash", "शुद्ध नकद")}</span>
+      <span style="font-weight:bold;color:${netCashColor}">${fmtSigned(netCash)}</span>
+    </div>
+  </div>
+  <!-- Account block (right) -->
+  <div style="flex:1;border:1px solid #bbdefb;border-radius:6px;padding:10px 12px;background:#f0f7ff">
+    <div style="font-size:11px;font-weight:bold;color:#1565c0;border-bottom:1px solid #bbdefb;padding-bottom:4px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px">
+      ${t("Account", "खाता")}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+      <span style="color:#555">${t("Total Account In", "कुल खाता आवक")}</span>
+      <span style="font-weight:600;color:#1565c0">₹${fmtAmt(sumAccIn)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+      <span style="color:#555">${t("Total Account Out", "कुल खाता जावक")}</span>
+      <span style="font-weight:600;color:#c62828">₹${fmtAmt(sumAccOut)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid #bbdefb;padding-top:6px;margin-top:2px">
+      <span style="font-weight:bold">${t("Net Account", "शुद्ध खाता")}</span>
+      <span style="font-weight:bold;color:${netAccColor}">${fmtSigned(netAcc)}</span>
+    </div>
+  </div>
+</div>`;
+
     let totalDr = 0;
     let totalCr = 0;
     const bodyRows = entriesToPrint.map((entry, idx) => {
@@ -2144,6 +2207,7 @@ ${headerHtml}
   </div>
   <div style="font-size:12px">${t("Generated", "तैयार")}: ${generated}</div>
 </div>
+${summaryHtml}
 <table>
   <colgroup>
     <col style="width:10%"><col style="width:29%"><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:25%">
