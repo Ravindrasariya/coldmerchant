@@ -222,18 +222,10 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const storedRevenue = parseFloat(transaction?.revenue || "0");
   const totalValue = storedRevenue > 0 ? storedRevenue : lotRevenueSum;
 
-  const txnCropForView = transaction?.crop || cropType || "potato";
-  const distinctCropsView = transaction && transaction.items.length > 0
-    ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCropForView)))
-    : [txnCropForView];
-  const hasMultipleCrops = distinctCropsView.length > 1;
-  const cropHeaderLabel = distinctCropsView.map(cropToLabel).join(", ");
-
   const buildCustomHtml = () => {
     if (!transaction || !merchant) return null;
     // Priority 1: custom per-merchant Bikri/sales HTML template
-    // Priority 2: header image → return null so JSX layout handles it
-    // Priority 3: built-in default Bikri template
+    // Priority 2: built-in default Bikri template (with header image if set)
     let html: string;
     let minRows: number;
     if (merchant?.salesReceiptHtmlTemplate) {
@@ -353,101 +345,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
           </div>
         ) : transaction && merchant ? (
           <div className="overflow-x-auto -mx-4 px-4">
-          {customHtml ? (
-            <div ref={printRef} className="p-4 bg-white text-black min-w-[650px]" dangerouslySetInnerHTML={{ __html: customHtml }} />
-          ) : (
-          <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
-            <div className="header text-center border-b-2 border-black pb-4">
-              <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
-            </div>
-
-            <div className="text-center">
-              <h2 className="text-xl font-semibold">
-                Bikri Receipt / बिक्री रसीद
-              </h2>
-            </div>
-
-            <div className="receipt-info flex justify-between text-sm" style={{ lineHeight: "1.4" }}>
-              <div>
-                <div><strong>Bill No / बिल नं:</strong> #{transaction.transactionNumber}</div>
-                <div><strong>Date / तारीख:</strong> {resolveTxnDate(transaction).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}</div>
-                {transaction.vehicleNumber && (
-                  <div><strong>Motor No / वाहन नं:</strong> {transaction.vehicleNumber}</div>
-                )}
-                <div><strong>Crop / फसल:</strong> {cropHeaderLabel}</div>
-              </div>
-              <div className="text-right right">
-                {(transaction.partyName || buyer?.name) && (
-                  <div><strong>Buyer / खरीदार:</strong> {transaction.partyName || buyer?.name}</div>
-                )}
-                {(buyer?.address || transaction.partyAddress) && (
-                  <div className="text-gray-600">{buyer?.address || transaction.partyAddress}</div>
-                )}
-              </div>
-            </div>
-
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border px-2 py-1 text-center">Item Name / वस्तु</th>
-                  <th className="border px-2 py-1 text-center">Marka / मार्का</th>
-                  <th className="border px-2 py-1 text-center">Quantity / बोरी</th>
-                  <th className="border px-2 py-1 text-center">Weight (Kg) / वजन</th>
-                  <th className="border px-2 py-1 text-right">Value / राशि</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transaction.items.map((item) => {
-                  const rev = parseFloat(item.revenue || "0");
-                  return (
-                    <tr key={item.id}>
-                      <td className="border px-2 py-1 text-center">{hasMultipleCrops ? `${cropToLabel(item.crop || txnCropForView)}${item.potatoType ? ` (${item.potatoType})` : ""}` : (item.potatoType || cropToLabel(item.crop || txnCropForView))}</td>
-                      <td className="border px-2 py-1 text-center">{item.marka || ""}</td>
-                      <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
-                      <td className="border px-2 py-1 text-center">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
-                      <td className="border px-2 py-1 text-right">{rev > 0 ? `₹${parseFloat(rev.toFixed(1)).toLocaleString('en-IN')}` : ""}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50 font-semibold">
-                  <td className="border px-2 py-1 text-center" colSpan={2}>Total / कुल</td>
-                  <td className="border px-2 py-1 text-center">{transaction.totalBags}</td>
-                  <td className="border px-2 py-1 text-center">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
-                  <td className="border px-2 py-1 text-right">₹{Math.round(totalValue).toLocaleString('en-IN')}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div className="text-sm">
-              <div className="grand-total flex justify-between items-center border-t-2 border-black pt-2 mt-2 font-bold text-base">
-                <span>Net Amount / शुद्ध राशि</span>
-                <span>₹{Math.round(totalValue).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="mt-2">
-                <strong>In Words:</strong> {numberToIndianWords(Math.round(totalValue))}
-              </div>
-              <div className="mt-3 text-xs text-gray-600">
-                <div className="font-bold text-black">SALES BILL</div>
-                <div>1. E.&amp; O.E.</div>
-                <div>2. Subject to INDORE Jurisdiction.</div>
-                <div>3. Sunday Closed.</div>
-              </div>
-            </div>
-
-            <div className="border-t pt-6 mt-6 flex justify-end">
-              <div className="text-center" style={{ minWidth: "180px" }}>
-                <div className="border-b border-gray-400 mb-1" style={{ height: "40px" }}></div>
-                <p className="text-sm font-semibold">For {merchant.name}</p>
-              </div>
-            </div>
-          </div>
-          )}
+          <div ref={printRef} className="p-4 bg-white text-black min-w-[650px]" dangerouslySetInnerHTML={{ __html: customHtml! }} />
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">

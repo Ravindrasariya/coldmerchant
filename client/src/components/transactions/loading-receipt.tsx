@@ -215,20 +215,12 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
 
   const totalAmount = transaction?.items.reduce((sum, item) => sum + parseFloat(item.amount || "0"), 0) || 0;
 
-  const txnCropForView = transaction?.crop || cropType || "potato";
-  const distinctCropsView = transaction && transaction.items.length > 0
-    ? Array.from(new Set(transaction.items.map((it) => it.crop || txnCropForView)))
-    : [txnCropForView];
-  const hasMultipleCrops = distinctCropsView.length > 1;
-  const cropHeaderLabel = distinctCropsView.map(cropToLabel).join(", ");
-
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
   const buildCustomHtml = () => {
     if (!transaction || !merchant) return null;
     // Priority 1: custom per-merchant HTML template
-    // Priority 2: header image → return null so JSX layout handles it
-    // Priority 3: built-in Indore default template
+    // Priority 2: built-in Indore default template (with header image if set)
     let html: string;
     let minRows: number;
     if (merchant?.receiptHtmlTemplate) {
@@ -376,22 +368,6 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
   };
 
   const customHtml = buildCustomHtml();
-  const mandiCommission = parseFloat(transaction?.totalMandiCommission || "0");
-  const aadhatCommission = parseFloat(transaction?.totalAadhatCommission || "0");
-  const hammali = parseFloat(transaction?.totalHammali || "0");
-  const extraCharges = parseFloat(transaction?.totalMandiExtraCharges || "0");
-  const totalMandiCharges = mandiCommission + aadhatCommission + hammali + extraCharges;
-  const salesCommission = parseFloat(transaction?.salesCommission || "0");
-  const advanceAmount = parseFloat(transaction?.otherCharges || "0");
-  const driverAdvance = parseFloat(transaction?.advancePayment || "0");
-  const tulai = parseFloat(transaction?.tulai || "0");
-  const majduri = parseFloat(transaction?.majduri || "0");
-  const thelaBhada = parseFloat(transaction?.thelaBhada || "0");
-  const palaKarai = parseFloat(transaction?.palaKarai || "0");
-  const bardan = parseFloat(transaction?.bardan || "0");
-  const totalAdditionalCharges = tulai + majduri + thelaBhada + palaKarai + bardan;
-  const debit = parseFloat(transaction?.debit || "0");
-  const grandTotal = totalAmount + totalMandiCharges + salesCommission + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -427,178 +403,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
           </div>
         ) : transaction && merchant ? (
           <div className="overflow-x-auto -mx-4 px-4">
-          {customHtml ? (
-            <div ref={printRef} className="p-4 bg-white text-black min-w-[650px]" dangerouslySetInnerHTML={{ __html: customHtml }} />
-          ) : (
-          <div ref={printRef} className="space-y-6 p-4 bg-white text-black min-w-[650px]">
-            <div className="header text-center border-b-2 border-black pb-4">
-              <img src={`/api/merchants/${merchantId}/receipt-header`} alt={merchant.name} className="max-h-24 mx-auto object-contain" />
-            </div>
-
-            <div className="text-center">
-              <h2 className="text-xl font-semibold">
-                Loading Receipt / लोडिंग रसीद
-              </h2>
-            </div>
-
-            <div className="receipt-info flex justify-between text-sm" style={{ lineHeight: "1.4" }}>
-              <div>
-                <div><strong>Receipt No / रसीद नं:</strong> #{transaction.transactionNumber}</div>
-                <div><strong>Date / तारीख:</strong> {resolveTxnDate(transaction).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}</div>
-                {transaction.vehicleNumber && (
-                  <div><strong>Vehicle # / वाहन नं:</strong> {transaction.vehicleNumber}</div>
-                )}
-                <div><strong>Crop / फसल:</strong> {cropHeaderLabel}</div>
-              </div>
-              <div className="text-right right">
-                {transaction.partyName && (
-                  <div><strong>Buyer / खरीदार:</strong> {transaction.partyName}</div>
-                )}
-                {(buyer?.address || transaction.partyAddress) && (
-                  <div className="text-gray-600">{buyer?.address || transaction.partyAddress}</div>
-                )}
-                <div><strong>Driver Contact:</strong> {transaction.driverContact ? ` ${transaction.driverContact}` : " ___________"}</div>
-              </div>
-            </div>
-
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border px-2 py-1 text-center">S.No / क्र.सं.</th>
-                  <th className="border px-2 py-1 text-center">Variety / किस्म</th>
-                  <th className="border px-2 py-1 text-center">Bags / बोरी</th>
-                  <th className="border px-2 py-1 text-center">Weight (Kg) / वजन</th>
-                  <th className="border px-2 py-1 text-center">₹/Kg</th>
-                  <th className="border px-2 py-1 text-right">Amount / राशि</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transaction.items.map((item, idx) => (
-                  <tr key={item.id}>
-                    <td className="border px-2 py-1 text-center">{idx + 1}</td>
-                    <td className="border px-2 py-1 text-center">{hasMultipleCrops ? `${cropToLabel(item.crop || txnCropForView)}${item.potatoType ? ` (${item.potatoType})` : ""}` : (item.potatoType || "")}</td>
-                    <td className="border px-2 py-1 text-center">{item.bagsMoved}</td>
-                    <td className="border px-2 py-1 text-center">{parseFloat(item.netWeight || "0").toFixed(1)}</td>
-                    <td className="border px-2 py-1 text-center">{item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td>
-                    <td className="border px-2 py-1 text-right">₹{parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString('en-IN')}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50 font-semibold">
-                  <td className="border px-2 py-1 text-center" colSpan={2}>Total / कुल</td>
-                  <td className="border px-2 py-1 text-center">{transaction.totalBags}</td>
-                  <td className="border px-2 py-1 text-center">{parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td>
-                  <td className="border px-2 py-1 text-center"></td>
-                  <td className="border px-2 py-1 text-right">₹{parseFloat(totalAmount.toFixed(1)).toLocaleString('en-IN')}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            <div className="charges-section text-sm">
-              {mandiCommission > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span>Mandi Commission / मंडी कमीशन</span>
-                  <span>₹{parseFloat(mandiCommission.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {aadhatCommission > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span>Aadhat Commission / आढ़त कमीशन</span>
-                  <span>₹{parseFloat(aadhatCommission.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {salesCommission > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span>Sales Commission / बिक्री कमीशन</span>
-                  <span>₹{parseFloat(salesCommission.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {hammali > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span>Hammali / हम्माली</span>
-                  <span>₹{parseFloat(hammali.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {extraCharges > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span>Extra Charges / अतिरिक्त शुल्क</span>
-                  <span>₹{parseFloat(extraCharges.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
-              {tulai > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span>Tulai / तुलाई</span>
-                  <span>₹{parseFloat(tulai.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {majduri > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span>Majduri / मजदूरी</span>
-                  <span>₹{parseFloat(majduri.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {thelaBhada > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span>Thela Bhada / ठेला भाड़ा</span>
-                  <span>₹{parseFloat(thelaBhada.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {palaKarai > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span>Pala Karai / पाला कराई</span>
-                  <span>₹{parseFloat(palaKarai.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-              {bardan > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span>Bardan (Bags) / बरदान (बोरी)</span>
-                  <span>₹{parseFloat(bardan.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
-              {driverAdvance > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span>Driver Advance / ड्राइवर अग्रिम</span>
-                  <span>₹{parseFloat(driverAdvance.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
-              {advanceAmount > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", color: "#dc2626" }}>
-                  <span>Less: Advance Amount / अग्रिम राशि</span>
-                  <span>-₹{parseFloat(advanceAmount.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
-              {debit > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", color: "#dc2626" }}>
-                  <span>Less: Debit / डेबिट</span>
-                  <span>-₹{parseFloat(debit.toFixed(1)).toLocaleString('en-IN')}</span>
-                </div>
-              )}
-
-            </div>
-
-            <div className="grand-total text-right border-t-2 border-black pt-3 mt-4">
-              <span className="text-xl font-bold">
-                Grand Total / कुल योग: ₹{parseFloat(grandTotal.toFixed(1)).toLocaleString('en-IN')}
-              </span>
-            </div>
-
-            <div className="border-t pt-6 mt-6 flex justify-end">
-              <div className="text-center" style={{ minWidth: "150px" }}>
-                <div className="border-b border-gray-400 mb-1" style={{ height: "40px" }}></div>
-                <p className="text-sm text-gray-600">Signature / हस्ताक्षर</p>
-              </div>
-            </div>
-          </div>
-          )}
+          <div ref={printRef} className="p-4 bg-white text-black min-w-[650px]" dangerouslySetInnerHTML={{ __html: customHtml! }} />
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">
