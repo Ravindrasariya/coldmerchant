@@ -335,7 +335,12 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ['/api/stock-entries', entry.id, 'history'] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      // Use refetchQueries with type:"all" so inactive individual-transaction
+      // caches (e.g. ["/api/transactions", 123] used by challan/receipt dialogs
+      // that are currently closed) are refreshed immediately rather than waiting
+      // for their next mount. staleTime:Infinity means invalidateQueries alone
+      // would not trigger a re-fetch for inactive disabled queries.
+      queryClient.refetchQueries({ queryKey: ["/api/transactions"], type: "all" });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
       queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });

@@ -306,10 +306,12 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
     onSuccess: () => {
       // Mirror invalidations from stock-entry-edit-dialog so every dependent
       // view refreshes when an entry disappears.
+      // Refetch all transaction queries (list + individual IDs) so challan/receipt
+      // dialogs that are currently closed also get fresh data on next open.
+      queryClient.refetchQueries({ queryKey: ["/api/transactions"], type: "all" });
       const keys = [
         ["/api/stock-entries"],
         ["/api/stock-entries/next-serial"],
-        ["/api/transactions"],
         ["/api/inventory/unsold"],
         ["/api/buyers"],
         ["/api/cash/farmers"],
