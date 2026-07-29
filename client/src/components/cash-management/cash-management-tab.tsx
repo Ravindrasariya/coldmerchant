@@ -2172,7 +2172,7 @@ export function CashManagementTab() {
     }
 
     const headerHtml = headerImg
-      ? `<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px"><img src="${headerImg}" style="max-height:110px;max-width:100%;object-fit:contain" /></div>`
+      ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px"><img src="${headerImg}" style="width:100%;height:auto;display:block" /></div>`
       : `<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px">
           <div style="font-size:22px;font-weight:bold">${esc(merchantName)}</div>
           ${merchantAddress ? `<div style="font-size:13px;color:#555;margin-top:2px">${esc(merchantAddress)}</div>` : ""}

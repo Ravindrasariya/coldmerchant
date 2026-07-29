@@ -217,7 +217,7 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
             {/* Header — merchant image if configured, otherwise text */}
             <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: 10, marginBottom: 12 }}>
               {headerImageDataUri ? (
-                <img src={headerImageDataUri} alt={merchant.name} style={{ maxHeight: 110, maxWidth: "100%", objectFit: "contain" }} />
+                <img src={headerImageDataUri} alt={merchant.name} style={{ width: "100%", height: "auto", display: "block" }} />
               ) : (
                 <>
                   <h1 style={{ margin: 0, fontSize: 26, fontWeight: "bold", textTransform: "uppercase", letterSpacing: 1 }}>{merchant.name}</h1>

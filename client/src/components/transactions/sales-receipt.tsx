@@ -84,6 +84,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
   const printRef = useRef<HTMLDivElement>(null);
   const [sharing, setSharing] = useState(false);
   const autoActionDone = useRef(false);
+  const [headerImageDataUri, setHeaderImageDataUri] = useState<string | null>(null);
 
   const receiptFilename = () => {
     if (!transaction) return "Bikri-Receipt";
@@ -125,6 +126,21 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     enabled: !!transaction?.buyerId && open,
   });
   const buyer = buyers?.find(b => b.id === transaction?.buyerId);
+
+  useEffect(() => {
+    if (!merchant?.receiptHeaderImage) { setHeaderImageDataUri(null); return; }
+    const fetchImage = async () => {
+      try {
+        const res = await fetch(`/api/merchants/${merchantId}/receipt-header`, { credentials: "include" });
+        if (!res.ok) { setHeaderImageDataUri(null); return; }
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => setHeaderImageDataUri(reader.result as string);
+        reader.readAsDataURL(blob);
+      } catch { setHeaderImageDataUri(null); }
+    };
+    fetchImage();
+  }, [merchant?.receiptHeaderImage, merchantId]);
 
   const isLoading = txnLoading || merchantLoading;
 
@@ -223,8 +239,6 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     if (merchant?.salesReceiptHtmlTemplate) {
       html = merchant.salesReceiptHtmlTemplate;
       minRows = 18;
-    } else if (merchant?.receiptHeaderImage) {
-      return null;
     } else {
       html = defaultBikriTemplate;
       // Dynamic row count: A4 content height (~1047px) minus fixed elements.
@@ -255,7 +269,12 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     // No deductions/additions on the Bikri bill: Net Amount === Total Value.
     const chargesRowsHtml = `<tr><td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div></td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
 
+    const headerHtml = headerImageDataUri
+      ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px"><img src="${headerImageDataUri}" style="width:100%;height:auto;display:block"></div>`
+      : `<div class="header"><h1>${escHtml(merchant.name || "")}</h1><p>${escHtml(merchant.address || "")}</p><p>Phone : Mobile&nbsp; &ndash; ${escHtml(merchant.contactNumber || "")}</p><p class="tagline">Commission Agent &amp; Order Suppliers of Potato, Onion, Garlic, Ginger &amp; Arbi</p></div>`;
+
     const replacements: Record<string, string> = {
+      "{{headerHtml}}": headerHtml,
       "{{merchantName}}": escHtml(merchant.name || ""),
       "{{merchantAddress}}": escHtml(merchant.address || ""),
       "{{merchantContact}}": escHtml(merchant.contactNumber || ""),

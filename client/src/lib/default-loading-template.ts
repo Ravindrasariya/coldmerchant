@@ -37,12 +37,7 @@ export const defaultLoadingTemplate = `<!DOCTYPE html>
 <body>
 <div class="page">
 
-  <div class="header">
-    <h1>{{merchantName}}</h1>
-    <p>{{merchantAddress}}</p>
-    <p>Phone : Mobile&nbsp; &ndash; {{merchantContact}}</p>
-    <p class="tagline">Commission Agent &amp; Order Suppliers of Potato, Onion, Garlic, Ginger &amp; Arbi</p>
-  </div>
+  {{headerHtml}}
 
   <table class="buyer-table">
     <tr>
