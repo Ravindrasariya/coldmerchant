@@ -67,6 +67,7 @@ interface Merchant {
   receiptHeaderImage: string | null;
   receiptHtmlTemplate: string | null;
   salesReceiptHtmlTemplate: string | null;
+  receiptNotes: string | null;
 }
 
 interface SalesReceiptDialogProps {
@@ -258,8 +259,14 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     const fmtFinal = (v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`;
     const itemsTableHtml = `<table><thead><tr><th>Item Name</th><th>Marka</th><th>Quantity</th><th>Weight</th><th style="text-align:right">Value</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr style="font-weight:bold;border-top:1px solid #000"><td>Total</td><td></td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td style="text-align:right">${fmtFinal(totalValue)}</td></tr></tfoot></table>`;
 
+    // Build notes HTML from merchant's custom notes (one line per note, auto-numbered).
+    const notesLines = (merchant.receiptNotes || "").split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    const receiptNotesHtml = notesLines.length > 0
+      ? `<div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">${notesLines.map((l, i) => `${i + 1}. ${escHtml(l)}`).join("<br>")}</div>`
+      : "";
+
     // No deductions/additions on the Bikri bill: Net Amount === Total Value.
-    const chargesRowsHtml = `<tr><td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div></td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
+    const chargesRowsHtml = `<tr><td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div>${receiptNotesHtml}</td><td colspan="2" style="border:1px solid #000">&nbsp;</td><td style="border:1px solid #000">&nbsp;</td></tr>`;
 
     const headerHtml = headerImageDataUri
       ? `<div style="border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px;margin-left:-8px;margin-right:-8px"><img src="${headerImageDataUri}" style="width:100%;height:auto;display:block"></div>`
@@ -267,6 +274,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
 
     const replacements: Record<string, string> = {
       "{{headerHtml}}": headerHtml,
+      "{{receiptNotesHtml}}": receiptNotesHtml,
       "{{merchantName}}": escHtml(merchant.name || ""),
       "{{merchantAddress}}": escHtml(merchant.address || ""),
       "{{merchantContact}}": escHtml(merchant.contactNumber || ""),

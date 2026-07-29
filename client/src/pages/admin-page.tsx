@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,7 +33,7 @@ export default function AdminPage() {
   
   const [merchantDialogOpen, setMerchantDialogOpen] = useState(false);
   const [editingMerchant, setEditingMerchant] = useState<MerchantWithUsers | null>(null);
-  const [merchantForm, setMerchantForm] = useState({ name: "", contactNumber: "", address: "" });
+  const [merchantForm, setMerchantForm] = useState({ name: "", contactNumber: "", address: "", receiptNotes: "" });
   
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithMerchant | null>(null);
@@ -166,7 +167,7 @@ export default function AdminPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       setMerchantDialogOpen(false);
       setEditingMerchant(null);
-      setMerchantForm({ name: "", contactNumber: "", address: "" });
+      setMerchantForm({ name: "", contactNumber: "", address: "", receiptNotes: "" });
       toast({ title: "Merchant updated successfully", variant: "success" });
     },
     onError: (error: Error) => {
@@ -282,10 +283,11 @@ export default function AdminPage() {
         name: merchant.name,
         contactNumber: merchant.contactNumber || "",
         address: merchant.address || "",
+        receiptNotes: merchant.receiptNotes || "",
       });
     } else {
       setEditingMerchant(null);
-      setMerchantForm({ name: "", contactNumber: "", address: "" });
+      setMerchantForm({ name: "", contactNumber: "", address: "", receiptNotes: "" });
     }
     setMerchantDialogOpen(true);
   };
@@ -1369,6 +1371,20 @@ export default function AdminPage() {
                     </label>
                   </div>
                 )}
+              </div>
+            )}
+            {editingMerchant && (
+              <div className="space-y-2">
+                <Label>Receipt Notes</Label>
+                <Textarea
+                  value={merchantForm.receiptNotes}
+                  onChange={(e) => setMerchantForm({ ...merchantForm, receiptNotes: e.target.value })}
+                  placeholder={"Enter one note per line\nE.g.: E. & O.E.\nSubject to local jurisdiction\nSunday Closed"}
+                  rows={4}
+                  className="text-sm resize-none"
+                  data-testid="textarea-receipt-notes"
+                />
+                <p className="text-xs text-muted-foreground">One note per line — auto-numbered on receipts. Leave blank to show no notes.</p>
               </div>
             )}
           </div>

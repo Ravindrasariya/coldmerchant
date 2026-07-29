@@ -81,6 +81,7 @@ interface Merchant {
   address: string | null;
   receiptHeaderImage: string | null;
   receiptHtmlTemplate: string | null;
+  receiptNotes: string | null;
 }
 
 interface LoadingReceiptDialogProps {
@@ -302,7 +303,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       ["Debit", dbt],
     ];
     const nonZeroCharges = chargesList.filter(([, v]) => v > 0);
-    const salesBillInner = `<div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div>`;
+    const notesLines = (merchant.receiptNotes || "").split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    const notesDiv = notesLines.length > 0
+      ? `<div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">${notesLines.map((l, i) => `${i + 1}. ${escHtml(l)}`).join("<br>")}</div>`
+      : "";
+    const salesBillInner = `<div style="font-weight:bold">SALES BILL</div>${notesDiv}`;
     let chargesRowsHtml: string;
     const isDeduction = (label: string) => label === "Advance Amount" || label === "Debit";
     if (nonZeroCharges.length > 0) {

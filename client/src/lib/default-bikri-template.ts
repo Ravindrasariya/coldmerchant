@@ -104,7 +104,7 @@ export const defaultBikriTemplate = `<!DOCTYPE html>
     </colgroup>
     <tbody>
       <tr>
-        <td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div><div style="font-weight:normal;font-size:12px;margin-top:8px;line-height:1.6">1. E.&amp; O.E.<br>2. Subject to INDORE Jurisdiction.<br>3. Sunday Closed.</div></td>
+        <td colspan="2" rowspan="2" style="vertical-align:top;border:1px solid #000"><div style="font-weight:bold">SALES BILL</div>{{receiptNotesHtml}}</td>
         <td colspan="2" style="border:1px solid #000">&nbsp;</td>
         <td style="border:1px solid #000">&nbsp;</td>
       </tr>

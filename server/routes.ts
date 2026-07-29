@@ -2046,12 +2046,13 @@ export async function registerRoutes(
   app.put("/api/admin/merchants/:id", requireSystemAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { name, contactNumber, address } = req.body;
+      const { name, contactNumber, address, receiptNotes } = req.body;
 
       const updated = await storage.updateMerchant(id, {
         name,
         contactNumber,
         address,
+        receiptNotes: receiptNotes || null,
       });
 
       if (!updated) {
