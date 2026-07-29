@@ -2,6 +2,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getTodayIST, getISTYear } from "@/lib/date-utils";
+import { useCurrentDateIST } from "@/hooks/use-current-date-ist";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -127,6 +128,15 @@ export function StockEntryForm({ onSuccess, onCancel, selectedCrop = "potato", s
     resolver: zodResolver(stockEntryFormSchema),
     defaultValues: loadSavedFormData(selectedCrop, selectedPlace),
   });
+
+  // Live midnight reset: when IST date changes while the form is open,
+  // snap purchaseDate to the new current date. `changed` is false on the
+  // initial render so we never override a user-selected same-day date.
+  const { today: currentDateIST, changed: dateChanged } = useCurrentDateIST();
+  useEffect(() => {
+    if (!dateChanged) return;
+    form.setValue("purchaseDate", currentDateIST);
+  }, [dateChanged, currentDateIST]);
 
   const watchedPurchaseDate = form.watch("purchaseDate");
   const nextSerialYear = useMemo(() => {

@@ -6,6 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { getTodayIST } from "@/lib/date-utils";
+import { useCurrentDateIST } from "@/hooks/use-current-date-ist";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -698,6 +700,10 @@ export function CashManagementTab() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [ledgerBuyers, managedParties]);
 
+  // Live midnight reset: snap all three entry-date fields to the new IST date
+  // when the calendar day changes while the tab is open.
+  const { today: currentDateIST, changed: dateChanged } = useCurrentDateIST();
+
   const inwardForm = useForm<InwardFormValues>({
     resolver: zodResolver(inwardFormSchema),
     defaultValues: {
@@ -708,7 +714,7 @@ export function CashManagementTab() {
       bankAccountId: undefined,
       chequeNumber: "",
       amount: "" as unknown as number,
-      entryDate: format(new Date(), "yyyy-MM-dd"),
+      entryDate: getTodayIST(),
       remarks: "",
     },
   });
@@ -740,7 +746,7 @@ export function CashManagementTab() {
       capitalAssetCategory: "",
       capitalDepreciationRate: "" as unknown as number,
       amount: "" as unknown as number,
-      entryDate: format(new Date(), "yyyy-MM-dd"),
+      entryDate: getTodayIST(),
       remarks: "",
     },
   });
@@ -757,7 +763,7 @@ export function CashManagementTab() {
       fromAccountType: "cash_in_hand",
       toAccountType: "",
       amount: "" as unknown as number,
-      entryDate: format(new Date(), "yyyy-MM-dd"),
+      entryDate: getTodayIST(),
       remarks: "",
     },
   });
@@ -779,6 +785,15 @@ export function CashManagementTab() {
       outflowForm.setValue("bankAccountId", undefined);
     }
   }, [paymentMode]);
+
+  // Midnight reset: only fires when dateChanged becomes true (actual date flip),
+  // never on initial mount, so intraday user-selected dates are preserved.
+  useEffect(() => {
+    if (!dateChanged) return;
+    inwardForm.setValue("entryDate", currentDateIST);
+    outflowForm.setValue("entryDate", currentDateIST);
+    transferForm.setValue("entryDate", currentDateIST);
+  }, [dateChanged, currentDateIST]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -827,7 +842,7 @@ export function CashManagementTab() {
           sundryPayDbId: undefined,
           chequeNumber: "",
           amount: "" as unknown as number,
-          entryDate: format(new Date(), "yyyy-MM-dd"),
+          entryDate: getTodayIST(),
           remarks: "",
         });
       } else if (activeTab === "outflow") {
@@ -847,7 +862,7 @@ export function CashManagementTab() {
           capitalAssetCategory: "",
           capitalDepreciationRate: "" as unknown as number,
           amount: "" as unknown as number,
-          entryDate: format(new Date(), "yyyy-MM-dd"),
+          entryDate: getTodayIST(),
           remarks: "",
         });
         setAadhatAllocations([]);
@@ -857,7 +872,7 @@ export function CashManagementTab() {
           fromAccountType: "cash_in_hand",
           toAccountType: "",
           amount: "" as unknown as number,
-          entryDate: format(new Date(), "yyyy-MM-dd"),
+          entryDate: getTodayIST(),
           remarks: "",
         });
       }
