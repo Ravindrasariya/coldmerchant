@@ -1586,7 +1586,7 @@ export async function registerRoutes(
         for (const lotData of lots) {
           if (lotData.id) {
             const existingLot = existingEntry.lots.find((l: any) => l.id === lotData.id);
-            const lotLabel = `Lot #${lotData.id} (${existingLot?.coldStoreName || 'Unknown'})`;
+            const lotLabel = `Lot #${existingLot?.serialNumber ?? lotData.id} (${existingLot?.crop || existingLot?.coldStoreName || 'Unknown'})`;
 
             // Track lot-level changes
             if (existingLot && lotData.remainingBags !== undefined) {
@@ -1604,16 +1604,25 @@ export async function registerRoutes(
             if (existingLot && lotData.adjustedAmount !== undefined) {
               compareField('adjustedAmount', existingLot.adjustedAmount, lotData.adjustedAmount, lotLabel, 'lot', lotData.id);
             }
-            if (existingLot && lotData.adjustedAmountType !== undefined) {
+            // Only diff adjustment sub-fields when an adjustment amount is actually in play
+            // (either the existing DB value or the incoming value is non-zero). This prevents
+            // the UI's default adjustedAmountType:"credit" from being recorded as a change
+            // every time a lot with no adjustment is saved.
+            const effectiveAdjAmt = lotData.adjustedAmount !== undefined
+              ? lotData.adjustedAmount
+              : existingLot?.adjustedAmount;
+            const hasAdjustment = effectiveAdjAmt !== null && effectiveAdjAmt !== undefined &&
+              parseFloat(String(effectiveAdjAmt)) > 0;
+            if (existingLot && hasAdjustment && lotData.adjustedAmountType !== undefined) {
               compareField('adjustedAmountType', existingLot.adjustedAmountType, lotData.adjustedAmountType, lotLabel, 'lot', lotData.id);
             }
-            if (existingLot && lotData.adjustedAmountRemark !== undefined) {
+            if (existingLot && hasAdjustment && lotData.adjustedAmountRemark !== undefined) {
               compareField('adjustedAmountRemark', existingLot.adjustedAmountRemark, lotData.adjustedAmountRemark, lotLabel, 'lot', lotData.id);
             }
-            if (existingLot && lotData.adjustedAmountRate !== undefined) {
+            if (existingLot && hasAdjustment && lotData.adjustedAmountRate !== undefined) {
               compareField('adjustedAmountRate', existingLot.adjustedAmountRate, lotData.adjustedAmountRate, lotLabel, 'lot', lotData.id);
             }
-            if (existingLot && lotData.adjustedAmountEffectiveDate !== undefined) {
+            if (existingLot && hasAdjustment && lotData.adjustedAmountEffectiveDate !== undefined) {
               compareField('adjustedAmountEffectiveDate', existingLot.adjustedAmountEffectiveDate, lotData.adjustedAmountEffectiveDate, lotLabel, 'lot', lotData.id);
             }
             if (existingLot && lotData.place !== undefined) {
