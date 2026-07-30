@@ -7691,9 +7691,6 @@ export async function registerRoutes(
         { key: 'state', label: 'State' },
         { key: 'vehicleNumber', label: 'Vehicle Number' },
         { key: 'otherChargesRemarks', label: 'Other Charges Remarks' },
-        { key: 'adjustmentType', label: 'Adjustment Type' },
-        { key: 'adjustmentEffectiveDate', label: 'Adjustment Effective Date' },
-        { key: 'adjustmentReason', label: 'Adjustment Reason' },
       ];
 
       for (const { key, label } of textFieldsToTrack) {
@@ -7713,8 +7710,6 @@ export async function registerRoutes(
         { key: 'totalRevenue', label: 'Total Revenue' },
         { key: 'totalProfitLoss', label: 'Profit/Loss' },
         { key: 'totalDueToFarmer', label: 'Total Due' },
-        { key: 'adjustmentAmount', label: 'Adjustment Amount' },
-        { key: 'adjustmentRate', label: 'Adjustment Rate' },
       ];
 
       for (const { key, label } of numericFieldsToTrack) {
@@ -7724,6 +7719,39 @@ export async function registerRoutes(
           const formattedOld = oldVal !== null ? `₹${parseFloat(String(oldVal)).toLocaleString('en-IN')}` : null;
           const formattedNew = newVal !== null ? `₹${parseFloat(String(newVal)).toLocaleString('en-IN')}` : null;
           changes.push({ field: label, oldValue: formattedOld, newValue: formattedNew });
+        }
+      }
+
+      // Compare adjustment fields only when an adjustment is genuinely present on
+      // the old record or the new record — prevents the default "credit" type from
+      // the edit dialog registering as a fake change when no adjustment is set.
+      const oldAdjAmt = parseFloat(String(existingTxn.adjustmentAmount ?? '0')) || 0;
+      const newAdjAmt = parseFloat(String(transaction.adjustmentAmount ?? '0')) || 0;
+      if (oldAdjAmt !== 0 || newAdjAmt !== 0) {
+        const adjustmentTextFields = [
+          { key: 'adjustmentType', label: 'Adjustment Type' },
+          { key: 'adjustmentEffectiveDate', label: 'Adjustment Effective Date' },
+          { key: 'adjustmentReason', label: 'Adjustment Reason' },
+        ];
+        for (const { key, label } of adjustmentTextFields) {
+          const oldVal = existingTxn[key as keyof typeof existingTxn];
+          const newVal = transaction[key as keyof typeof transaction];
+          if (String(oldVal || '').trim() !== String(newVal || '').trim()) {
+            changes.push({ field: label, oldValue: oldVal || null, newValue: newVal || null });
+          }
+        }
+        const adjustmentNumericFields = [
+          { key: 'adjustmentAmount', label: 'Adjustment Amount' },
+          { key: 'adjustmentRate', label: 'Adjustment Rate' },
+        ];
+        for (const { key, label } of adjustmentNumericFields) {
+          const oldVal = existingTxn[key as keyof typeof existingTxn];
+          const newVal = transaction[key as keyof typeof transaction];
+          if (normalizeValue(oldVal) !== normalizeValue(newVal)) {
+            const formattedOld = oldVal !== null ? `₹${parseFloat(String(oldVal)).toLocaleString('en-IN')}` : null;
+            const formattedNew = newVal !== null ? `₹${parseFloat(String(newVal)).toLocaleString('en-IN')}` : null;
+            changes.push({ field: label, oldValue: formattedOld, newValue: formattedNew });
+          }
         }
       }
 
