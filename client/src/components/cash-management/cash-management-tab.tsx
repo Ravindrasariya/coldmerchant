@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer, FileText, HandCoins } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, RefreshCw, Banknote, Building2, Wallet, CreditCard, Filter, X, Settings, Download, Leaf, Package, ChevronsUpDown, Check, Undo2, Printer, FileText, HandCoins, Calculator } from "lucide-react";
 import { numberToIndianWords, escapeHtml } from "@/lib/number-to-words";
 import {
   AlertDialog,
@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { MultiDayFilter } from "@/components/ui/multi-day-filter";
 import { CashSettingsDialog } from "./cash-settings-dialog";
+import { CalcDialog } from "@/components/ui/calc-dialog";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -566,6 +567,8 @@ export function CashManagementTab() {
   
   // Settings dialog state
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [buyerCalcOpen, setBuyerCalcOpen] = useState(false);
+  const [aadhatCalcOpen, setAadhatCalcOpen] = useState(false);
   
   
   // View details dialog state
@@ -3225,9 +3228,23 @@ ${summaryHtml}
                           })}
 
                           <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="buyer-grand-total">
-                            <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                onClick={() => setBuyerCalcOpen(true)}
+                                title="Calculator"
+                                data-testid="buyer-calc-open"
+                              >
+                                <Calculator className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                             <span className="font-bold text-lg">₹{buyerGrandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                           </div>
+                          <CalcDialog open={buyerCalcOpen} onOpenChange={setBuyerCalcOpen} />
                           {buyerGrandTotalPetty > 0 && (
                             <div className="flex items-center justify-between p-2 bg-orange-50 dark:bg-orange-950/30 rounded-md" data-testid="buyer-petty-total">
                               <span className="text-sm text-orange-700 dark:text-orange-400">{t("Total Petty Adj", "कुल पेटी समायोजन")}</span>
@@ -3916,9 +3933,23 @@ ${summaryHtml}
                           })}
 
                           <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="aadhat-grand-total">
-                            <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm">{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-primary"
+                                onClick={() => setAadhatCalcOpen(true)}
+                                title="Calculator"
+                                data-testid="aadhat-calc-open"
+                              >
+                                <Calculator className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                             <span className="font-bold text-lg">₹{aadhatGrandTotalCash.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
                           </div>
+                          <CalcDialog open={aadhatCalcOpen} onOpenChange={setAadhatCalcOpen} />
                         </div>
                       )}
                     </div>
