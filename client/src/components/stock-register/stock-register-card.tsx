@@ -770,7 +770,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
         rows.push([
           entry.serialNumber.toString(),
           (lotIndex + 1).toString(),
-          format(new Date(entry.purchaseDate), "dd/MM/yyyy"),
+          format(new Date(`${entry.purchaseDate}T00:00:00`), "dd/MM/yyyy"),
           placeLabel,
           entry.farmerName,
           entry.village || "-",
@@ -1387,7 +1387,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
                           <span className="font-semibold text-base">{t("Sr No:", "क्र.:")} {entry.serialNumber}</span>
                         </div>
                         <span className="text-muted-foreground text-xs">
-                          {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
+                          {new Date(`${entry.purchaseDate}T00:00:00`).toLocaleDateString("en-IN", {
                             day: "numeric",
                             month: "short",
                             year: "numeric",

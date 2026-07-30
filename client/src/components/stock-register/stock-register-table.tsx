@@ -271,7 +271,7 @@ export function StockRegisterTable() {
                           #{entry.serialNumber}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {new Date(entry.purchaseDate).toLocaleDateString("en-IN", {
+                          {new Date(`${entry.purchaseDate}T00:00:00`).toLocaleDateString("en-IN", {
                             day: "2-digit",
                             month: "short",
                             year: "numeric",

@@ -724,7 +724,7 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3.5 w-3.5" />
-                          <span>{format(new Date(entry.purchaseDate), "dd MMM yyyy")}</span>
+                          <span>{format(new Date(`${entry.purchaseDate}T00:00:00`), "dd MMM yyyy")}</span>
                         </div>
                         {entry.supplierContact && (
                           <div className="flex items-center gap-1">
