@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -263,6 +263,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const { toast } = useToast();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
+  // Mirrors editableItems synchronously. Item handlers must compute their next
+  // array from this rather than from the editableItems state value: state updates
+  // are async, so two edits landing in the same tick would both build on the same
+  // pre-edit snapshot and the first would be lost. Always mutate via applyItems.
+  const editableItemsRef = useRef<EditableItem[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [selectedInventory, setSelectedInventory] = useState<string>("");
   const [lotPopoverOpen, setLotPopoverOpen] = useState(false);
@@ -305,6 +310,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [aadhatPct, setAadhatPct] = useState(0);
   const [hammaliRate, setHammaliRate] = useState(0);
   const [salesCommPct, setSalesCommPct] = useState(0);
+  // False until the user actually edits lots/bags/weight/price or a % / rate box.
+  // While false, the mandi charge amounts saved on the transaction are left exactly
+  // as loaded, so simply opening (or opening and saving) the dialog never rewrites
+  // a hand-entered charge.
+  const chargesTouchedRef = useRef(false);
+  // Set by recomputeMandiFromLots so the rate x base effect skips the render it
+  // triggers. That effect would otherwise recompute from the 2dp-rounded rate and
+  // overwrite the exact lot-derived totals the helper just wrote.
+  const skipRateEffectRef = useRef(false);
   const [revenueOverridden, setRevenueOverridden] = useState(false);
   const [prevItemRevenueFingerprint, setPrevItemRevenueFingerprint] = useState("");
 
@@ -380,6 +394,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       setVisibleEditCharges(activeCharges);
       setSelectedBuyerId(transaction.buyerId || null);
       setPrevItemRevenueFingerprint("");
+      chargesTouchedRef.current = false;
 
       const txnCrops = new Set(transaction.items.map(i => i.crop || "potato"));
       setSelectedCrops(txnCrops.size > 0 ? txnCrops : new Set(["potato"]));
@@ -471,29 +486,34 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           action: 'keep' as const
         };
       });
-      setEditableItems(mappedItems);
+      applyItems(mappedItems);
 
       if (transaction.transactionType === "loading") {
-        // Recompute mandi charges from the lots' CURRENT stock-register rates
-        // (mirrors the Create-Loading dialog), so rates entered or changed after
-        // creation are reflected. Falls back to 0 cleanly when a lot has no rate.
-        let aggMC = 0, aggAC = 0, aggHM = 0, aggEC = 0, amtBaseL = 0, bagBaseL = 0;
+        // Seed the % / rate boxes by BACK-DERIVING them from the amounts already
+        // saved on the transaction, so each box reproduces its saved total instead
+        // of the lot's current rate. A charge the user overrode by hand (at
+        // creation or in a previous edit) therefore survives reopening the dialog,
+        // and the dialog agrees with the bill that was printed from those saved
+        // values. Extra Charges is deliberately NOT written here at all — the value
+        // form.reset() loaded above stands.
+        //
+        // Derivation is STRICT: a charge the transaction never stored derives a rate
+        // of 0 rather than falling back to the lot's rate. The amount shown under
+        // each box is rate x base, so a lot-derived rate on a transaction with no
+        // stored amount would display a charge that isn't actually saved. The lot
+        // only becomes the source of truth again when the user edits
+        // lots/bags/weight/price — see recomputeMandiFromLots.
+        let amtBaseL = 0, bagBaseL = 0;
         for (const it of mappedItems) {
-          const amt = it.loadingAmount || 0;
-          const b = it.bagsMoved || 0;
-          amtBaseL += amt;
-          bagBaseL += b;
-          if (it.mandiCommissionPercent) aggMC += (amt * parseFloat(it.mandiCommissionPercent)) / 100;
-          if (it.aadhatCommissionPercent) aggAC += (amt * parseFloat(it.aadhatCommissionPercent)) / 100;
-          if (it.hammaliPerBag) aggHM += b * parseFloat(it.hammaliPerBag);
-          if (it.mandiExtraCharges && it.lotOriginalBags > 0) aggEC += parseFloat(it.mandiExtraCharges) * (b / it.lotOriginalBags);
+          amtBaseL += it.loadingAmount || 0;
+          bagBaseL += it.bagsMoved || 0;
         }
         const aBase = amtBaseL > 0 ? amtBaseL : 1;
         const bBase = bagBaseL > 0 ? bagBaseL : 1;
-        setMandiPct(Math.round((aggMC / aBase) * 10000) / 100);
-        setAadhatPct(Math.round((aggAC / aBase) * 10000) / 100);
-        setHammaliRate(Math.round((aggHM / bBase) * 100) / 100);
-        form.setValue("totalMandiExtraCharges", Math.round(aggEC * 100) / 100 || undefined);
+        const savedAmt = (saved: string | null | undefined) => parseFloat(saved || "0") || 0;
+        setMandiPct(Math.round((savedAmt(transaction.totalMandiCommission) / aBase) * 10000) / 100);
+        setAadhatPct(Math.round((savedAmt(transaction.totalAadhatCommission) / aBase) * 10000) / 100);
+        setHammaliRate(Math.round((savedAmt(transaction.totalHammali) / bBase) * 100) / 100);
         setSalesCommPct(amtBaseL > 0 ? Math.round((storedSC / amtBaseL) * 10000) / 100 : 0);
       } else {
         setMandiPct(0);
@@ -593,7 +613,16 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       .reduce((sum, i) => sum + (i.costOfGoods || 0), 0);
   }, [editableItems, isLoadingType]);
 
+  // Writes rate x base back into the charge amounts. GATED on chargesTouchedRef:
+  // on open it must NOT fire, or it would overwrite the saved (possibly
+  // hand-edited) amounts that form.reset() just loaded with lot-derived figures.
+  // Once the user has edited something it drives the totals as before.
   useEffect(() => {
+    if (!chargesTouchedRef.current) return;
+    if (skipRateEffectRef.current) {
+      skipRateEffectRef.current = false;
+      return;
+    }
     if (isLoadingType) {
       form.setValue("totalMandiCommission", Math.round(totalLotAmount * mandiPct / 100 * 100) / 100 || undefined);
       form.setValue("totalAadhatCommission", Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100 || undefined);
@@ -606,31 +635,49 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     }
   }, [mandiPct, aadhatPct, hammaliRate, salesCommPct, totalLotAmount, totalEditBags, isLoadingType, form, totalMandiSaleCOGS]);
 
-  const adjustMandiCharges = (delta: { mc: number; ac: number; hm: number; ec: number }, sign: 1 | -1, itemAmount: number = 0, itemBags: number = 0) => {
-    const cur = {
-      mc: Number(form.getValues("totalMandiCommission")) || 0,
-      ac: Number(form.getValues("totalAadhatCommission")) || 0,
-      hm: Number(form.getValues("totalHammali")) || 0,
-      ec: Number(form.getValues("totalMandiExtraCharges")) || 0,
-    };
-    const updated = {
-      mc: Math.round((cur.mc + sign * delta.mc) * 100) / 100,
-      ac: Math.round((cur.ac + sign * delta.ac) * 100) / 100,
-      hm: Math.round((cur.hm + sign * delta.hm) * 100) / 100,
-      ec: Math.round((cur.ec + sign * delta.ec) * 100) / 100,
-    };
-    form.setValue("totalMandiCommission", updated.mc || undefined);
-    form.setValue("totalAadhatCommission", updated.ac || undefined);
-    form.setValue("totalHammali", updated.hm || undefined);
-    form.setValue("totalMandiExtraCharges", updated.ec || undefined);
+  // Single entry point for changing the item list: keeps the synchronous ref and
+  // the React state in lockstep.
+  const applyItems = (next: EditableItem[]) => {
+    editableItemsRef.current = next;
+    setEditableItems(next);
+  };
 
-    const newRevenue = totalLotAmount + sign * itemAmount;
-    const newBags = totalEditBags + sign * itemBags;
-    const amtBase = newRevenue > 0 ? newRevenue : 1;
-    const bagBase = newBags > 0 ? newBags : 1;
-    setMandiPct(Math.round((updated.mc / amtBase) * 10000) / 100);
-    setAadhatPct(Math.round((updated.ac / amtBase) * 10000) / 100);
-    setHammaliRate(Math.round((updated.hm / bagBase) * 100) / 100);
+  // Reset ALL FOUR mandi charges from the lot tables, proportionately to the bags
+  // now selected. Called whenever the user changes the lots themselves — add or
+  // remove a lot, or change bags / net weight / price per kg. Any hand-entered
+  // override is deliberately discarded at that point: once the lot composition
+  // changes, the lot table becomes the source of truth again.
+  //
+  // Takes the NEXT items array explicitly because React state updates are async —
+  // reading editableItems here would use the pre-change values.
+  const recomputeMandiFromLots = (nextItems: EditableItem[]) => {
+    if (!isLoadingType) return;
+    chargesTouchedRef.current = true;
+    skipRateEffectRef.current = true;
+    let mc = 0, ac = 0, hm = 0, ec = 0, amtBase = 0, bagBase = 0;
+    for (const it of nextItems.filter(i => i.action !== 'remove')) {
+      const c = computeItemMandiCharges(it);
+      mc += c.mc; ac += c.ac; hm += c.hm; ec += c.ec;
+      amtBase += it.loadingAmount || 0;
+      bagBase += it.bagsMoved || 0;
+    }
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    form.setValue("totalMandiCommission", r2(mc) || undefined);
+    form.setValue("totalAadhatCommission", r2(ac) || undefined);
+    form.setValue("totalHammali", r2(hm) || undefined);
+    form.setValue("totalMandiExtraCharges", r2(ec) || undefined);
+
+    // Sales Commission is NOT lot-derived — it is a rate the user sets — but it is
+    // charged on the lot amount, so it must be restated against the new base here.
+    // The rate x base effect normally does this, but it is suppressed for the
+    // render this helper triggers, so skipping it would leave a stale commission.
+    form.setValue("salesCommission", r2(amtBase * salesCommPct / 100) || undefined);
+
+    const aBase = amtBase > 0 ? amtBase : 1;
+    const bBase = bagBase > 0 ? bagBase : 1;
+    setMandiPct(Math.round((mc / aBase) * 10000) / 100);
+    setAadhatPct(Math.round((ac / aBase) * 10000) / 100);
+    setHammaliRate(Math.round((hm / bBase) * 100) / 100);
   };
 
   const updateItemsMutation = useMutation({
@@ -687,7 +734,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   });
 
   const handleBagCountChange = (index: number, newBags: number) => {
-    setEditableItems(items => items.map((item, i) => {
+    const nextItems = editableItemsRef.current.map((item, i) => {
       if (i !== index) return item;
       let newWeight: number;
       if (item.lotSourceBags > 0) {
@@ -710,13 +757,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         costOfGoods: newCostOfGoods,
         loadingAmount: newLoadingAmount,
         revenue: isLoadingType ? newLoadingAmount : item.revenue,
-        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+        action: item.id ? (hasChanges ? 'update' as const : 'keep' as const) : 'add' as const
       };
-    }));
+    });
+    applyItems(nextItems);
+    recomputeMandiFromLots(nextItems);
   };
 
   const handleNetWeightChange = (index: number, newWeight: number) => {
-    setEditableItems(items => items.map((item, i) => {
+    const nextItems = editableItemsRef.current.map((item, i) => {
       if (i !== index) return item;
       const newLoadingAmount = isLoadingType ? parseFloat((item.loadingPricePerKg * newWeight).toFixed(2)) : item.loadingAmount;
       const cogsDenom = item.originalNetWeight > 0 ? item.originalNetWeight : item.netWeight;
@@ -730,13 +779,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         costOfGoods: newCostOfGoods,
         loadingAmount: newLoadingAmount,
         revenue: isLoadingType ? newLoadingAmount : item.revenue,
-        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+        action: item.id ? (hasChanges ? 'update' as const : 'keep' as const) : 'add' as const
       };
-    }));
+    });
+    applyItems(nextItems);
+    recomputeMandiFromLots(nextItems);
   };
 
   const handleLoadingPricePerKgChange = (index: number, newPpk: number) => {
-    setEditableItems(items => items.map((item, i) => {
+    const nextItems = editableItemsRef.current.map((item, i) => {
       if (i !== index) return item;
       const newAmount = parseFloat((newPpk * item.netWeight).toFixed(2));
       return {
@@ -744,13 +795,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         loadingPricePerKg: newPpk,
         loadingAmount: newAmount,
         revenue: newAmount,
-        action: item.id ? 'update' : 'add'
+        action: item.id ? 'update' as const : 'add' as const
       };
-    }));
+    });
+    applyItems(nextItems);
+    recomputeMandiFromLots(nextItems);
   };
 
   const handleRevenueChange = (index: number, newRevenue: number) => {
-    setEditableItems(items => items.map((item, i) => {
+    const nextItems = editableItemsRef.current.map((item, i) => {
       if (i !== index) return item;
       const hasChanges = item.bagsMoved !== item.originalBags || 
                         item.netWeight !== item.originalNetWeight ||
@@ -758,9 +811,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       return {
         ...item,
         revenue: newRevenue,
-        action: item.id ? (hasChanges ? 'update' : 'keep') : 'add'
+        action: item.id ? (hasChanges ? 'update' as const : 'keep' as const) : 'add' as const
       };
-    }));
+    });
+    applyItems(nextItems);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -771,24 +825,18 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     if (deleteConfirmIndex === null) return;
     const index = deleteConfirmIndex;
     const removedItem = editableItems[index];
-    
-    if (removedItem && isLoadingType) {
-      adjustMandiCharges(computeItemMandiCharges(removedItem), -1, removedItem.loadingAmount, removedItem.bagsMoved);
+    if (!removedItem) {
+      setDeleteConfirmIndex(null);
+      return;
     }
-    
-    setEditableItems(items => {
-      const item = items[index];
-      if (!item) return items;
-      
-      if (!item.id) {
-        return items.filter((_, i) => i !== index);
-      }
-      
-      return items.map((it, i) => 
-        i === index ? { ...it, action: 'remove' as const } : it
-      );
-    });
-    
+
+    const nextItems = removedItem.id
+      ? editableItemsRef.current.map((it, i) => i === index ? { ...it, action: 'remove' as const } : it)
+      : editableItemsRef.current.filter((_, i) => i !== index);
+
+    applyItems(nextItems);
+    recomputeMandiFromLots(nextItems);
+
     setDeleteConfirmIndex(null);
   };
 
@@ -828,7 +876,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     const loadingPpk = inv.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
     const loadingAmt = isLoadingType ? parseFloat((loadingPpk * newItemWeight).toFixed(2)) : 0;
     
-    setEditableItems(items => [...items, {
+    const newItem: EditableItem = {
       lotId: inv.lotId,
       breakdownId: inv.breakdownId,
       serialNumber: inv.serialNumber,
@@ -858,29 +906,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       lotOriginalBags: inv.lotOriginalBags || 0,
       costPerBag: costPerBag,
       action: 'add' as const
-    }]);
-    
-    if (isLoadingType) {
-      const newItem: EditableItem = {
-        lotId: inv.lotId, breakdownId: inv.breakdownId, serialNumber: inv.serialNumber,
-        crop: inv.crop || "potato",
-        place: inv.place, coldStoreName: inv.coldStoreName, potatoType: inv.potatoType, size: inv.size,
-        bagsMoved: newItemBags, originalBags: 0, netWeight: newItemWeight, originalNetWeight: 0,
-        pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag, costOfGoods, originalCostOfGoods: costOfGoods,
-        revenue: isLoadingType ? loadingAmt : newItemRevenue, originalRevenue: 0,
-        loadingPricePerKg: loadingPpk, loadingAmount: loadingAmt,
-        lotSourceWeight: 0, lotSourceBags: 0,
-        mandiCommissionPercent: inv.mandiCommissionPercent || null,
-        aadhatCommissionPercent: inv.aadhatCommissionPercent || null,
-        hammaliPerBag: inv.hammaliPerBag || null,
-        mandiExtraCharges: inv.mandiExtraCharges || null,
-        lotOriginalBags: inv.lotOriginalBags || 0,
-        costPerBag: costPerBag,
-        action: 'add',
-      };
-      adjustMandiCharges(computeItemMandiCharges(newItem), 1, newItem.loadingAmount, newItem.bagsMoved);
-    }
-    
+    };
+
+    const nextItems = [...editableItemsRef.current, newItem];
+    applyItems(nextItems);
+    recomputeMandiFromLots(nextItems);
+
     setSelectedInventory("");
     setNewItemBags(0);
     setNewItemWeight(0);
@@ -1560,6 +1591,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             value={mandiPct || ""}
                             onChange={(e) => {
                               const pct = Number(e.target.value) || 0;
+                              chargesTouchedRef.current = true;
                               setMandiPct(pct);
                               form.setValue("totalMandiCommission", Math.round(totalLotAmount * pct / 100 * 100) / 100 || undefined);
                             }}
@@ -1567,7 +1599,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalLotAmount * mandiPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
+                        {/* Show the actual charge amount, not rate x base: the rate is
+                            rounded to 2dp when back-derived from a saved total, so
+                            recomputing here could disagree with what is stored. */}
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Number(form.watch("totalMandiCommission")) || 0).toLocaleString('en-IN')}</p>
                       </div>
                       <div>
                         <Label className="text-xs">{t("Aadhat Comm. %", "आढ़त कमीशन %")}</Label>
@@ -1580,6 +1615,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             value={aadhatPct || ""}
                             onChange={(e) => {
                               const pct = Number(e.target.value) || 0;
+                              chargesTouchedRef.current = true;
                               setAadhatPct(pct);
                               form.setValue("totalAadhatCommission", Math.round(totalLotAmount * pct / 100 * 100) / 100 || undefined);
                             }}
@@ -1587,7 +1623,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalLotAmount * aadhatPct / 100 * 100) / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Number(form.watch("totalAadhatCommission")) || 0).toLocaleString('en-IN')}</p>
                       </div>
                       <div>
                         <Label className="text-xs">{t("Hammali ₹/bag", "हम्माली ₹/बोरी")}</Label>
@@ -1600,13 +1636,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             value={hammaliRate || ""}
                             onChange={(e) => {
                               const rate = Number(e.target.value) || 0;
+                              chargesTouchedRef.current = true;
                               setHammaliRate(rate);
                               form.setValue("totalHammali", Math.round(totalEditBags * rate * 100) / 100 || undefined);
                             }}
                             data-testid="input-edit-hammali"
                           />
                         </div>
-                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Math.round(totalEditBags * hammaliRate * 100) / 100).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Number(form.watch("totalHammali")) || 0).toLocaleString('en-IN')}</p>
                       </div>
                       <FormField
                         control={form.control}
@@ -1634,6 +1671,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             value={salesCommPct || ""}
                             onChange={(e) => {
                               const pct = Number(e.target.value) || 0;
+                              chargesTouchedRef.current = true;
                               setSalesCommPct(pct);
                               const scBase = totalLotAmount;
                               form.setValue("salesCommission", Math.round(scBase * pct / 100 * 100) / 100 || undefined);
@@ -1642,7 +1680,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
                         </div>
-                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(() => { const scBase = totalLotAmount; return (Math.round(scBase * salesCommPct / 100 * 100) / 100).toLocaleString('en-IN'); })()}</p>
+                        <p className="text-xs text-orange-500 font-mono mt-0.5">₹{(Number(form.watch("salesCommission")) || 0).toLocaleString('en-IN')}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium">{t("Revenue", "राजस्व")} (₹)</Label>
