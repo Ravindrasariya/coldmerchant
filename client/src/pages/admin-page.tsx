@@ -1422,7 +1422,11 @@ export default function AdminPage() {
                     onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
                     placeholder="Enter username"
                     data-testid="input-user-username"
+                    className={users.some(u => u.username.toLowerCase() === userForm.username.trim().toLowerCase()) && userForm.username.trim() ? "border-destructive focus-visible:ring-destructive" : ""}
                   />
+                  {userForm.username.trim() && users.some(u => u.username.toLowerCase() === userForm.username.trim().toLowerCase()) && (
+                    <p className="text-xs text-destructive">Username already taken</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="user-merchant">Merchant *</Label>
@@ -1492,6 +1496,7 @@ export default function AdminPage() {
               disabled={
                 !userForm.name ||
                 (!editingUser && (!userForm.username || !userForm.merchantId)) ||
+                (!editingUser && users.some(u => u.username.toLowerCase() === userForm.username.trim().toLowerCase())) ||
                 createUserMutation.isPending ||
                 updateUserMutation.isPending
               }
