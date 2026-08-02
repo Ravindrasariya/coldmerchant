@@ -1952,7 +1952,10 @@ export function CashManagementTab() {
       entry.receiptType ? getReceiptTypeLabel(entry.receiptType) : "",
       entry.revenueType ? getRevenueTypeLabel(entry.revenueType) : "",
       entry.expenseType ? getExpenseTypeLabel(entry.expenseType) : "",
-      entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "",
+      // Inward entries store their mode in receiptType, not paymentMode.
+      entry.direction === "inward"
+        ? (entry.receiptType === "cash_received" ? t("Cash", "नकद") : entry.receiptType === "account_received" ? t("Account", "खाता") : entry.receiptType === "cheque_received" ? t("Cheque", "चेक") : "")
+        : (entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : ""),
       entry.bankAccountName || "",
       entry.partyName || "",
       entry.partyVillage || "",
@@ -2150,7 +2153,12 @@ export function CashManagementTab() {
       if (isIn || isTransfer) totalCr += amt;
       const dr = (isOut || isTransfer) ? fmtAmt(amt) : "-";
       const cr = (isIn || isTransfer) ? fmtAmt(amt) : "-";
-      const mode = isTransfer ? t("Transfer", "ट्रांसफर") : (entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "");
+      // Inward entries store their mode in receiptType, not paymentMode.
+      const mode = isTransfer
+        ? t("Transfer", "ट्रांसफर")
+        : isIn
+          ? (entry.receiptType === "cash_received" ? t("Cash", "नकद") : entry.receiptType === "account_received" ? t("Account", "खाता") : entry.receiptType === "cheque_received" ? t("Cheque", "चेक") : "")
+          : (entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "");
       const remarks = entry.remarks ? esc(entry.remarks) : "";
       const bg = idx % 2 === 0 ? "#fafafa" : "#f0f0f0";
       return `<tr style="background:${bg}">
@@ -2212,6 +2220,8 @@ export function CashManagementTab() {
   td { padding: 6px 8px; vertical-align: top; }
   td.num, th.num { text-align: right; white-space: nowrap; }
   tr.total-row td { background: #e6f4ea; font-weight: bold; border-top: 1px solid #1e8a3c; }
+  thead { display: table-header-group; }
+  tbody tr { page-break-inside: avoid; }
   @media print { body { padding: 0; } }
 </style>
 </head>
