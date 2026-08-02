@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
+import { printHtmlDocument } from "@/lib/print-receipt";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -2265,13 +2266,10 @@ ${summaryHtml}
 </div>
 </body>
 </html>`;
-    try {
-      await shareReceiptAsPdf(document.createElement("div"), `Cash_Flow_History_${format(new Date(), "dd-MM-yyyy")}`, html);
-    } catch (err: any) {
-      if (err?.name !== "AbortError") {
-        toast({ title: t("PDF generation failed", "PDF बनाने में विफल"), description: t("Please try again", "कृपया पुनः प्रयास करें"), variant: "destructive" });
-      }
-    }
+    // Use the hidden-iframe print approach so the browser's native print
+    // engine handles page breaks. The canvas-based shareReceiptAsPdf slices a
+    // single image at fixed A4 heights and cannot respect CSS page-break rules.
+    printHtmlDocument(html);
   };
 
   return (
