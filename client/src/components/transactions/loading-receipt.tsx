@@ -252,7 +252,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       const _chargeRows = Math.max(_nonZeroCount, 1) + 1;
       const _fixedPx = 340 + _chargeRows * 26;
       const _availPx = 1047 - _fixedPx;
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - (headerImageDataUri ? 4 : 0));
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - 5);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0

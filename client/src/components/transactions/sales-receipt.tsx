@@ -240,7 +240,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       const _availPx = 1047 - 392;
       // Subtract 3 rows so the bill keeps ~3 rows of breathing space at the
       // bottom and never spills the footer blocks onto a second page.
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - (headerImageDataUri ? 7 : 3));
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - 7);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
