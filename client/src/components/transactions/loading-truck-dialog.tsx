@@ -134,6 +134,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
+  const [purchaseOrder, setPurchaseOrder] = useState("");
 
   const ADDITIONAL_CHARGE_OPTIONS = [
     { key: "tulai", label: "Tulai", labelHi: "तुलाई" },
@@ -410,6 +411,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         palaKarai: additionalCharges.palaKarai,
         bardan: additionalCharges.bardan,
         debit,
+        purchaseOrder: purchaseOrder.trim() || undefined,
         // Lock the previewed Tnx# for this loading row.
         transactionNumber: upcomingTnxNumber,
         tnxGroupId,
@@ -465,6 +467,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setHammaliPerBagRate(0);
     setEditExtraCharges(0);
     setDebit(0);
+    setPurchaseOrder("");
   };
 
   const handleSubmit = () => {
@@ -635,6 +638,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 <div>
                   <Label className="text-xs">{t("Select Buyer", "खरीदार चुनें")}</Label>
                   <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
+
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
@@ -691,6 +695,15 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       </Command>
                     </PopoverContent>
                   </Popover>
+                </div>
+                <div>
+                  <Label className="text-xs">{t("Purchase Order", "क्रय आदेश")}</Label>
+                  <Input
+                    value={purchaseOrder}
+                    onChange={(e) => setPurchaseOrder(e.target.value)}
+                    placeholder={t("PO / reference number", "पीओ / संदर्भ संख्या")}
+                    data-testid="input-purchase-order"
+                  />
                 </div>
               </div>
               {selectedBuyer?.redFlag && (

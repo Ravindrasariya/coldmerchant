@@ -2809,7 +2809,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -3063,6 +3063,7 @@ export async function registerRoutes(
           palaKarai: palaKarai ? palaKarai.toString() : null,
           bardan: bardan ? bardan.toString() : null,
           debit: transactionType === "loading" && debit ? debit.toString() : null,
+          purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null,
         },
         transactionItems
       );
@@ -3238,7 +3239,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -3386,6 +3387,9 @@ export async function registerRoutes(
       if (debit !== undefined && !decimalEqual(debit, existingTxn.debit)) {
         changes.push({ field: "debit", oldValue: existingTxn.debit, newValue: debit?.toString() || null });
       }
+      if (purchaseOrder !== undefined && (purchaseOrder || null) !== (existingTxn.purchaseOrder || null)) {
+        changes.push({ field: "purchaseOrder", oldValue: existingTxn.purchaseOrder, newValue: purchaseOrder || null });
+      }
 
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: titleCase(partyName) || null,
@@ -3413,6 +3417,7 @@ export async function registerRoutes(
         ...(palaKarai !== undefined ? { palaKarai: palaKarai ? palaKarai.toString() : null } : {}),
         ...(debit !== undefined && existingTxn.transactionType === "loading" ? { debit: debit ? debit.toString() : null } : {}),
         ...(bardan !== undefined ? { bardan: bardan ? bardan.toString() : null } : {}),
+        ...(purchaseOrder !== undefined ? { purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null } : {}),
       });
       
       // Record edit history if there are changes

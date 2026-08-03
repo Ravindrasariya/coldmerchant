@@ -165,6 +165,7 @@ interface TransactionWithHistory {
   palaKarai: string | null;
   bardan: string | null;
   debit: string | null;
+  purchaseOrder: string | null;
   tnxGroupId: string | null;
   createdAt: string;
   dateOfLoading: string | null;
@@ -194,6 +195,7 @@ const editTransactionSchema = z.object({
   palaKarai: z.coerce.number().optional(),
   bardan: z.coerce.number().optional(),
   debit: z.coerce.number().optional(),
+  purchaseOrder: z.string().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -361,6 +363,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       palaKarai: undefined,
       bardan: undefined,
       debit: undefined,
+      purchaseOrder: "",
     },
   });
 
@@ -388,6 +391,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         thelaBhada: transaction.thelaBhada ? parseFloat(transaction.thelaBhada) : undefined,
         palaKarai: transaction.palaKarai ? parseFloat(transaction.palaKarai) : undefined,
         bardan: transaction.bardan ? parseFloat(transaction.bardan) : undefined,
+        purchaseOrder: transaction.purchaseOrder || "",
       });
       const chargeKeys: EditChargeKey[] = ["tulai", "majduri", "thelaBhada", "palaKarai", "bardan"];
       const activeCharges = chargeKeys.filter(k => transaction[k] && parseFloat(transaction[k] as string) !== 0);
@@ -1124,6 +1128,19 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <FormLabel>{t("Driver Advance", "ड्राइवर अग्रिम")} (₹)</FormLabel>
                     <FormControl>
                       <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="purchaseOrder"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Purchase Order", "क्रय आदेश")}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={t("PO / reference number", "पीओ / संदर्भ संख्या")} {...field} data-testid="input-purchase-order" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

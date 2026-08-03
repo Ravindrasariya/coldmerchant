@@ -41,7 +41,7 @@ export const defaultLoadingTemplate = `<!DOCTYPE html>
 
   <table class="buyer-table">
     <tr>
-      <td class="buyer-name-cell" rowspan="4"><div style="display:flex;flex-direction:column;height:100%;min-height:90px"><div>{{buyerName}}</div>{{buyerContact}}</div></td>
+      <td class="buyer-name-cell" rowspan="4"><div style="display:flex;flex-direction:column;height:100%;min-height:90px"><div>{{buyerName}}</div>{{buyerContact}}{{purchaseOrder}}</div></td>
       <td style="width:100px">Quantity</td>
       <td>{{totalBags}}</td>
     </tr>

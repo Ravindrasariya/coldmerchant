@@ -339,6 +339,9 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       "{{buyerContact}}": buyer?.contact && buyer.contact.trim()
         ? `<div style="margin-top:auto;font-weight:normal;font-size:13px">Mobile: ${escHtml(buyer.contact)}</div>`
         : "",
+      "{{purchaseOrder}}": transaction.purchaseOrder
+        ? `<div style="font-weight:normal;font-size:12px;margin-top:2px">PO#: ${escHtml(transaction.purchaseOrder)}</div>`
+        : "",
       "{{buyerAddress}}": escHtml(buyer?.address || transaction.partyAddress || ""),
       "{{driverContact}}": escHtml(transaction.driverContact || ""),
       "{{vehicleNumber}}": escHtml(transaction.vehicleNumber || ""),
