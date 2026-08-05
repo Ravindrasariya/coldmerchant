@@ -61,6 +61,8 @@ interface LoadingTransaction {
   palaKarai: string | null;
   bardan: string | null;
   debit: string | null;
+  purchaseOrder: string | null;
+  freightPaidSeparately: boolean;
   crop: string | null;
   createdAt: string;
   dateOfLoading: string | null;
@@ -274,7 +276,8 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const hamm = parseFloat(transaction.totalHammali || "0");
     const extra = parseFloat(transaction.totalMandiExtraCharges || "0");
     const salesComm = parseFloat(transaction.salesCommission || "0");
-    const drvAdv = parseFloat(transaction.advancePayment || "0");
+    // When freight is paid separately, Driver Advance is not a buyer charge — hide it from the receipt.
+    const drvAdv = transaction.freightPaidSeparately ? 0 : parseFloat(transaction.advancePayment || "0");
     const advAmt = parseFloat(transaction.otherCharges || "0");
     const tl = parseFloat(transaction.tulai || "0");
     const mj = parseFloat(transaction.majduri || "0");

@@ -131,6 +131,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     return stored ? Number(stored) || 0 : 0;
   });
   const [totalFreight, setTotalFreight] = useState<number | null>(null);
+  const [freightPaidSeparately, setFreightPaidSeparately] = useState(false);
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
@@ -330,16 +331,18 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalCostOfGoods += Math.round(lineCogs * 100) / 100;
     });
 
-    const grandTotal = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
-    // Loading overall P&L = Revenue − COGS − pass-throughs. Revenue uses the
-    // same basis the backend stores on create (lot amounts + mandi + sales
-    // commission + additional charges + driver advance − debit; advance
-    // amount/otherCharges is NOT part of revenue). COGS already includes mandi
-    // tax for Mandi lots (cancels via Revenue − COGS), but the additional labour
-    // charges and driver advance are buyer-reimbursed pass-throughs added to
-    // Revenue yet NOT in COGS, so subtract them back out or P&L inflates.
-    const revenue = totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - debit;
-    const totalPL = revenue - totalCostOfGoods - totalAdditionalCharges - driverAdvance;
+    // Freight paid separately: Driver Advance is NOT a buyer charge — remove it
+    // from Revenue and grand total. P&L deducts Total Freight as a direct cost.
+    // Default: Driver Advance is a buyer-reimbursed pass-through (current behaviour).
+    const grandTotal = freightPaidSeparately
+      ? totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges - advanceAmount - debit
+      : totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - advanceAmount - debit;
+    const revenue = freightPaidSeparately
+      ? totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges - debit
+      : totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - debit;
+    const totalPL = freightPaidSeparately
+      ? revenue - totalCostOfGoods - totalAdditionalCharges - (totalFreight || 0)
+      : revenue - totalCostOfGoods - totalAdditionalCharges - driverAdvance;
 
     return {
       totalBags,
@@ -349,7 +352,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       grandTotal,
       totalPL,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit]);
+  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -412,6 +415,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         bardan: additionalCharges.bardan,
         debit,
         purchaseOrder: purchaseOrder.trim() || undefined,
+        freightPaidSeparately,
         // Lock the previewed Tnx# for this loading row.
         transactionNumber: upcomingTnxNumber,
         tnxGroupId,
@@ -458,6 +462,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setTnxGroupId(crypto.randomUUID());
     setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
     setTotalFreight(null);
+    setFreightPaidSeparately(false);
     setDriverAdvance(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
@@ -1126,6 +1131,16 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     placeholder="0"
                     data-testid="input-loading-total-freight"
                   />
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <Checkbox
+                      id="freight-paid-separately"
+                      checked={freightPaidSeparately}
+                      onCheckedChange={(v) => setFreightPaidSeparately(v === true)}
+                    />
+                    <label htmlFor="freight-paid-separately" className="text-xs text-muted-foreground cursor-pointer select-none">
+                      {t("Paid Separately", "अलग से भुगतान")}
+                    </label>
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">{t("Driver Advance", "ड्राइवर अग्रिम")}</Label>

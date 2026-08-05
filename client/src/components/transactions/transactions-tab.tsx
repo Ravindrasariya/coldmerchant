@@ -80,6 +80,7 @@ interface Transaction {
   palaKarai: string | null;
   bardan: string | null;
   debit: string | null;
+  freightPaidSeparately: boolean | null;
   revenue: string | null;
   tnxGroupId: string | null;
   totalBags: number;
@@ -109,6 +110,11 @@ function computeDisplayPL(txn: Transaction): number {
       parseFloat(txn.thelaBhada || "0") +
       parseFloat(txn.palaKarai || "0") +
       parseFloat(txn.bardan || "0");
+    if (txn.freightPaidSeparately) {
+      // Revenue was saved without Driver Advance; P&L deducts Total Freight directly.
+      const freight = parseFloat(txn.totalFreight || "0");
+      return rev - cogs - addl - freight;
+    }
     const adv = parseFloat(txn.advancePayment || "0");
     return rev - cogs - addl - adv;
   }
@@ -138,6 +144,10 @@ function computeDisplayCost(txn: Transaction): number {
       parseFloat(txn.thelaBhada || "0") +
       parseFloat(txn.palaKarai || "0") +
       parseFloat(txn.bardan || "0");
+    if (txn.freightPaidSeparately) {
+      // Driver Advance excluded from cost (not in Revenue either).
+      return cogs + addl;
+    }
     const adv = parseFloat(txn.advancePayment || "0");
     return cogs + addl + adv;
   }

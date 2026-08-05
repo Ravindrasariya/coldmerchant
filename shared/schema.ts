@@ -213,6 +213,7 @@ export const transactions = pgTable("transactions", {
   bardan: decimal("bardan", { precision: 12, scale: 2 }),
   debit: decimal("debit", { precision: 12, scale: 2 }), // unexpected buyer deduction (loading only); reduces revenue, grand total & P&L
   purchaseOrder: text("purchase_order"), // optional purchase order / reference number (loading only)
+  freightPaidSeparately: boolean("freight_paid_separately").notNull().default(false), // loading only: freight paid by user, not billed to buyer
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Lookup index for "find all rows in this loading session" queries used by
@@ -1260,6 +1261,7 @@ export const transactionItemFormSchema = z.object({
 export const transactionFormSchema = z.object({
   partyName: z.string().optional(),
   totalFreight: z.coerce.number().int().positive().optional().nullable(),
+  freightPaidSeparately: z.boolean().optional(),
   advancePayment: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),

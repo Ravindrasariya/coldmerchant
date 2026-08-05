@@ -2809,7 +2809,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -3018,15 +3018,19 @@ export async function registerRoutes(
         const mandiTotal = mcNum + acNum + hNum + ecNum;
         const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
         const advancePaymentNum = parseFloat(advancePayment) || 0;
+        const totalFreightNum = parseFloat(totalFreight) || 0;
+        const isPaidSeparately = freightPaidSeparately === true || freightPaidSeparately === "true";
         const lotAmounts = transactionItems.reduce((sum: number, item: any) => sum + (parseFloat(item.amount || item.revenue || "0")), 0);
-        revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
-        // Loading overall P&L = Revenue − COGS − pass-throughs. COGS
-        // (totalCostOfGoods) already includes purchase-side mandi tax for Mandi
-        // lots (so mandi cancels via Revenue − COGS), but the additional labour
-        // charges (tulai/majduri/thelaBhada/palaKarai/bardan) and driver advance
-        // are added to Revenue yet are NOT in COGS — they are buyer-reimbursed
-        // pass-throughs, so they must be subtracted back out or they inflate P&L.
-        profitLoss = revenueNum - totalCostOfGoods - additionalCharges - advancePaymentNum;
+        if (isPaidSeparately) {
+          // Freight paid separately: Driver Advance is NOT a buyer charge, so
+          // remove it from Revenue. P&L deducts Total Freight as a direct cost.
+          revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges - debitNum;
+          profitLoss = revenueNum - totalCostOfGoods - additionalCharges - totalFreightNum;
+        } else {
+          // Default: Driver Advance is a buyer-reimbursed pass-through.
+          revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
+          profitLoss = revenueNum - totalCostOfGoods - additionalCharges - advancePaymentNum;
+        }
       }
 
       const transaction = await storage.createTransaction(
@@ -3064,6 +3068,7 @@ export async function registerRoutes(
           bardan: bardan ? bardan.toString() : null,
           debit: transactionType === "loading" && debit ? debit.toString() : null,
           purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null,
+          freightPaidSeparately: freightPaidSeparately === true || freightPaidSeparately === "true",
         },
         transactionItems
       );
@@ -3239,7 +3244,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, freightPaidSeparately } = req.body;
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
@@ -3319,19 +3324,26 @@ export async function registerRoutes(
         const mandiTotal = mcNum + acNum + hNum + ecNum;
         const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
         const advancePaymentNum = parseFloat(advancePayment !== undefined ? advancePayment : existingTxn.advancePayment) || 0;
+        const totalFreightNum = parseFloat(totalFreight !== undefined ? totalFreight : existingTxn.totalFreight) || 0;
+        const isPaidSeparately = freightPaidSeparately !== undefined
+          ? (freightPaidSeparately === true || freightPaidSeparately === "true")
+          : (existingTxn.freightPaidSeparately === true);
         const existingItems = existingTxn.items || [];
         const lotAmounts = existingItems.reduce((sum: number, item: any) => sum + parseFloat(item.amount || item.revenue || "0"), 0);
-        newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
         // Recompute COGS LIVE from the stock register so a lot priced after this
         // transaction was created is reflected (the stale stored value is what
         // left the card P&L wrong after a plain metadata save).
         const liveCogs = await recomputeTxnTotalCogs(existingItems, merchantId, true);
         persistedCostOfGoods = liveCogs;
-        // Loading overall P&L = Revenue − COGS − pass-throughs. Mandi tax is
-        // already inside COGS for Mandi lots (cancels via Revenue − COGS); the
-        // additional labour charges and driver advance are buyer-reimbursed
-        // pass-throughs added to Revenue but NOT in COGS, so subtract them back.
-        newProfitLoss = newRevenue - liveCogs - additionalCharges - advancePaymentNum;
+        if (isPaidSeparately) {
+          // Freight paid separately: Driver Advance is NOT a buyer charge.
+          newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges - debitNum;
+          newProfitLoss = newRevenue - liveCogs - additionalCharges - totalFreightNum;
+        } else {
+          // Default: Driver Advance is a buyer-reimbursed pass-through.
+          newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
+          newProfitLoss = newRevenue - liveCogs - additionalCharges - advancePaymentNum;
+        }
       } else {
         const saleRevenueNum = revenue !== undefined ? parseFloat(revenue) || 0 : parseFloat(existingTxn.revenue || "0");
         if (revenue !== undefined) {
@@ -3390,6 +3402,12 @@ export async function registerRoutes(
       if (purchaseOrder !== undefined && (purchaseOrder || null) !== (existingTxn.purchaseOrder || null)) {
         changes.push({ field: "purchaseOrder", oldValue: existingTxn.purchaseOrder, newValue: purchaseOrder || null });
       }
+      const resolvedFreightPaidSeparately = freightPaidSeparately !== undefined
+        ? (freightPaidSeparately === true || freightPaidSeparately === "true")
+        : (existingTxn.freightPaidSeparately === true);
+      if (freightPaidSeparately !== undefined && resolvedFreightPaidSeparately !== (existingTxn.freightPaidSeparately === true)) {
+        changes.push({ field: "freightPaidSeparately", oldValue: String(existingTxn.freightPaidSeparately), newValue: String(resolvedFreightPaidSeparately) });
+      }
 
       const updatedTxn = await storage.updateTransaction(transactionId, merchantId, {
         partyName: titleCase(partyName) || null,
@@ -3418,6 +3436,7 @@ export async function registerRoutes(
         ...(debit !== undefined && existingTxn.transactionType === "loading" ? { debit: debit ? debit.toString() : null } : {}),
         ...(bardan !== undefined ? { bardan: bardan ? bardan.toString() : null } : {}),
         ...(purchaseOrder !== undefined ? { purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null } : {}),
+        freightPaidSeparately: resolvedFreightPaidSeparately,
       });
       
       // Record edit history if there are changes
@@ -3910,13 +3929,18 @@ export async function registerRoutes(
         const salesCommission = Math.round(newBase * commPct / 100 * 100) / 100;
         recalcSalesComm = salesCommission;
         const advancePaymentNum = parseFloat(existingTxn.advancePayment || "0");
+        const totalFreightNum = parseFloat(existingTxn.totalFreight || "0");
+        const isPaidSeparately = existingTxn.freightPaidSeparately === true;
         const debitNum = parseFloat(existingTxn.debit || "0");
-        finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal + advancePaymentNum - debitNum;
-        // Loading overall P&L = Revenue − COGS − pass-throughs. Mandi tax is
-        // already inside COGS for Mandi lots (cancels via Revenue − COGS); the
-        // additional labour charges and driver advance are buyer-reimbursed
-        // pass-throughs added to Revenue but NOT in COGS, so subtract them back.
-        newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - advancePaymentNum;
+        if (isPaidSeparately) {
+          // Freight paid separately: Driver Advance not a buyer charge.
+          finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal - debitNum;
+          newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - totalFreightNum;
+        } else {
+          // Default: Driver Advance is a buyer-reimbursed pass-through.
+          finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal + advancePaymentNum - debitNum;
+          newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - advancePaymentNum;
+        }
       } else {
         const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
         const otherCharges = parseFloat(existingTxn.otherCharges || "0");

@@ -166,6 +166,7 @@ interface TransactionWithHistory {
   bardan: string | null;
   debit: string | null;
   purchaseOrder: string | null;
+  freightPaidSeparately: boolean;
   tnxGroupId: string | null;
   createdAt: string;
   dateOfLoading: string | null;
@@ -196,6 +197,7 @@ const editTransactionSchema = z.object({
   bardan: z.coerce.number().optional(),
   debit: z.coerce.number().optional(),
   purchaseOrder: z.string().optional(),
+  freightPaidSeparately: z.boolean().optional(),
 });
 
 type EditTransactionFormData = z.infer<typeof editTransactionSchema>;
@@ -392,6 +394,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         palaKarai: transaction.palaKarai ? parseFloat(transaction.palaKarai) : undefined,
         bardan: transaction.bardan ? parseFloat(transaction.bardan) : undefined,
         purchaseOrder: transaction.purchaseOrder || "",
+        freightPaidSeparately: transaction.freightPaidSeparately === true,
       });
       const chargeKeys: EditChargeKey[] = ["tulai", "majduri", "thelaBhada", "palaKarai", "bardan"];
       const activeCharges = chargeKeys.filter(k => transaction[k] && parseFloat(transaction[k] as string) !== 0);
@@ -1117,6 +1120,22 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       />
                     </FormControl>
                     <FormMessage />
+                    <FormField
+                      control={form.control}
+                      name="freightPaidSeparately"
+                      render={({ field: psField }) => (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <Checkbox
+                            id="edit-freight-paid-separately"
+                            checked={psField.value === true}
+                            onCheckedChange={(v) => psField.onChange(v === true)}
+                          />
+                          <label htmlFor="edit-freight-paid-separately" className="text-xs text-muted-foreground cursor-pointer select-none">
+                            {t("Paid Separately", "अलग से भुगतान")}
+                          </label>
+                        </div>
+                      )}
+                    />
                   </FormItem>
                 )}
               />
@@ -1809,27 +1828,23 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
                     {(() => {
                       const activeItems = editableItems.filter(i => i.action !== 'remove');
-                      // Loading overall P&L = Revenue − COGS. Revenue here uses the
-                      // exact same basis as the Revenue field above (lot amounts +
-                      // mandi + sales commission + additional charges + driver
-                      // advance − debit). COGS is the live per-row `costOfGoods`
-                      // which ties out to the backend `totalCostOfGoods` (already
-                      // includes purchase-side mandi tax for Mandi lots). Do NOT add
-                      // sales commission / subtract debit again — they are already
-                      // inside the revenue figure.
                       const lotAmounts = activeItems.reduce((sum, i) => sum + (i.loadingAmount || 0), 0);
                       const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
                       const sc = Number(form.watch("salesCommission")) || 0;
                       const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
                       const drvAdv = Number(form.watch("advancePayment")) || 0;
                       const dbt = Number(form.watch("debit")) || 0;
-                      const displayedRevenue = lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt;
+                      const freight = Number(form.watch("totalFreight")) || 0;
+                      const isPaidSeparately = form.watch("freightPaidSeparately") === true;
                       const totalCogs = activeItems.reduce((sum, i) => sum + (i.costOfGoods || 0), 0);
-                      // Subtract the additional labour charges + driver advance:
-                      // they are added to Revenue but are buyer-reimbursed
-                      // pass-throughs NOT in COGS, so they must net out (mandi tax
-                      // stays inside COGS and cancels via Revenue − COGS).
-                      const totalPL = displayedRevenue - totalCogs - addlCharges - drvAdv;
+                      // Paid Separately: Driver Advance removed from Revenue; Total Freight deducted from P&L.
+                      // Default: Driver Advance is a buyer-reimbursed pass-through (cancels in Revenue − Cost).
+                      const displayedRevenue = isPaidSeparately
+                        ? lotAmounts + mandiTotal + sc + addlCharges - dbt
+                        : lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt;
+                      const totalPL = isPaidSeparately
+                        ? displayedRevenue - totalCogs - addlCharges - freight
+                        : displayedRevenue - totalCogs - addlCharges - drvAdv;
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
                           <CardContent className="py-3 px-4 flex items-center justify-between">
