@@ -51,6 +51,7 @@ import { db } from "./db";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } from './ist-utils';
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, isNotNull, inArray } from "drizzle-orm";
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, exceedsDue } from "@shared/utils";
+import { getFreightPaidForTruck } from "./freight-utils";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -1897,6 +1898,29 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
       if (blockingFifo.length > 0) {
         throw new TransactionDeletionBlockedError("A cash inward has been auto-applied (FIFO) to this transaction. Reverse the cash entry first, then delete.");
+      }
+
+      // Freight payments target the truck (loading date, transporter,
+      // vehicle) rather than the transaction row, so a freight payment
+      // recorded between the route precheck and this delete would be
+      // orphaned. Re-verify inside the transaction, same as the payment
+      // rechecks above.
+      const [txnRow] = await tx.select().from(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.merchantId, merchantId)));
+      if (txnRow && txnRow.transactionType === "loading") {
+        const merchantCashEntries = await tx.select().from(cashEntries)
+          .where(eq(cashEntries.merchantId, merchantId));
+        const freightPaid = getFreightPaidForTruck(
+          merchantCashEntries,
+          txnRow.dateOfLoading,
+          txnRow.transporterName,
+          txnRow.vehicleNumber,
+        );
+        if (freightPaid > 0) {
+          throw new TransactionDeletionBlockedError(
+            `₹${freightPaid.toLocaleString('en-IN')} of freight has already been paid for this truck. Reverse that freight payment in the Cash tab before deleting this transaction.`,
+          );
+        }
       }
 
       // Clean up ONLY reversed allocations referencing this transaction.
