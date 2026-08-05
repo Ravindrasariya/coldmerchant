@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { Buyer } from "@shared/schema";
 
@@ -406,13 +407,9 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
       return results.filter(Boolean);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/transporters"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       toast({
         title: t("Transaction Created", "लेनदेन बनाया गया"),
         description: t("Truck loaded successfully", "ट्रक सफलतापूर्वक लोड किया गया"),

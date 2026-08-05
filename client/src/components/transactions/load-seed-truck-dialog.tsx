@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { SEED_DISTRICTS, STATES } from "@shared/schema";
 
 interface Farmer {
@@ -257,14 +258,8 @@ export function LoadSeedTruckDialog({ open, onOpenChange }: LoadSeedTruckDialogP
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       toast({
         title: t("Success", "सफल"),
         description: t("Seed transaction created successfully", "बीज लेनदेन सफलतापूर्वक बनाया गया"),

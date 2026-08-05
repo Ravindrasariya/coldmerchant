@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { LoadTruckDialog } from "./load-truck-dialog";
 import { LoadingTruckDialog } from "./loading-truck-dialog";
 import { EditTransactionDialog } from "./edit-transaction-dialog";
@@ -993,15 +994,8 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
       return res.json() as Promise<{ message: string; transactionNumber: number }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       setConfirmDeleteTxn(null);
       toast({
         title: t("Transaction deleted", "लेनदेन हटा दिया गया"),

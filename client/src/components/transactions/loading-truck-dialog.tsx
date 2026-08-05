@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import type { Buyer } from "@shared/schema";
 
 interface UnsoldInventoryItem {
@@ -423,16 +424,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions/transporters"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
       toast({
         title: t("Loading Created", "लोडिंग बनाई गई"),
         description: t("Loading transaction saved successfully", "लोडिंग लेनदेन सफलतापूर्वक सहेजा गया"),

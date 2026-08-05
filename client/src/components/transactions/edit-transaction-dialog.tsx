@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { type Buyer } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { useToast } from "@/hooks/use-toast";
 import { EditableTnxNumber } from "./editable-tnx-number";
 import { InlineEditableDate } from "@/components/ui/inline-editable-date";
@@ -633,16 +634,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       return apiRequest("PATCH", `/api/transactions/${transactionId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);
@@ -789,16 +783,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       return apiRequest("PUT", `/api/transactions/${transactionId}/items`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory/unsold"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);

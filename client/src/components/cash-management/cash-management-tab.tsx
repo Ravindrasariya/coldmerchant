@@ -41,6 +41,7 @@ import { CalcDialog } from "@/components/ui/calc-dialog";
 import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES, ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
 
 type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
@@ -809,30 +810,7 @@ export function CashManagementTab() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-store-pending-charges"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/freight-outstanding"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sundry-pay"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
+      invalidateCashRelatedQueries(queryClient);
       toast({
         title: t("Success", "सफलता"),
         description: t("Entry recorded successfully", "प्रविष्टि सफलतापूर्वक दर्ज की गई"),
@@ -4802,30 +4780,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
         description: t("The cash entry has been reversed successfully.", "नकद प्रविष्टि सफलतापूर्वक उलट दी गई है।"),
         variant: "success",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/parties"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-stores"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/seed-suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhats-with-dues"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-store-pending-charges"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash/freight-outstanding"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cold-store-ledger"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cold-stores/search"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sundry-pay"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
+      invalidateCashRelatedQueries(queryClient);
     },
     onError: (error: any) => {
       toast({
