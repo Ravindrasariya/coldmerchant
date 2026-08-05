@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { farmers, lots, seedTransactions } from "@shared/schema";
+import { cashFarmers, farmers, lots, seedTransactions } from "@shared/schema";
 import { gt, isNotNull, and, sql } from "drizzle-orm";
 import { calculateSimpleInterest, getISTDateString } from "./ist-utils";
 import { log } from "./index";
@@ -10,27 +10,78 @@ export async function accrueInterestForAll(): Promise<void> {
   let lotCount = 0;
   let seedTxnCount = 0;
 
+  // Each farmer receivable is its own cash_farmers row carrying its own amount,
+  // interest rate and start date; the farmers table only holds the rolled-up
+  // total. So interest is computed per receivable from that receivable's own
+  // start date and summed — the same shape as the lot and seed adjustments
+  // below. Because every term is derived from stored inputs rather than added
+  // to a running balance, re-running this is a no-op and a day missed while the
+  // app was down is picked up on the next run.
+  const allCashFarmers = await db.select().from(cashFarmers).where(isNotNull(cashFarmers.farmerId));
+  const receivablesByFarmer = new Map<number, typeof allCashFarmers>();
+  for (const cf of allCashFarmers) {
+    if (!cf.farmerId) continue;
+    const list = receivablesByFarmer.get(cf.farmerId);
+    if (list) list.push(cf);
+    else receivablesByFarmer.set(cf.farmerId, [cf]);
+  }
+
+  // Fully paid receivables stop accruing, matching previous behaviour. This
+  // filter is required: without it a settled receivable would keep deriving
+  // interest from its original dates and resurrect a balance the farmer has
+  // already cleared.
+  //
+  // Consequence worth knowing: if a payment that cleared a receivable is later
+  // reversed, the next run charges interest for the whole period the balance
+  // sat at zero. That is intended — a reversal means the payment never really
+  // happened, so the money was owed throughout — but it is a policy choice, not
+  // an accident, and it differs from the old behaviour which resumed from the
+  // reversal date and silently forgave that interval.
   const allFarmers = await db.select().from(farmers).where(
-    and(
-      gt(sql`CAST(${farmers.receivableInterestRate} AS numeric)`, 0),
-      gt(sql`CAST(${farmers.remainingReceivable} AS numeric)`, 0),
-      isNotNull(farmers.receivableEffectiveDate)
-    )
+    gt(sql`CAST(${farmers.remainingReceivable} AS numeric)`, 0)
   );
 
   for (const farmer of allFarmers) {
-    const remaining = parseFloat(farmer.remainingReceivable || "0");
-    const rate = parseFloat(farmer.receivableInterestRate || "0");
-    if (remaining <= 0 || rate <= 0) continue;
+    // Principal is the original receivable, never reduced by payments, so
+    // interest stays simple rather than compounding on accrued interest.
+    const principalTotal = parseFloat(farmer.pyReceivable || "0");
+    if (principalTotal <= 0) continue;
 
-    const dailyInterest = remaining * rate / (365 * 100);
-    const currentFinal = parseFloat(farmer.pyReceivableFinalAmount || farmer.pyReceivable || "0");
-    const newFinalAmount = currentFinal + dailyInterest;
-    const newRemaining = remaining + dailyInterest;
+    const receivables = receivablesByFarmer.get(farmer.id) || [];
+    let accruedInterest = 0;
+
+    if (receivables.length > 0) {
+      for (const r of receivables) {
+        const principal = parseFloat(r.pendingDueToBePaid || "0");
+        const rate = parseFloat(r.rateOfInterest || "0");
+        if (principal <= 0 || rate <= 0 || !r.effectiveDate) continue;
+        accruedInterest += calculateSimpleInterest(principal, rate, r.effectiveDate, null) - principal;
+      }
+    } else {
+      // Receivable set directly on the farmer with no cash entry behind it:
+      // treat the farmer's own rate and start date as a single receivable.
+      const rate = parseFloat(farmer.receivableInterestRate || "0");
+      if (rate > 0 && farmer.receivableEffectiveDate) {
+        accruedInterest = calculateSimpleInterest(principalTotal, rate, farmer.receivableEffectiveDate, null) - principalTotal;
+      }
+    }
+
+    // Round before comparing: the stored value is 2dp, so comparing it against a
+    // full-precision total would leave a sub-paisa difference every run and the
+    // balance would creep. Both sides rounded means a repeat run is exactly zero.
+    const newFinal = Math.round((principalTotal + accruedInterest) * 100) / 100;
+    const storedFinal = parseFloat(farmer.pyReceivableFinalAmount || "0");
+    const oldFinal = storedFinal > 0 ? storedFinal : principalTotal;
+    const interestDelta = newFinal - oldFinal;
+    if (Math.abs(interestDelta) < 0.005) continue;
+
+    // Apply only the change, so payments already deducted stay deducted.
+    const oldRemaining = parseFloat(farmer.remainingReceivable || "0");
+    const newRemaining = Math.max(0, oldRemaining + interestDelta);
 
     await db.update(farmers)
       .set({
-        pyReceivableFinalAmount: newFinalAmount.toFixed(2),
+        pyReceivableFinalAmount: newFinal.toFixed(2),
         remainingReceivable: newRemaining.toFixed(2),
       })
       .where(sql`${farmers.id} = ${farmer.id}`);
@@ -119,18 +170,12 @@ function getMillisUntilMidnightIST(): number {
 }
 
 export function startInterestScheduler(): void {
-  // accrueInterestForAll adds one day's interest each time it runs and has no
-  // per-date guard, so it must run at most once per day. In development the
-  // server uses `tsx watch` and restarts on every server edit, which would
-  // otherwise over-accrue interest against the persistent dev database. The
-  // midnight schedule below still runs normally in both environments.
-  if (process.env.NODE_ENV === "production") {
-    accrueInterestForAll().catch(err => {
-      log(`Initial interest accrual error: ${err.message}`, "interest-scheduler");
-    });
-  } else {
-    log("Skipping startup interest accrual in development (watch-mode restarts would over-accrue)", "interest-scheduler");
-  }
+  // Every branch of accrueInterestForAll recomputes totals from stored dates and
+  // applies only the difference, so running it on each start is safe and lets a
+  // day missed while the app was down be picked up immediately.
+  accrueInterestForAll().catch(err => {
+    log(`Initial interest accrual error: ${err.message}`, "interest-scheduler");
+  });
 
   function scheduleNext() {
     const msUntilMidnight = getMillisUntilMidnightIST();
