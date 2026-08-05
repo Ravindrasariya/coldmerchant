@@ -41,6 +41,7 @@ interface SeedTransaction {
   uniqueId: string | null;
   merchantId: number;
   transactionNumber: number;
+  farmerId: number | null;
   farmerName: string;
   farmerContact: string | null;
   village: string | null;
@@ -58,6 +59,7 @@ interface SeedTransaction {
   totalDueToFarmer: string | null;
   adjustmentType: string | null;
   adjustmentAmount: string | null;
+  adjustmentAmountFinal: string | null;
   adjustmentRate: string | null;
   adjustmentEffectiveDate: string | null;
   adjustmentReason: string | null;

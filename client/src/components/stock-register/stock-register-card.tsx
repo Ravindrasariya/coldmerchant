@@ -52,6 +52,7 @@ interface StockEntryWithLots {
   id: number;
   uniqueId: string | null;
   serialNumber: number;
+  farmerId: number | null;
   purchaseDate: string;
   farmerName: string;
   farmerContact: string | null;
@@ -98,6 +99,8 @@ interface StockEntryWithLots {
     adjustedAmountRate: string | null;
     adjustedAmountEffectiveDate: string | null;
     adjustedAmountRemark: string | null;
+    earlyPayPercent: string | null;
+    earlyPayAmount: string | null;
     totalCogs: string | null;
     totalCharges: string | null;
     netPayable: string | null;

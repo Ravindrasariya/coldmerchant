@@ -150,7 +150,7 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/merchants"] });
       setMerchantDialogOpen(false);
-      setMerchantForm({ name: "", contactNumber: "", address: "" });
+      setMerchantForm({ name: "", contactNumber: "", address: "", receiptNotes: "" });
       toast({ title: "Merchant created successfully", variant: "success" });
     },
     onError: (error: Error) => {

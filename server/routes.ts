@@ -1081,7 +1081,7 @@ export async function registerRoutes(
           await storage.createBagBreakdown({
             lotId: lot.id,
             merchantId,
-            size: bdData.size,
+            size: bdData.size!,
             marka: bdData.marka || null,
             numberOfBags: bdData.numberOfBags,
             remainingBags: bdData.size === "Wastage" ? 0 : bdData.numberOfBags,
@@ -4246,7 +4246,7 @@ export async function registerRoutes(
           sourceType: "Harvest",
           serialNumber: seInfo?.serialNumber || 0,
           dueAmount: roundRupee(due),
-          lotNumber: lot.lotNumber ? `Lot #${lot.lotNumber}` : undefined,
+          lotNumber: (lot as any).lotNumber ? `Lot #${(lot as any).lotNumber}` : undefined,
         });
       }
 
@@ -4264,7 +4264,7 @@ export async function registerRoutes(
           sourceType: "Seed",
           serialNumber: seedSeInfo?.serialNumber || 0,
           dueAmount: roundRupee(due),
-          lotNumber: sLot.lotNumber ? `Lot #${sLot.lotNumber}` : undefined,
+          lotNumber: (sLot as any).lotNumber ? `Lot #${(sLot as any).lotNumber}` : undefined,
         });
       }
 
@@ -4304,7 +4304,7 @@ export async function registerRoutes(
         lotsByEntryId.set(lot.stockEntryId, arr);
       }
 
-      type AadhatStockEntry = { id: number; aadhatDbId?: number | null; paymentStatus?: string | null; createdAt?: Date | string | null; amountPaid?: string | null; uniqueId?: string | null; serialNumber?: number | null; purchaseDate?: string | null };
+      type AadhatStockEntry = { id: number; aadhatDbId?: number | null; paymentStatus?: string | null; createdAt?: Date | string | null; amountPaid?: string | null; uniqueId?: string | null; serialNumber?: number | null; purchaseDate?: string | null; crop?: string | null };
       const pendingEntries = (stockEntryList as AadhatStockEntry[])
         .filter(se => se.aadhatDbId === aadhatDbId && (se.paymentStatus === "due" || se.paymentStatus === "partial"))
         .sort((a, b) => new Date(String(a.createdAt || 0)).getTime() - new Date(String(b.createdAt || 0)).getTime())
@@ -4325,7 +4325,7 @@ export async function registerRoutes(
           const dueAmount = roundRupee(rawDue);
 
           const purchaseDate = se.purchaseDate;
-          const daysSince = Math.floor((Date.now() - new Date(purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
+          const daysSince = Math.floor((Date.now() - new Date(purchaseDate as string).getTime()) / (1000 * 60 * 60 * 24));
 
           return {
             stockEntryId: se.id,
@@ -4375,7 +4375,7 @@ export async function registerRoutes(
           const received = parseFloat(txn.amountReceived || "0");
           return revenue - received >= 1;
         })
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        .sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
 
       const cropMap = await storage.getDistinctCropsByTransactionIds(
         merchantId,
@@ -4386,7 +4386,7 @@ export async function registerRoutes(
         const revenue = parseFloat(txn.revenue || "0");
         const received = parseFloat(txn.amountReceived || "0");
         const dueAmount = roundRupee(revenue - received);
-        const daysSince = Math.floor((Date.now() - new Date(txn.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+        const daysSince = Math.floor((Date.now() - new Date(txn.createdAt ?? 0).getTime()) / (1000 * 60 * 60 * 24));
         // # Days for the Buyer Panna is measured from the loading date when
         // present, falling back to the creation-based daysSince for legacy rows.
         let daysSinceLoading = daysSince;
@@ -7547,7 +7547,7 @@ export async function registerRoutes(
         return res.json(existing);
       }
 
-      const updates: Record<string, any> = {
+      const updates = {
         farmerId: newFarmerId,
         farmerName: newFarmer.name,
         farmerContact: newFarmer.contact,

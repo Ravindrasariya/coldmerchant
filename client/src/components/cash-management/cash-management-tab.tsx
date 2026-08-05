@@ -1356,7 +1356,7 @@ export function CashManagementTab() {
   const outflowFarmerDue = useMemo(() => {
     if (!selectedOutflowFarmerName) return 0;
     const farmer = ledgerFarmers.find(f => f.name.toLowerCase() === selectedOutflowFarmerName.toLowerCase());
-    return farmer?.netDue > 0 ? farmer.netDue : 0;
+    return farmer && farmer.netDue > 0 ? farmer.netDue : 0;
   }, [selectedOutflowFarmerName, ledgerFarmers]);
 
   const outflowColdStoreDue = useMemo(() => {
@@ -3982,7 +3982,7 @@ ${summaryHtml}
                                   >
                                     {field.value ? (() => {
                                       const f = ledgerFarmers.find(f => f.name === field.value);
-                                      const due = f?.netDue > 0 ? f.netDue : 0;
+                                      const due = f && f.netDue > 0 ? f.netDue : 0;
                                       return due > 0
                                         ? `${f?.name || field.value} — ${t("Due", "बकाया")}: ₹${due.toLocaleString('en-IN')}`
                                         : f?.name || field.value;

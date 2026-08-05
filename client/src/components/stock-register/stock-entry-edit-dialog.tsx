@@ -42,6 +42,7 @@ import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryWithLots {
   id: number;
+  uniqueId?: string | null;
   serialNumber: number;
   purchaseDate: string;
   place: string | null;
@@ -168,7 +169,7 @@ export function StockEntryEditDialog({ entry, open, onOpenChange }: StockEntryEd
         ...bd,
         remainingBags: bd.remainingBags ?? bd.numberOfBags,
         weight: bd.weight && parseFloat(bd.weight) !== 0 ? parseFloat(bd.weight) : null,
-        pricePerKg: bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0,
+        pricePerKg: bd.pricePerKg ? parseFloat(bd.pricePerKg) : (0 as number | null),
         totalAmount: bd.totalAmount ?? null,
       }));
     })()

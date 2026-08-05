@@ -28,7 +28,9 @@ import { useLanguage } from "@/hooks/use-language";
 
 interface StockEntryWithLots {
   id: number;
+  uniqueId?: string | null;
   serialNumber: number;
+  farmerId: number | null;
   purchaseDate: string;
   farmerName: string;
   farmerContact: string | null;
@@ -36,24 +38,51 @@ interface StockEntryWithLots {
   tehsil: string | null;
   district: string;
   state: string;
+  place: string | null;
+  aadhatDbId: number | null;
+  aadhatName: string | null;
   paymentStatus: string;
   remarks: string | null;
+  attachmentImage: string | null;
+  crop?: string;
   lots: Array<{
     id: number;
-    coldStoreName: string;
+    place: string | null;
+    coldStoreName: string | null;
+    coldStoreLotNumber: string | null;
+    crop?: string;
     originalBags: number;
     remainingBags: number;
-    potatoType: string;
+    potatoType: string | null;
+    harvestPotatoType: string | null;
     bagType: string;
     quality: string;
     cutType: string;
     size: string | null;
+    marka: string | null;
     pricePerKg: string | null;
+    totalWeight: string | null;
     coldStoreChargesPerBag: string | null;
+    hammaliGradingCharges: string | null;
+    coldStoreDbId: number | null;
+    charges: Array<{ type: string; amount: number | string; coldStoreName?: string; coldStoreDbId?: number | null }> | null;
+    mandiCommissionPercent: string | null;
+    aadhatCommissionPercent: string | null;
+    hammaliPerBag: string | null;
+    mandiExtraCharges: string | null;
+    coldStorageChargesPaid: string | null;
+    adjustedAmount: string | null;
+    adjustedAmountType: string | null;
+    adjustedAmountRate: string | null;
+    adjustedAmountEffectiveDate: string | null;
+    adjustedAmountRemark: string | null;
+    earlyPayPercent: string | null;
+    earlyPayAmount: string | null;
     remarks: string | null;
     bagBreakdowns: Array<{
       id: number;
       size: string;
+      marka: string | null;
       numberOfBags: number;
       remainingBags: number | null;
       weight: string | null;
@@ -82,7 +111,7 @@ export function StockRegisterTable() {
     const stores = new Set<string>();
     entries.forEach(entry => {
       entry.lots.forEach(lot => {
-        stores.add(lot.coldStoreName);
+        stores.add(lot.coldStoreName ?? "");
       });
     });
     return Array.from(stores);
@@ -97,7 +126,7 @@ export function StockRegisterTable() {
         const matchesSearch = 
           entry.farmerName.toLowerCase().includes(search) ||
           entry.serialNumber.toString().includes(search) ||
-          entry.lots.some(lot => lot.coldStoreName.toLowerCase().includes(search));
+          entry.lots.some(lot => (lot.coldStoreName ?? "").toLowerCase().includes(search));
         if (!matchesSearch) return false;
       }
 
