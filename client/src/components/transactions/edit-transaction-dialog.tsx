@@ -369,6 +369,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       bardan: undefined,
       debit: undefined,
       purchaseOrder: "",
+      freightPaidSeparately: false,
     },
   });
 
@@ -650,7 +651,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         description: t("Changes saved successfully", "परिवर्तन सफलतापूर्वक सहेजे गए"),
         variant: "success",
       });
-      onOpenChange(false);
+      // Dialog close is handled by onSubmit after both mutations complete so
+      // the items mutation runs while the component is still mounted.
     },
     onError: (error: any) => {
       toast({
@@ -800,11 +802,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);
-      toast({
-        title: t("Items Updated", "आइटम अपडेट किए गए"),
-        description: t("Transaction items saved successfully", "लेनदेन आइटम सफलतापूर्वक सहेजे गए"),
-        variant: "success",
-      });
+      // No toast here — updateMutation already showed "Transaction Updated";
+      // a second toast for items would be redundant for a single Save action.
     },
     onError: (error: any) => {
       toast({
@@ -1003,11 +1002,15 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   const onSubmit = async (data: EditTransactionFormData) => {
     try {
-      await updateMutation.mutateAsync({ ...data, buyerId: selectedBuyerId });
       // Sequence: items recompute reads stored debit/charges, so PATCH must finish first.
       // Always run the items update so refreshed stock-register costs (COGS/cost-per-bag)
       // are recomputed and persisted even when the user made no manual item change.
+      // IMPORTANT: close the dialog only AFTER both mutations complete. If we close first
+      // the component unmounts (open=false → return null), and the items mutation runs in a
+      // stale closure where transaction/isLoadingType may already be null.
+      await updateMutation.mutateAsync({ ...data, buyerId: selectedBuyerId });
       await updateItemsMutation.mutateAsync();
+      onOpenChange(false);
     } catch {
       // Errors surfaced via individual mutation onError toasts
     }
