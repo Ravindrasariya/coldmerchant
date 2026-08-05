@@ -3548,6 +3548,26 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
 
+      // Freight payments are linked to the truck by its loading date,
+      // transporter and vehicle number, so deleting this transaction would
+      // leave any unreversed freight payment attached to a truck that no
+      // longer exists — same orphaning problem the edit guard prevents.
+      // Payment-driven, not flag-driven: if money has been paid against this
+      // truck, deletion is refused even when the row's flag is somehow false.
+      if (existingTxn.transactionType === "loading") {
+        const freightPaid = getFreightPaidForTruck(
+          await storage.getCashEntriesByMerchant(merchantId),
+          existingTxn.dateOfLoading,
+          existingTxn.transporterName,
+          existingTxn.vehicleNumber,
+        );
+        if (freightPaid > 0) {
+          return res.status(409).json({
+            message: `₹${freightPaid.toLocaleString('en-IN')} of freight has already been paid for this truck. Reverse that freight payment in the Cash tab before deleting this transaction.`,
+          });
+        }
+      }
+
       const blocker = await storage.getTransactionDeleteBlocker(transactionId, merchantId);
       if (blocker) {
         return res.status(409).json({ message: blocker.reason });
