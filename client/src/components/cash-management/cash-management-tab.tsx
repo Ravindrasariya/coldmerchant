@@ -436,6 +436,9 @@ const outflowFormSchema = z.object({
   capitalAssetName: z.string().optional(),
   capitalAssetCategory: z.string().optional(),
   capitalDepreciationRate: z.coerce.number().optional(),
+  // Which truck a Transport/Freight payment settles. "others" means untargeted,
+  // which is the default and behaves exactly as freight expenses always have.
+  freightTruckKey: z.string().optional().default("others"),
   amount: z.coerce.number().min(0, "Amount cannot be negative").optional().default(0),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
@@ -749,6 +752,7 @@ export function CashManagementTab() {
       capitalAssetName: "",
       capitalAssetCategory: "",
       capitalDepreciationRate: "" as unknown as number,
+      freightTruckKey: "others",
       amount: "" as unknown as number,
       entryDate: getTodayIST(),
       remarks: "",
@@ -815,6 +819,7 @@ export function CashManagementTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-store-pending-charges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/freight-outstanding"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -865,6 +870,7 @@ export function CashManagementTab() {
           capitalAssetName: "",
           capitalAssetCategory: "",
           capitalDepreciationRate: "" as unknown as number,
+          freightTruckKey: "others",
           amount: "" as unknown as number,
           entryDate: getTodayIST(),
           remarks: "",
@@ -926,6 +932,53 @@ export function CashManagementTab() {
   }, [selectedAadhatDbId]);
 
   const aadhatGrandTotalCash = aadhatAllocations.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  // ---- Transport/Freight: paying a specific truck -------------------------
+  // Only trucks marked "freight paid separately" and still owing money appear.
+  // The driver advance does not count as paid freight; only Cash tab payments do.
+  interface OutstandingFreightTruck {
+    key: string;
+    dateOfLoading: string;
+    transporterName: string;
+    vehicleNumber: string;
+    transactionNumbers: number[];
+    totalFreight: number;
+    paidAmount: number;
+    remainingFreight: number;
+  }
+
+  const selectedFreightTruckKey = outflowForm.watch("freightTruckKey");
+
+  const { data: outstandingFreightTrucks = [], isFetched: freightTrucksFetched } = useQuery<OutstandingFreightTruck[]>({
+    queryKey: ["/api/cash/freight-outstanding"],
+    queryFn: async () => {
+      const res = await fetch("/api/cash/freight-outstanding", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch outstanding freight");
+      return res.json();
+    },
+    enabled: expenseType === "transport_freight",
+  });
+
+  const selectedFreightTruck = useMemo(
+    () => outstandingFreightTrucks.find(t => t.key === selectedFreightTruckKey) || null,
+    [outstandingFreightTrucks, selectedFreightTruckKey],
+  );
+
+  // Fall back to "Others" whenever the chosen truck is no longer payable —
+  // switching away from freight, or the truck being settled by someone else.
+  useEffect(() => {
+    if (!selectedFreightTruckKey || selectedFreightTruckKey === "others") return;
+    if (expenseType !== "transport_freight") {
+      outflowForm.setValue("freightTruckKey", "others");
+      return;
+    }
+    // Wait for the list to have loaded once, otherwise the selection would be
+    // cleared on the initial empty render. After that, a missing truck means it
+    // was settled elsewhere — including when nothing is outstanding at all.
+    if (freightTrucksFetched && !selectedFreightTruck) {
+      outflowForm.setValue("freightTruckKey", "others");
+    }
+  }, [expenseType, selectedFreightTruckKey, selectedFreightTruck, freightTrucksFetched]);
 
   const [coldStoreAllocations, setColdStoreAllocations] = useState<ColdStoreAllocationRow[]>([]);
   const [coldStoreEntryPickerOpen, setColdStoreEntryPickerOpen] = useState(false);
@@ -1594,6 +1647,15 @@ export function CashManagementTab() {
         });
         return;
       }
+      // Paying a named truck can never exceed that truck's remaining freight.
+      if (effectiveExpenseType === "transport_freight" && selectedFreightTruck && values.amount > selectedFreightTruck.remainingFreight + 0.01) {
+        const rem = selectedFreightTruck.remainingFreight.toLocaleString('en-IN');
+        outflowForm.setError("amount", {
+          type: "manual",
+          message: t(`Amount cannot exceed the remaining freight (₹${rem})`, `राशि शेष भाड़े (₹${rem}) से अधिक नहीं हो सकती`),
+        });
+        return;
+      }
     }
     
     const selectedAadhat = isAadhtiya
@@ -1620,6 +1682,10 @@ export function CashManagementTab() {
       sundryPayDbId: effectiveExpenseType === "sundry_pay" ? (values.sundryPayDbId || null) : null,
       capitalAssetName: isCapital ? values.capitalAssetName : null,
       capitalAssetCategory: isCapital ? values.capitalAssetCategory : null,
+      // Null unless the user picked a specific truck ("Others" is the default).
+      freightLoadingDate: selectedFreightTruck?.dateOfLoading ?? null,
+      freightTransporterName: selectedFreightTruck?.transporterName ?? null,
+      freightVehicleNumber: selectedFreightTruck?.vehicleNumber ?? null,
       amount: isAadhtiya ? aadhatGrandTotalCash : isColdStoreCharge ? coldStoreGrandTotalCash : values.amount,
       entryDate: values.entryDate,
       remarks: values.remarks || null,
@@ -3650,6 +3716,54 @@ ${summaryHtml}
                   />
                   )}
 
+                  {expenseType === "transport_freight" && (
+                    <FormField
+                      control={outflowForm.control}
+                      name="freightTruckKey"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("Pay Freight For", "किस ट्रक का भाड़ा")}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "others"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-freight-truck">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="others">{t("Others", "अन्य")}</SelectItem>
+                              {outstandingFreightTrucks.map((truck) => {
+                                const [y, m, d] = truck.dateOfLoading.split("-");
+                                const label = [
+                                  truck.transactionNumbers.length > 0
+                                    ? `Tnx #${truck.transactionNumbers.join(", #")}`
+                                    : null,
+                                  d && m && y ? `${d}/${m}/${y}` : truck.dateOfLoading,
+                                  truck.vehicleNumber || t("No vehicle no.", "वाहन नं. नहीं"),
+                                  truck.transporterName,
+                                ].filter(Boolean).join(" · ");
+                                return (
+                                  <SelectItem key={truck.key} value={truck.key}>
+                                    {label} — ₹{truck.remainingFreight.toLocaleString('en-IN')} {t("left", "बाकी")}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          {selectedFreightTruck && (
+                            <p className="text-xs text-muted-foreground" data-testid="text-freight-remaining">
+                              {t("Total freight", "कुल भाड़ा")} ₹{selectedFreightTruck.totalFreight.toLocaleString('en-IN')}
+                              {" · "}
+                              {t("Paid", "भुगतान")} ₹{selectedFreightTruck.paidAmount.toLocaleString('en-IN')}
+                              {" · "}
+                              {t("Remaining", "शेष")} ₹{selectedFreightTruck.remainingFreight.toLocaleString('en-IN')}
+                            </p>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   {expenseType === "aadhtiya" && (
                     <FormField
                       control={outflowForm.control}
@@ -4406,6 +4520,7 @@ ${summaryHtml}
                       render={({ field }) => {
                         const maxDue = expenseType === "farmer" ? outflowFarmerDue
                           : expenseType === "supplier" ? outflowSupplierDue
+                          : expenseType === "transport_freight" ? (selectedFreightTruck?.remainingFreight || 0)
                           : 0;
                         return (
                           <FormItem>
@@ -4697,6 +4812,7 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
       queryClient.invalidateQueries({ queryKey: ["/api/cash/aadhat-pending-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/cold-store-pending-charges"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash/buyer-pending-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash/freight-outstanding"] });
       queryClient.invalidateQueries({ queryKey: ["/api/aadhats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });

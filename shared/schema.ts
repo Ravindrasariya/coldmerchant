@@ -285,6 +285,14 @@ export const cashEntries = pgTable("cash_entries", {
   aadhatDbId: integer("aadhat_db_id").references(() => aadhats.id), // resolved aadhat ledger ID
   sundryPayName: text("sundry_pay_name"), // For sundry pay outflow/inward
   sundryPayDbId: integer("sundry_pay_db_id"), // resolved sundry pay stakeholder ledger ID
+  // Freight settlement target (transport_freight outflow only). A freight payment
+  // can be pointed at one truck, identified by the loading date + transporter +
+  // vehicle number triple rather than a single transaction id, because one truck
+  // can span several transaction rows (one per buyer) in the same loading session.
+  // All three are null for untargeted ("Others") freight payments.
+  freightLoadingDate: text("freight_loading_date"),
+  freightTransporterName: text("freight_transporter_name"),
+  freightVehicleNumber: text("freight_vehicle_number"),
   expenseCategory: text("expense_category"), // "revenue" or "capital" for outflow
   capitalAssetName: text("capital_asset_name"), // Asset name for capital expenses
   capitalAssetCategory: text("capital_asset_category"), // Asset category for capital expenses

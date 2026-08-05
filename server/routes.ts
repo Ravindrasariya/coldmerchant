@@ -9,6 +9,7 @@ import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, roundColdStoreChargeAmounts } from "@shared/utils";
+import { computeOutstandingFreight, freightKey } from "./freight-utils";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -4473,11 +4474,29 @@ export async function registerRoutes(
   });
 
   // POST /api/cash/entries - Create a cash entry (inward, outflow, or transfer)
+  // GET /api/cash/freight-outstanding - trucks whose freight the user still owes
+  // the transporter. Only loading transactions flagged "freight paid separately"
+  // qualify; the driver advance is ignored, so only Cash tab payments reduce the
+  // balance. Trucks settled in full drop out of the list.
+  app.get("/api/cash/freight-outstanding", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const [txns, entries] = await Promise.all([
+        storage.getTransactionsByMerchant(merchantId),
+        storage.getCashEntriesByMerchant(merchantId),
+      ]);
+      res.json(computeOutstandingFreight(txns as any, entries as any));
+    } catch (error) {
+      console.error("Error fetching outstanding freight:", error);
+      res.status(500).json({ message: "Failed to fetch outstanding freight" });
+    }
+  });
+
   app.post("/api/cash/entries", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, buyerAllocations, coldStoreAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber } = req.body;
+      const { direction, receiptType, revenueType, expenseType, paymentMode, bankAccountId, fromAccountType, fromBankAccountId, toAccountType, toBankAccountId, partyName, partyVillage, buyerId: requestBuyerId, farmerName, farmerVillage, farmerContact, farmerId: requestFarmerId, coldStoreName, coldStoreDbId: requestColdStoreDbId, supplierName, aadhatName, aadhatDbId: requestAadhatDbId, sundryPayName, sundryPayDbId: requestSundryPayDbId, amount, entryDate, remarks, aadhatAllocations, buyerAllocations, coldStoreAllocations, expenseCategory, capitalAssetName, capitalAssetCategory, chequeNumber, freightLoadingDate, freightTransporterName, freightVehicleNumber } = req.body;
 
       // Validate required fields
       if (!direction || !["inward", "outflow", "transfer"].includes(direction)) {
@@ -4566,6 +4585,36 @@ export async function registerRoutes(
         }
         if (expenseType === "sundry_pay" && !sundryPayName) {
           return res.status(400).json({ message: "Stakeholder name is required when expense type is sundry pay" });
+        }
+        if (freightLoadingDate && expenseType !== "transport_freight") {
+          return res.status(400).json({ message: "A truck can only be selected for Transport/Freight expenses" });
+        }
+        // A truck is the whole (date, transporter, vehicle) triple. Half a triple
+        // would be stored but could never be matched back to a truck, so reject it
+        // rather than silently recording an untargeted payment.
+        if (!freightLoadingDate && (freightTransporterName || freightVehicleNumber)) {
+          return res.status(400).json({ message: "Incomplete truck details for this freight payment" });
+        }
+        // A freight payment aimed at a truck cannot exceed what is still owed on it.
+        // Recomputed here rather than trusted from the client, so a stale form or a
+        // concurrent payment cannot overpay the transporter.
+        if (expenseType === "transport_freight" && freightLoadingDate) {
+          const [freightTxns, freightEntries] = await Promise.all([
+            storage.getTransactionsByMerchant(merchantId),
+            storage.getCashEntriesByMerchant(merchantId),
+          ]);
+          const targetKey = freightKey(freightLoadingDate, freightTransporterName, freightVehicleNumber);
+          const truck = computeOutstandingFreight(freightTxns as any, freightEntries as any, true)
+            .find(t => t.key === targetKey);
+          if (!truck) {
+            return res.status(400).json({ message: "That truck was not found, or its freight is not paid separately" });
+          }
+          if (truck.remainingFreight <= 0.005) {
+            return res.status(400).json({ message: "That truck's freight is already fully paid" });
+          }
+          if (parsedAmount > truck.remainingFreight + 0.01) {
+            return res.status(400).json({ message: `Amount cannot exceed the remaining freight (₹${truck.remainingFreight.toLocaleString('en-IN')})` });
+          }
         }
         if (expenseType === "aadhtiya" && Array.isArray(aadhatAllocations)) {
           if (aadhatAllocations.length === 0) {
@@ -4766,6 +4815,9 @@ export async function registerRoutes(
             aadhatDbId: expenseType === "aadhtiya" ? resolvedAadhatDbId : null,
             sundryPayName: (expenseType === "sundry_pay" || revenueType === "sundry_pay") ? (titleCaseKeep(sundryPayName) || null) : null,
             sundryPayDbId: (expenseType === "sundry_pay" || revenueType === "sundry_pay") ? resolvedSundryPayDbId : null,
+            freightLoadingDate: expenseType === "transport_freight" ? (freightLoadingDate || null) : null,
+            freightTransporterName: expenseType === "transport_freight" ? (freightTransporterName || null) : null,
+            freightVehicleNumber: expenseType === "transport_freight" ? (freightVehicleNumber || null) : null,
             expenseCategory: expenseCategory || null,
             capitalAssetName: capitalAssetName || null,
             capitalAssetCategory: capitalAssetCategory || null,
@@ -9833,16 +9885,21 @@ export async function registerRoutes(
             // them back for revenue − COGS to reconcile with the stored
             // profitLoss. Do NOT add mandi/aadhat/hammali/extra again.
             // When freight is paid separately the driver advance is excluded from
-            // revenue entirely and Total Freight is the user-borne cost deducted
-            // from P&L, so Books must add back totalFreight instead of the advance
-            // — otherwise revenue − COGS no longer equals the stored profitLoss.
+            // revenue entirely, so there is nothing to add back for it here.
+            //
+            // Total Freight is deliberately NOT added into COGS either. Freight is
+            // reported on its own Transport/Freight line, funded by the actual Cash
+            // tab payments against that truck, so folding it into COGS as well would
+            // count the same freight twice. Two accepted consequences: revenue − COGS
+            // no longer equals the stored profitLoss for these trucks, and freight
+            // that has not been paid yet is absent from Books until it is paid.
             return sum + cost
               + num(tx.tulai)
               + num(tx.majduri)
               + num(tx.thelaBhada)
               + num(tx.palaKarai)
               + num(tx.bardan)
-              + (tx.freightPaidSeparately === true ? num(tx.totalFreight) : num(tx.advancePayment));
+              + (tx.freightPaidSeparately === true ? 0 : num(tx.advancePayment));
           }
           return sum + cost
             + num(tx.totalMandiCommission)
