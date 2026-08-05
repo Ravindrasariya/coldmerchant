@@ -83,6 +83,25 @@ export function sumFreightPaidByTruck(
 }
 
 /**
+ * Freight already paid (unreversed) against one specific truck.
+ *
+ * Used to refuse edits that would strand those payments — unticking "freight
+ * paid separately", changing the truck's identity, or changing Total Freight —
+ * since a payment whose truck no longer exists stays on the books as an expense
+ * belonging to nothing.
+ */
+export function getFreightPaidForTruck(
+  cashEntries: FreightPaymentLike[],
+  dateOfLoading: string | null | undefined,
+  transporterName: string | null | undefined,
+  vehicleNumber: string | null | undefined,
+): number {
+  const key = freightKey(dateOfLoading, transporterName, vehicleNumber);
+  const paid = sumFreightPaidByTruck(cashEntries).get(key) || 0;
+  return Math.round(paid * 100) / 100;
+}
+
+/**
  * Trucks whose freight the user pays themselves, with how much is still owed.
  *
  * Only loading transactions flagged freightPaidSeparately are considered — when

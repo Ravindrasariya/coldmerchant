@@ -168,6 +168,9 @@ interface TransactionWithHistory {
   debit: string | null;
   purchaseOrder: string | null;
   freightPaidSeparately: boolean;
+  // Freight already paid (unreversed) from the Cash tab against this truck.
+  // Anything above zero freezes the freight fields until the payment is reversed.
+  freightPaidAmount?: number;
   tnxGroupId: string | null;
   createdAt: string;
   dateOfLoading: string | null;
@@ -659,6 +662,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   const isLoadingType = transaction?.transactionType === "loading";
 
+  // Freight already settled from the Cash tab pins this truck's freight details:
+  // those payments are linked to the truck by its date, transporter and vehicle,
+  // so editing any of them would orphan the payment. The server enforces this
+  // too — locking the fields just saves the user a rejected save.
+  const freightPaidAmount = transaction?.freightPaidAmount || 0;
+  const freightLocked = freightPaidAmount > 0;
+  const freightLockedHint = t(
+    `₹${freightPaidAmount.toLocaleString('en-IN')} already paid — reverse that payment in the Cash tab to change this`,
+    `₹${freightPaidAmount.toLocaleString('en-IN')} का भुगतान हो चुका है — बदलने के लिए पहले कैश टैब में उस भुगतान को रिवर्स करें`,
+  );
+
   const computeItemMandiCharges = (item: EditableItem) => {
     // Loading mandi is charged on the sale amount (mirrors the Create-Loading
     // dialog); sale mandi is charged on COGS.
@@ -1147,7 +1161,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   <FormItem className="flex flex-col">
                     <FormLabel>{t("Vehicle #", "वाहन नं")}</FormLabel>
                     <FormControl>
-                      <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
+                      <Input placeholder={t("Enter vehicle number", "वाहन नंबर दर्ज करें")} {...field} disabled={freightLocked} title={freightLocked ? freightLockedHint : undefined} onChange={(e) => field.onChange(e.target.value.toUpperCase())} data-testid="input-vehicle-number" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1178,6 +1192,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         min="1"
                         step="1"
                         placeholder="0"
+                        disabled={freightLocked}
+                        title={freightLocked ? freightLockedHint : undefined}
                         value={field.value ?? ""}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -1196,6 +1212,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           <Checkbox
                             id="edit-freight-paid-separately"
                             checked={psField.value === true}
+                            disabled={freightLocked}
                             onCheckedChange={(v) => psField.onChange(v === true)}
                           />
                           <label htmlFor="edit-freight-paid-separately" className="text-xs text-muted-foreground cursor-pointer select-none">
@@ -1204,6 +1221,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         </div>
                       )}
                     />
+                    {freightLocked && (
+                      <p className="text-xs text-amber-600 mt-0.5" data-testid="text-freight-locked">
+                        {freightLockedHint}
+                      </p>
+                    )}
                   </FormItem>
                 )}
               />

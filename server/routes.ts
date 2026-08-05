@@ -9,7 +9,7 @@ import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, roundColdStoreChargeAmounts } from "@shared/utils";
-import { computeOutstandingFreight, freightKey } from "./freight-utils";
+import { computeOutstandingFreight, freightKey, getFreightPaidForTruck } from "./freight-utils";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -3101,7 +3101,18 @@ export async function registerRoutes(
       }
       
       const editHistory = await storage.getTransactionEditHistory(transactionId, merchantId);
-      res.json({ ...transaction, editHistory });
+      // Freight already paid against this truck, so the edit dialog can lock the
+      // freight fields up front instead of letting the user discover the block
+      // only when they try to save.
+      const freightPaidAmount = transaction.transactionType === "loading"
+        ? getFreightPaidForTruck(
+            await storage.getCashEntriesByMerchant(merchantId),
+            transaction.dateOfLoading,
+            transaction.transporterName,
+            transaction.vehicleNumber,
+          )
+        : 0;
+      res.json({ ...transaction, editHistory, freightPaidAmount });
     } catch (error) {
       console.error("Error fetching transaction:", error);
       res.status(500).json({ message: "Failed to fetch transaction" });
@@ -3212,6 +3223,31 @@ export async function registerRoutes(
         return res.json(existing);
       }
 
+      // The loading date is part of a truck's identity for freight settlement,
+      // so moving it would strand any freight already paid against this truck.
+      // Checked across the whole group because the date change cascades to every
+      // sibling row of the loading session.
+      if (existing.transactionType === "loading") {
+        const allTxns = await storage.getTransactionsByMerchant(merchantId);
+        const groupRows = existing.tnxGroupId
+          ? allTxns.filter(t => t.tnxGroupId === existing.tnxGroupId)
+          : allTxns.filter(t => t.id === id);
+        const cashEntries = await storage.getCashEntriesByMerchant(merchantId);
+        for (const row of groupRows) {
+          const freightPaid = getFreightPaidForTruck(
+            cashEntries,
+            row.dateOfLoading,
+            row.transporterName,
+            row.vehicleNumber,
+          );
+          if (freightPaid > 0) {
+            return res.status(400).json({
+              message: `₹${freightPaid.toLocaleString('en-IN')} of freight has already been paid for this truck. Reverse that freight payment in the Cash tab before changing the loading date.`,
+            });
+          }
+        }
+      }
+
       const { updatedIds } = await storage.updateTransactionDateForGroup(
         merchantId,
         existing.tnxGroupId ?? null,
@@ -3254,6 +3290,36 @@ export async function registerRoutes(
       }
       
       const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, freightPaidSeparately } = req.body;
+
+      // Once freight has actually been paid from the Cash tab, the truck is
+      // frozen. Those payments are linked to the truck by its loading date,
+      // transporter and vehicle number, so unticking the flag, renaming the
+      // vehicle or changing Total Freight would leave the payment attached to a
+      // truck that no longer exists. Refuse and tell the user to reverse first.
+      // Payment-driven, not flag-driven: if money has been paid against this
+      // truck the details are frozen even when the row's flag is somehow false.
+      if (existingTxn.transactionType === "loading") {
+        const freightPaid = getFreightPaidForTruck(
+          await storage.getCashEntriesByMerchant(merchantId),
+          existingTxn.dateOfLoading,
+          existingTxn.transporterName,
+          existingTxn.vehicleNumber,
+        );
+        if (freightPaid > 0) {
+          const wouldUntick = freightPaidSeparately !== undefined
+            && !(freightPaidSeparately === true || freightPaidSeparately === "true");
+          const wouldRenameVehicle = vehicleNumber !== undefined
+            && (vehicleNumber || "").trim() !== (existingTxn.vehicleNumber || "").trim();
+          const wouldChangeFreight = totalFreight !== undefined
+            && (parseFloat(String(sanitizeFreight(totalFreight) ?? "")) || 0) !== (parseFloat(existingTxn.totalFreight || "0") || 0);
+          if (wouldUntick || wouldRenameVehicle || wouldChangeFreight) {
+            const paidLabel = `₹${freightPaid.toLocaleString('en-IN')}`;
+            return res.status(400).json({
+              message: `${paidLabel} of freight has already been paid for this truck. Reverse that freight payment in the Cash tab before changing the freight details.`,
+            });
+          }
+        }
+      }
       
       // Helper to compare decimal values (treats "1000.00" and "1000" as equal)
       const decimalEqual = (a: string | number | null | undefined, b: string | number | null | undefined): boolean => {
