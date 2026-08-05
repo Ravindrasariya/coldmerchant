@@ -31,12 +31,13 @@ export async function accrueInterestForAll(): Promise<void> {
   // interest from its original dates and resurrect a balance the farmer has
   // already cleared.
   //
-  // Consequence worth knowing: if a payment that cleared a receivable is later
-  // reversed, the next run charges interest for the whole period the balance
-  // sat at zero. That is intended — a reversal means the payment never really
-  // happened, so the money was owed throughout — but it is a policy choice, not
-  // an accident, and it differs from the old behaviour which resumed from the
-  // reversal date and silently forgave that interval.
+  // CONFIRMED POLICY: if a payment that cleared a receivable is later reversed,
+  // the next run charges interest for the whole period the balance sat at zero.
+  // Rationale: a reversal means the payment never really happened, so the money
+  // was owed throughout — the cleared period is not forgiven. This was
+  // explicitly confirmed by the business owner (August 2026) and differs from
+  // the old behaviour, which resumed from the reversal date and silently
+  // forgave that interval. Do not change this without a new explicit decision.
   const allFarmers = await db.select().from(farmers).where(
     gt(sql`CAST(${farmers.remainingReceivable} AS numeric)`, 0)
   );
