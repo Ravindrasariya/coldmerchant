@@ -119,9 +119,18 @@ function getMillisUntilMidnightIST(): number {
 }
 
 export function startInterestScheduler(): void {
-  accrueInterestForAll().catch(err => {
-    log(`Initial interest accrual error: ${err.message}`, "interest-scheduler");
-  });
+  // accrueInterestForAll adds one day's interest each time it runs and has no
+  // per-date guard, so it must run at most once per day. In development the
+  // server uses `tsx watch` and restarts on every server edit, which would
+  // otherwise over-accrue interest against the persistent dev database. The
+  // midnight schedule below still runs normally in both environments.
+  if (process.env.NODE_ENV === "production") {
+    accrueInterestForAll().catch(err => {
+      log(`Initial interest accrual error: ${err.message}`, "interest-scheduler");
+    });
+  } else {
+    log("Skipping startup interest accrual in development (watch-mode restarts would over-accrue)", "interest-scheduler");
+  }
 
   function scheduleNext() {
     const msUntilMidnight = getMillisUntilMidnightIST();

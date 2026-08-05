@@ -470,7 +470,15 @@ export async function registerRoutes(
           (tx.palaKarai ? parseFloat(tx.palaKarai) : 0) +
           (tx.bardan ? parseFloat(tx.bardan) : 0);
         const advance = tx.advancePayment ? parseFloat(tx.advancePayment) : 0;
-        const wantPl = roundRupee(revenue - liveCogs - additional - advance);
+        // Freight paid separately: Driver Advance is not a buyer pass-through
+        // (it is already excluded from revenue), and Total Freight is the real
+        // cost borne by the user. Mirrors the PATCH/POST branching — without
+        // this the backfill silently rewrites P&L on every server restart.
+        const totalFreightVal = tx.totalFreight ? parseFloat(tx.totalFreight) : 0;
+        const paidSeparately = tx.freightPaidSeparately === true;
+        const wantPl = paidSeparately
+          ? roundRupee(revenue - liveCogs - additional - totalFreightVal)
+          : roundRupee(revenue - liveCogs - additional - advance);
         const wantCogs = roundRupee(liveCogs);
         const existingPl = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
         const existingCogs = tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0;
@@ -9824,13 +9832,17 @@ export async function registerRoutes(
             // are added to revenue but are NOT in COGS, so Books COGS must add
             // them back for revenue − COGS to reconcile with the stored
             // profitLoss. Do NOT add mandi/aadhat/hammali/extra again.
+            // When freight is paid separately the driver advance is excluded from
+            // revenue entirely and Total Freight is the user-borne cost deducted
+            // from P&L, so Books must add back totalFreight instead of the advance
+            // — otherwise revenue − COGS no longer equals the stored profitLoss.
             return sum + cost
               + num(tx.tulai)
               + num(tx.majduri)
               + num(tx.thelaBhada)
               + num(tx.palaKarai)
               + num(tx.bardan)
-              + num(tx.advancePayment);
+              + (tx.freightPaidSeparately === true ? num(tx.totalFreight) : num(tx.advancePayment));
           }
           return sum + cost
             + num(tx.totalMandiCommission)

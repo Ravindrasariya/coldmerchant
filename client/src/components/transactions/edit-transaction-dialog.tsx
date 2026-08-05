@@ -802,8 +802,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       setShowAddItem(false);
       setSelectedInventory("");
       setNewItemBags(0);
-      // No toast here — updateMutation already showed "Transaction Updated";
-      // a second toast for items would be redundant for a single Save action.
+      toast({
+        title: t("Items Updated", "आइटम अपडेट किए गए"),
+        description: t("Transaction items saved successfully", "लेनदेन आइटम सफलतापूर्वक सहेजे गए"),
+        variant: "success",
+      });
     },
     onError: (error: any) => {
       toast({
