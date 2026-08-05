@@ -325,6 +325,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const skipRateEffectRef = useRef(false);
   const [revenueOverridden, setRevenueOverridden] = useState(false);
   const [prevItemRevenueFingerprint, setPrevItemRevenueFingerprint] = useState("");
+  // Tracks the previous freightPaidSeparately value so the checkbox-toggle
+  // useEffect can skip the initial mount and only fire on real changes.
+  const prevFreightPaidSeparatelyRef = useRef<boolean | undefined>(undefined);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers"],
@@ -371,6 +374,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
   useEffect(() => {
     if (transaction) {
+      // Reset the freightPaidSeparately prev-ref so the checkbox-toggle
+      // useEffect treats the first value after dialog open as the baseline.
+      prevFreightPaidSeparatelyRef.current = undefined;
       form.reset({
         partyName: transaction.partyName || "",
         vehicleNumber: transaction.vehicleNumber || "",
@@ -396,6 +402,31 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         purchaseOrder: transaction.purchaseOrder || "",
         freightPaidSeparately: transaction.freightPaidSeparately === true,
       });
+      // For loading transactions with freightPaidSeparately=true, immediately
+      // recompute revenue so the form value (and therefore PATCH body) is correct
+      // even if the user opens and saves without toggling the checkbox.
+      if (transaction.transactionType === "loading" && transaction.freightPaidSeparately === true) {
+        const lotAmounts = transaction.items.reduce((sum, i) => {
+          const amt = parseFloat(i.amount || "0");
+          const rev = parseFloat(i.revenue || "0");
+          return sum + (amt > 0 ? amt : rev);
+        }, 0);
+        const mTotal =
+          (parseFloat(transaction.totalMandiCommission || "0")) +
+          (parseFloat(transaction.totalAadhatCommission || "0")) +
+          (parseFloat(transaction.totalHammali || "0")) +
+          (parseFloat(transaction.totalMandiExtraCharges || "0"));
+        const sc = parseFloat(transaction.salesCommission || "0");
+        const addl =
+          (parseFloat(transaction.tulai || "0")) +
+          (parseFloat(transaction.majduri || "0")) +
+          (parseFloat(transaction.thelaBhada || "0")) +
+          (parseFloat(transaction.palaKarai || "0")) +
+          (parseFloat(transaction.bardan || "0"));
+        const dbt = parseFloat(transaction.debit || "0");
+        // Revenue excludes Driver Advance when paid separately.
+        form.setValue("revenue", parseFloat((lotAmounts + mTotal + sc + addl - dbt).toFixed(1)));
+      }
       const chargeKeys: EditChargeKey[] = ["tulai", "majduri", "thelaBhada", "palaKarai", "bardan"];
       const activeCharges = chargeKeys.filter(k => transaction[k] && parseFloat(transaction[k] as string) !== 0);
       setVisibleEditCharges(activeCharges);
@@ -534,6 +565,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const computedLotRevenue = editableItems
     .filter(i => i.action !== 'remove')
     .reduce((sum, i) => sum + (i.revenue || 0), 0);
+  // Watched at component level so the freightPaidSeparately toggle useEffect
+  // has a reactive dependency that triggers when the checkbox changes.
+  const watchedFreightPaidSeparately = form.watch("freightPaidSeparately");
   const itemRevenueFingerprint = editableItems
     .filter(i => i.action !== 'remove')
     .map(i => `${i.id}:${i.bagsMoved}:${i.netWeight}:${i.revenue}`)
@@ -551,6 +585,47 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       form.setValue("revenue", parseFloat(computedLotRevenue.toFixed(1)));
     }
   }, [itemRevenueFingerprint, prevItemRevenueFingerprint, transaction, form, computedLotRevenue]);
+
+  // For loading transactions: immediately recompute and persist the revenue
+  // form field whenever the "Freight Paid Separately" checkbox is toggled.
+  // Mirrors the inline P&L card formula (same branch logic) so the form value
+  // stays consistent with what the server will recompute on save.
+  useEffect(() => {
+    if (!transaction || transaction.transactionType !== "loading") return;
+    const current = watchedFreightPaidSeparately === true;
+    // Skip initial mount — treat first value as the baseline.
+    if (prevFreightPaidSeparatelyRef.current === undefined) {
+      prevFreightPaidSeparatelyRef.current = current;
+      return;
+    }
+    if (prevFreightPaidSeparatelyRef.current === current) return;
+    prevFreightPaidSeparatelyRef.current = current;
+
+    const activeItems = editableItems.filter(i => i.action !== "remove");
+    const lotAmounts = activeItems.reduce((sum, i) => sum + (i.loadingAmount || 0), 0);
+    const mandiTotal =
+      (Number(form.getValues("totalMandiCommission")) || 0) +
+      (Number(form.getValues("totalAadhatCommission")) || 0) +
+      (Number(form.getValues("totalHammali")) || 0) +
+      (Number(form.getValues("totalMandiExtraCharges")) || 0);
+    const sc = Number(form.getValues("salesCommission")) || 0;
+    const addlCharges =
+      (Number(form.getValues("tulai")) || 0) +
+      (Number(form.getValues("majduri")) || 0) +
+      (Number(form.getValues("thelaBhada")) || 0) +
+      (Number(form.getValues("palaKarai")) || 0) +
+      (Number(form.getValues("bardan")) || 0);
+    const dbt = Number(form.getValues("debit")) || 0;
+    const drvAdv = Number(form.getValues("advancePayment")) || 0;
+
+    // When paid separately: Revenue excludes Driver Advance.
+    // When not paid separately: Driver Advance is a buyer-reimbursed pass-through.
+    const newRevenue = current
+      ? parseFloat((lotAmounts + mandiTotal + sc + addlCharges - dbt).toFixed(1))
+      : parseFloat((lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt).toFixed(1));
+
+    form.setValue("revenue", newRevenue);
+  }, [watchedFreightPaidSeparately, transaction, editableItems, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: EditTransactionFormData & { buyerId?: number | null }) => {
@@ -1726,7 +1801,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                             const mandiTotal = (Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalAadhatCommission")) || 0) + (Number(form.watch("totalHammali")) || 0) + (Number(form.watch("totalMandiExtraCharges")) || 0);
                             const sc = Number(form.watch("salesCommission")) || 0;
                             const addlCharges = (Number(form.watch("tulai")) || 0) + (Number(form.watch("majduri")) || 0) + (Number(form.watch("thelaBhada")) || 0) + (Number(form.watch("palaKarai")) || 0) + (Number(form.watch("bardan")) || 0);
-                            const drvAdv = Number(form.watch("advancePayment")) || 0;
+                            // Exclude Driver Advance from Revenue when freight is paid separately.
+                            const drvAdv = watchedFreightPaidSeparately ? 0 : (Number(form.watch("advancePayment")) || 0);
                             const dbt = Number(form.watch("debit")) || 0;
                             return parseFloat((lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt).toFixed(1)).toLocaleString('en-IN');
                           })()}
@@ -1847,15 +1923,25 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         : displayedRevenue - totalCogs - addlCharges - drvAdv;
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
-                          <CardContent className="py-3 px-4 flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium">{t("Total P&L", "कुल लाभ/हानि")}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {t("Revenue − Cost", "राजस्व − लागत")}
+                          <CardContent className="py-3 px-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">{t("Total P&L", "कुल लाभ/हानि")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {t("Revenue − Cost", "राजस्व − लागत")}
+                                  {isPaidSeparately && ` − ${t("Freight", "माल भाड़ा")}`}
+                                </p>
+                              </div>
+                              <p className={`text-xl font-bold ${totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                {totalPL >= 0 ? "+" : ""}₹{parseFloat(Math.abs(totalPL).toFixed(1)).toLocaleString('en-IN')}
                               </p>
                             </div>
-                            <p className={`text-xl font-bold ${totalPL >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                              {totalPL >= 0 ? "+" : ""}₹{parseFloat(Math.abs(totalPL).toFixed(1)).toLocaleString('en-IN')}
+                            <p className="text-xs text-muted-foreground border-t pt-1">
+                              {t("Revenue", "राजस्व")}: ₹{parseFloat(displayedRevenue.toFixed(1)).toLocaleString('en-IN')}
+                              {isPaidSeparately
+                                ? ` (${t("excl. advance", "अग्रिम छोड़कर")})`
+                                : ` (${t("incl. advance", "अग्रिम सहित")})`}
+                              {" · "}{t("Cost", "लागत")}: ₹{parseFloat(totalCogs.toFixed(1)).toLocaleString('en-IN')}
                             </p>
                           </CardContent>
                         </Card>

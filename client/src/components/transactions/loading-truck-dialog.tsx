@@ -351,6 +351,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalCostOfGoods,
       grandTotal,
       totalPL,
+      revenue,
     };
   }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
 
@@ -400,7 +401,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         totalFreight,
         advancePayment: driverAdvance,
         items: validItems,
-        revenue: totals.totalAmount,
+        revenue: totals.revenue,
         salesCommission: computedSalesComm,
         totalMandiCommission: computedMandiComm,
         totalAadhatCommission: computedAadhatComm,
