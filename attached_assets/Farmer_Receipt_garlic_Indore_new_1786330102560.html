@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Farmer Receipt</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; font-size: 13px; color: #000; }
+.page-wrapper { display: flex; flex-direction: column; min-height: 1100px; }
+.receipt-copy { width: 100%; padding: 12px 18px; }
+.receipt-copy.main-copy { flex: 1; display: flex; flex-direction: column; }
+.produce-wrap { flex: 1; display: flex; flex-direction: column; }
+table.produce { flex: 1; }
+.cut-line { text-align: center; padding: 2px 0; font-size: 10px; color: #555; border-top: 1.5px dashed #888; border-bottom: 1.5px dashed #888; margin: 4px 0; }
+.header { text-align: center; margin-bottom: 8px; }
+.firm-title { font-size: 18px; font-weight: bold; }
+.firm-address { font-size: 13px; margin-bottom: 3px; }
+.mandi-line { font-size: 12px; margin: 2px 0; }
+.fields-row { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; font-size: 13px; }
+.bold { font-weight: bold; }
+.info-grid { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; }
+.info-grid td { padding: 4px 5px; vertical-align: middle; }
+.label-col { width: 190px; }
+.colon-col { width: 10px; }
+.right-col { text-align: right; width: 200px; white-space: nowrap; }
+table.produce { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0; border: 1px solid #000; }
+table.produce th { border: 1px solid #000; padding: 3px 8px; text-align: center; background: #f0f0f0; }
+table.produce td { border-left: 1px solid #000; border-right: 1px solid #000; border-top: none; border-bottom: none; padding: 3px 8px; text-align: center; }
+table.produce td:first-child, table.produce th:first-child { text-align: left; }
+table.produce tbody td { vertical-align: top; }
+table.summary { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+table.summary th, table.summary td { border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 12px; }
+table.summary th { background: #f0f0f0; }
+.footer-row { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13px; }
+.slip-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; border: 1.5px solid #000; }
+.slip-table td { padding: 6px 10px; vertical-align: top; }
+.slip-table tr td { border-bottom: 1px solid #000; }
+.slip-table tr:last-child td { border-bottom: none; }
+@media print {
+  body { margin: 8mm; }
+  .page-wrapper { min-height: auto; height: 100vh; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+<!-- ========== COPY 1 (MAIN MANDI RECEIPT) ========== -->
+<div class="receipt-copy main-copy">
+  <div class="header">
+    <div class="firm-title">{{BUSINESS_NAME}}</div>
+    <div class="firm-address">देवी अहिल्या फल सब्जी मंडी, इंदौर (म.प्र.)</div>
+    <div class="mandi-line">{ प्रारूप&mdash;एक ( तथा संशोधित ) }</div>
+    <div class="mandi-line">अनाज / तौल / भुगतान पत्रक</div>
+    <div class="mandi-line">उपविधि की कंडिका 4(4),4(5)(2),4(5)(3) के अंतर्गत</div>
+  </div>
+
+  <div class="fields-row">
+    <div><span class="bold">क्रमांक :</span> <span style="font-size:26px;font-weight:bold">{{SERIAL_NUMBER}}</span></div>
+    <div><span class="bold">बुक क्रमांक :</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    <div><span class="bold">दिनांक</span> &nbsp; {{DATE}}</div>
+  </div>
+
+  <table class="info-grid">
+    <tr>
+      <td class="label-col">कमीशन एजेंट / फर्म का नाम</td>
+      <td class="colon-col">:</td>
+      <td><span class="bold">{{BUSINESS_NAME}}</span></td>
+      <td class="right-col"><span class="bold">लायसेंस नंबर</span> : {{BUSINESS_LICENCE}}</td>
+    </tr>
+    <tr>
+      <td class="label-col">मोबाइल नंबर</td>
+      <td class="colon-col">:</td>
+      <td>{{BUSINESS_PHONE}}</td>
+      <td class="right-col"><span class="bold">दुकान नंबर</span> : {{BUSINESS_SHOP_NO}}</td>
+    </tr>
+    <tr>
+      <td class="label-col">विक्रेता / कृषक का नाम व ग्राम</td>
+      <td class="colon-col">:</td>
+      <td colspan="2"><span class="bold">{{FARMER_NAME}}</span>&nbsp;&ndash;&nbsp;{{FARMER_VILLAGE}}</td>
+    </tr>
+    <tr>
+      <td class="label-col">प्रवेश क्रमांक</td>
+      <td class="colon-col">:</td>
+      <td colspan="2"></td>
+    </tr>
+  </table>
+
+  <div style="text-align:right;font-size:14px;font-weight:bold;margin-bottom:2px">{{CROP_BAGS_LABEL}}</div>
+  <div class="produce-wrap">
+    <table class="produce">
+      <thead>
+        <tr>
+          <th>कृषि उपज का नाम</th>
+          <th>संख्या</th>
+          <th>वास्तविक वजन</th>
+          <th>दर प्रति किंटल</th>
+          <th>कृषि उपज का मूल्य</th>
+        </tr>
+        <tr>
+          <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{TXN_ROWS_HTML}}
+      </tbody>
+    </table>
+  </div>
+
+  <table class="summary">
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:16%">कुल रकम</th>
+        <th rowspan="2" style="width:18%;font-size:10px">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
+        <th rowspan="2" style="width:14%">ट्रक भाड़ा / अन्य</th>
+        <th rowspan="2" style="width:15%;font-size:10px">विक्रेता / कृषक को देय रकम</th>
+        <th colspan="2">विक्रेता/कृषक को भुगतान</th>
+      </tr>
+      <tr>
+        <th style="width:12%;font-size:10px">नगत भुगतान राशि</th>
+        <th style="font-size:9.5px">आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
+      </tr>
+      <tr>
+        <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{GROSS_AMOUNT}}</td>
+        <td>{{HAMMALI_AND_EXTRAS}}</td>
+        <td>{{FREIGHT}}</td>
+        <td>{{NET_PAYABLE}}</td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer-row">
+    <div>क्रेता/कमीशन एजेंट के हस्ताक्षर</div>
+    <div>विक्रेता /कृषक के भुगतान प्राप्ति के हस्ताक्षर</div>
+  </div>
+</div>
+
+<!-- ========== CUT LINE ========== -->
+<div class="cut-line">&#9986; &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+
+<!-- ========== COPY 2 (FARMER PAYMENT SLIP) ========== -->
+<div class="receipt-copy">
+  <div class="header">
+    <div class="firm-title">{{BUSINESS_NAME}}</div>
+    <div class="firm-address" style="font-size:12px;color:#333">{{BUSINESS_ADDRESS}}</div>
+  </div>
+
+  <table class="slip-table">
+    <tr>
+      <td style="width:50%"><span class="bold">बिल दिनांक</span> : {{DATE}}</td>
+      <td style="width:25%;text-align:center"><span class="bold">बिल नंबर</span> : <span style="font-size:19.5px">{{SERIAL_NUMBER}}</span></td>
+      <td style="width:25%;text-align:right"><span class="bold">दिनांक</span> : {{DATE}}</td>
+    </tr>
+    <tr>
+      <td colspan="2"><span class="bold">{{FARMER_NAME}}</span>&nbsp;&ndash;&nbsp;{{FARMER_VILLAGE}}</td>
+      <td style="text-align:right"><span class="bold">कुल योग :</span> {{GROSS_AMOUNT}}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top:6px">
+        <span class="bold">प्रवेश क्रमांक :</span> &nbsp;&nbsp;
+        हम्माली <span class="bold">{{HAMMALI}}</span> &nbsp;
+        तुलाई <span class="bold">{{TULAI}}</span> &nbsp;
+        भराई <span class="bold">{{BHARAI}}</span> &nbsp;
+        खड़ी कराई <span class="bold">{{KHADI_KARAI}}</span>
+      </td>
+      <td style="text-align:right; vertical-align:middle"><span class="bold">कुल खर्च :</span> {{TOTAL_DEDUCTION}}</td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        ठेला भाड़ा <span class="bold">{{THELA_BHADA}}</span>
+        &nbsp;&nbsp;&nbsp;
+        ट्रक भाड़ा <span class="bold">{{FREIGHT}}</span>
+      </td>
+      <td style="text-align:right"><span class="bold">नेट रकम :</span> {{NET_PAYABLE}}</td>
+    </tr>
+  </table>
+
+  <div style="font-size:14px;font-weight:bold;margin-top:10px">{{CROP_BAGS_LABEL}}</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;font-size:13px">
+    <div>{{FARMER_BANK_ROW}}</div>
+    <div>विक्रेता /कृषक के भुगतान प्राप्ति के हस्ताक्षर</div>
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>
