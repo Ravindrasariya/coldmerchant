@@ -65,6 +65,7 @@ interface Transaction {
   transactionType: string | null;
   partyName: string | null;
   partyAddress: string | null;
+  location: string | null;
   vehicleNumber: string | null;
   totalFreight: string | null;
   advancePayment: string | null;
@@ -1250,6 +1251,12 @@ function PartyCard({ group, onEdit, onPrint }: PartyCardProps) {
                       return (
                         <tr className="bg-muted/30">
                           <td colSpan={13} className="px-4 py-3" data-testid={`region-tnx-items-${txn.id}`}>
+                            {txn.location && txn.location.trim() && (
+                              <div className="mb-1.5 text-xs" data-testid={`text-tnx-location-${txn.id}`}>
+                                <span className="font-semibold text-muted-foreground mr-1">{t("Location", "स्थान")} :</span>
+                                <span>{txn.location}</span>
+                              </div>
+                            )}
                             <div className="flex flex-wrap items-center gap-1.5">
                               <span className="text-xs font-semibold text-muted-foreground mr-1">{t("Items", "आइटम")}:</span>
                               {txn.items.length === 0 ? (
