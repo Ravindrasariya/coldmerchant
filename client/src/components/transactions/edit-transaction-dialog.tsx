@@ -167,6 +167,7 @@ interface TransactionWithHistory {
   bardan: string | null;
   debit: string | null;
   purchaseOrder: string | null;
+  location: string | null;
   freightPaidSeparately: boolean;
   // Freight already paid (unreversed) from the Cash tab against this truck.
   // Anything above zero freezes the freight fields until the payment is reversed.
@@ -201,6 +202,7 @@ const editTransactionSchema = z.object({
   bardan: z.coerce.number().optional(),
   debit: z.coerce.number().optional(),
   purchaseOrder: z.string().optional(),
+  location: z.string().optional(),
   freightPaidSeparately: z.boolean().optional(),
 });
 
@@ -373,6 +375,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       bardan: undefined,
       debit: undefined,
       purchaseOrder: "",
+      location: "",
       freightPaidSeparately: false,
     },
   });
@@ -405,6 +408,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         palaKarai: transaction.palaKarai ? parseFloat(transaction.palaKarai) : undefined,
         bardan: transaction.bardan ? parseFloat(transaction.bardan) : undefined,
         purchaseOrder: transaction.purchaseOrder || "",
+        location: transaction.location || "",
         freightPaidSeparately: transaction.freightPaidSeparately === true,
       });
       // For loading transactions with freightPaidSeparately=true, immediately
@@ -1255,6 +1259,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                   </FormItem>
                 )}
               />
+              {/* Loading only — a sale has no separate delivery location. */}
+              {isLoadingType && <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>{t("Location", "स्थान")}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={t("Delivery location", "डिलीवरी स्थान")} {...field} data-testid="input-location" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />}
             </div>
 
             <div className="bg-muted/50 p-4 rounded-md space-y-3">

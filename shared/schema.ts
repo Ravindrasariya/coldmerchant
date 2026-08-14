@@ -213,6 +213,7 @@ export const transactions = pgTable("transactions", {
   bardan: decimal("bardan", { precision: 12, scale: 2 }),
   debit: decimal("debit", { precision: 12, scale: 2 }), // unexpected buyer deduction (loading only); reduces revenue, grand total & P&L
   purchaseOrder: text("purchase_order"), // optional purchase order / reference number (loading only)
+  location: text("location"), // optional delivery location for this transaction — a buyer can have several, so it belongs to the transaction, not the buyer
   freightPaidSeparately: boolean("freight_paid_separately").notNull().default(false), // loading only: freight paid by user, not billed to buyer
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({

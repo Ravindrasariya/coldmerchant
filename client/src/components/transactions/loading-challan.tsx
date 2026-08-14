@@ -38,6 +38,7 @@ interface LoadingTransaction {
   buyerId: number | null;
   partyName: string | null;
   partyAddress: string | null;
+  location: string | null;
   vehicleNumber: string | null;
   totalFreight: string | null;
   advancePayment: string | null;
@@ -244,9 +245,15 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
                 <tr>
                   <td rowSpan={7} style={{ border, padding: "6px 8px", width: "52%", verticalAlign: "top" }}>
                     <div style={{ fontWeight: "bold", fontSize: 13 }}>{t("To", "सेवा में")}:</div>
-                    <div style={{ fontWeight: "bold", fontSize: 15, marginTop: 2 }}>{transaction.partyName || buyer?.name || ""}</div>
-                    {(buyer?.address || transaction.partyAddress) && (
-                      <div style={{ fontSize: 13, marginTop: 2 }}>{buyer?.address || transaction.partyAddress}</div>
+                    {/* Buyer address reads inline with the name ("Raj Traders, Kanpur");
+                        the transaction's own Location, when given, sits on the line below. */}
+                    <div style={{ fontWeight: "bold", fontSize: 15, marginTop: 2 }}>
+                      {[transaction.partyName || buyer?.name || "", buyer?.address || transaction.partyAddress || ""]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
+                    {transaction.location && transaction.location.trim() && (
+                      <div style={{ fontSize: 13, marginTop: 2 }}>{t("Location", "स्थान")} : {transaction.location}</div>
                     )}
                     {buyer?.contact && buyer.contact.trim() && (
                       <div style={{ fontSize: 13, marginTop: 2 }}>{t("Mobile", "मोबाइल")}: {buyer.contact}</div>

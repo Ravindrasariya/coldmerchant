@@ -137,6 +137,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
   const [purchaseOrder, setPurchaseOrder] = useState("");
+  // Delivery location for this consignment. A buyer can have several locations,
+  // so it is captured per transaction rather than taken from the buyer record.
+  const [location, setLocation] = useState("");
 
   const ADDITIONAL_CHARGE_OPTIONS = [
     { key: "tulai", label: "Tulai", labelHi: "तुलाई" },
@@ -417,6 +420,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         bardan: additionalCharges.bardan,
         debit,
         purchaseOrder: purchaseOrder.trim() || undefined,
+        location: location.trim() || undefined,
         freightPaidSeparately,
         // Lock the previewed Tnx# for this loading row.
         transactionNumber: upcomingTnxNumber,
@@ -468,6 +472,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setEditExtraCharges(0);
     setDebit(0);
     setPurchaseOrder("");
+    setLocation("");
   };
 
   const handleSubmit = () => {
@@ -634,7 +639,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
           <Card>
             <CardContent className="pt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label className="text-xs">{t("Select Buyer", "खरीदार चुनें")}</Label>
                   <Popover open={buyerPopoverOpen} onOpenChange={setBuyerPopoverOpen}>
@@ -703,6 +708,15 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     onChange={(e) => setPurchaseOrder(e.target.value)}
                     placeholder={t("PO / reference number", "पीओ / संदर्भ संख्या")}
                     data-testid="input-purchase-order"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">{t("Location", "स्थान")}</Label>
+                  <Input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder={t("Delivery location", "डिलीवरी स्थान")}
+                    data-testid="input-location"
                   />
                 </div>
               </div>

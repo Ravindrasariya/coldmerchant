@@ -2818,7 +2818,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -3077,6 +3077,7 @@ export async function registerRoutes(
           bardan: bardan ? bardan.toString() : null,
           debit: transactionType === "loading" && debit ? debit.toString() : null,
           purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null,
+          location: location ? location.toString().trim() : null,
           freightPaidSeparately: freightPaidSeparately === true || freightPaidSeparately === "true",
         },
         transactionItems
@@ -3289,7 +3290,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, freightPaidSeparately } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately } = req.body;
 
       // Once freight has actually been paid from the Cash tab, the truck is
       // frozen. Those payments are linked to the truck by its loading date,
@@ -3477,6 +3478,14 @@ export async function registerRoutes(
       if (purchaseOrder !== undefined && (purchaseOrder || null) !== (existingTxn.purchaseOrder || null)) {
         changes.push({ field: "purchaseOrder", oldValue: existingTxn.purchaseOrder, newValue: purchaseOrder || null });
       }
+      // Location is a loading-only field, and is normalised once so the history
+      // records exactly what gets stored.
+      const normalizedLocation = location !== undefined && existingTxn.transactionType === "loading"
+        ? (location ? location.toString().trim() : "") || null
+        : undefined;
+      if (normalizedLocation !== undefined && normalizedLocation !== (existingTxn.location || null)) {
+        changes.push({ field: "location", oldValue: existingTxn.location, newValue: normalizedLocation });
+      }
       const resolvedFreightPaidSeparately = freightPaidSeparately !== undefined
         ? (freightPaidSeparately === true || freightPaidSeparately === "true")
         : (existingTxn.freightPaidSeparately === true);
@@ -3511,6 +3520,7 @@ export async function registerRoutes(
         ...(debit !== undefined && existingTxn.transactionType === "loading" ? { debit: debit ? debit.toString() : null } : {}),
         ...(bardan !== undefined ? { bardan: bardan ? bardan.toString() : null } : {}),
         ...(purchaseOrder !== undefined ? { purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null } : {}),
+        ...(normalizedLocation !== undefined ? { location: normalizedLocation } : {}),
         freightPaidSeparately: resolvedFreightPaidSeparately,
       });
       

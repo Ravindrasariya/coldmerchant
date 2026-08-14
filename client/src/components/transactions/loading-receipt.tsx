@@ -62,6 +62,7 @@ interface LoadingTransaction {
   bardan: string | null;
   debit: string | null;
   purchaseOrder: string | null;
+  location: string | null;
   freightPaidSeparately: boolean;
   crop: string | null;
   createdAt: string;
@@ -338,7 +339,16 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       "{{merchantContact}}": escHtml(merchant.contactNumber || ""),
       "{{receiptNumber}}": String(transaction.transactionNumber),
       "{{date}}": dateStr,
-      "{{buyerName}}": escHtml(transaction.partyName || buyer?.name || ""),
+      // Address reads inline with the name ("Raj Traders, Kanpur"); the
+      // transaction's Location, when given, prints on the line below.
+      "{{buyerName}}": escHtml(
+        [transaction.partyName || buyer?.name || "", buyer?.address || transaction.partyAddress || ""]
+          .filter(Boolean)
+          .join(", "),
+      ),
+      "{{location}}": transaction.location && transaction.location.trim()
+        ? `<div style="font-weight:normal;font-size:13px;margin-top:2px">Location : ${escHtml(transaction.location)}</div>`
+        : "",
       "{{buyerContact}}": buyer?.contact && buyer.contact.trim()
         ? `<div style="margin-top:auto;font-weight:normal;font-size:13px">Mobile: ${escHtml(buyer.contact)}</div>`
         : "",
