@@ -669,6 +669,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
       t("Large", "बड़ा"),
       t("Medium", "मध्यम"),
       t("Small", "छोटा"),
+      t("Chhatan", "छटन"),
       t("Remaining Bags", "बचे बैग"),
       t("Cold Charges ₹", "कोल्ड शुल्क ₹"),
       t("Hammali/Grading ₹", "हम्माली/ग्रेडिंग ₹"),
@@ -709,6 +710,9 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           .reduce((sum, bd) => sum + bd.numberOfBags, 0);
         const smallBags = metrics.sellableBreakdowns
           .filter(bd => bd.size === "Small")
+          .reduce((sum, bd) => sum + bd.numberOfBags, 0);
+        const chhatanBags = metrics.sellableBreakdowns
+          .filter(bd => bd.size === "Chhatan")
           .reduce((sum, bd) => sum + bd.numberOfBags, 0);
         
         // Deduction breakdown - categorize charges from charges array
@@ -821,6 +825,7 @@ export function StockRegisterCard({ downloadDialogOpen = false, onDownloadDialog
           largeBags.toString(),
           mediumBags.toString(),
           smallBags.toString(),
+          chhatanBags.toString(),
           metrics.remainingToSell.toString(),
           parseFloat(coldCharges.toFixed(1)).toLocaleString('en-IN'),
           parseFloat(hammaliGrading.toFixed(1)).toLocaleString('en-IN'),

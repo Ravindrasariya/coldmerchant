@@ -176,7 +176,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return bd.size !== "Wastage";
   };
 
-  const SIZE_TIE_ORDER = ["Large", "Medium", "Small", "Wastage"];
+  const SIZE_TIE_ORDER = ["Large", "Medium", "Small", "Chhatan", "Wastage"];
 
   // Build a single consolidated row for a Gate Cut lot that has bag breakdowns.
   // Size = the size with the highest bag count (ties broken by the order above).
@@ -406,6 +406,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       "Large": "Large / बड़ा",
       "Medium": "Medium / मध्यम",
       "Small": "Small / छोटा",
+      "Chhatan": "Chhatan / छटन",
       "Wastage": "Wastage / कचरा",
     };
     return sizeMap[size] || size;

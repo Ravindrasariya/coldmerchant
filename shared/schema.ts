@@ -106,7 +106,7 @@ export const lots = pgTable("lots", {
   bagType: text("bag_type").notNull(), // editable text field now
   quality: text("quality"), // Poor, Medium, Good (made nullable)
   cutType: text("cut_type").notNull(), // gate_cut, bilty_cut (now called Delivery Type in UI)
-  size: text("size"), // Large, Medium, Small - for gate cut only
+  size: text("size"), // Large, Medium, Small, Chhatan - for gate cut only
   marka: text("marka"), // optional bag mark/identifier (free-form: null, number, or text)
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   totalWeight: decimal("total_weight", { precision: 12, scale: 2 }), // Total weight in kg (optional)
@@ -144,7 +144,7 @@ export const bagBreakdowns = pgTable("bag_breakdowns", {
   id: serial("id").primaryKey(),
   lotId: integer("lot_id").notNull().references(() => lots.id, { onDelete: "cascade" }),
   merchantId: integer("merchant_id").notNull().references(() => merchants.id),
-  size: text("size").notNull(), // Large, Medium, Small, Wastage
+  size: text("size").notNull(), // Large, Medium, Small, Chhatan, Wastage
   marka: text("marka"), // optional bag mark/identifier (free-form: null, number, or text)
   numberOfBags: integer("number_of_bags").notNull(),
   remainingBags: integer("remaining_bags"), // tracks remaining per size, initially equals numberOfBags
@@ -1297,7 +1297,7 @@ export const BAG_TYPE_SUGGESTIONS = ["Jute", "Shakti", "PP", "HDPE", "Net"] as c
 
 export const QUALITY_OPTIONS = ["Poor", "Medium", "Good"] as const;
 export const CUT_TYPES = ["gate_cut", "bilty_cut"] as const; // Delivery Types
-export const SIZE_OPTIONS = ["Large", "Medium", "Small", "Wastage"] as const;
+export const SIZE_OPTIONS = ["Large", "Medium", "Small", "Chhatan", "Wastage"] as const;
 export const SEED_SIZE_OPTIONS = ["Small", "Medium", "Large"] as const;
 export const PAYMENT_STATUS = ["due", "paid"] as const;
 
