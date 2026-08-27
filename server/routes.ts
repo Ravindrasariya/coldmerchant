@@ -216,6 +216,33 @@ async function recomputeHarvestLotCharges(entryId: number, merchantId: number) {
   }
 }
 
+// Decide the net weight to store for a transaction item. When the client flags
+// the weight as hand-entered, that value is taken as given — no tolerance check,
+// so a deliberate 0.2 kg correction survives. Otherwise the weight is derived
+// from the lot's average weight per bag. Items saved before the flag existed
+// arrive with `overridden` undefined; they fall back to the historical
+// "differs from derived by more than 0.5 kg" heuristic so reopening and saving
+// an old transaction does not silently reset a weight the user once typed.
+function resolveItemNetWeight(
+  submitted: unknown,
+  overridden: unknown,
+  computed: number,
+): { netWeight: number; overridden: boolean } {
+  const value = typeof submitted === "number" && submitted > 0 ? submitted : null;
+  if (overridden === true) {
+    return value !== null
+      ? { netWeight: value, overridden: true }
+      : { netWeight: computed, overridden: false };
+  }
+  if (overridden === false || value === null) {
+    return { netWeight: computed, overridden: false };
+  }
+  const legacyOverride = Math.abs(value - computed) > 0.5;
+  return legacyOverride
+    ? { netWeight: value, overridden: true }
+    : { netWeight: computed, overridden: false };
+}
+
 // Compute a transaction item's COGS and cost-per-bag snapshot from the CURRENT
 // stock register. Mirrors the edit dialog display: COGS = costPerBag × bags for
 // sale and cold-store/farm-gate loading (the documented proportionate lot-cost
@@ -2844,7 +2871,7 @@ export async function registerRoutes(
       }
 
       // Parse inventoryKey and validate
-      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number; pricePerKg?: number; amount?: number }[] = [];
+      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number; netWeightOverridden: boolean; pricePerKg?: number; amount?: number }[] = [];
       
       for (const item of items) {
         // Parse inventoryKey format: "lotId-breakdownId" or "lotId-lot"
@@ -2890,6 +2917,7 @@ export async function registerRoutes(
           breakdownId,
           bagsMoved: item.bagsMoved,
           netWeight: item.netWeight || 0,
+          netWeightOverridden: item.netWeightOverridden === true,
           pricePerKg: item.pricePerKg,
           amount: item.amount,
         });
@@ -2955,8 +2983,11 @@ export async function registerRoutes(
         const costPerBag = breakdownCosts.get(item.breakdownId || null) || 0;
         
         const computedNetWeight = storage.computeProportionateNetWeight(lot!, allBreakdowns, item.breakdownId, item.bagsMoved);
-        const netWeight = (item.netWeight && item.netWeight > 0 && Math.abs(item.netWeight - computedNetWeight) > 0.5)
-          ? item.netWeight : computedNetWeight;
+        const { netWeight, overridden: netWeightOverridden } = resolveItemNetWeight(
+          item.netWeight,
+          item.netWeightOverridden,
+          computedNetWeight,
+        );
 
         let costOfGoods: number;
         let snapshotPrice: number;
@@ -2986,6 +3017,7 @@ export async function registerRoutes(
           size,
           bagsMoved: item.bagsMoved,
           netWeight: netWeight.toString(),
+          netWeightOverridden,
           pricePerKgSnapshot: snapshotPrice.toString(),
           costOfGoods: costOfGoods.toString(),
         };
@@ -3688,9 +3720,11 @@ export async function registerRoutes(
               return res.status(400).json({ message: `Lot ${existingItem.lotId} not found` });
             }
             const computedNetWeight = storage.computeProportionateNetWeight(editLot, editBreakdowns, existingItem.breakdownId, itemChange.bagsMoved);
-            const newNetWeight = (typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0 && Math.abs(itemChange.netWeight - computedNetWeight) > 0.5)
-              ? itemChange.netWeight
-              : computedNetWeight;
+            const { netWeight: newNetWeight, overridden: newNetWeightOverridden } = resolveItemNetWeight(
+              itemChange.netWeight,
+              itemChange.netWeightOverridden,
+              computedNetWeight,
+            );
             const editCost = computeTxnItemCost(
               editLot,
               editBreakdowns,
@@ -3706,6 +3740,7 @@ export async function registerRoutes(
             const updateFields: Partial<TransactionItem> = {
               bagsMoved: itemChange.bagsMoved,
               netWeight: newNetWeight.toString(),
+              netWeightOverridden: newNetWeightOverridden,
               costOfGoods: newCostOfGoods.toString(),
               pricePerKgSnapshot: editCost.snapshot.toString(),
               revenue: itemRevenue.toString()
@@ -3861,9 +3896,11 @@ export async function registerRoutes(
           const addBreakdowns = await storage.getBagBreakdownsByLot(lotId, merchantId);
           
           const computedNetWeight = storage.computeProportionateNetWeight(lot, addBreakdowns, breakdownId, itemChange.bagsMoved);
-          const netWeight = (typeof itemChange.netWeight === 'number' && itemChange.netWeight > 0 && Math.abs(itemChange.netWeight - computedNetWeight) > 0.5)
-            ? itemChange.netWeight
-            : computedNetWeight;
+          const { netWeight, overridden: addNetWeightOverridden } = resolveItemNetWeight(
+            itemChange.netWeight,
+            itemChange.netWeightOverridden,
+            computedNetWeight,
+          );
           const addCost = computeTxnItemCost(lot, addBreakdowns, breakdownId, itemChange.bagsMoved, netWeight, existingTxn.transactionType === "loading");
           const costOfGoods = addCost.cogs;
           const addSnapshotPrice = addCost.snapshot;
@@ -3882,6 +3919,7 @@ export async function registerRoutes(
             size,
             bagsMoved: itemChange.bagsMoved,
             netWeight: netWeight.toString(),
+            netWeightOverridden: addNetWeightOverridden,
             pricePerKgSnapshot: addSnapshotPrice.toString(),
             costOfGoods: costOfGoods.toString(),
             revenue: itemRevenue.toString()

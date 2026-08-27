@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ChevronDown, ChevronUp, History, Save, Plus, Trash2, X, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Buyer } from "@shared/schema";
+import { computeNetWeight } from "@shared/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
@@ -40,6 +41,7 @@ interface TransactionItem {
   size: string | null;
   bagsMoved: number;
   netWeight: string | null;
+  netWeightOverridden: boolean | null;
   pricePerKgSnapshot: string | null;
   costOfGoods: string | null;
   revenue: string | null;
@@ -97,6 +99,12 @@ interface EditableItem {
   originalBags: number;
   netWeight: number;
   originalNetWeight: number;
+  // True once the user types a weight by hand; false whenever the weight is
+  // re-derived from the lot (bag count change). Stays null for rows saved
+  // before this flag existed, and is then OMITTED from the payload so the
+  // server keeps applying its legacy tolerance rule to them rather than
+  // re-deriving a weight the user may have typed long ago.
+  netWeightOverridden: boolean | null;
   pricePerKg: number;
   costOfGoods: number;
   originalCostOfGoods: number;
@@ -283,6 +291,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const [lotPopoverOpen, setLotPopoverOpen] = useState(false);
   const [newItemBags, setNewItemBags] = useState<number>(0);
   const [newItemWeight, setNewItemWeight] = useState<number>(0);
+  const [newItemWeightOverridden, setNewItemWeightOverridden] = useState<boolean>(false);
   const [newItemRevenue, setNewItemRevenue] = useState<number>(0);
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [buyerPopoverOpen, setBuyerPopoverOpen] = useState(false);
@@ -481,12 +490,16 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
 
         let effNetWeight = storedNetWeight;
         let effLoadingPpk = storedLoadingPpk;
+        // A stored hand-entered weight is authoritative on open — it is NOT
+        // re-derived from the lot, even if the lot's weight has since changed.
+        let effNetWeightOverridden: boolean | null = item.netWeightOverridden ?? null;
         if (isLoadingTxn) {
           if (effNetWeight <= 0 && lotSrcBags > 0) {
             // Match the server's computeNetWeight: mandi lots use the full weight
             // (no per-bag deduction); other places deduct 1kg/bag.
-            const lotNetWeight = item.place === "mandi" ? lotSrcWeight : Math.max(0, lotSrcWeight - lotSrcBags);
+            const lotNetWeight = computeNetWeight(lotSrcWeight, lotSrcBags, item.place);
             effNetWeight = parseFloat(((bags / lotSrcBags) * lotNetWeight).toFixed(1));
+            effNetWeightOverridden = false;
           }
           if (effLoadingPpk <= 0 && liveLotPpk > 0) {
             effLoadingPpk = liveLotPpk;
@@ -515,6 +528,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           originalBags: bags,
           netWeight: itemNetWeight,
           originalNetWeight: itemNetWeight,
+          netWeightOverridden: effNetWeightOverridden,
           pricePerKg: liveCostPerBag,
           costOfGoods: liveCogs,
           originalCostOfGoods: liveCogs,
@@ -784,6 +798,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           inventoryKey: item.inventoryKey,
           bagsMoved: item.bagsMoved,
           netWeight: item.netWeight,
+          // Omitted (not sent as false) for pre-flag rows so the server keeps
+          // its legacy tolerance rule instead of re-deriving their weight.
+          ...(item.netWeightOverridden === null ? {} : { netWeightOverridden: item.netWeightOverridden }),
           revenue: item.revenue,
           action: item.action
         };
@@ -825,9 +842,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
   const handleBagCountChange = (index: number, newBags: number) => {
     const nextItems = editableItemsRef.current.map((item, i) => {
       if (i !== index) return item;
+      // Changing the bag count always re-derives the weight from the lot's
+      // average and discards any earlier hand-typed value.
       let newWeight: number;
       if (item.lotSourceBags > 0) {
-        const lotNetWeight = Math.max(0, item.lotSourceWeight - item.lotSourceBags);
+        const lotNetWeight = computeNetWeight(item.lotSourceWeight, item.lotSourceBags, item.place);
         newWeight = parseFloat(((newBags / item.lotSourceBags) * lotNetWeight).toFixed(1));
       } else {
         const weightPerBag = item.originalBags > 0 ? item.originalNetWeight / item.originalBags : 0;
@@ -843,6 +862,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         ...item,
         bagsMoved: newBags,
         netWeight: newWeight,
+        netWeightOverridden: false,
         costOfGoods: newCostOfGoods,
         loadingAmount: newLoadingAmount,
         revenue: isLoadingType ? newLoadingAmount : item.revenue,
@@ -865,6 +885,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       return {
         ...item,
         netWeight: newWeight,
+        netWeightOverridden: true,
         costOfGoods: newCostOfGoods,
         loadingAmount: newLoadingAmount,
         revenue: isLoadingType ? newLoadingAmount : item.revenue,
@@ -944,6 +965,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       const nwpb = getNetWeightPerBag(inv);
       setNewItemBags(bags);
       setNewItemWeight(parseFloat((nwpb * bags).toFixed(1)));
+      setNewItemWeightOverridden(false);
       setNewItemRevenue(0);
     }
   };
@@ -978,6 +1000,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       originalBags: 0,
       netWeight: newItemWeight,
       originalNetWeight: 0,
+      netWeightOverridden: newItemWeightOverridden,
       pricePerKg: isLoadingType ? breakdownPricePerKg : costPerBag,
       costOfGoods: costOfGoods,
       originalCostOfGoods: costOfGoods,
@@ -1004,6 +1027,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     setSelectedInventory("");
     setNewItemBags(0);
     setNewItemWeight(0);
+    setNewItemWeightOverridden(false);
     setNewItemRevenue(0);
     setShowAddItem(false);
   };
@@ -1304,6 +1328,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         setSelectedInventory("");
                         setNewItemBags(0);
                         setNewItemWeight(0);
+                        setNewItemWeightOverridden(false);
                         setNewItemRevenue(0);
                       }}
                       data-testid="button-close-add-lot"
@@ -1417,6 +1442,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         if (inv) {
                           const nwpb = getNetWeightPerBag(inv);
                           setNewItemWeight(parseFloat((nwpb * bags).toFixed(1)));
+                          setNewItemWeightOverridden(false);
                         }
                       }}
                       className="w-20 no-spinner"
@@ -1428,7 +1454,10 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       step="any"
                       placeholder={t("Weight (Kg)", "वजन (किग्रा)")}
                       value={newItemWeight || ""}
-                      onChange={(e) => setNewItemWeight(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => {
+                        setNewItemWeight(parseFloat(e.target.value) || 0);
+                        setNewItemWeightOverridden(true);
+                      }}
                       className="w-24 no-spinner"
                       data-testid="input-new-item-weight"
                     />

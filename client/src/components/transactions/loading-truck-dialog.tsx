@@ -64,6 +64,9 @@ interface LoadingLotItem {
   bagsMoved: number;
   totalWeight: number;
   netWeight: number;
+  // True once the user types a weight by hand. Cleared whenever the weight is
+  // re-derived from the lot (lot selected, or bag count changed).
+  netWeightOverridden: boolean;
   pricePerKg: number;
   amount: number;
 }
@@ -120,7 +123,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   };
 
   const [items, setItems] = useState<LoadingLotItem[]>([
-    { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 },
+    { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, pricePerKg: 0, amount: 0 },
   ]);
 
   // Tnx# preview + group id. Single-buyer dialog, but still uses a group id
@@ -364,7 +367,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 }]);
+    setItems((prev) => [...prev, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, pricePerKg: 0, amount: 0 }]);
   };
 
   const removeItem = (index: number) => {
@@ -389,6 +392,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
           bagsMoved: item.bagsMoved,
           totalWeight: item.totalWeight,
           netWeight: item.netWeight,
+          netWeightOverridden: item.netWeightOverridden,
           pricePerKg: item.pricePerKg,
           amount: item.amount,
         }));
@@ -456,7 +460,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setBuyerId(null);
     setPartyName("");
     setPartyAddress("");
-    setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, pricePerKg: 0, amount: 0 }]);
+    setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, pricePerKg: 0, amount: 0 }]);
     // Roll a fresh group id for the next loading session.
     setTnxGroupId(crypto.randomUUID());
     setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
@@ -846,6 +850,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                                 bagsMoved: bags,
                                                 totalWeight: Math.round(netWeight * 10) / 10,
                                                 netWeight: Math.round(netWeight * 10) / 10,
+                                                netWeightOverridden: false,
                                                 pricePerKg,
                                                 amount,
                                               });
@@ -855,6 +860,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                                 bagsMoved: 0,
                                                 totalWeight: 0,
                                                 netWeight: 0,
+                                                netWeightOverridden: false,
                                                 pricePerKg: 0,
                                                 amount: 0,
                                               });
@@ -898,12 +904,15 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                           onChange={(e) => {
                             const bags = Number(e.target.value) || 0;
                             if (selectedInv) {
+                              // Bag count changed → weight goes back to the
+                              // lot's average, discarding any hand-typed value.
                               const netWeight = calculateNetWeight(selectedInv, bags);
                               const amount = Math.round(item.pricePerKg * netWeight * 100) / 100;
                               updateItem(itemIndex, {
                                 bagsMoved: bags,
                                 totalWeight: Math.round(netWeight * 10) / 10,
                                 netWeight: Math.round(netWeight * 10) / 10,
+                                netWeightOverridden: false,
                                 amount,
                               });
                             } else {
@@ -916,9 +925,24 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       </div>
 
                       <div className="col-span-3 md:col-span-2">
-                        <div className="h-9 px-2 flex items-center justify-center bg-muted/50 rounded-md text-sm font-medium">
-                          {(Number(item.netWeight) || 0).toFixed(1)}
-                        </div>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={item.netWeight || ""}
+                          onChange={(e) => {
+                            const nw = Number(e.target.value) || 0;
+                            const amount = Math.round((Number(item.pricePerKg) || 0) * nw * 100) / 100;
+                            updateItem(itemIndex, {
+                              netWeight: nw,
+                              totalWeight: nw,
+                              netWeightOverridden: true,
+                              amount,
+                            });
+                          }}
+                          className="text-center px-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          data-testid={`input-loading-netweight-${itemIndex}`}
+                        />
                       </div>
 
                       <div className="col-span-2 md:col-span-1">

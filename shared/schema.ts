@@ -236,6 +236,10 @@ export const transactionItems = pgTable("transaction_items", {
   size: text("size"), // cached size for display
   bagsMoved: integer("bags_moved").notNull(),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
+  // True when the user typed the net weight by hand instead of accepting the
+  // value derived from the lot's average weight per bag. Nullable so rows
+  // created before this column existed keep behaving as derived.
+  netWeightOverridden: boolean("net_weight_overridden"),
   pricePerKgSnapshot: decimal("price_per_kg_snapshot", { precision: 10, scale: 2 }),
   costOfGoods: decimal("cost_of_goods", { precision: 12, scale: 2 }),
   revenue: decimal("revenue", { precision: 12, scale: 2 }), // per-item revenue for P&L calculation
