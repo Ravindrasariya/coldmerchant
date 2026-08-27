@@ -136,6 +136,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   });
   const [totalFreight, setTotalFreight] = useState<number | null>(null);
   const [freightPaidSeparately, setFreightPaidSeparately] = useState(false);
+  // PRINT-ONLY: when every lot carries the same rate, the merchant can ask for
+  // the buyer's bill and challan to show one combined row instead of one row
+  // per lot. Affects nothing that is calculated or stored as a figure.
+  const [combineBillItems, setCombineBillItems] = useState(false);
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
@@ -362,6 +366,21 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     };
   }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
 
+  // The combined-row option only makes sense when there is a single rate to
+  // print. Rates are compared as numbers so 14 and 14.00 count as the same.
+  const canCombineBill = useMemo(() => {
+    const rates = items
+      .filter((i) => i.inventoryKey && (Number(i.bagsMoved) || 0) > 0)
+      .map((i) => Number(i.pricePerKg) || 0);
+    return rates.length > 1 && rates.every((r) => r > 0) && rates.every((r) => r === rates[0]);
+  }, [items]);
+
+  // Never leave the flag set once the rates diverge — the documents would fall
+  // back to per-lot rows anyway, and a stored true would be misleading.
+  useEffect(() => {
+    if (!canCombineBill && combineBillItems) setCombineBillItems(false);
+  }, [canCombineBill, combineBillItems]);
+
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
   };
@@ -426,6 +445,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         purchaseOrder: purchaseOrder.trim() || undefined,
         location: location.trim() || undefined,
         freightPaidSeparately,
+        combineBillItems: canCombineBill && combineBillItems,
         // Lock the previewed Tnx# for this loading row.
         transactionNumber: upcomingTnxNumber,
         tnxGroupId,
@@ -466,6 +486,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
     setTotalFreight(null);
     setFreightPaidSeparately(false);
+    setCombineBillItems(false);
     setDriverAdvance(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
@@ -1247,6 +1268,22 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       </p>
                     </div>
                   </div>
+                  {/* Print-only option: collapse the lots into one row on the
+                      buyer's bill and challan. Only offered while every lot
+                      carries the same rate. */}
+                  {canCombineBill && (
+                    <div className="flex items-center gap-2 pt-3 mt-3 border-t border-primary/20">
+                      <Checkbox
+                        id="loading-combine-bill-items"
+                        checked={combineBillItems}
+                        onCheckedChange={(checked) => setCombineBillItems(checked === true)}
+                        data-testid="checkbox-loading-combine-bill-items"
+                      />
+                      <Label htmlFor="loading-combine-bill-items" className="text-xs font-normal cursor-pointer">
+                        {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
+                      </Label>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </CardContent>
