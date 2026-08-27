@@ -313,6 +313,25 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     return Math.round(base * salesCommissionPct / 100 * 100) / 100;
   }, [totalItemAmount, salesCommissionPct]);
 
+  // Single source of truth for one lot line's cost of goods. The per-row P&L,
+  // the lots Total row and the totals memo all go through this, so they cannot
+  // drift apart on fractional per-bag costs.
+  const lineCostOfGoods = useCallback((item: LoadingLotItem) => {
+    const inv = findInventoryByKey(item.inventoryKey);
+    const bags = Number(item.bagsMoved) || 0;
+    const netWeight = Number(item.netWeight) || 0;
+    // Align Loading COGS with Bikri/Sale: use stock register's per-breakdown
+    // costPerBag (which already includes proportionate Extra Charges to Buyer
+    // and, for farm-gate, cold/warehouse share). Fall back to the legacy
+    // netWeight × pricePerKg for any inventory row missing a costPerBag so
+    // legacy data doesn't shift unexpectedly.
+    const costPerBag = Number(inv?.costPerBag) || 0;
+    const raw = (costPerBag > 0 && bags > 0)
+      ? costPerBag * bags
+      : (inv?.pricePerKg ? parseFloat(inv.pricePerKg) : 0) * netWeight;
+    return Math.round(raw * 100) / 100;
+  }, [findInventoryByKey]);
+
   const totals = useMemo(() => {
     let totalBags = 0;
     let totalNetWeight = 0;
@@ -320,26 +339,10 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     let totalCostOfGoods = 0;
 
     items.forEach((item) => {
-      const inv = findInventoryByKey(item.inventoryKey);
-      const bags = Number(item.bagsMoved) || 0;
-      const netWeight = Number(item.netWeight) || 0;
-      totalBags += bags;
-      totalNetWeight += netWeight;
+      totalBags += Number(item.bagsMoved) || 0;
+      totalNetWeight += Number(item.netWeight) || 0;
       totalAmount += Number(item.amount) || 0;
-      // Align Loading COGS with Bikri/Sale: use stock register's per-breakdown
-      // costPerBag (which already includes proportionate Extra Charges to Buyer
-      // and, for farm-gate, cold/warehouse share). Fall back to the legacy
-      // netWeight × pricePerKg for any inventory row missing a costPerBag so
-      // legacy data doesn't shift unexpectedly.
-      const costPerBag = Number(inv?.costPerBag) || 0;
-      let lineCogs: number;
-      if (costPerBag > 0 && bags > 0) {
-        lineCogs = costPerBag * bags;
-      } else {
-        const breakdownPricePerKg = inv?.pricePerKg ? parseFloat(inv.pricePerKg) : 0;
-        lineCogs = breakdownPricePerKg * netWeight;
-      }
-      totalCostOfGoods += Math.round(lineCogs * 100) / 100;
+      totalCostOfGoods += lineCostOfGoods(item);
     });
 
     // Freight paid separately: Driver Advance is NOT a buyer charge — remove it
@@ -364,7 +367,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalPL,
       revenue,
     };
-  }, [items, findInventoryByKey, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
+  }, [items, lineCostOfGoods, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
 
   // The combined-row option only makes sense when there is a single rate to
   // print. Rates are compared as numbers so 14 and 14.00 count as the same.
@@ -785,15 +788,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
                 {items.map((item, itemIndex) => {
                   const selectedInv = findInventoryByKey(item.inventoryKey);
-                  const bagsForRow = Number(item.bagsMoved) || 0;
-                  const netWeightForRow = Number(item.netWeight) || 0;
-                  // Match the COGS formula used in the totals memo so per-row
-                  // P&L stays consistent with Total P&L.
-                  const rowCostPerBag = Number(selectedInv?.costPerBag) || 0;
-                  const itemCost = (rowCostPerBag > 0 && bagsForRow > 0)
-                    ? rowCostPerBag * bagsForRow
-                    : (selectedInv?.pricePerKg ? parseFloat(selectedInv.pricePerKg) : 0) * netWeightForRow;
-                  const itemPL = (Number(item.amount) || 0) - itemCost;
+                  // Shared line-COGS helper keeps this row, the Total row and
+                  // the summary card's Total P&L in agreement.
+                  const itemPL = (Number(item.amount) || 0) - lineCostOfGoods(item);
 
                   return (
                     <div key={itemIndex} className="grid grid-cols-12 gap-1 items-center">
@@ -1012,6 +1009,82 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     </div>
                   );
                 })}
+
+                {(() => {
+                  const totalBagsRow = items.reduce((sum, i) => sum + (Number(i.bagsMoved) || 0), 0);
+                  const totalWeightRow = items.reduce((sum, i) => sum + (Number(i.netWeight) || 0), 0);
+                  const totalAmountRow = items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+                  // Same COGS formula as each row above and as the `totals`
+                  // memo, so the three never disagree.
+                  const totalPLRow = items.reduce(
+                    (sum, i) => sum + ((Number(i.amount) || 0) - lineCostOfGoods(i)),
+                    0,
+                  );
+                  const plClass = totalPLRow >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+                  const plText = `${totalPLRow >= 0 ? "+" : ""}₹${parseFloat(Math.abs(totalPLRow).toFixed(1)).toLocaleString('en-IN')}`;
+                  // Print-only option: collapse the lots into one bill row.
+                  // Shown only while every lot carries the same rate.
+                  // Rendered twice (desktop + mobile), so each copy needs its
+                  // own element id for the label association to work.
+                  const combineTick = (suffix: string) => (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`loading-combine-bill-items-${suffix}`}
+                        checked={combineBillItems}
+                        onCheckedChange={(checked) => setCombineBillItems(checked === true)}
+                        data-testid={`checkbox-loading-combine-bill-items-${suffix}`}
+                      />
+                      <Label htmlFor={`loading-combine-bill-items-${suffix}`} className="text-xs font-normal cursor-pointer">
+                        {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
+                      </Label>
+                    </div>
+                  );
+
+                  return (
+                    <>
+                      {/* Desktop totals row — columns line up with the header above */}
+                      <div className="hidden md:grid md:grid-cols-12 gap-1 items-center text-sm font-medium border-t pt-2 mt-2">
+                        <div className="col-span-3">{t("Total", "कुल")}</div>
+                        <div className="col-span-1 text-center">{totalBagsRow}</div>
+                        <div className="col-span-2 text-center">{totalWeightRow.toFixed(1)}</div>
+                        <div className="col-span-1"></div>
+                        <div className="col-span-2 text-center">
+                          ₹{parseFloat(totalAmountRow.toFixed(1)).toLocaleString('en-IN')}
+                        </div>
+                        <div className={`col-span-2 text-center ${plClass}`}>{plText}</div>
+                        <div className="col-span-1"></div>
+                      </div>
+                      {canCombineBill && (
+                        <div className="hidden md:flex items-center justify-end pt-2">{combineTick("d")}</div>
+                      )}
+
+                      {/* Mobile totals */}
+                      <div className="md:hidden border-t pt-2 mt-2">
+                        <div className="grid grid-cols-4 gap-2 text-xs font-medium">
+                          <div className="text-center">
+                            <span className="text-muted-foreground block">{t("Bags", "बोरी")}</span>
+                            <span>{totalBagsRow}</span>
+                          </div>
+                          <div className="text-center">
+                            <span className="text-muted-foreground block">{t("Weight", "वजन")}</span>
+                            <span>{totalWeightRow.toFixed(1)}</span>
+                          </div>
+                          <div className="text-center">
+                            <span className="text-muted-foreground block">{t("Amount", "राशि")}</span>
+                            <span>₹{parseFloat(totalAmountRow.toFixed(1)).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="text-center">
+                            <span className="text-muted-foreground block">{t("P&L", "लाभ/हानि")}</span>
+                            <span className={plClass}>{plText}</span>
+                          </div>
+                        </div>
+                        {canCombineBill && (
+                          <div className="pt-2 mt-2 border-t">{combineTick("m")}</div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <Separator />
@@ -1268,22 +1341,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       </p>
                     </div>
                   </div>
-                  {/* Print-only option: collapse the lots into one row on the
-                      buyer's bill and challan. Only offered while every lot
-                      carries the same rate. */}
-                  {canCombineBill && (
-                    <div className="flex items-center gap-2 pt-3 mt-3 border-t border-primary/20">
-                      <Checkbox
-                        id="loading-combine-bill-items"
-                        checked={combineBillItems}
-                        onCheckedChange={(checked) => setCombineBillItems(checked === true)}
-                        data-testid="checkbox-loading-combine-bill-items"
-                      />
-                      <Label htmlFor="loading-combine-bill-items" className="text-xs font-normal cursor-pointer">
-                        {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
-                      </Label>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </CardContent>
