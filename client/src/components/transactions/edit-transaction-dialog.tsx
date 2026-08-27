@@ -177,6 +177,7 @@ interface TransactionWithHistory {
   purchaseOrder: string | null;
   location: string | null;
   freightPaidSeparately: boolean;
+  combineBillItems?: boolean;
   // Freight already paid (unreversed) from the Cash tab against this truck.
   // Anything above zero freezes the freight fields until the payment is reversed.
   freightPaidAmount?: number;
@@ -389,6 +390,33 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     },
   });
 
+  // PRINT-ONLY setting, kept OUT of the edit form on purpose. Saving the form
+  // recomputes cost of goods and profit/loss from live lot prices, so a
+  // presentation toggle must not ride along with it. It saves on its own
+  // through a dedicated endpoint that writes nothing but this one column.
+  const [combineBillItems, setCombineBillItems] = useState(false);
+  const combineBillItemsMutation = useMutation({
+    mutationFn: async (value: boolean) =>
+      apiRequest("PATCH", `/api/transactions/${transactionId}/combine-bill-items`, { combineBillItems: value }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    },
+    onError: (error: any) => {
+      // Put the box back where it was so it never shows a state that was not saved.
+      setCombineBillItems((prev) => !prev);
+      toast({
+        title: t("Could not save", "सहेजा नहीं जा सका"),
+        description: error?.message || t("Please try again", "कृपया पुनः प्रयास करें"),
+        variant: "destructive",
+      });
+    },
+  });
+  const toggleCombineBillItems = (value: boolean) => {
+    setCombineBillItems(value);
+    combineBillItemsMutation.mutate(value);
+  };
+
   useEffect(() => {
     if (transaction) {
       // Reset the freightPaidSeparately prev-ref so the checkbox-toggle
@@ -420,6 +448,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         location: transaction.location || "",
         freightPaidSeparately: transaction.freightPaidSeparately === true,
       });
+      setCombineBillItems(transaction.combineBillItems === true);
       // For loading transactions with freightPaidSeparately=true, immediately
       // recompute revenue so the form value (and therefore PATCH body) is correct
       // even if the user opens and saves without toggling the checkbox.
@@ -1705,6 +1734,14 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     : i.costOfGoods;
                   return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - cogs);
                 }, 0);
+                // The "combine into one row on the bill" option only makes sense
+                // when there is a single rate to print. Rates are compared as
+                // numbers so 14 and 14.00 count as the same.
+                const rates = activeItems.map(i => Number(i.loadingPricePerKg) || 0);
+                const canCombineBill = isLoadingType
+                  && activeItems.length > 1
+                  && rates.every(r => r > 0)
+                  && rates.every(r => r === rates[0]);
                 return (
                   <>
                     {/* Desktop totals row */}
@@ -1721,6 +1758,22 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       </span>
                       <span></span>
                     </div>
+                    {/* Print-only option: collapse the lots into one bill row.
+                        Shown only while every lot carries the same rate. */}
+                    {canCombineBill && (
+                      <div className="hidden md:flex items-center justify-end gap-2 pt-2">
+                        <Checkbox
+                          id="combine-bill-items"
+                          checked={combineBillItems}
+                          onCheckedChange={(checked) => toggleCombineBillItems(checked === true)}
+                          disabled={combineBillItemsMutation.isPending}
+                          data-testid="checkbox-combine-bill-items"
+                        />
+                        <Label htmlFor="combine-bill-items" className="text-xs font-normal cursor-pointer">
+                          {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
+                        </Label>
+                      </div>
+                    )}
                     {/* Mobile totals */}
                     <div className="md:hidden border-t pt-2 mt-2">
                       <div className="grid grid-cols-4 gap-2 text-xs font-medium">
@@ -1743,6 +1796,20 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           </span>
                         </div>
                       </div>
+                      {canCombineBill && (
+                        <div className="flex items-center gap-2 pt-2 mt-2 border-t">
+                          <Checkbox
+                            id="combine-bill-items-mobile"
+                            checked={combineBillItems}
+                            onCheckedChange={(checked) => toggleCombineBillItems(checked === true)}
+                            disabled={combineBillItemsMutation.isPending}
+                            data-testid="checkbox-combine-bill-items-mobile"
+                          />
+                          <Label htmlFor="combine-bill-items-mobile" className="text-xs font-normal cursor-pointer">
+                            {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
+                          </Label>
+                        </div>
+                      )}
                     </div>
                   </>
                 );

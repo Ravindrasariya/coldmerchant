@@ -2845,7 +2845,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, combineBillItems, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -3111,6 +3111,9 @@ export async function registerRoutes(
           purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null,
           location: location ? location.toString().trim() : null,
           freightPaidSeparately: freightPaidSeparately === true || freightPaidSeparately === "true",
+          // Print-only: collapse the lots into one row on the buyer's bill and
+          // challan. Never affects any stored figure.
+          combineBillItems: transactionType === "loading" && (combineBillItems === true || combineBillItems === "true"),
         },
         transactionItems
       );
@@ -3311,6 +3314,53 @@ export async function registerRoutes(
   });
 
   // PATCH /api/transactions/:id - Update a transaction (only partyName, advancePayment, transportationCharges, otherCharges, revenue)
+  // PATCH /api/transactions/:id/combine-bill-items
+  //
+  // Deliberately separate from the main transaction PATCH. This flag is
+  // PRINT-ONLY: it decides whether the buyer's receipt and challan show one
+  // combined row or one row per lot. The main PATCH recomputes cost of goods
+  // and profit/loss from live lot prices, so routing a presentation toggle
+  // through it could silently rewrite stored money on a transaction whose
+  // source lot was repriced. This endpoint writes the one column and nothing
+  // else.
+  app.patch("/api/transactions/:id/combine-bill-items", requireMerchant, async (req, res) => {
+    try {
+      const merchantId = req.user!.merchantId!;
+      const userId = req.user!.id;
+      const transactionId = parseInt(req.params.id);
+      if (isNaN(transactionId)) {
+        return res.status(400).json({ message: "Invalid transaction id" });
+      }
+
+      const existingTxn = await storage.getTransactionById(transactionId, merchantId);
+      if (!existingTxn) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      if (existingTxn.transactionType !== "loading") {
+        return res.status(400).json({ message: "Only loading transactions can combine bill rows" });
+      }
+
+      const { combineBillItems } = req.body;
+      const resolved = combineBillItems === true || combineBillItems === "true";
+      const previous = existingTxn.combineBillItems === true;
+
+      if (resolved !== previous) {
+        await storage.updateTransaction(transactionId, merchantId, { combineBillItems: resolved });
+        await storage.createTransactionEditHistory({
+          transactionId,
+          merchantId,
+          userId,
+          changeSet: [{ field: "combineBillItems", oldValue: String(previous), newValue: String(resolved) }],
+        });
+      }
+
+      res.json({ combineBillItems: resolved });
+    } catch (error) {
+      console.error("Error updating combineBillItems:", error);
+      res.status(500).json({ message: "Failed to update bill row setting" });
+    }
+  });
+
   app.patch("/api/transactions/:id", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;

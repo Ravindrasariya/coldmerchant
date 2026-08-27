@@ -215,6 +215,11 @@ export const transactions = pgTable("transactions", {
   purchaseOrder: text("purchase_order"), // optional purchase order / reference number (loading only)
   location: text("location"), // optional delivery location for this transaction — a buyer can have several, so it belongs to the transaction, not the buyer
   freightPaidSeparately: boolean("freight_paid_separately").notNull().default(false), // loading only: freight paid by user, not billed to buyer
+  // Loading only, PRINT-ONLY setting: collapse every item into a single row on
+  // the buyer receipt and challan so the buyer cannot see the load came from
+  // several lots. Only meaningful when all items share one ₹/Kg; consumers must
+  // re-check that at print time. Never affects stored figures or any register.
+  combineBillItems: boolean("combine_bill_items").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Lookup index for "find all rows in this loading session" queries used by

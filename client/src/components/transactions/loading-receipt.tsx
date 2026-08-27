@@ -10,6 +10,7 @@ import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
 import { defaultLoadingTemplate } from "@/lib/default-loading-template";
+import { shouldCombineBillItems } from "@/lib/combine-bill-items";
 
 interface TransactionItem {
   id: number;
@@ -49,6 +50,7 @@ interface LoadingTransaction {
   revenue: string | null;
   totalBags: number;
   totalNetWeight: string | null;
+  combineBillItems?: boolean;
   totalCostOfGoods: string | null;
   salesCommission: string | null;
   totalMandiCommission: string | null;
@@ -223,6 +225,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
 
   const buildCustomHtml = () => {
     if (!transaction || !merchant) return null;
+    // Print-only: collapse the lots into a single row when the merchant asked
+    // for it and every lot really does share one rate. Marka is left blank —
+    // a combined row can span several markas, so none of them applies.
+    const combineRows = shouldCombineBillItems(transaction.combineBillItems, transaction.items);
+    const printedRowCount = combineRows ? 1 : transaction.items.length;
     // Priority 1: custom per-merchant HTML template
     // Priority 2: built-in Indore default template (with header image if set)
     let html: string;
@@ -255,7 +262,7 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       const _chargeRows = Math.max(_nonZeroCount, 1) + 1;
       const _fixedPx = 340 + _chargeRows * 26;
       const _availPx = 1047 - _fixedPx;
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - 9);
+      minRows = Math.max(printedRowCount, Math.floor(_availPx / 24) - 9);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
@@ -264,10 +271,13 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const cropLabel = distinctCrops.map(cropToLabel).join(", ");
     const dateStr = resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
-    const itemsDataRows = transaction.items.map((item) =>
+    const combinedRate = combineRows ? parseFloat(transaction.items[0].pricePerKg || "0") : 0;
+    const itemsDataRows = combineRows
+      ? `<tr><td>${escHtml(cropLabel)}</td><td></td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td>₹${combinedRate.toFixed(2)}</td><td style="text-align:right">₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr>`
+      : transaction.items.map((item) =>
       `<tr><td>${escHtml(cropToLabel(item.crop || txnCrop))}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
     ).join("");
-    const blankCount = Math.max(0, minRows - transaction.items.length);
+    const blankCount = Math.max(0, minRows - printedRowCount);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
     const itemRowsHtml = itemsDataRows + blankRows;
     const itemsTableHtml = `<table><thead><tr><th>Item Name</th><th>Marka</th><th>Quantity</th><th>Weight</th><th>Rate</th><th style="text-align:right">Value</th></tr></thead><tbody>${itemRowsHtml}</tbody><tfoot><tr style="font-weight:bold;border-top:1px solid #000"><td>Total</td><td></td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td></td><td style="text-align:right">₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr></tfoot></table>`;
