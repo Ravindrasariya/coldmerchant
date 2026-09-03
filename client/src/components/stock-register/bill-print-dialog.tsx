@@ -847,14 +847,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
     const summaryCellsHtml = billSummary.cells.map(cell => {
       const isHighlight = cell.tone === "highlight";
-      const wrapperStyle = isHighlight
-        ? "min-width: 0; background: #0d9488; padding: 6px 4px; border-radius: 6px;"
-        : "min-width: 0;";
-      const labelStyle = isHighlight
-        ? "font-size: 10px; line-height: 1.3; color: #fff; margin: 0 0 4px 0; overflow-wrap: anywhere;"
-        : "font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;";
+      const wrapperStyle = "min-width: 0;";
+      const labelStyle = "font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0; overflow-wrap: anywhere;";
       const valueStyle = isHighlight
-        ? "font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;"
+        ? "font-family: monospace; font-weight: 700; font-size: 13px; margin: 0; color: #0f766e;"
         : `font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; ${SUMMARY_TONE_PRINT[cell.tone]}`;
       return `
                 <div style="${wrapperStyle}">
@@ -1000,17 +996,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">{billSummary.title}</h3>
         <div className="grid gap-2 text-center items-stretch" style={{ gridTemplateColumns: `repeat(${billSummary.cells.length}, minmax(0, 1fr))` }}>
           {billSummary.cells.map((cell) => (
-            cell.tone === "highlight" ? (
-              <div key={cell.key} className="min-w-0 bg-teal-600 text-white rounded-md px-1 py-1.5">
-                <p className="text-xs leading-tight mb-1 break-words">{cell.labelEn} /<br />{cell.labelHi}</p>
-                <p className="font-mono font-bold text-sm">{cell.value}</p>
-              </div>
-            ) : (
-              <div key={cell.key} className="min-w-0">
-                <p className="text-xs leading-tight text-gray-600 mb-1">{cell.labelEn} /<br />{cell.labelHi}</p>
-                <p className={`font-mono font-semibold text-xs ${SUMMARY_TONE_CLASS[cell.tone]}`}>{cell.value}</p>
-              </div>
-            )
+            <div key={cell.key} className="min-w-0">
+              <p className="text-xs leading-tight text-gray-600 mb-1 break-words">{cell.labelEn} /<br />{cell.labelHi}</p>
+              <p className={`font-mono ${cell.tone === "highlight" ? "font-bold text-sm text-teal-700" : `font-semibold text-xs ${SUMMARY_TONE_CLASS[cell.tone]}`}`}>{cell.value}</p>
+            </div>
           ))}
         </div>
       </div>
