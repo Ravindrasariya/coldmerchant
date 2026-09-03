@@ -455,7 +455,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
   type SummaryCell = {
     key: string;
-    label: string;
+    labelEn: string;
+    labelHi: string;
     value: string;
     tone: "default" | "green" | "blue" | "orange" | "highlight";
   };
@@ -464,28 +465,32 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     const cells: SummaryCell[] = [];
     cells.push({
       key: "bags",
-      label: "Total Bags / कुल बोरी",
+      labelEn: "Total Bags",
+      labelHi: "कुल बोरी",
       value: String(totalBagsExcludingWastage),
       tone: "default",
     });
     if (isMandi) {
       cells.push({
         key: "netWeight",
-        label: "Total Net Weight / कुल शुद्ध वजन",
+        labelEn: "Total Net Weight",
+        labelHi: "कुल शुद्ध वजन",
         value: overallTotals.totalNetWeight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         tone: "default",
       });
     }
     cells.push({
       key: "payable",
-      label: "Total Payable / कुल देय",
+      labelEn: "Total Payable",
+      labelHi: "कुल देय",
       value: formatMoney(overallTotals.totalPayable),
       tone: "green",
     });
     if (isMandi || overallTotals.totalMandiCharges > 0) {
       cells.push({
         key: "mandiCharges",
-        label: "Mandi Charges / मंडी शुल्क",
+        labelEn: "Mandi Charges",
+        labelHi: "मंडी शुल्क",
         value: formatMoney(overallTotals.totalMandiCharges),
         tone: "blue",
       });
@@ -493,14 +498,16 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     if (!isMandi) {
       cells.push({
         key: "deductions",
-        label: "Deductions / कटौती",
+        labelEn: "Deductions",
+        labelHi: "कटौती",
         value: formatMoney(overallTotals.totalDeductions),
         tone: "orange",
       });
     }
     cells.push({
       key: "netDue",
-      label: isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय",
+      labelEn: isMandi ? "Net Due to Aadhat" : "Net Due to Farmer",
+      labelHi: isMandi ? "आढ़तिया को देय" : "किसान को देय",
       value: `₹${Math.round(overallTotals.netPayable).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
       tone: "highlight",
     });
@@ -851,7 +858,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         : `font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; ${SUMMARY_TONE_PRINT[cell.tone]}`;
       return `
                 <div style="${wrapperStyle}">
-                  <p style="${labelStyle}">${cell.label}</p>
+                  <p style="${labelStyle}">${cell.labelEn} /<br />${cell.labelHi}</p>
                   <p style="${valueStyle}">${cell.value}</p>
                 </div>`;
     }).join("");
@@ -995,12 +1002,12 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           {billSummary.cells.map((cell) => (
             cell.tone === "highlight" ? (
               <div key={cell.key} className="min-w-0 bg-teal-600 text-white rounded-md px-1 py-1.5">
-                <p className="text-xs leading-tight mb-1 break-words">{cell.label}</p>
+                <p className="text-xs leading-tight mb-1 break-words">{cell.labelEn} /<br />{cell.labelHi}</p>
                 <p className="font-mono font-bold text-sm">{cell.value}</p>
               </div>
             ) : (
               <div key={cell.key} className="min-w-0">
-                <p className="text-xs leading-tight text-gray-600 mb-1">{cell.label}</p>
+                <p className="text-xs leading-tight text-gray-600 mb-1">{cell.labelEn} /<br />{cell.labelHi}</p>
                 <p className={`font-mono font-semibold text-xs ${SUMMARY_TONE_CLASS[cell.tone]}`}>{cell.value}</p>
               </div>
             )
