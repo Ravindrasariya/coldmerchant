@@ -256,25 +256,28 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const calculateLotTotals = (lot: StockEntryWithLots["lots"][0]) => {
     let totalPayable: number;
     let totalBagsForMandi: number;
+    let totalNetWeight: number;
 
     if (lot.bagBreakdowns.length > 0) {
-      totalPayable = lot.bagBreakdowns
-        .filter(bd => isPayableBreakdown(bd, lot.cutType))
-        .reduce((sum, bd) => {
+      const payableBreakdowns = lot.bagBreakdowns.filter(bd => isPayableBreakdown(bd, lot.cutType));
+      totalPayable = payableBreakdowns.reduce((sum, bd) => {
           const weight = bd.weight ? parseFloat(bd.weight) : 0;
           const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
           const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
           return sum + (netWeight * price);
         }, 0);
-      totalBagsForMandi = lot.bagBreakdowns
-        .filter(bd => isPayableBreakdown(bd, lot.cutType))
-        .reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
+      totalBagsForMandi = payableBreakdowns.reduce((sum, bd) => sum + (bd.numberOfBags || 0), 0);
+      totalNetWeight = payableBreakdowns.reduce((sum, bd) => {
+        const weight = bd.weight ? parseFloat(bd.weight) : 0;
+        return sum + computeNetWeight(weight, bd.numberOfBags, lot.place);
+      }, 0);
     } else {
       const weight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
       const netWeight = computeNetWeight(weight, lot.originalBags, lot.place);
       const price = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
       totalPayable = netWeight * price;
       totalBagsForMandi = lot.originalBags;
+      totalNetWeight = netWeight;
     }
     
     const hammali = lot.hammaliGradingCharges ? parseFloat(lot.hammaliGradingCharges) : 0;
@@ -311,19 +314,20 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     
     const netPayable = totalPayable - totalDeductions + totalMandiCharges + adjustedValue;
     
-    return { totalPayable, hammali, charges, dynamicCharges, earlyPayPct, earlyPayAmt, mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalMandiCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
+    return { totalPayable, totalNetWeight, hammali, charges, dynamicCharges, earlyPayPct, earlyPayAmt, mandiCommission, aadhatCommission, mandiHammali, mandiExtra, totalMandiCharges, totalDeductions, principal, rate, interestDays, interest, adjustedValue, netPayable };
   };
 
   const overallTotals = entry.lots.reduce((acc, lot) => {
     const lotTotals = calculateLotTotals(lot);
     return {
       totalPayable: acc.totalPayable + lotTotals.totalPayable,
+      totalNetWeight: acc.totalNetWeight + lotTotals.totalNetWeight,
       totalDeductions: acc.totalDeductions + lotTotals.totalDeductions,
       totalMandiCharges: acc.totalMandiCharges + lotTotals.totalMandiCharges,
       adjustedValue: acc.adjustedValue + lotTotals.adjustedValue,
       netPayable: acc.netPayable + lotTotals.netPayable,
     };
-  }, { totalPayable: 0, totalDeductions: 0, totalMandiCharges: 0, adjustedValue: 0, netPayable: 0 });
+  }, { totalPayable: 0, totalNetWeight: 0, totalDeductions: 0, totalMandiCharges: 0, adjustedValue: 0, netPayable: 0 });
 
   const aggregatedMandiCharges = (() => {
     let mandiCommission = 0, aadhatCommission = 0, mandiHammali = 0, mandiExtra = 0;
