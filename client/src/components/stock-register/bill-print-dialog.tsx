@@ -428,11 +428,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   const escapeHtml = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-  const formatMarkaSuffix = (val?: string | null) => {
-    const m = (val || "").trim();
-    return m ? ` <span style="color:#666; white-space:nowrap;">(Marka -${escapeHtml(m)})</span>` : "";
-  };
-
   const getPlaceBilingual = (lot: StockEntryWithLots["lots"][0]) => {
     if (lot.place === "farm_gate") return "Farm Gate / फार्म गेट";
     if (lot.place === "mandi") return "Mandi / मंडी";
@@ -531,143 +526,315 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     highlight: "",
   };
 
+  // ---------------------------------------------------------------------------
+  // Shared bill "lot section" model: crop table rows + charge/deduction lines.
+  // Both the React preview (renderBillContent) and the printed HTML (handlePrint)
+  // render from these structures, so labels and visibility rules exist once.
+  // ---------------------------------------------------------------------------
+  type BillCell = { text: string; muted?: string[]; align: "left" | "right"; mono?: boolean; bold?: boolean };
+  type BillColumn = { label: string; align: "left" | "right" };
+  type ChargeLine = { key: string; label: string; value: string; tone: "default" | "green" | "red" };
+  type ChargeBlock = { key: string; title: string; variant: "charges" | "deductions"; lines: ChargeLine[] };
+  type BillSection = {
+    key: string;
+    columns: BillColumn[];
+    rows: Array<{ key: string; cells: BillCell[] }>;
+    blocks: ChargeBlock[];
+    remarks: string | null;
+  };
+
+  const formatQty = (n: number) => (n > 0 ? n.toFixed(2) : "—");
+  const formatPrice = (p: number) => (p > 0 ? `₹${parseFloat((Math.trunc(p * 100) / 100).toFixed(2))}` : "—");
+  const formatAmount = (a: number) => (a > 0 ? `₹${parseFloat(a.toFixed(1)).toLocaleString("en-IN")}` : "—");
+  const formatCharge = (n: number) =>
+    `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+
+  const buildCropCell = (crop: string | undefined, size: string | null | undefined, marka: string | null | undefined): BillCell => {
+    const muted: string[] = [];
+    if (size) muted.push(`(${getSizeBilingual(size)})`);
+    const m = (marka || "").trim();
+    if (m) muted.push(`(Marka -${m})`);
+    return { text: getCropBilingual(crop), muted, align: "left" };
+  };
+
+  const buildRowCells = (crop: BillCell, bags: number, weights: number[], price: number, amount: number): BillCell[] => [
+    crop,
+    { text: String(bags), align: "right", mono: true },
+    ...weights.map((w) => ({ text: formatQty(w), align: "right" as const, mono: true })),
+    { text: formatPrice(price), align: "right", mono: true },
+    { text: formatAmount(amount), align: "right", mono: true, bold: true },
+  ];
+
+  const buildAdjustmentLine = (
+    key: string,
+    value: number,
+    suffix: string,
+  ): ChargeLine => ({
+    key,
+    label: `Adjustment / समायोजन${suffix}`,
+    value: `${value > 0 ? "+" : ""}₹${Math.abs(value).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`,
+    tone: value > 0 ? "green" : "red",
+  });
+
+  const buildLotSection = (lot: StockEntryWithLots["lots"][0]): BillSection => {
+    const weightHeader = lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन";
+    const columns: BillColumn[] = [
+      { label: "Crop / फसल", align: "left" },
+      { label: "# Bags / बोरी", align: "right" },
+      { label: weightHeader, align: "right" },
+      { label: "Price/kg / मूल्य", align: "right" },
+      { label: "Amount / राशि", align: "right" },
+    ];
+
+    const rows: BillSection["rows"] = [];
+    if (lot.bagBreakdowns.length > 0) {
+      if (lot.cutType === "gate_cut") {
+        const c = buildGateCutConsolidatedRow(lot);
+        if (c.totalBags > 0) {
+          rows.push({
+            key: `lot-${lot.id}-gate`,
+            cells: buildRowCells(
+              buildCropCell(lot.crop, c.dominantSize, getLotMarkaValue(lot)),
+              c.totalBags,
+              [c.totalNetWeight],
+              c.dominantPrice,
+              c.totalAmount,
+            ),
+          });
+        }
+      } else {
+        lot.bagBreakdowns
+          .filter((bd) => isPayableBreakdown(bd, lot.cutType))
+          .forEach((bd, idx) => {
+            const weight = bd.weight ? parseFloat(bd.weight) : 0;
+            const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
+            const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
+            rows.push({
+              key: `lot-${lot.id}-bd-${bd.id || idx}`,
+              cells: buildRowCells(
+                buildCropCell(lot.crop, null, (bd.marka || "").trim() || getLotMarkaValue(lot)),
+                bd.numberOfBags,
+                [netWeight],
+                price,
+                netWeight * price,
+              ),
+            });
+          });
+      }
+    } else {
+      const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
+      const lotNetWeight = computeNetWeight(lotWeight, lot.originalBags, lot.place);
+      const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
+      rows.push({
+        key: `lot-${lot.id}-single`,
+        cells: buildRowCells(
+          buildCropCell(lot.crop, null, getLotMarkaValue(lot)),
+          lot.originalBags,
+          [lotNetWeight],
+          lotPrice,
+          lotNetWeight * lotPrice,
+        ),
+      });
+    }
+
+    const lotTotals = calculateLotTotals(lot);
+    const blocks: ChargeBlock[] = [];
+
+    if (lotTotals.totalMandiCharges > 0) {
+      const lines: ChargeLine[] = [];
+      if (lotTotals.mandiCommission > 0) lines.push({ key: "mandiCommission", label: "Mandi Commission / मंडी कमीशन", value: formatCharge(lotTotals.mandiCommission), tone: "default" });
+      if (lotTotals.aadhatCommission > 0) lines.push({ key: "aadhatCommission", label: "Aadhat Commission / आढ़त कमीशन", value: formatCharge(lotTotals.aadhatCommission), tone: "default" });
+      if (lotTotals.mandiHammali > 0) lines.push({ key: "mandiHammali", label: "Hammali / हम्माली", value: formatCharge(lotTotals.mandiHammali), tone: "default" });
+      if (lotTotals.mandiExtra > 0) lines.push({ key: "mandiExtra", label: "Extra Charges / अतिरिक्त शुल्क", value: formatCharge(lotTotals.mandiExtra), tone: "default" });
+      blocks.push({ key: `lot-${lot.id}-mandi`, title: "Mandi Charges / मंडी शुल्क", variant: "charges", lines });
+    }
+
+    if (lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0) {
+      const lines: ChargeLine[] = [];
+      if (lotTotals.hammali > 0) lines.push({ key: "hammali", label: "Hammali/Grading / हम्माली", value: formatCharge(lotTotals.hammali), tone: "default" });
+      lotTotals.charges
+        .filter((c) => {
+          if (!isFarmerDeductionCharge(c, lot.place)) return false;
+          const amt = typeof c.amount === "string" ? parseFloat(c.amount) : (c.amount || 0);
+          return amt > 0;
+        })
+        .forEach((c, i) => {
+          const amt = typeof c.amount === "string" ? parseFloat(c.amount) : (c.amount || 0);
+          lines.push({ key: `charge-${i}`, label: c.type || "Charge", value: formatCharge(amt), tone: "default" });
+        });
+      if (lotTotals.earlyPayAmt > 0) lines.push({ key: "earlyPay", label: `Early Pay/Bataw / जल्दी भुगतान (${lotTotals.earlyPayPct}%)`, value: formatCharge(lotTotals.earlyPayAmt), tone: "default" });
+      if (lotTotals.adjustedValue !== 0) {
+        const suffix = lotTotals.rate > 0 && lotTotals.interestDays > 0
+          ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})`
+          : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : "";
+        lines.push(buildAdjustmentLine("adjustment", lotTotals.adjustedValue, suffix));
+      }
+      blocks.push({ key: `lot-${lot.id}-deductions`, title: "Deductions / कटौती", variant: "deductions", lines });
+    }
+
+    return { key: `lot-${lot.id}`, columns, rows, blocks, remarks: lot.remarks };
+  };
+
+  const buildMandiSection = (): BillSection => {
+    const columns: BillColumn[] = [
+      { label: "Crop / फसल", align: "left" },
+      { label: "# Bags / बोरी", align: "right" },
+      { label: "Gross Wt / कुल वजन", align: "right" },
+      { label: "Net Wt / शुद्ध वजन", align: "right" },
+      { label: "Price/kg / मूल्य", align: "right" },
+      { label: "Amount / राशि", align: "right" },
+    ];
+    const rows = allTableRows.map((r, idx) => ({
+      key: `mandi-row-${idx}`,
+      cells: buildRowCells(
+        buildCropCell(r.crop, r.size, r.marka),
+        r.bags,
+        [r.grossWeight, r.netWeight],
+        r.price,
+        r.amount,
+      ),
+    }));
+
+    const a = aggregatedMandiCharges;
+    const lines: ChargeLine[] = [];
+    if (a.mandiCommission > 0) lines.push({ key: "mandiCommission", label: `Mandi Commission${a.mandiPctLabel} / मंडी कमीशन${a.mandiPctLabel}`, value: formatCharge(a.mandiCommission), tone: "default" });
+    if (a.aadhatCommission > 0) lines.push({ key: "aadhatCommission", label: `Aadhat Commission${a.aadhatPctLabel} / आढ़त कमीशन${a.aadhatPctLabel}`, value: formatCharge(a.aadhatCommission), tone: "default" });
+    if (a.mandiHammali > 0) lines.push({ key: "mandiHammali", label: "Hammali / हम्माली", value: formatCharge(a.mandiHammali), tone: "default" });
+    if (a.mandiExtra > 0) lines.push({ key: "mandiExtra", label: "Extra Charges / अतिरिक्त शुल्क", value: formatCharge(a.mandiExtra), tone: "default" });
+    if (a.totalHammali > 0) lines.push({ key: "hammali", label: "Hammali/Grading / हम्माली", value: formatCharge(a.totalHammali), tone: "default" });
+    Object.entries(a.chargesByType).forEach(([type, amt]) => {
+      if (amt > 0) lines.push({ key: `charge-${type}`, label: type, value: formatCharge(amt), tone: "default" });
+    });
+    if (a.totalEarlyPayAmt > 0) lines.push({ key: "earlyPay", label: "Early Pay/Bataw / जल्दी भुगतान", value: formatCharge(a.totalEarlyPayAmt), tone: "default" });
+    if (a.totalAdjustedValue !== 0) lines.push(buildAdjustmentLine("adjustment", a.totalAdjustedValue, ""));
+
+    const blocks: ChargeBlock[] = lines.length
+      ? [{ key: "mandi-charges", title: "Charges & Deductions / शुल्क एवं कटौती", variant: "charges", lines }]
+      : [];
+
+    return { key: "mandi", columns, rows, blocks, remarks: null };
+  };
+
+  const billSections: BillSection[] = isMandi ? [buildMandiSection()] : entry.lots.map(buildLotSection);
+
+  const CHARGE_TONE_PRINT: Record<ChargeLine["tone"], string> = {
+    default: "",
+    green: " color: #15803d;",
+    red: " color: #dc2626;",
+  };
+
+  const CHARGE_TONE_CLASS: Record<ChargeLine["tone"], string> = {
+    default: "",
+    green: "text-green-700",
+    red: "text-red-600",
+  };
+
+  const BLOCK_STYLE_PRINT: Record<ChargeBlock["variant"], string> = {
+    charges: "background: #eff6ff; border-left: 3px solid #3b82f6;",
+    deductions: "background: #fff7ed; border-left: 3px solid #f97316;",
+  };
+
+  const BLOCK_CLASS: Record<ChargeBlock["variant"], string> = {
+    charges: "bg-blue-50 border-blue-400",
+    deductions: "bg-orange-50 border-orange-400",
+  };
+
+  const renderSectionHtml = (section: BillSection) => {
+    const headHtml = section.columns
+      .map((col) => `<th style="padding: 3px 8px; text-align: ${col.align}; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">${escapeHtml(col.label)}</th>`)
+      .join("");
+    const rowsHtml = section.rows
+      .map((row) => `<tr>${row.cells
+        .map((cell) => {
+          const muted = (cell.muted || []).map((m) => ` <span style="color:#666; white-space:nowrap;">${escapeHtml(m)}</span>`).join("");
+          return `<td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: ${cell.align};${cell.mono ? " font-family: monospace;" : ""}${cell.bold ? " font-weight: 600;" : ""}">${escapeHtml(cell.text)}${muted}</td>`;
+        })
+        .join("")}</tr>`)
+      .join("");
+    const blocksHtml = section.blocks
+      .map((block) => `
+        <div style="margin-top: 6px; padding: 8px; border-radius: 4px; ${BLOCK_STYLE_PRINT[block.variant]}">
+          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">${escapeHtml(block.title)}</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
+            ${block.lines
+              .map((line) => `<div><span style="color: #666;">${escapeHtml(line.label)}:</span></div><div style="text-align: right; font-family: monospace;${CHARGE_TONE_PRINT[line.tone]}">${escapeHtml(line.value)}</div>`)
+              .join("")}
+          </div>
+        </div>
+      `)
+      .join("");
+    const remarksHtml = section.remarks
+      ? `
+        <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #eee;">
+          <p style="font-size: 11px; color: #666; margin: 0;">Remarks / टिप्पणी: <span style="color: #000;">${escapeHtml(section.remarks)}</span></p>
+        </div>
+      `
+      : "";
+    return `
+      <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; page-break-inside: avoid;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
+          <thead><tr style="background: #f5f5f5;">${headHtml}</tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        ${blocksHtml}
+        ${remarksHtml}
+      </div>
+    `;
+  };
+
+  const renderSection = (section: BillSection) => (
+    <div key={section.key} className="border border-gray-300 rounded-lg p-3">
+      <table className="w-full text-sm mt-1 border-collapse">
+        <thead>
+          <tr className="border-b bg-gray-100">
+            {section.columns.map((col) => (
+              <th key={col.label} className={`${col.align === "left" ? "text-left" : "text-right"} py-1 px-2 text-xs uppercase text-gray-600 font-semibold`}>
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {section.rows.map((row) => (
+            <tr key={row.key} className="border-b border-gray-200">
+              {row.cells.map((cell, i) => (
+                <td key={i} className={`py-1 px-2 ${cell.align === "left" ? "text-left" : "text-right"} ${cell.mono ? "font-mono" : ""} ${cell.bold ? "font-medium" : ""}`}>
+                  {cell.text}
+                  {(cell.muted || []).map((m) => (
+                    <span key={m} className="text-gray-500 whitespace-nowrap"> {m}</span>
+                  ))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {section.blocks.map((block) => (
+        <div key={block.key} className={`mt-2 p-2 rounded border-l-4 ${BLOCK_CLASS[block.variant]}`}>
+          <p className="text-xs uppercase text-gray-600 font-semibold mb-1">{block.title}</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {block.lines.map((line) => (
+              <React.Fragment key={line.key}>
+                <span className="text-gray-600">{line.label}:</span>
+                <span className={`text-right font-mono ${CHARGE_TONE_CLASS[line.tone]}`}>{line.value}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      ))}
+      {section.remarks && (
+        <div className="mt-2 pt-2 border-t border-gray-200">
+          <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{section.remarks}</span></p>
+        </div>
+      )}
+    </div>
+  );
+
   const handlePrint = () => {
     if (isMandi && entry.aadhatDbId && aadhatLoading) return;
     if (merchantLoading || (merchantData?.receiptHeaderImage && !headerImageDataUri)) return;
 
-    const lotsHtml = entry.lots.map((lot) => {
-      let breakdownHtml = "";
-      
-      if (lot.bagBreakdowns.length > 0) {
-        const renderRow = (cropLabel: string, bags: number, netWeight: number, price: number, amount: number) => `
-            <tr>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${cropLabel}</td>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${bags}</td>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${netWeight > 0 ? netWeight.toFixed(2) : "—"}</td>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
-              <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-            </tr>
-          `;
-        let rows = "";
-        if (lot.cutType === "gate_cut") {
-          const c = buildGateCutConsolidatedRow(lot);
-          if (c.totalBags > 0) {
-            const cropLabel = `${getCropBilingual(lot.crop)} <span style="color:#666;">(${getSizeBilingual(c.dominantSize)})</span>${formatMarkaSuffix(getLotMarkaValue(lot))}`;
-            rows = renderRow(cropLabel, c.totalBags, c.totalNetWeight, c.dominantPrice, c.totalAmount);
-          }
-        } else {
-          rows = lot.bagBreakdowns
-            .filter(bd => isPayableBreakdown(bd, lot.cutType))
-            .map((bd) => {
-              const weight = bd.weight ? parseFloat(bd.weight) : 0;
-              const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
-              const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-              const amount = netWeight * price;
-              return renderRow(`${getCropBilingual(lot.crop)}${formatMarkaSuffix((bd.marka || "").trim() || getLotMarkaValue(lot))}`, bd.numberOfBags, netWeight, price, amount);
-            }).join("");
-        }
-        
-        breakdownHtml = `
-          <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
-            <thead>
-              <tr style="background: #f5f5f5;">
-                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">${lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows}
-            </tbody>
-          </table>
-        `;
-      } else {
-        const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
-        const lotNetWeight = computeNetWeight(lotWeight, lot.originalBags, lot.place);
-        const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-        const lotAmount = lotNetWeight * lotPrice;
-        breakdownHtml = `
-          <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
-            <thead>
-              <tr style="background: #f5f5f5;">
-                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">${lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(lot.crop)}${formatMarkaSuffix(getLotMarkaValue(lot))}</td>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lot.originalBags}</td>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotNetWeight > 0 ? lotNetWeight.toFixed(2) : "—"}</td>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
-                <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-              </tr>
-            </tbody>
-          </table>
-        `;
-      }
-
-      const lotRemarksHtml = lot.remarks ? `
-        <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #eee;">
-          <p style="font-size: 11px; color: #666; margin: 0;">Remarks / टिप्पणी: <span style="color: #000;">${lot.remarks}</span></p>
-        </div>
-      ` : "";
-
-      const lotTotals = calculateLotTotals(lot);
-      const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
-      const hasMandiCharges = lotTotals.totalMandiCharges > 0;
-      
-      const chargesHtml = lotTotals.charges.filter(c => {
-        if (!isFarmerDeductionCharge(c, lot.place)) return false;
-        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-        return amt > 0;
-      }).map(c => {
-        const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-        return `<div><span style="color: #666;">${c.type || "Charge"}:</span></div><div style="text-align: right; font-family: monospace;">₹${amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>`;
-      }).join("");
-      
-      const adjustmentLabel = lotTotals.rate > 0 && lotTotals.interestDays > 0 
-        ? `Adjustment / समायोजन (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
-        : `Adjustment / समायोजन${lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}`;
-      
-      const mandiChargesBlockHtml = hasMandiCharges ? `
-        <div style="margin-top: 6px; padding: 8px; background: #eff6ff; border-radius: 4px; border-left: 3px solid #3b82f6;">
-          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Mandi Charges / मंडी शुल्क</p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
-            ${lotTotals.mandiCommission > 0 ? `<div><span style="color: #666;">Mandi Commission / मंडी कमीशन:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-            ${lotTotals.aadhatCommission > 0 ? `<div><span style="color: #666;">Aadhat Commission / आढ़त कमीशन:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-            ${lotTotals.mandiHammali > 0 ? `<div><span style="color: #666;">Hammali / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-            ${lotTotals.mandiExtra > 0 ? `<div><span style="color: #666;">Extra Charges / अतिरिक्त शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-          </div>
-        </div>
-      ` : "";
-
-      const deductionsHtml = hasDeductions ? `
-        <div style="margin-top: 6px; padding: 8px; background: #fff7ed; border-radius: 4px; border-left: 3px solid #f97316;">
-          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Deductions / कटौती</p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
-            ${lotTotals.hammali > 0 ? `<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-            ${chargesHtml}
-            ${lotTotals.earlyPayAmt > 0 ? `<div><span style="color: #666;">Early Pay/Bataw / जल्दी भुगतान (${lotTotals.earlyPayPct}%):</span></div><div style="text-align: right; font-family: monospace;">₹${lotTotals.earlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-            ${lotTotals.adjustedValue !== 0 ? `<div><span style="color: #666;">${adjustmentLabel}:</span></div><div style="text-align: right; font-family: monospace; color: ${lotTotals.adjustedValue > 0 ? '#15803d' : '#dc2626'};">${lotTotals.adjustedValue > 0 ? '+' : ''}₹${Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</div>` : ""}
-          </div>
-        </div>
-      ` : "";
-      
-      return `
-        <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; page-break-inside: avoid;">
-          ${breakdownHtml}
-          ${mandiChargesBlockHtml}
-          ${deductionsHtml}
-          ${lotRemarksHtml}
-        </div>
-      `;
-    }).join("");
+    const sectionsHtml = billSections.map(renderSectionHtml).join("");
 
     const { address, detailsLabel, name: detailsName, contact: detailsContact } = billParty;
 
@@ -689,79 +856,6 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
                 </div>`;
     }).join("");
 
-    let mandiUnifiedHtml = "";
-    if (isMandi) {
-      const tableRowsHtml = allTableRows.map(r => `
-        <tr>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd;">${getCropBilingual(r.crop)}${formatMarkaSuffix(r.marka)}</td>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.bags}</td>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.grossWeight > 0 ? r.grossWeight.toFixed(2) : "—"}</td>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.netWeight > 0 ? r.netWeight.toFixed(2) : "—"}</td>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace;">${r.price > 0 ? "₹" + parseFloat((Math.trunc(r.price * 100) / 100).toFixed(2)) : "—"}</td>
-          <td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: right; font-family: monospace; font-weight: 600;">${r.amount > 0 ? "₹" + parseFloat(r.amount.toFixed(1)).toLocaleString('en-IN') : "—"}</td>
-        </tr>
-      `).join("");
-
-      let mandiChargesLines = "";
-      if (aggregatedMandiCharges.mandiCommission > 0) {
-        mandiChargesLines += '<div><span style="color: #666;">Mandi Commission' + aggregatedMandiCharges.mandiPctLabel + ' / मंडी कमीशन' + aggregatedMandiCharges.mandiPctLabel + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-      if (aggregatedMandiCharges.aadhatCommission > 0) {
-        mandiChargesLines += '<div><span style="color: #666;">Aadhat Commission' + aggregatedMandiCharges.aadhatPctLabel + ' / आढ़त कमीशन' + aggregatedMandiCharges.aadhatPctLabel + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-      if (aggregatedMandiCharges.mandiHammali > 0) {
-        mandiChargesLines += '<div><span style="color: #666;">Hammali / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-      if (aggregatedMandiCharges.mandiExtra > 0) {
-        mandiChargesLines += '<div><span style="color: #666;">Extra Charges / अतिरिक्त शुल्क:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-      if (aggregatedMandiCharges.totalHammali > 0) {
-        mandiChargesLines += '<div><span style="color: #666;">Hammali/Grading / हम्माली:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.totalHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-      Object.entries(aggregatedMandiCharges.chargesByType).forEach(([type, amt]) => {
-        if (amt > 0) {
-          mandiChargesLines += '<div><span style="color: #666;">' + type + ':</span></div><div style="text-align: right; font-family: monospace;">₹' + amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-        }
-      });
-      if (aggregatedMandiCharges.totalEarlyPayAmt > 0) {
-        mandiChargesLines += '<div><span style="color: #666;">Early Pay/Bataw / जल्दी भुगतान:</span></div><div style="text-align: right; font-family: monospace;">₹' + aggregatedMandiCharges.totalEarlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-      if (aggregatedMandiCharges.totalAdjustedValue !== 0) {
-        const adjColor = aggregatedMandiCharges.totalAdjustedValue > 0 ? '#15803d' : '#dc2626';
-        const adjSign = aggregatedMandiCharges.totalAdjustedValue > 0 ? '+' : '';
-        mandiChargesLines += '<div><span style="color: #666;">Adjustment / समायोजन:</span></div><div style="text-align: right; font-family: monospace; color: ' + adjColor + ';">' + adjSign + '₹' + Math.abs(aggregatedMandiCharges.totalAdjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 }) + '</div>';
-      }
-
-      const mandiChargesBlockHtmlMandi = mandiChargesLines ? `
-        <div style="margin-top: 6px; padding: 8px; background: #eff6ff; border-radius: 4px; border-left: 3px solid #3b82f6;">
-          <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">Charges & Deductions / शुल्क एवं कटौती</p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
-            ${mandiChargesLines}
-          </div>
-        </div>
-      ` : "";
-
-      mandiUnifiedHtml = `
-        <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; page-break-inside: avoid;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-            <thead>
-              <tr style="background: #f5f5f5;">
-                <th style="padding: 3px 8px; text-align: left; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Crop / फसल</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;"># Bags / बोरी</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Gross Wt / कुल वजन</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Net Wt / शुद्ध वजन</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Price/kg / मूल्य</th>
-                <th style="padding: 3px 8px; text-align: right; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">Amount / राशि</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tableRowsHtml}
-            </tbody>
-          </table>
-          ${mandiChargesBlockHtmlMandi}
-        </div>
-      `;
-    }
 
     const html = `
       <!DOCTYPE html>
@@ -816,7 +910,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             <!-- Lot Details -->
             <div>
               <h3 style="font-size: 10px; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.05em;">${isMandi ? "Details / विवरण" : "Lot Details / लॉट विवरण"}</h3>
-              ${isMandi ? mandiUnifiedHtml : lotsHtml}
+              ${sectionsHtml}
             </div>
 
             <!-- Totals Summary -->
@@ -892,263 +986,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
       <div className="space-y-2">
         <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide">{isMandi ? "Details / विवरण" : "Lot Details / लॉट विवरण"}</h3>
-        {isMandi ? (
-          <div className="border border-gray-300 rounded-lg p-3">
-            <table className="w-full text-sm mt-1 border-collapse">
-              <thead>
-                <tr className="border-b bg-gray-100">
-                  <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
-                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Gross Wt / कुल वजन</th>
-                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Net Wt / शुद्ध वजन</th>
-                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
-                  <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allTableRows.map((r, idx) => (
-                  <tr key={idx} className="border-b border-gray-200">
-                    <td className="py-1 px-2">{getCropBilingual(r.crop)}</td>
-                    <td className="py-1 px-2 text-right font-mono">{r.bags}</td>
-                    <td className="py-1 px-2 text-right font-mono">{r.grossWeight > 0 ? r.grossWeight.toFixed(2) : "—"}</td>
-                    <td className="py-1 px-2 text-right font-mono">{r.netWeight > 0 ? r.netWeight.toFixed(2) : "—"}</td>
-                    <td className="py-1 px-2 text-right font-mono">{r.price > 0 ? `₹${parseFloat((Math.trunc(r.price * 100) / 100).toFixed(2))}` : "—"}</td>
-                    <td className="py-1 px-2 text-right font-mono font-medium">{r.amount > 0 ? `₹${parseFloat(r.amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {(overallTotals.totalMandiCharges > 0 || aggregatedMandiCharges.totalHammali > 0 || Object.keys(aggregatedMandiCharges.chargesByType).length > 0 || aggregatedMandiCharges.totalAdjustedValue !== 0) && (
-              <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Charges & Deductions / शुल्क एवं कटौती</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {aggregatedMandiCharges.mandiCommission > 0 && (
-                    <>
-                      <span className="text-gray-600">Mandi Commission{aggregatedMandiCharges.mandiPctLabel} / मंडी कमीशन{aggregatedMandiCharges.mandiPctLabel}:</span>
-                      <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                    </>
-                  )}
-                  {aggregatedMandiCharges.aadhatCommission > 0 && (
-                    <>
-                      <span className="text-gray-600">Aadhat Commission{aggregatedMandiCharges.aadhatPctLabel} / आढ़त कमीशन{aggregatedMandiCharges.aadhatPctLabel}:</span>
-                      <span className="text-right font-mono">₹{aggregatedMandiCharges.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                    </>
-                  )}
-                  {aggregatedMandiCharges.mandiHammali > 0 && (
-                    <>
-                      <span className="text-gray-600">Hammali / हम्माली:</span>
-                      <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                    </>
-                  )}
-                  {aggregatedMandiCharges.mandiExtra > 0 && (
-                    <>
-                      <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
-                      <span className="text-right font-mono">₹{aggregatedMandiCharges.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                    </>
-                  )}
-                  {aggregatedMandiCharges.totalHammali > 0 && (
-                    <>
-                      <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
-                      <span className="text-right font-mono">₹{aggregatedMandiCharges.totalHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                    </>
-                  )}
-                  {Object.entries(aggregatedMandiCharges.chargesByType).map(([type, amt]) => (
-                    amt > 0 ? (
-                      <React.Fragment key={type}>
-                        <span className="text-gray-600">{type}:</span>
-                        <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                      </React.Fragment>
-                    ) : null
-                  ))}
-                  {aggregatedMandiCharges.totalEarlyPayAmt > 0 && (
-                    <>
-                      <span className="text-gray-600">Early Pay/Bataw / जल्दी भुगतान:</span>
-                      <span className="text-right font-mono">₹{aggregatedMandiCharges.totalEarlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                    </>
-                  )}
-                  {aggregatedMandiCharges.totalAdjustedValue !== 0 && (
-                    <>
-                      <span className="text-gray-600">Adjustment / समायोजन:</span>
-                      <span className={`text-right font-mono ${aggregatedMandiCharges.totalAdjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                        {aggregatedMandiCharges.totalAdjustedValue > 0 ? '+' : ''}₹{Math.abs(aggregatedMandiCharges.totalAdjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          entry.lots.map((lot) => (
-            <div key={lot.id} className="border border-gray-300 rounded-lg p-3">
-              {lot.bagBreakdowns.length > 0 ? (
-                <table className="w-full text-sm mt-1 border-collapse">
-                  <thead>
-                    <tr className="border-b bg-gray-100">
-                      <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
-                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">{lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
-                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
-                      <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lot.cutType === "gate_cut" ? (() => {
-                      const c = buildGateCutConsolidatedRow(lot);
-                      if (c.totalBags <= 0) return null;
-                      return (
-                        <tr className="border-b border-gray-200">
-                          <td className="py-1 px-2">
-                            {getCropBilingual(lot.crop)} <span className="text-gray-500">({getSizeBilingual(c.dominantSize)})</span>
-                          </td>
-                          <td className="py-1 px-2 text-right font-mono">{c.totalBags}</td>
-                          <td className="py-1 px-2 text-right font-mono">{c.totalNetWeight > 0 ? c.totalNetWeight.toFixed(2) : "—"}</td>
-                          <td className="py-1 px-2 text-right font-mono">{c.dominantPrice > 0 ? `₹${parseFloat((Math.trunc(c.dominantPrice * 100) / 100).toFixed(2))}` : "—"}</td>
-                          <td className="py-1 px-2 text-right font-mono font-medium">{c.totalAmount > 0 ? `₹${parseFloat(c.totalAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                        </tr>
-                      );
-                    })() : lot.bagBreakdowns.filter(bd => isPayableBreakdown(bd, lot.cutType)).map((bd, bdIndex) => {
-                      const weight = bd.weight ? parseFloat(bd.weight) : 0;
-                      const netWeight = computeNetWeight(weight, bd.numberOfBags, lot.place);
-                      const price = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-                      const amount = netWeight * price;
-                      return (
-                        <tr key={bd.id || bdIndex} className="border-b border-gray-200">
-                          <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
-                          <td className="py-1 px-2 text-right font-mono">{bd.numberOfBags}</td>
-                          <td className="py-1 px-2 text-right font-mono">{netWeight > 0 ? netWeight.toFixed(2) : "—"}</td>
-                          <td className="py-1 px-2 text-right font-mono">{price > 0 ? `₹${parseFloat((Math.trunc(price * 100) / 100).toFixed(2))}` : "—"}</td>
-                          <td className="py-1 px-2 text-right font-mono font-medium">{amount > 0 ? `₹${parseFloat(amount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                (() => {
-                  const lotWeight = lot.totalWeight ? parseFloat(lot.totalWeight) : 0;
-                  const lotNetWeight = computeNetWeight(lotWeight, lot.originalBags, lot.place);
-                  const lotPrice = lot.pricePerKg ? parseFloat(lot.pricePerKg) : 0;
-                  const lotAmount = lotNetWeight * lotPrice;
-                  return (
-                    <table className="w-full text-sm mt-1 border-collapse">
-                      <thead>
-                        <tr className="border-b bg-gray-100">
-                          <th className="text-left py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Crop / फसल</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold"># Bags / बोरी</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">{lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन"}</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Price/kg / मूल्य</th>
-                          <th className="text-right py-1 px-2 text-xs uppercase text-gray-600 font-semibold">Amount / राशि</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="border-b border-gray-200">
-                          <td className="py-1 px-2">{getCropBilingual(lot.crop)}</td>
-                          <td className="py-1 px-2 text-right font-mono">{lot.originalBags}</td>
-                          <td className="py-1 px-2 text-right font-mono">{lotNetWeight > 0 ? lotNetWeight.toFixed(2) : "—"}</td>
-                          <td className="py-1 px-2 text-right font-mono">{lotPrice > 0 ? `₹${parseFloat((Math.trunc(lotPrice * 100) / 100).toFixed(2))}` : "—"}</td>
-                          <td className="py-1 px-2 text-right font-mono font-medium">{lotAmount > 0 ? `₹${parseFloat(lotAmount.toFixed(1)).toLocaleString('en-IN')}` : "—"}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  );
-                })()
-              )}
-
-              {(() => {
-                const lotTotals = calculateLotTotals(lot);
-                const hasDeductions = lotTotals.totalDeductions > 0 || lotTotals.adjustedValue !== 0;
-                const hasMandiCharges = lotTotals.totalMandiCharges > 0;
-                return (
-                  <>
-                    {hasMandiCharges && (
-                      <div className="mt-2 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
-                        <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Mandi Charges / मंडी शुल्क</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {lotTotals.mandiCommission > 0 && (
-                            <>
-                              <span className="text-gray-600">Mandi Commission / मंडी कमीशन:</span>
-                              <span className="text-right font-mono">₹{lotTotals.mandiCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </>
-                          )}
-                          {lotTotals.aadhatCommission > 0 && (
-                            <>
-                              <span className="text-gray-600">Aadhat Commission / आढ़त कमीशन:</span>
-                              <span className="text-right font-mono">₹{lotTotals.aadhatCommission.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </>
-                          )}
-                          {lotTotals.mandiHammali > 0 && (
-                            <>
-                              <span className="text-gray-600">Hammali / हम्माली:</span>
-                              <span className="text-right font-mono">₹{lotTotals.mandiHammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </>
-                          )}
-                          {lotTotals.mandiExtra > 0 && (
-                            <>
-                              <span className="text-gray-600">Extra Charges / अतिरिक्त शुल्क:</span>
-                              <span className="text-right font-mono">₹{lotTotals.mandiExtra.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {hasDeductions && (
-                      <div className="mt-2 p-2 bg-orange-50 rounded border-l-4 border-orange-400">
-                        <p className="text-xs uppercase text-gray-600 font-semibold mb-1">Deductions / कटौती</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {lotTotals.hammali > 0 && (
-                            <>
-                              <span className="text-gray-600">Hammali/Grading / हम्माली:</span>
-                              <span className="text-right font-mono">₹{lotTotals.hammali.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </>
-                          )}
-                          {lotTotals.charges.filter((c: any) => {
-                            if (!isFarmerDeductionCharge(c, lot.place)) return false;
-                            const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                            return amt > 0;
-                          }).map((c: any, i: number) => {
-                            const amt = typeof c.amount === 'string' ? parseFloat(c.amount) : (c.amount || 0);
-                            return (
-                              <React.Fragment key={i}>
-                                <span className="text-gray-600">{c.type || "Charge"}:</span>
-                                <span className="text-right font-mono">₹{amt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                              </React.Fragment>
-                            );
-                          })}
-                          {lotTotals.earlyPayAmt > 0 && (
-                            <>
-                              <span className="text-gray-600">Early Pay/Bataw / जल्दी भुगतान ({lotTotals.earlyPayPct}%):</span>
-                              <span className="text-right font-mono">₹{lotTotals.earlyPayAmt.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</span>
-                            </>
-                          )}
-                          {lotTotals.adjustedValue !== 0 && (
-                            <>
-                              <span className="text-gray-600">
-                                Adjustment / समायोजन
-                                {lotTotals.rate > 0 && lotTotals.interestDays > 0 
-                                  ? ` (₹${lotTotals.principal.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })} + ${lotTotals.rate}% × ${lotTotals.interestDays}d${lot.adjustedAmountRemark ? `, ${lot.adjustedAmountRemark}` : ""})` 
-                                  : lot.adjustedAmountRemark ? ` (${lot.adjustedAmountRemark})` : ""}:
-                              </span>
-                              <span className={`text-right font-mono ${lotTotals.adjustedValue > 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                {lotTotals.adjustedValue > 0 ? '+' : ''}₹{Math.abs(lotTotals.adjustedValue).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-
-              {lot.remarks && (
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <p className="text-xs text-gray-600">Remarks / टिप्पणी: <span className="text-black">{lot.remarks}</span></p>
-                </div>
-              )}
-            </div>
-          ))
-        )}
+        {billSections.map(renderSection)}
       </div>
 
       <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
