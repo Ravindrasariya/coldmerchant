@@ -751,7 +751,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       .map((col) => `<th style="padding: 3px 8px; text-align: ${col.align}; font-size: 9px; text-transform: uppercase; color: #666; border-bottom: 1px solid #ddd;">${escapeHtml(col.label)}</th>`)
       .join("");
     const rowsHtml = section.rows
-      .map((row) => `<tr>${row.cells
+      .map((row) => `<tr style="page-break-inside: avoid;">${row.cells
         .map((cell) => {
           const muted = (cell.muted || []).map((m) => ` <span style="color:#666; white-space:nowrap;">${escapeHtml(m)}</span>`).join("");
           return `<td style="padding: 3px 8px; border-bottom: 1px solid #ddd; text-align: ${cell.align};${cell.mono ? " font-family: monospace;" : ""}${cell.bold ? " font-weight: 600;" : ""}">${escapeHtml(cell.text)}${muted}</td>`;
@@ -760,7 +760,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       .join("");
     const blocksHtml = section.blocks
       .map((block) => `
-        <div style="margin-top: 6px; padding: 8px; border-radius: 4px; ${BLOCK_STYLE_PRINT[block.variant]}">
+        <div style="margin-top: 6px; padding: 8px; border-radius: 4px; page-break-inside: avoid; ${BLOCK_STYLE_PRINT[block.variant]}">
           <p style="font-size: 10px; text-transform: uppercase; color: #666; margin: 0 0 4px 0; font-weight: 600;">${escapeHtml(block.title)}</p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
             ${block.lines
@@ -778,9 +778,9 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       `
       : "";
     return `
-      <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; page-break-inside: avoid;">
+      <div style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px;">
         <table style="width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px;">
-          <thead><tr style="background: #f5f5f5;">${headHtml}</tr></thead>
+          <thead style="display: table-header-group;"><tr style="background: #f5f5f5;">${headHtml}</tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
         ${blocksHtml}
