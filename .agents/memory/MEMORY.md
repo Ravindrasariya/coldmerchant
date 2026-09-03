@@ -9,3 +9,4 @@
 - [Farmer interest accrual](farmer-interest-accrual.md) — interest derives from per-entry cash_farmers rows; the farmers.* receivable columns are a rollup and recomputing from them claws back interest.
 - [Freight settlement](freight-settlement.md) — a truck is (loading date, transporter, vehicle); freight counted once per loading session; Books shows it outside COGS.
 - [Loading P&L consumers](loading-pl-consumers.md) — every place recomputing loading P&L must branch on freightPaidSeparately; startup backfills silently rewrite rows that miss it.
+- [Harvest bag counts](harvest-bag-counts.md) — soldBags is authoritative; remainingBags is derived, never hand-adjusted, or the register and the lot dropdown drift apart.

@@ -77,6 +77,54 @@ const PostgresSessionStore = connectPg(session);
 // (or for legacy gate-cut lots with no breakdown row, the lot-level value)
 // stays true.
 // ---------------------------------------------------------------------------
+// Re-derive remainingBags from sold history for one harvest lot.
+//
+// soldBags is the durable record of what actually left the yard: it is only
+// ever moved by transaction create/edit/delete, and every one of those paths
+// reverses it exactly. remainingBags, by contrast, used to be adjusted by hand
+// at each call site, so a delete could restore one and not the other — leaving
+// a lot the Stock Register showed as available but the transaction lot
+// dropdown (which gates on remainingBags) refused to offer. Deriving it here
+// makes both screens read the same truth by construction.
+async function syncHarvestLotRemaining(
+  client: any,
+  merchantId: number,
+  lotId: number,
+): Promise<void> {
+  const allBd = await client.select().from(bagBreakdowns)
+    .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+  const sellable = allBd.filter((b: any) => b.size !== "Wastage");
+
+  if (sellable.length > 0) {
+    let lotRemaining = 0;
+    for (const bd of sellable) {
+      const cap = bd.numberOfBags ?? 0;
+      const next = Math.max(0, cap - (bd.soldBags ?? 0));
+      lotRemaining += next;
+      if ((bd.remainingBags ?? cap) !== next) {
+        await client.update(bagBreakdowns)
+          .set({ remainingBags: next })
+          .where(and(eq(bagBreakdowns.id, bd.id), eq(bagBreakdowns.merchantId, merchantId)));
+      }
+    }
+    await client.update(lots)
+      .set({ remainingBags: lotRemaining })
+      .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+    return;
+  }
+
+  // Gate-cut lot: no sellable size rows, so capacity is the lot itself minus
+  // any wastage rows recorded against it.
+  const [lot] = await client.select().from(lots)
+    .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+  if (!lot) return;
+  const wastage = allBd.reduce((s: number, b: any) => s + (b.numberOfBags ?? 0), 0);
+  const capacity = Math.max(0, (lot.originalBags ?? 0) - wastage);
+  await client.update(lots)
+    .set({ remainingBags: Math.max(0, capacity - (lot.soldBags ?? 0)) })
+    .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
+}
+
 async function applyHarvestSoldDelta(
   client: any,
   merchantId: number,
@@ -84,48 +132,82 @@ async function applyHarvestSoldDelta(
   breakdownId: number | null,
   delta: number,
 ): Promise<void> {
+  const allBd = await client.select().from(bagBreakdowns)
+    .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
+  const sellable = allBd
+    .filter((b: any) => b.size !== "Wastage")
+    .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id - b.id);
+
+  const setSold = async (bdId: number, value: number) => {
+    await client.update(bagBreakdowns)
+      .set({ soldBags: value })
+      .where(and(eq(bagBreakdowns.id, bdId), eq(bagBreakdowns.merchantId, merchantId)));
+  };
+
   if (breakdownId) {
-    const [bd] = await client.select().from(bagBreakdowns)
-      .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+    const bd = allBd.find((b: any) => b.id === breakdownId);
     if (bd) {
       const cap = bd.numberOfBags ?? 0;
       const cur = bd.soldBags ?? 0;
       // Clamp into [0, numberOfBags]. We never let soldBags exceed capacity;
       // a transaction that would do so should have already been rejected
-      // upstream by the remainingBags decrement guard.
-      const next = Math.max(0, Math.min(cap, cur + delta));
-      await client.update(bagBreakdowns)
-        .set({ soldBags: next })
-        .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+      // upstream by the availability guard.
+      await setSold(breakdownId, Math.max(0, Math.min(cap, cur + delta)));
+      bd.soldBags = Math.max(0, Math.min(cap, cur + delta));
+    }
+  } else if (sellable.length > 0) {
+    // Gate-cut item on a lot that does have size rows (legacy shape, and the
+    // mixed create path). Spread the delta across the size rows so the sold
+    // history lands somewhere real instead of being silently dropped —
+    // otherwise the lot total and the size rows drift apart for good.
+    let left = delta;
+    if (delta > 0) {
+      for (const bd of sellable) {
+        if (left <= 0) break;
+        const cap = bd.numberOfBags ?? 0;
+        const room = Math.max(0, cap - (bd.soldBags ?? 0));
+        const take = Math.min(room, left);
+        if (take > 0) {
+          await setSold(bd.id, (bd.soldBags ?? 0) + take);
+          bd.soldBags = (bd.soldBags ?? 0) + take;
+          left -= take;
+        }
+      }
+    } else {
+      for (const bd of (sellable.slice() as any[]).reverse()) {
+        if (left >= 0) break;
+        const give = Math.min(bd.soldBags ?? 0, -left);
+        if (give > 0) {
+          await setSold(bd.id, (bd.soldBags ?? 0) - give);
+          bd.soldBags = (bd.soldBags ?? 0) - give;
+          left += give;
+        }
+      }
     }
   }
-  // Always recompute lot.soldBags from the breakdown rows when any exist —
-  // this keeps the invariant tight even for legacy gate-cut items that
-  // pass breakdownId=null but whose lot does actually have a synthetic
-  // breakdown row (every lot created via the current create route has one).
-  const allBd = await client.select().from(bagBreakdowns)
-    .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
-  if (allBd.length > 0) {
-    const lotSold = allBd
-      .filter((b: any) => b.size !== "Wastage")
-      .reduce((s: number, b: any) => s + (b.soldBags ?? 0), 0);
+
+  if (sellable.length > 0) {
+    // lot.soldBags is always the sum of its sellable size rows.
+    const lotSold = sellable.reduce((s: number, b: any) => s + (b.soldBags ?? 0), 0);
     await client.update(lots)
       .set({ soldBags: lotSold })
       .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
   } else if (!breakdownId) {
-    // Pure-legacy: gate-cut lot with no breakdown rows at all. Apply the
-    // delta directly to the lot's soldBags, clamped to its capacity.
+    // Pure gate-cut lot with no sellable size rows. Apply the delta directly
+    // to the lot's soldBags, clamped to its capacity.
     const [lot] = await client.select().from(lots)
       .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
     if (lot) {
-      const cap = lot.originalBags ?? 0;
+      const wastage = allBd.reduce((s: number, b: any) => s + (b.numberOfBags ?? 0), 0);
+      const cap = Math.max(0, (lot.originalBags ?? 0) - wastage);
       const cur = lot.soldBags ?? 0;
-      const next = Math.max(0, Math.min(cap, cur + delta));
       await client.update(lots)
-        .set({ soldBags: next })
+        .set({ soldBags: Math.max(0, Math.min(cap, cur + delta)) })
         .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
     }
   }
+
+  await syncHarvestLotRemaining(client, merchantId, lotId);
 }
 
 async function applySeedSoldDelta(
@@ -1230,35 +1312,9 @@ export class DatabaseStorage implements IStorage {
         .returning();
       createdItems.push(createdItem);
       
-      // Decrement remaining bags on the breakdown (if exists) or lot
-      if (item.breakdownId) {
-        // Decrement from breakdown
-        const breakdown = await this.getBagBreakdownById(item.breakdownId, item.merchantId);
-        if (breakdown) {
-          const currentRemaining = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
-          const newRemaining = Math.max(0, currentRemaining - item.bagsMoved);
-          await this.updateBagBreakdown(item.breakdownId, item.merchantId, { remainingBags: newRemaining });
-        }
-        // Also update lot total remaining by recalculating from all breakdowns AFTER the update
-        const lot = await this.getLotById(item.lotId, item.merchantId);
-        if (lot) {
-          const allBreakdowns = await db.select().from(bagBreakdowns)
-            .where(and(eq(bagBreakdowns.lotId, item.lotId), eq(bagBreakdowns.merchantId, item.merchantId)));
-          const totalRemaining = allBreakdowns
-            .filter(b => b.size !== "Wastage")
-            .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
-          await this.updateLot(item.lotId, item.merchantId, { remainingBags: totalRemaining });
-        }
-      } else {
-        // Gate cut lot - decrement directly from lot
-        const lot = await this.getLotById(item.lotId, item.merchantId);
-        if (lot) {
-          const newRemaining = Math.max(0, lot.remainingBags - item.bagsMoved);
-          await this.updateLot(item.lotId, item.merchantId, { remainingBags: newRemaining });
-        }
-      }
-      // Mirror the remainingBags decrement into the persistent soldBags column
-      // so editing numberOfBags later cannot silently erase sold history.
+      // Record the bags as sold; remainingBags on the breakdown and the lot is
+      // re-derived from that sold history, so create and delete can never
+      // restore one without the other.
       await applyHarvestSoldDelta(db, item.merchantId, item.lotId, item.breakdownId ?? null, item.bagsMoved);
     }
     
@@ -1810,13 +1866,17 @@ export class DatabaseStorage implements IStorage {
   // DELETE fails (e.g., an FK we did not block), inventory is rolled back
   // and stock totals never drift out of sync with reality.
   async deleteTransaction(id: number, merchantId: number): Promise<void> {
-    const items = await db.select().from(transactionItems)
-      .where(and(
-        eq(transactionItems.transactionId, id),
-        eq(transactionItems.merchantId, merchantId),
-      ));
-
     await db.transaction(async (tx) => {
+      // Read (and lock) the items inside the transaction: two concurrent
+      // deletes, or an edit landing between the read and the restore, would
+      // otherwise both hand the same bags back and inflate the lot.
+      const items = await tx.select().from(transactionItems)
+        .where(and(
+          eq(transactionItems.transactionId, id),
+          eq(transactionItems.merchantId, merchantId),
+        ))
+        .for("update");
+
       // Group bag deltas per (lotId, breakdownId) so we apply each lot once.
       const bdDeltas = new Map<number, number>();
       const lotDeltas = new Map<number, number>();
@@ -1828,47 +1888,27 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Bilty cuts: bump breakdown.remainingBags up to its original capacity.
-      const touchedLots = new Set<number>(lotDeltas.keys());
+      // Bilty cuts: give the bags back to their size row. remainingBags on the
+      // row and on the lot is re-derived from the reversed sold history, so a
+      // lot always returns to the transaction lot dropdown with the same count
+      // the Stock Register shows.
       for (const [breakdownId, delta] of Array.from(bdDeltas.entries())) {
         const [bd] = await tx.select().from(bagBreakdowns)
           .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
+        // A size row with sold history cannot be deleted (the stock-entry edit
+        // route blocks it), so a missing row here means there is no sold
+        // history left to reverse. Spreading the return across the surviving
+        // rows would undo somebody else's sale, so skip it.
         if (!bd) continue;
-        const current = bd.remainingBags ?? bd.numberOfBags ?? 0;
-        const cap = bd.numberOfBags ?? current;
-        const next = Math.min(cap, Math.max(0, current + delta));
-        await tx.update(bagBreakdowns)
-          .set({ remainingBags: next })
-          .where(and(eq(bagBreakdowns.id, breakdownId), eq(bagBreakdowns.merchantId, merchantId)));
-        touchedLots.add(bd.lotId);
-        // Mirror into soldBags so deleting a transaction also undoes the
-        // sold-history bump it created.
         await applyHarvestSoldDelta(tx, merchantId, bd.lotId, breakdownId, -delta);
       }
 
-      // Gate cuts: bump lot.remainingBags directly (capped at originalBags).
+      // Gate cuts: return the bags at lot level.
       for (const [lotId, delta] of Array.from(lotDeltas.entries())) {
         const [lot] = await tx.select().from(lots)
           .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
         if (!lot) continue;
-        const next = Math.min(lot.originalBags, Math.max(0, lot.remainingBags + delta));
-        await tx.update(lots)
-          .set({ remainingBags: next })
-          .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
         await applyHarvestSoldDelta(tx, merchantId, lotId, null, -delta);
-      }
-
-      // Recompute lot totals from breakdowns for any lot whose breakdowns moved.
-      for (const lotId of Array.from(touchedLots)) {
-        if (lotDeltas.has(lotId)) continue; // gate-cut path already handled
-        const allBd = await tx.select().from(bagBreakdowns)
-          .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
-        const totalRemaining = allBd
-          .filter(b => b.size !== "Wastage")
-          .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
-        await tx.update(lots)
-          .set({ remainingBags: totalRemaining })
-          .where(and(eq(lots.id, lotId), eq(lots.merchantId, merchantId)));
       }
 
       // Re-check inside the transaction so a payment created after the
@@ -1959,32 +1999,9 @@ export class DatabaseStorage implements IStorage {
 
   // Adjust inventory (for returning bags when items are modified/removed)
   async adjustInventory(lotId: number, breakdownId: number | null, merchantId: number, bagsDelta: number): Promise<void> {
-    if (breakdownId) {
-      // Bilty cut - adjust breakdown and recalc lot
-      const breakdown = await this.getBagBreakdownById(breakdownId, merchantId);
-      if (breakdown) {
-        const currentRemaining = breakdown.remainingBags ?? breakdown.numberOfBags ?? 0;
-        const maxBags = breakdown.numberOfBags ?? currentRemaining;
-        const newRemaining = Math.min(maxBags, Math.max(0, currentRemaining + bagsDelta));
-        await this.updateBagBreakdown(breakdownId, merchantId, { remainingBags: newRemaining });
-      }
-      // Recalculate lot total from all breakdowns
-      const allBreakdowns = await db.select().from(bagBreakdowns)
-        .where(and(eq(bagBreakdowns.lotId, lotId), eq(bagBreakdowns.merchantId, merchantId)));
-      const totalRemaining = allBreakdowns
-        .filter(b => b.size !== "Wastage")
-        .reduce((sum, b) => sum + (b.remainingBags ?? b.numberOfBags ?? 0), 0);
-      await this.updateLot(lotId, merchantId, { remainingBags: totalRemaining });
-    } else {
-      // Gate cut - adjust lot directly
-      const lot = await this.getLotById(lotId, merchantId);
-      if (lot) {
-        const newRemaining = Math.min(lot.originalBags, Math.max(0, lot.remainingBags + bagsDelta));
-        await this.updateLot(lotId, merchantId, { remainingBags: newRemaining });
-      }
-    }
-    // bagsDelta is the change applied to remainingBags. The matching sold
-    // delta is its inverse (returning bags = unselling, taking bags = selling).
+    // bagsDelta is the change to remaining stock. The matching sold delta is
+    // its inverse (returning bags = unselling, taking bags = selling), and
+    // remainingBags on both the size row and the lot is re-derived from it.
     await applyHarvestSoldDelta(db, merchantId, lotId, breakdownId, -bagsDelta);
   }
 
