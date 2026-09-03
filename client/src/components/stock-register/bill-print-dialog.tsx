@@ -439,6 +439,98 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return lot.coldStoreName || "Cold Store";
   };
 
+  // ---------------------------------------------------------------------------
+  // Shared bill "party" + "summary" model.
+  // Both the React preview (renderBillContent) and the printed HTML (handlePrint)
+  // read labels, ordering, visibility and formatted values from here, so the two
+  // outputs cannot drift apart.
+  // ---------------------------------------------------------------------------
+  const formatMoney = (n: number) =>
+    `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+
+  const billParty = (() => {
+    const farmerAddress = [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ");
+    return {
+      detailsLabel: isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण",
+      name: isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName,
+      contact: isMandi ? (aadhatRecord?.contact || null) : entry.farmerContact,
+      address: isMandi ? (aadhatRecord?.address || "") : farmerAddress,
+    };
+  })();
+
+  type SummaryCell = {
+    key: string;
+    label: string;
+    value: string;
+    tone: "default" | "green" | "blue" | "orange" | "highlight";
+  };
+
+  const billSummary = (() => {
+    const cells: SummaryCell[] = [];
+    cells.push({
+      key: "bags",
+      label: "Total Bags / कुल बोरी",
+      value: String(totalBagsExcludingWastage),
+      tone: "default",
+    });
+    if (isMandi) {
+      cells.push({
+        key: "netWeight",
+        label: "Total Net Weight / कुल शुद्ध वजन",
+        value: overallTotals.totalNetWeight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        tone: "default",
+      });
+    }
+    cells.push({
+      key: "payable",
+      label: "Total Payable / कुल देय",
+      value: formatMoney(overallTotals.totalPayable),
+      tone: "green",
+    });
+    if (isMandi || overallTotals.totalMandiCharges > 0) {
+      cells.push({
+        key: "mandiCharges",
+        label: "Mandi Charges / मंडी शुल्क",
+        value: formatMoney(overallTotals.totalMandiCharges),
+        tone: "blue",
+      });
+    }
+    if (!isMandi) {
+      cells.push({
+        key: "deductions",
+        label: "Deductions / कटौती",
+        value: formatMoney(overallTotals.totalDeductions),
+        tone: "orange",
+      });
+    }
+    cells.push({
+      key: "netDue",
+      label: isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय",
+      value: `₹${Math.round(overallTotals.netPayable).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+      tone: "highlight",
+    });
+    return {
+      title: isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश",
+      cells,
+    };
+  })();
+
+  const SUMMARY_TONE_PRINT: Record<SummaryCell["tone"], string> = {
+    default: "",
+    green: "color: #15803d;",
+    blue: "color: #3b82f6;",
+    orange: "color: #ea580c;",
+    highlight: "color: #fff;",
+  };
+
+  const SUMMARY_TONE_CLASS: Record<SummaryCell["tone"], string> = {
+    default: "",
+    green: "text-green-700",
+    blue: "text-blue-600",
+    orange: "text-orange-600",
+    highlight: "",
+  };
+
   const handlePrint = () => {
     if (isMandi && entry.aadhatDbId && aadhatLoading) return;
     if (merchantLoading || (merchantData?.receiptHeaderImage && !headerImageDataUri)) return;
@@ -577,13 +669,25 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       `;
     }).join("");
 
-    const farmerAddress = [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ");
-    const address = isMandi ? (aadhatRecord?.address || "") : farmerAddress;
-    const detailsLabel = isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण";
-    const detailsName = isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName;
-    const detailsContact = isMandi ? (aadhatRecord?.contact || null) : entry.farmerContact;
-    const summaryLabel = isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश";
-    const netDueLabel = isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय";
+    const { address, detailsLabel, name: detailsName, contact: detailsContact } = billParty;
+
+    const summaryCellsHtml = billSummary.cells.map(cell => {
+      const isHighlight = cell.tone === "highlight";
+      const wrapperStyle = isHighlight
+        ? "min-width: 0; background: #0d9488; padding: 6px 4px; border-radius: 6px;"
+        : "min-width: 0;";
+      const labelStyle = isHighlight
+        ? "font-size: 10px; line-height: 1.3; color: #fff; margin: 0 0 4px 0; overflow-wrap: anywhere;"
+        : "font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;";
+      const valueStyle = isHighlight
+        ? "font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;"
+        : `font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; ${SUMMARY_TONE_PRINT[cell.tone]}`;
+      return `
+                <div style="${wrapperStyle}">
+                  <p style="${labelStyle}">${cell.label}</p>
+                  <p style="${valueStyle}">${cell.value}</p>
+                </div>`;
+    }).join("");
 
     let mandiUnifiedHtml = "";
     if (isMandi) {
@@ -717,32 +821,8 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
 
             <!-- Totals Summary -->
             <div style="margin-top: 12px; padding: 10px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 8px; border: 1px solid #0ea5e9;">
-              <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 8px 0; font-weight: 700; letter-spacing: 0.05em;">${summaryLabel}</h3>
-              <div style="display: grid; grid-template-columns: repeat(${isMandi ? 5 : (overallTotals.totalMandiCharges > 0 ? 5 : 4)}, minmax(0, 1fr)); gap: 8px; text-align: center; align-items: stretch;">
-                <div style="min-width: 0;">
-                  <p style="font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;">Total Bags / कुल बोरी</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0;">${totalBagsExcludingWastage}</p>
-                </div>
-                ${isMandi ? `<div style="min-width: 0;">
-                  <p style="font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;">Total Net Weight / कुल शुद्ध वजन</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0;">${overallTotals.totalNetWeight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>` : ""}
-                <div style="min-width: 0;">
-                  <p style="font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;">Total Payable / कुल देय</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #15803d;">₹${overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>
-                ${isMandi || overallTotals.totalMandiCharges > 0 ? `<div style="min-width: 0;">
-                  <p style="font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;">Mandi Charges / मंडी शुल्क</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #3b82f6;">₹${overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>` : ""}
-                ${!isMandi ? `<div style="min-width: 0;">
-                  <p style="font-size: 10px; line-height: 1.3; color: #666; margin: 0 0 4px 0;">Deductions / कटौती</p>
-                  <p style="font-family: monospace; font-weight: 600; font-size: 12px; margin: 0; color: #ea580c;">₹${overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-                </div>` : ""}
-                <div style="min-width: 0; background: #0d9488; padding: 6px 4px; border-radius: 6px;">
-                  <p style="font-size: 10px; line-height: 1.3; color: #fff; margin: 0 0 4px 0; overflow-wrap: anywhere;">${netDueLabel}</p>
-                  <p style="font-family: monospace; font-weight: 700; font-size: 15px; margin: 0; color: #fff;">₹${Math.round(overallTotals.netPayable).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                </div>
+              <h3 style="font-size: 10px; text-transform: uppercase; color: #0369a1; margin: 0 0 8px 0; font-weight: 700; letter-spacing: 0.05em;">${billSummary.title}</h3>
+              <div style="display: grid; grid-template-columns: repeat(${billSummary.cells.length}, minmax(0, 1fr)); gap: 8px; text-align: center; align-items: stretch;">${summaryCellsHtml}
               </div>
             </div>
 
@@ -799,14 +879,11 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
           </div>
         </div>
         <div>
-          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">{isMandi ? "Aadhat Details / आढ़तिया विवरण" : "Farmer Details / किसान विवरण"}</h3>
+          <h3 className="text-xs uppercase text-gray-600 font-semibold tracking-wide mb-2">{billParty.detailsLabel}</h3>
           <div className="space-y-1 text-sm">
-            <p className="font-semibold">{isMandi && entry.aadhatName ? entry.aadhatName : entry.farmerName}</p>
-            {isMandi && aadhatRecord?.contact && <p className="text-gray-600">{aadhatRecord.contact}</p>}
-            {!isMandi && entry.farmerContact && <p className="text-gray-600">{entry.farmerContact}</p>}
-            <p className="text-gray-600">
-              {isMandi ? (aadhatRecord?.address || "") : [entry.village, entry.tehsil, entry.district, entry.state].filter(Boolean).join(", ")}
-            </p>
+            <p className="font-semibold">{billParty.name}</p>
+            {billParty.contact && <p className="text-gray-600">{billParty.contact}</p>}
+            <p className="text-gray-600">{billParty.address}</p>
           </div>
         </div>
       </div>
@@ -1075,38 +1152,21 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
       </div>
 
       <div className="mt-3 p-3 bg-gradient-to-r from-sky-50 to-cyan-50 rounded-lg border border-sky-300">
-        <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">{isMandi ? "Aadhat Payment Summary / आढ़तिया भुगतान सारांश" : "Farmer Payment Summary / किसान भुगतान सारांश"}</h3>
-        <div className={`grid ${isMandi ? 'grid-cols-5' : (overallTotals.totalMandiCharges > 0 ? 'grid-cols-5' : 'grid-cols-4')} gap-2 text-center items-stretch`}>
-          <div className="min-w-0">
-            <p className="text-xs leading-tight text-gray-600 mb-1">Total Bags / कुल बोरी</p>
-            <p className="font-mono font-semibold text-xs">{totalBagsExcludingWastage}</p>
-          </div>
-          {isMandi && (
-            <div className="min-w-0">
-              <p className="text-xs leading-tight text-gray-600 mb-1">Total Net Weight / कुल शुद्ध वजन</p>
-              <p className="font-mono font-semibold text-xs">{overallTotals.totalNetWeight.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-xs leading-tight text-gray-600 mb-1">Total Payable / कुल देय</p>
-            <p className="font-mono font-semibold text-xs text-green-700">₹{overallTotals.totalPayable.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-          </div>
-          {(isMandi || overallTotals.totalMandiCharges > 0) && (
-            <div className="min-w-0">
-              <p className="text-xs leading-tight text-gray-600 mb-1">Mandi Charges / मंडी शुल्क</p>
-              <p className="font-mono font-semibold text-xs text-blue-600">₹{overallTotals.totalMandiCharges.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-            </div>
-          )}
-          {!isMandi && (
-            <div className="min-w-0">
-              <p className="text-xs leading-tight text-gray-600 mb-1">Deductions / कटौती</p>
-              <p className="font-mono font-semibold text-xs text-orange-600">₹{overallTotals.totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 1 })}</p>
-            </div>
-          )}
-          <div className="min-w-0 bg-teal-600 text-white rounded-md px-1 py-1.5">
-            <p className="text-xs leading-tight mb-1 break-words">{isMandi ? "Net Due to Aadhat / आढ़तिया को देय" : "Net Due to Farmer / किसान को देय"}</p>
-            <p className="font-mono font-bold text-sm">₹{Math.round(overallTotals.netPayable).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-          </div>
+        <h3 className="text-xs uppercase text-sky-800 font-bold tracking-wide mb-2">{billSummary.title}</h3>
+        <div className="grid gap-2 text-center items-stretch" style={{ gridTemplateColumns: `repeat(${billSummary.cells.length}, minmax(0, 1fr))` }}>
+          {billSummary.cells.map((cell) => (
+            cell.tone === "highlight" ? (
+              <div key={cell.key} className="min-w-0 bg-teal-600 text-white rounded-md px-1 py-1.5">
+                <p className="text-xs leading-tight mb-1 break-words">{cell.label}</p>
+                <p className="font-mono font-bold text-sm">{cell.value}</p>
+              </div>
+            ) : (
+              <div key={cell.key} className="min-w-0">
+                <p className="text-xs leading-tight text-gray-600 mb-1">{cell.label}</p>
+                <p className={`font-mono font-semibold text-xs ${SUMMARY_TONE_CLASS[cell.tone]}`}>{cell.value}</p>
+              </div>
+            )
+          ))}
         </div>
       </div>
 
