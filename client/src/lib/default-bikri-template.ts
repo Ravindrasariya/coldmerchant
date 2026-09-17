@@ -19,8 +19,17 @@ export const defaultBikriTemplate = `<!DOCTYPE html>
   .buyer-table { margin-top: 10px; }
   .buyer-table td { height: 24px; }
   .buyer-name-cell { width: 55%; font-weight: bold; font-size: 15px; }
+  /* table-layout:fixed makes the colgroup widths below authoritative and is
+     required for text-overflow:ellipsis to reliably clip instead of wrapping
+     or silently growing a column. */
+  .items-table { table-layout: fixed; }
   .items-table th { background: #fff; font-weight: bold; text-align: center; padding: 6px 6px; }
-  .items-table td { text-align: center; height: 24px; }
+  /* Fixed line-height + single line so a Hindi/mixed-script or long-text row
+     renders at the same height as a blank filler row -- Devanagari's fallback
+     font has taller "normal" line metrics than Latin at the same font-size,
+     and unbounded text otherwise wraps to a second line. Both previously made
+     filled rows grow as blanks were replaced, pushing the footer down. */
+  .items-table td { text-align: center; height: 24px; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .items-table tbody td { border-top: none; border-bottom: none; }
   .items-table td:first-child { text-align: left; }
   .items-table td:last-child { text-align: right; }

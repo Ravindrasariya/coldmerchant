@@ -262,7 +262,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
       const _chargeRows = Math.max(_nonZeroCount, 1) + 1;
       const _fixedPx = 340 + _chargeRows * 26;
       const _availPx = 1047 - _fixedPx;
-      minRows = Math.max(printedRowCount, Math.floor(_availPx / 24) - 9);
+      // Each item row (blank or filled) now renders at a fixed ~29px --
+      // measured from the .items-table td line-height/padding, not the
+      // nominal 24px `height` in the CSS, which table cells treat as a
+      // minimum rather than a cap.
+      minRows = Math.max(printedRowCount, Math.floor(_availPx / 29) - 9);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0

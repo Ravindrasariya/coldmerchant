@@ -238,9 +238,12 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       // Fixed px: header 91 + buyer-table 107 + items-thead 28 + items-tfoot 28
       //   + charges block (2 rows ≈ 52) + words-row 28 + signature 17 + buffer 41 = 392px.
       const _availPx = 1047 - 392;
-      // Subtract 3 rows so the bill keeps ~3 rows of breathing space at the
-      // bottom and never spills the footer blocks onto a second page.
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 24) - 9);
+      // Each item row (blank or filled) now renders at a fixed ~29px --
+      // measured from the .items-table td line-height/padding, not the
+      // nominal 24px `height` in the CSS, which table cells treat as a
+      // minimum rather than a cap. Subtract 3 rows so the bill keeps some
+      // breathing space at the bottom and never spills onto a second page.
+      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 29) - 9);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
