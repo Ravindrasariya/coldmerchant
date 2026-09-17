@@ -9,6 +9,7 @@ import { z } from "zod";
 import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTransactionCode, parseDateToCodeFormat } from "./codeGenerators";
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, roundColdStoreChargeAmounts } from "@shared/utils";
+import { advanceDiscountAmount, MAX_ADVANCE_DISCOUNT_PERCENT } from "@shared/advance-discount";
 import { computeOutstandingFreight, freightKey, getFreightPaidForTruck } from "./freight-utils";
 import multer from "multer";
 import path from "path";
@@ -519,9 +520,14 @@ export async function registerRoutes(
         // this the backfill silently rewrites P&L on every server restart.
         const totalFreightVal = tx.totalFreight ? parseFloat(tx.totalFreight) : 0;
         const paidSeparately = tx.freightPaidSeparately === true;
+        // The retained advance discount is real profit in the default branch.
+        // Paid separately the advance is outside P&L, so there is nothing to
+        // add back. This must mirror POST/PATCH or the backfill silently
+        // rewrites P&L on every server restart.
         const wantPl = paidSeparately
           ? roundRupee(revenue - liveCogs - additional - totalFreightVal)
-          : roundRupee(revenue - liveCogs - additional - advance);
+          : roundRupee(revenue - liveCogs - additional - advance
+              + advanceDiscountAmount(advance, tx.advanceDiscountPercent));
         const wantCogs = roundRupee(liveCogs);
         const existingPl = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
         const existingCogs = tx.totalCostOfGoods ? parseFloat(tx.totalCostOfGoods) : 0;
@@ -533,6 +539,43 @@ export async function registerRoutes(
         }
       }
       if (updated > 0) console.log(`[backfill] Updated ${updated} loading transaction profitLoss/COGS (Revenue − liveCOGS − pass-throughs)`);
+
+      // Sale/Bikri: the driver advance is billed to the buyer, so it sits inside
+      // the entered Revenue and the real outgo must be deducted. Rows saved
+      // before that rule existed still hold the old profit, which would leave
+      // the register card and Books disagreeing until someone re-saved the row.
+      // Only rows that actually carry an advance can differ, and COGS is left
+      // alone (the sale PATCH branch keeps the stored value too).
+      const saleTxns = await db.select({
+        id: transactions.id,
+        merchantId: transactions.merchantId,
+      })
+        .from(transactions)
+        .where(and(eq(transactions.transactionType, "sale"), isNotNull(transactions.advancePayment)));
+      let saleUpdated = 0;
+      for (const row of saleTxns) {
+        const tx = await storage.getTransactionById(row.id, row.merchantId);
+        if (!tx) continue;
+        const advance = tx.advancePayment ? parseFloat(tx.advancePayment) : 0;
+        if (!advance) continue;
+        const num = (v: string | null | undefined) => (v ? parseFloat(v) : 0);
+        const revenue = tx.revenue
+          ? parseFloat(tx.revenue)
+          : (tx.items || []).reduce((s: number, i: any) => s + num(i.revenue), 0);
+        const wantPl = roundRupee(
+          revenue - num(tx.totalCostOfGoods) - num(tx.transportationCharges) - num(tx.otherCharges)
+            - num(tx.totalMandiCommission) - num(tx.totalHammali)
+            - advance + advanceDiscountAmount(advance, tx.advanceDiscountPercent),
+        );
+        const existingPl = tx.profitLoss ? parseFloat(tx.profitLoss) : 0;
+        if (Math.abs(wantPl - existingPl) > 0.01) {
+          await db.update(transactions)
+            .set({ profitLoss: wantPl.toString() })
+            .where(eq(transactions.id, row.id));
+          saleUpdated++;
+        }
+      }
+      if (saleUpdated > 0) console.log(`[backfill] Updated ${saleUpdated} sale transaction profitLoss (real driver-advance outgo)`);
     } catch (err) {
       console.error("[backfill] Error backfilling loading profitLoss:", err);
     }
@@ -2860,7 +2903,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, advanceDiscountPercent, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -3059,11 +3102,21 @@ export async function registerRoutes(
       let revenueNum = parseFloat(revenue) || 0;
       const transportNum = parseFloat(transportationCharges) || 0;
       const otherNum = parseFloat(otherCharges) || 0;
+      const discountPctNum = parseFloat(advanceDiscountPercent) || 0;
+      if (discountPctNum < 0 || discountPctNum > MAX_ADVANCE_DISCOUNT_PERCENT) {
+        return res.status(400).json({ error: `Advance discount % must be between 0 and ${MAX_ADVANCE_DISCOUNT_PERCENT}` });
+      }
       let profitLoss = revenueNum - totalCostOfGoods - transportNum - otherNum;
       if (transactionType === "sale" || !transactionType) {
         const mcNum = parseFloat(totalMandiCommission) || 0;
         const hNum = parseFloat(totalHammali) || 0;
+        // Bikri: the buyer is billed the driver advance, so it sits inside the
+        // entered Revenue. Deduct it as the real outgo, then add back the
+        // retained discount.
+        const saleAdvance = parseFloat(advancePayment) || 0;
         profitLoss -= (mcNum + hNum);
+        profitLoss -= saleAdvance;
+        profitLoss += advanceDiscountAmount(saleAdvance, discountPctNum);
       }
       if (transactionType === "loading") {
         const scNum = parseFloat(salesCommission) || 0;
@@ -3092,9 +3145,11 @@ export async function registerRoutes(
           revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges - debitNum;
           profitLoss = revenueNum - totalCostOfGoods - additionalCharges - totalFreightNum;
         } else {
-          // Default: Driver Advance is a buyer-reimbursed pass-through.
+          // Default: Driver Advance is a buyer-reimbursed pass-through, so it
+          // cancels out — except for the retained discount, which is real profit.
           revenueNum = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
-          profitLoss = revenueNum - totalCostOfGoods - additionalCharges - advancePaymentNum;
+          profitLoss = revenueNum - totalCostOfGoods - additionalCharges - advancePaymentNum
+            + advanceDiscountAmount(advancePaymentNum, discountPctNum);
         }
       }
 
@@ -3114,6 +3169,11 @@ export async function registerRoutes(
           buyerId: buyerId ? parseInt(buyerId) : null,
           totalFreight: sanitizeFreight(totalFreight),
           advancePayment: advancePayment ? advancePayment.toString() : null,
+          // Paid Separately keeps the advance out of P&L, so a discount there is
+          // meaningless — never store one that could reactivate if untucked later.
+          advanceDiscountPercent: (discountPctNum && !(freightPaidSeparately === true || freightPaidSeparately === "true"))
+            ? discountPctNum.toString()
+            : null,
           transportationCharges: transportationCharges ? transportationCharges.toString() : null,
           otherCharges: otherCharges ? otherCharges.toString() : null,
           revenue: revenueNum ? roundRupee(revenueNum).toString() : null,
@@ -3347,7 +3407,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Transaction not found" });
       }
       
-      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately } = req.body;
+      const { partyName, partyAddress, vehicleNumber, driverContact, totalFreight, advancePayment, advanceDiscountPercent, amountReceived, transportationCharges, otherCharges, revenue, remarks, buyerId, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately } = req.body;
 
       // Once freight has actually been paid from the Cash tab, the truck is
       // frozen. Those payments are linked to the truck by its loading date,
@@ -3408,6 +3468,15 @@ export async function registerRoutes(
       if (advancePayment !== undefined && !decimalEqual(advancePayment, existingTxn.advancePayment)) {
         changes.push({ field: "advancePayment", oldValue: existingTxn.advancePayment, newValue: advancePayment?.toString() || null });
       }
+      if (advanceDiscountPercent !== undefined) {
+        const pct = parseFloat(advanceDiscountPercent) || 0;
+        if (pct < 0 || pct > MAX_ADVANCE_DISCOUNT_PERCENT) {
+          return res.status(400).json({ error: `Advance discount % must be between 0 and ${MAX_ADVANCE_DISCOUNT_PERCENT}` });
+        }
+      }
+      if (advanceDiscountPercent !== undefined && !decimalEqual(advanceDiscountPercent, existingTxn.advanceDiscountPercent)) {
+        changes.push({ field: "advanceDiscountPercent", oldValue: existingTxn.advanceDiscountPercent, newValue: advanceDiscountPercent?.toString() || null });
+      }
       if (amountReceived !== undefined && !decimalEqual(amountReceived, existingTxn.amountReceived)) {
         changes.push({ field: "amountReceived", oldValue: existingTxn.amountReceived, newValue: amountReceived?.toString() || null });
       }
@@ -3458,6 +3527,7 @@ export async function registerRoutes(
         const additionalCharges = tulaiNum + majduriNum + thelaBhadaNum + palaKaraiNum + bardanNum;
         const advancePaymentNum = parseFloat(advancePayment !== undefined ? advancePayment : existingTxn.advancePayment) || 0;
         const totalFreightNum = parseFloat(totalFreight !== undefined ? totalFreight : existingTxn.totalFreight) || 0;
+        const discountPct = parseFloat(advanceDiscountPercent !== undefined ? advanceDiscountPercent : existingTxn.advanceDiscountPercent) || 0;
         const isPaidSeparately = freightPaidSeparately !== undefined
           ? (freightPaidSeparately === true || freightPaidSeparately === "true")
           : (existingTxn.freightPaidSeparately === true);
@@ -3473,9 +3543,11 @@ export async function registerRoutes(
           newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges - debitNum;
           newProfitLoss = newRevenue - liveCogs - additionalCharges - totalFreightNum;
         } else {
-          // Default: Driver Advance is a buyer-reimbursed pass-through.
+          // Default: Driver Advance is a buyer-reimbursed pass-through, so it
+          // cancels out — except for the retained discount, which is real profit.
           newRevenue = lotAmounts + mandiTotal + scNum + additionalCharges + advancePaymentNum - debitNum;
-          newProfitLoss = newRevenue - liveCogs - additionalCharges - advancePaymentNum;
+          newProfitLoss = newRevenue - liveCogs - additionalCharges - advancePaymentNum
+            + advanceDiscountAmount(advancePaymentNum, discountPct);
         }
       } else {
         const saleRevenueNum = revenue !== undefined ? parseFloat(revenue) || 0 : parseFloat(existingTxn.revenue || "0");
@@ -3487,7 +3559,12 @@ export async function registerRoutes(
         }
         const mcNum = parseFloat(totalMandiCommission !== undefined ? totalMandiCommission : existingTxn.totalMandiCommission) || 0;
         const hNum = parseFloat(totalHammali !== undefined ? totalHammali : existingTxn.totalHammali) || 0;
-        newProfitLoss = saleRevenueNum - totalCostOfGoods - transportNum - otherNum - mcNum - hNum;
+        // Bikri: the advance is billed to the buyer and so sits inside Revenue.
+        // Deduct the real outgo and add back the retained discount.
+        const saleAdvance = parseFloat(advancePayment !== undefined ? advancePayment : existingTxn.advancePayment) || 0;
+        const saleDiscountPct = parseFloat(advanceDiscountPercent !== undefined ? advanceDiscountPercent : existingTxn.advanceDiscountPercent) || 0;
+        newProfitLoss = saleRevenueNum - totalCostOfGoods - transportNum - otherNum - mcNum - hNum
+          - saleAdvance + advanceDiscountAmount(saleAdvance, saleDiscountPct);
       }
 
       // Round only the FINAL revenue and profit/loss to whole rupees.
@@ -3557,6 +3634,14 @@ export async function registerRoutes(
         driverContact: driverContact !== undefined ? (driverContact || null) : existingTxn.driverContact,
         totalFreight: totalFreight !== undefined ? sanitizedFreight : existingTxn.totalFreight,
         advancePayment: advancePayment ? advancePayment.toString() : null,
+        // Preserve when the caller omits it; an explicit blank/0 clears it.
+        // Paid Separately keeps the advance out of P&L, so a discount there is
+        // meaningless — never keep one that could reactivate if untucked later.
+        advanceDiscountPercent: resolvedFreightPaidSeparately
+          ? null
+          : (advanceDiscountPercent !== undefined
+              ? ((parseFloat(advanceDiscountPercent) || 0) ? advanceDiscountPercent.toString() : null)
+              : existingTxn.advanceDiscountPercent),
         amountReceived: amountReceived ? amountReceived.toString() : null,
         transportationCharges: transportationCharges ? transportationCharges.toString() : null,
         otherCharges: otherCharges ? otherCharges.toString() : null,
@@ -4129,6 +4214,7 @@ export async function registerRoutes(
         const salesCommission = Math.round(newBase * commPct / 100 * 100) / 100;
         recalcSalesComm = salesCommission;
         const advancePaymentNum = parseFloat(existingTxn.advancePayment || "0");
+        const advanceDiscountPct = parseFloat(existingTxn.advanceDiscountPercent || "0");
         const totalFreightNum = parseFloat(existingTxn.totalFreight || "0");
         const isPaidSeparately = existingTxn.freightPaidSeparately === true;
         const debitNum = parseFloat(existingTxn.debit || "0");
@@ -4137,9 +4223,11 @@ export async function registerRoutes(
           finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal - debitNum;
           newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - totalFreightNum;
         } else {
-          // Default: Driver Advance is a buyer-reimbursed pass-through.
+          // Default: Driver Advance is a buyer-reimbursed pass-through, so it
+          // cancels out — except for the retained discount, which is real profit.
           finalRevenue = newTotalRevenue + mandiTotal + salesCommission + additionalTotal + advancePaymentNum - debitNum;
-          newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - advancePaymentNum;
+          newProfitLoss = finalRevenue - newTotalCostOfGoods - additionalTotal - advancePaymentNum
+            + advanceDiscountAmount(advancePaymentNum, advanceDiscountPct);
         }
       } else {
         const transportationCharges = parseFloat(existingTxn.transportationCharges || "0");
@@ -4147,7 +4235,12 @@ export async function registerRoutes(
         if (overallRevenue !== undefined && overallRevenue !== null) {
           finalRevenue = parseFloat(overallRevenue) || 0;
         }
-        newProfitLoss = finalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges;
+        // Bikri: the advance is billed to the buyer and so sits inside Revenue.
+        // Deduct the real outgo and add back the retained discount.
+        const saleAdvance = parseFloat(existingTxn.advancePayment || "0");
+        const saleDiscountPct = parseFloat(existingTxn.advanceDiscountPercent || "0");
+        newProfitLoss = finalRevenue - newTotalCostOfGoods - transportationCharges - otherCharges
+          - saleAdvance + advanceDiscountAmount(saleAdvance, saleDiscountPct);
       }
       
       // Update transaction totals with aggregated revenue
@@ -10084,19 +10177,27 @@ export async function registerRoutes(
             // count the same freight twice. Two accepted consequences: revenue − COGS
             // no longer equals the stored profitLoss for these trucks, and freight
             // that has not been paid yet is absent from Books until it is paid.
+            //
+            // The retained advance discount is not a real cost, so it comes
+            // straight back off — mirroring the P&L add-back.
             return sum + cost
               + num(tx.tulai)
               + num(tx.majduri)
               + num(tx.thelaBhada)
               + num(tx.palaKarai)
               + num(tx.bardan)
-              + (tx.freightPaidSeparately === true ? 0 : num(tx.advancePayment));
+              + (tx.freightPaidSeparately === true
+                  ? 0
+                  : num(tx.advancePayment) - advanceDiscountAmount(tx.advancePayment, tx.advanceDiscountPercent));
           }
+          // Bikri: the driver advance is billed to the buyer and sits inside
+          // revenue, so it is a real cost here — less the retained discount.
           return sum + cost
             + num(tx.totalMandiCommission)
             + num(tx.totalHammali)
             + num(tx.transportationCharges)
-            + num(tx.otherCharges);
+            + num(tx.otherCharges)
+            + num(tx.advancePayment) - advanceDiscountAmount(tx.advancePayment, tx.advanceDiscountPercent);
         }, 0);
 
       const seedTxns = await storage.getSeedTransactionsByMerchant(merchantId);

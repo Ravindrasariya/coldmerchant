@@ -38,6 +38,7 @@ import { LoadingChallanDialog } from "./loading-challan";
 import { TransactionNakalDialog } from "./transaction-nakal";
 import { MonthFilter } from "@/components/ui/month-filter";
 import { DateFilter } from "@/components/ui/date-filter";
+import { advanceDiscountAmount } from "@shared/advance-discount";
 
 interface TransactionItem {
   id: number;
@@ -69,6 +70,7 @@ interface Transaction {
   vehicleNumber: string | null;
   totalFreight: string | null;
   advancePayment: string | null;
+  advanceDiscountPercent: string | null;
   amountReceived: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
@@ -114,20 +116,15 @@ function computeDisplayPL(txn: Transaction): number {
       parseFloat(txn.bardan || "0");
     if (txn.freightPaidSeparately) {
       // Revenue was saved without Driver Advance; P&L deducts Total Freight directly.
+      // Nothing to add back for the advance discount — the advance is outside P&L.
       const freight = parseFloat(txn.totalFreight || "0");
       return rev - cogs - addl - freight;
     }
     const adv = parseFloat(txn.advancePayment || "0");
-    return rev - cogs - addl - adv;
+    return rev - cogs - addl - adv + advanceDiscountAmount(adv, txn.advanceDiscountPercent);
   }
   if (txn.revenue) return parseFloat(txn.profitLoss || "0");
-  const cost =
-    parseFloat(txn.totalCostOfGoods || "0") +
-    parseFloat(txn.totalMandiCommission || "0") +
-    parseFloat(txn.totalHammali || "0") +
-    parseFloat(txn.transportationCharges || "0") +
-    parseFloat(txn.otherCharges || "0");
-  return rev - cost;
+  return rev - computeDisplayCost(txn);
 }
 
 // Display Cost for a transaction. Mirrors computeDisplayPL so the per-row card,
@@ -147,18 +144,24 @@ function computeDisplayCost(txn: Transaction): number {
       parseFloat(txn.palaKarai || "0") +
       parseFloat(txn.bardan || "0");
     if (txn.freightPaidSeparately) {
-      // Driver Advance excluded from cost (not in Revenue either).
-      return cogs + addl;
+      // Driver Advance excluded from cost (not in Revenue either); Total Freight
+      // is the real direct cost, so it must be here too or Revenue − Cost stops
+      // matching the P&L shown on the same card.
+      return cogs + addl + parseFloat(txn.totalFreight || "0");
     }
     const adv = parseFloat(txn.advancePayment || "0");
-    return cogs + addl + adv;
+    return cogs + addl + adv - advanceDiscountAmount(adv, txn.advanceDiscountPercent);
   }
+  // Bikri: the advance is billed to the buyer and so sits inside Revenue, which
+  // makes it a real cost here — less the retained discount.
+  const saleAdv = parseFloat(txn.advancePayment || "0");
   return (
     cogs +
     parseFloat(txn.totalMandiCommission || "0") +
     parseFloat(txn.totalHammali || "0") +
     parseFloat(txn.transportationCharges || "0") +
-    parseFloat(txn.otherCharges || "0")
+    parseFloat(txn.otherCharges || "0") +
+    saleAdv - advanceDiscountAmount(saleAdv, txn.advanceDiscountPercent)
   );
 }
 

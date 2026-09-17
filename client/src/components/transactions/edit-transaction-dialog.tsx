@@ -28,6 +28,7 @@ import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { useToast } from "@/hooks/use-toast";
 import { EditableTnxNumber } from "./editable-tnx-number";
 import { InlineEditableDate } from "@/components/ui/inline-editable-date";
+import { advanceDiscountAmount, MAX_ADVANCE_DISCOUNT_PERCENT } from "@shared/advance-discount";
 
 interface TransactionItem {
   id: number;
@@ -163,6 +164,7 @@ interface TransactionWithHistory {
   driverContact: string | null;
   totalFreight: string | null;
   advancePayment: string | null;
+  advanceDiscountPercent: string | null;
   amountReceived: string | null;
   transportationCharges: string | null;
   otherCharges: string | null;
@@ -202,6 +204,7 @@ const editTransactionSchema = z.object({
   driverContact: z.string().optional(),
   totalFreight: z.number().int().positive().nullable().optional(),
   advancePayment: z.coerce.number().optional(),
+  advanceDiscountPercent: z.coerce.number().min(0).max(100).optional(),
   amountReceived: z.coerce.number().optional(),
   transportationCharges: z.coerce.number().optional(),
   otherCharges: z.coerce.number().optional(),
@@ -238,7 +241,9 @@ function ProfitLossDisplay({
   otherCharges,
   isLoadingType,
   salesCommission,
-  mandiCharges
+  mandiCharges,
+  advancePayment,
+  advanceDiscountPercent,
 }: { 
   totalCostOfGoods: number; 
   revenue: number | undefined; 
@@ -247,6 +252,8 @@ function ProfitLossDisplay({
   isLoadingType?: boolean;
   salesCommission?: number;
   mandiCharges?: number;
+  advancePayment?: number;
+  advanceDiscountPercent?: number;
 }) {
   const { t } = useLanguage();
   const safeRevenue = Number(revenue) || 0;
@@ -265,7 +272,11 @@ function ProfitLossDisplay({
     const safeTrans = Number(transportationCharges) || 0;
     const safeOther = Number(otherCharges) || 0;
     const safeMC = Number(mandiCharges) || 0;
-    chargesAmount = safeTrans + safeOther + safeMC;
+    // Bikri: the driver advance is billed to the buyer and so sits inside the
+    // entered Revenue. The real outgo is a charge; the retained discount is not.
+    const safeAdv = Number(advancePayment) || 0;
+    const realAdvanceOutgo = safeAdv - advanceDiscountAmount(safeAdv, advanceDiscountPercent);
+    chargesAmount = safeTrans + safeOther + safeMC + realAdvanceOutgo;
     profitLoss = safeRevenue - safeCost - chargesAmount;
     chargesLabel = t("Charges", "शुल्क");
   }
@@ -376,6 +387,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       driverContact: "",
       totalFreight: undefined,
       advancePayment: undefined,
+      advanceDiscountPercent: undefined,
       amountReceived: undefined,
       transportationCharges: undefined,
       otherCharges: undefined,
@@ -409,6 +421,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         driverContact: transaction.driverContact || "",
         totalFreight: transaction.totalFreight ? parseFloat(transaction.totalFreight) : null,
         advancePayment: transaction.advancePayment ? parseFloat(transaction.advancePayment) : undefined,
+        advanceDiscountPercent: transaction.advanceDiscountPercent ? parseFloat(transaction.advanceDiscountPercent) : undefined,
         amountReceived: transaction.amountReceived ? parseFloat(transaction.amountReceived) : undefined,
         transportationCharges: transaction.transportationCharges && parseFloat(transaction.transportationCharges) !== 0 ? parseFloat(transaction.transportationCharges) : undefined,
         otherCharges: transaction.otherCharges && parseFloat(transaction.otherCharges) !== 0 ? parseFloat(transaction.otherCharges) : undefined,
@@ -1062,7 +1075,11 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       // IMPORTANT: close the dialog only AFTER both mutations complete. If we close first
       // the component unmounts (open=false → return null), and the items mutation runs in a
       // stale closure where transaction/isLoadingType may already be null.
-      await updateMutation.mutateAsync({ ...data, buyerId: selectedBuyerId });
+      // No advance means no discount — never leave a stale percent behind.
+      const advanceDiscountPercent = (Number(data.advancePayment) || 0) > 0
+        ? (Number(data.advanceDiscountPercent) || 0)
+        : 0;
+      await updateMutation.mutateAsync({ ...data, advanceDiscountPercent, buyerId: selectedBuyerId });
       await updateItemsMutation.mutateAsync();
       onOpenChange(false);
     } catch {
@@ -1077,6 +1094,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       driverContact: t("Driver Contact", "ड्राइवर संपर्क"),
       totalFreight: t("Total Freight", "कुल भाड़ा"),
       advancePayment: t("Advance Payment", "अग्रिम भुगतान"),
+      advanceDiscountPercent: t("Advance Discount %", "अग्रिम छूट %"),
       transportationCharges: t("Transportation", "परिवहन"),
       otherCharges: t("Other Charges", "अन्य शुल्क"),
       revenue: t("Revenue", "राजस्व"),
@@ -1288,6 +1306,33 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     <FormControl>
                       <Input type="number" step="any" placeholder="0" {...field} data-testid="input-advance-payment" />
                     </FormControl>
+                    {/* Paid Separately keeps the advance out of P&L entirely, so a
+                        discount would have no effect — don't offer it there. */}
+                    {(Number(form.watch("advancePayment")) || 0) > 0 && !(isLoadingType && watchedFreightPaidSeparately) && (
+                      <FormField
+                        control={form.control}
+                        name="advanceDiscountPercent"
+                        render={({ field: pctField }) => (
+                          <FormItem className="mt-1.5">
+                            <FormLabel className="text-[10px] text-muted-foreground">{t("Discount %", "छूट %")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="any"
+                                min={0}
+                                max={MAX_ADVANCE_DISCOUNT_PERCENT}
+                                className="h-8"
+                                placeholder="0"
+                                {...pctField}
+                                value={pctField.value ?? ""}
+                                data-testid="input-advance-discount-pct"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -2024,9 +2069,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       const displayedRevenue = isPaidSeparately
                         ? lotAmounts + mandiTotal + sc + addlCharges - dbt
                         : lotAmounts + mandiTotal + sc + addlCharges + drvAdv - dbt;
+                      // Paid Separately: the advance is outside P&L, so the
+                      // discount has nothing to add back.
+                      const discountPct = Number(form.watch("advanceDiscountPercent")) || 0;
                       const totalPL = isPaidSeparately
                         ? displayedRevenue - totalCogs - addlCharges - freight
-                        : displayedRevenue - totalCogs - addlCharges - drvAdv;
+                        : displayedRevenue - totalCogs - addlCharges - drvAdv
+                          + advanceDiscountAmount(drvAdv, discountPct);
                       return (
                         <Card className={`border ${totalPL >= 0 ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20" : "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20"}`}>
                           <CardContent className="py-3 px-4 space-y-2">
@@ -2138,6 +2187,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       isLoadingType={false}
                       salesCommission={0}
                       mandiCharges={(Number(form.watch("totalMandiCommission")) || 0) + (Number(form.watch("totalHammali")) || 0)}
+                      advancePayment={Number(form.watch("advancePayment")) || 0}
+                      advanceDiscountPercent={Number(form.watch("advanceDiscountPercent")) || 0}
                     />
                   </>
                 )}

@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import type { Buyer } from "@shared/schema";
+import { advanceDiscountAmount, MAX_ADVANCE_DISCOUNT_PERCENT } from "@shared/advance-discount";
 
 interface UnsoldInventoryItem {
   breakdownId: number | null;
@@ -141,6 +142,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   const [totalFreight, setTotalFreight] = useState<number | null>(null);
   const [freightPaidSeparately, setFreightPaidSeparately] = useState(false);
   const [driverAdvance, setDriverAdvance] = useState(0);
+  // Percentage of the driver advance retained as a discount — only the real
+  // outgo is a cost. Shown only while an advance is entered; 0 = no effect.
+  const [advanceDiscountPct, setAdvanceDiscountPct] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
   const [purchaseOrder, setPurchaseOrder] = useState("");
@@ -354,9 +358,12 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     const revenue = freightPaidSeparately
       ? totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges - debit
       : totalAmount + totalMandiCharges + computedSalesComm + totalAdditionalCharges + driverAdvance - debit;
+    // Paid separately the advance is outside P&L, so the discount has nothing
+    // to add back. Otherwise the retained discount is real profit.
     const totalPL = freightPaidSeparately
       ? revenue - totalCostOfGoods - totalAdditionalCharges - (totalFreight || 0)
-      : revenue - totalCostOfGoods - totalAdditionalCharges - driverAdvance;
+      : revenue - totalCostOfGoods - totalAdditionalCharges - driverAdvance
+        + advanceDiscountAmount(driverAdvance, advanceDiscountPct);
 
     return {
       totalBags,
@@ -367,7 +374,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
       totalPL,
       revenue,
     };
-  }, [items, lineCostOfGoods, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
+  }, [items, lineCostOfGoods, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceDiscountPct, advanceAmount, debit, freightPaidSeparately, totalFreight]);
 
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
@@ -416,6 +423,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         partyAddress,
         totalFreight,
         advancePayment: driverAdvance,
+        advanceDiscountPercent: driverAdvance > 0 ? advanceDiscountPct : 0,
         items: validItems,
         revenue: totals.revenue,
         salesCommission: computedSalesComm,
@@ -475,6 +483,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setTotalFreight(null);
     setFreightPaidSeparately(false);
     setDriverAdvance(0);
+    setAdvanceDiscountPct(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
     setVisibleCharges([]);
@@ -1257,6 +1266,33 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                     placeholder="0"
                     data-testid="input-loading-driver-advance"
                   />
+                  {/* Paid Separately keeps the advance out of P&L entirely, so a
+                      discount would have no effect — don't offer it there. */}
+                  {driverAdvance > 0 && !freightPaidSeparately && (
+                    <div className="mt-1.5">
+                      <Label className="text-[10px] text-muted-foreground">{t("Discount %", "छूट %")}</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        min={0}
+                        max={MAX_ADVANCE_DISCOUNT_PERCENT}
+                        className="h-8"
+                        value={advanceDiscountPct || ""}
+                        onChange={(e) => {
+                          const pct = Number(e.target.value) || 0;
+                          setAdvanceDiscountPct(Math.min(Math.max(pct, 0), MAX_ADVANCE_DISCOUNT_PERCENT));
+                        }}
+                        placeholder="0"
+                        data-testid="input-loading-advance-discount-pct"
+                      />
+                      {advanceDiscountPct > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {t("Real outgo", "वास्तविक भुगतान")} ₹
+                          {Math.round(driverAdvance - advanceDiscountAmount(driverAdvance, advanceDiscountPct)).toLocaleString("en-IN")}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs">{t("Advance Amount", "अग्रिम राशि")}</Label>

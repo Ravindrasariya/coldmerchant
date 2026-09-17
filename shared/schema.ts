@@ -192,6 +192,10 @@ export const transactions = pgTable("transactions", {
   buyerId: integer("buyer_id").references(() => buyers.id), // optional reference to buyer
   totalFreight: decimal("total_freight", { precision: 12, scale: 2 }), // optional total truck freight (whole number, nullable)
   advancePayment: decimal("advance_payment", { precision: 12, scale: 2 }), // advance given to driver/transporter
+  // Percentage of the driver advance retained as a discount, so the real outgo is
+  // advance × (100 − pct)%. NULL/blank means 0 (no discount). Only affects P&L —
+  // bills and receipts always print the full advancePayment as entered.
+  advanceDiscountPercent: decimal("advance_discount_percent", { precision: 5, scale: 2 }),
   amountReceived: decimal("amount_received", { precision: 12, scale: 2 }), // payment received from buyer
   transportationCharges: decimal("transportation_charges", { precision: 12, scale: 2 }),
   otherCharges: decimal("other_charges", { precision: 12, scale: 2 }),

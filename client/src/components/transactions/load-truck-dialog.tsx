@@ -33,6 +33,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { Buyer } from "@shared/schema";
+import { advanceDiscountAmount, MAX_ADVANCE_DISCOUNT_PERCENT } from "@shared/advance-discount";
 
 interface UnsoldInventoryItem {
   breakdownId: number | null;
@@ -78,6 +79,9 @@ interface BuyerSection {
   hammaliPerBag: number;
   totalFreight: number | null;
   advancePayment: number;
+  // Percentage of the advance retained as a discount; only the real outgo is a
+  // cost. 0 = no effect.
+  advanceDiscountPercent: number;
   transportationCharges: number;
   otherCharges: number;
   isExpanded: boolean;
@@ -99,6 +103,7 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   hammaliPerBag: 0,
   totalFreight: null,
   advancePayment: 0,
+  advanceDiscountPercent: 0,
   transportationCharges: 0,
   otherCharges: 0,
   isExpanded: true,
@@ -255,8 +260,13 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
       const mandiCommAmount = Math.round(mandiCOGSBase * section.mandiCommissionPct / 100 * 100) / 100;
       const hammaliAmount = Math.round(totalBags * section.hammaliPerBag * 100) / 100;
+      // The driver advance is billed to the buyer, so it sits inside revenue and
+      // is a real cost — but only the part actually paid out after the discount.
+      const advance = Number(section.advancePayment) || 0;
+      const realAdvanceOutgo = advance - advanceDiscountAmount(advance, section.advanceDiscountPercent);
 
       return {
+        realAdvanceOutgo: isNaN(realAdvanceOutgo) ? 0 : realAdvanceOutgo,
         totalBags: isNaN(totalBags) ? 0 : totalBags,
         totalNetWeight: isNaN(totalNetWeight) ? 0 : totalNetWeight,
         totalCostOfGoods: isNaN(totalCostOfGoods) ? 0 : totalCostOfGoods,
@@ -286,6 +296,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
     let totalHammali = 0;
     let totalTransport = 0;
     let totalOther = 0;
+    let totalAdvanceOutgo = 0;
 
     buyerSections.forEach((section) => {
       const summary = calculateBuyerSummary(section);
@@ -296,6 +307,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
       totalHammali += summary.hammaliAmount;
       totalTransport += Number(section.transportationCharges) || 0;
       totalOther += Number(section.otherCharges) || 0;
+      totalAdvanceOutgo += summary.realAdvanceOutgo;
     });
 
     return {
@@ -306,6 +318,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
       totalHammali,
       totalTransport,
       totalOther,
+      totalAdvanceOutgo,
     };
   }, [buyerSections, calculateBuyerSummary]);
 
@@ -398,6 +411,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
           totalHammali: 0,
           totalFreight: section.totalFreight,
           advancePayment: section.advancePayment,
+          advanceDiscountPercent: section.advancePayment > 0 ? section.advanceDiscountPercent : 0,
           transportationCharges: section.transportationCharges,
           otherCharges: section.otherCharges,
           items,
@@ -1037,6 +1051,38 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                               placeholder="0"
                               data-testid={`input-advance-${sectionIndex}`}
                             />
+                            {section.advancePayment > 0 && (
+                              <div className="mt-1.5">
+                                <Label className="text-[10px] text-muted-foreground">
+                                  {t("Discount %", "छूट %")}
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  min={0}
+                                  max={MAX_ADVANCE_DISCOUNT_PERCENT}
+                                  className="h-8"
+                                  value={section.advanceDiscountPercent || ""}
+                                  onChange={(e) => {
+                                    const pct = Number(e.target.value) || 0;
+                                    updateBuyerSection(section.id, {
+                                      advanceDiscountPercent: Math.min(Math.max(pct, 0), MAX_ADVANCE_DISCOUNT_PERCENT),
+                                    });
+                                  }}
+                                  placeholder="0"
+                                  data-testid={`input-advance-discount-pct-${sectionIndex}`}
+                                />
+                                {section.advanceDiscountPercent > 0 && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {t("Real outgo", "वास्तविक भुगतान")} ₹
+                                    {Math.round(
+                                      section.advancePayment -
+                                        advanceDiscountAmount(section.advancePayment, section.advanceDiscountPercent),
+                                    ).toLocaleString("en-IN")}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <Label className="text-xs">
@@ -1087,7 +1133,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                               <p className="text-muted-foreground">{t("Net Weight (Kg)", "शुद्ध वजन (किग्रा)")}</p>
                             </div>
                             <div>
-                              <p className="text-lg font-bold">₹{parseFloat((summary.totalCostOfGoods + summary.mandiCommAmount + summary.hammaliAmount + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0)).toFixed(1)).toLocaleString('en-IN')}</p>
+                              <p className="text-lg font-bold">₹{parseFloat((summary.totalCostOfGoods + summary.mandiCommAmount + summary.hammaliAmount + (Number(section.transportationCharges) || 0) + (Number(section.otherCharges) || 0) + summary.realAdvanceOutgo).toFixed(1)).toLocaleString('en-IN')}</p>
                               <p className="text-muted-foreground flex items-center justify-center gap-1">
                                 <IndianRupee className="h-3 w-3" />
                                 {t("Total Cost", "कुल लागत")}
@@ -1134,7 +1180,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                       <p className="text-xs text-muted-foreground">{t("Total Weight (Kg)", "कुल वजन (किग्रा)")}</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold">₹{parseFloat((grandTotals.totalCostOfGoods + grandTotals.totalMandiComm + grandTotals.totalHammali + grandTotals.totalTransport + grandTotals.totalOther).toFixed(1)).toLocaleString('en-IN')}</p>
+                      <p className="text-2xl font-bold">₹{parseFloat((grandTotals.totalCostOfGoods + grandTotals.totalMandiComm + grandTotals.totalHammali + grandTotals.totalTransport + grandTotals.totalOther + grandTotals.totalAdvanceOutgo).toFixed(1)).toLocaleString('en-IN')}</p>
                       <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                         <IndianRupee className="h-3 w-3" />
                         {t("Total Cost", "कुल लागत")}
