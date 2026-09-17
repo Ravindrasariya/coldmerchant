@@ -10,7 +10,7 @@ import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
 import { printHtmlDocument } from "@/lib/print-receipt";
-import { shouldCombineBillItems } from "@/lib/combine-bill-items";
+import { groupBillRows } from "@/lib/group-bill-rows";
 
 interface TransactionItem {
   id: number;
@@ -19,6 +19,7 @@ interface TransactionItem {
   potatoType: string | null;
   size: string | null;
   bagsMoved: number;
+  netWeight: string | null;
   pricePerKg: string | null;
   marka: string | null;
   crop: string | null;
@@ -46,7 +47,6 @@ interface LoadingTransaction {
   advancePayment: string | null;
   totalBags: number;
   totalNetWeight: string | null;
-  combineBillItems?: boolean;
   crop: string | null;
   createdAt: string;
   dateOfLoading: string | null;
@@ -314,22 +314,21 @@ export function LoadingChallanDialog({ transactionId, merchantId, open, onOpenCh
                 </tr>
               </thead>
               <tbody>
-                {shouldCombineBillItems(transaction.combineBillItems, transaction.items) ? (
-                  // Print-only single row: the buyer sees one line instead of
-                  // the individual lots. No potato type (a combined row may
-                  // span several) and no marka (likewise).
-                  <tr>
-                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "left" }}>{cropToLabel(transaction.crop || txnCropForView)}</td>
-                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{totalBags}</td>
-                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}></td>
-                  </tr>
-                ) : transaction.items.map((item) => (
-                  <tr key={item.id}>
-                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "left" }}>{cropToLabel(item.crop || txnCropForView)}{item.potatoType ? ` (${item.potatoType})` : ""}</td>
-                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{item.bagsMoved}</td>
-                    <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{item.marka || ""}</td>
-                  </tr>
-                ))}
+                {/* Lots sharing a marka and a rate print as one line, matching
+                    the bill. A merged line can span several potato types, so it
+                    lists each of them once. */}
+                {groupBillRows(transaction.items, true).map((row, rowIndex) => {
+                  const names = Array.from(new Set(row.items.map((item) =>
+                    `${cropToLabel(item.crop || txnCropForView)}${item.potatoType ? ` (${item.potatoType})` : ""}`
+                  ))).join(", ");
+                  return (
+                    <tr key={`${row.marka}-${row.pricePerKg}-${rowIndex}`}>
+                      <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "left" }}>{names}</td>
+                      <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{row.bagsMoved}</td>
+                      <td style={{ border, padding: "4px 8px", fontSize: 13, textAlign: "center" }}>{row.marka}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr style={{ fontWeight: "bold" }}>

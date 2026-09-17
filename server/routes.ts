@@ -243,6 +243,21 @@ function resolveItemNetWeight(
     : { netWeight: computed, overridden: false };
 }
 
+// Decide whether an incoming item edit changes the row's marka. The client only
+// sends `marka` when the field is present in that dialog, so an absent value
+// leaves the stored one alone. An empty string is a deliberate blank and is
+// stored as "" (distinct from NULL, which means "never set" and still falls
+// back to the lot's marka when read).
+function resolveMarkaChange(
+  submitted: unknown,
+  existing: string | null,
+): { next: string } | null {
+  if (typeof submitted !== "string") return null;
+  const next = submitted.trim();
+  if (existing !== null && existing === next) return null;
+  return { next };
+}
+
 // Compute a transaction item's COGS and cost-per-bag snapshot from the CURRENT
 // stock register. Mirrors the edit dialog display: COGS = costPerBag × bags for
 // sale and cold-store/farm-gate loading (the documented proportionate lot-cost
@@ -2845,7 +2860,7 @@ export async function registerRoutes(
   app.post("/api/transactions", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, combineBillItems, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
+      const { transporterName, driverContact, dateOfLoading, partyName, partyAddress, vehicleNumber, buyerId, totalFreight, advancePayment, transportationCharges, otherCharges, revenue, items, transactionType, salesCommission, totalMandiCommission, totalAadhatCommission, totalHammali, totalMandiExtraCharges, tulai, majduri, thelaBhada, palaKarai, bardan, debit, purchaseOrder, location, freightPaidSeparately, transactionNumber: transactionNumberOverride, tnxGroupId: tnxGroupIdRaw } = req.body;
 
       // Optional client-supplied tnxGroupId. Multiple per-buyer POSTs from the
       // same Load A Truck submission share this id so they can be linked into
@@ -2871,7 +2886,7 @@ export async function registerRoutes(
       }
 
       // Parse inventoryKey and validate
-      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number; netWeightOverridden: boolean; pricePerKg?: number; amount?: number }[] = [];
+      const parsedItems: { lotId: number; breakdownId: number | null; bagsMoved: number; netWeight: number; netWeightOverridden: boolean; marka?: string; pricePerKg?: number; amount?: number }[] = [];
       
       for (const item of items) {
         // Parse inventoryKey format: "lotId-breakdownId" or "lotId-lot"
@@ -2918,6 +2933,10 @@ export async function registerRoutes(
           bagsMoved: item.bagsMoved,
           netWeight: item.netWeight || 0,
           netWeightOverridden: item.netWeightOverridden === true,
+          // Undefined means the client sent no marka at all — the row then
+          // inherits the lot / breakdown marka below. An empty string is a
+          // deliberate blank and is stored as such.
+          marka: typeof item.marka === "string" ? item.marka.trim() : undefined,
           pricePerKg: item.pricePerKg,
           amount: item.amount,
         });
@@ -2970,9 +2989,13 @@ export async function registerRoutes(
         const entry = await storage.getStockEntryById(lot!.stockEntryId, merchantId);
         
         let size: string | null = null;
+        // Marka defaults to the stock entry's mark (breakdown first, then lot)
+        // whenever the client did not supply one for this row.
+        let defaultMarka: string | null = (lot?.marka && lot.marka.trim()) ? lot.marka : null;
         if (item.breakdownId) {
           const breakdown = await storage.getBagBreakdownById(item.breakdownId, merchantId);
           size = breakdown?.size || null;
+          if (breakdown?.marka && breakdown.marka.trim()) defaultMarka = breakdown.marka;
         }
         if (!size) {
           size = lot?.size || null;
@@ -3015,6 +3038,7 @@ export async function registerRoutes(
           coldStoreName: lot?.coldStoreName || "",
           potatoType: lot?.potatoType || "",
           size,
+          marka: item.marka !== undefined ? item.marka : defaultMarka,
           bagsMoved: item.bagsMoved,
           netWeight: netWeight.toString(),
           netWeightOverridden,
@@ -3111,9 +3135,6 @@ export async function registerRoutes(
           purchaseOrder: purchaseOrder ? purchaseOrder.toString().trim() : null,
           location: location ? location.toString().trim() : null,
           freightPaidSeparately: freightPaidSeparately === true || freightPaidSeparately === "true",
-          // Print-only: collapse the lots into one row on the buyer's bill and
-          // challan. Never affects any stored figure.
-          combineBillItems: transactionType === "loading" && (combineBillItems === true || combineBillItems === "true"),
         },
         transactionItems
       );
@@ -3314,52 +3335,6 @@ export async function registerRoutes(
   });
 
   // PATCH /api/transactions/:id - Update a transaction (only partyName, advancePayment, transportationCharges, otherCharges, revenue)
-  // PATCH /api/transactions/:id/combine-bill-items
-  //
-  // Deliberately separate from the main transaction PATCH. This flag is
-  // PRINT-ONLY: it decides whether the buyer's receipt and challan show one
-  // combined row or one row per lot. The main PATCH recomputes cost of goods
-  // and profit/loss from live lot prices, so routing a presentation toggle
-  // through it could silently rewrite stored money on a transaction whose
-  // source lot was repriced. This endpoint writes the one column and nothing
-  // else.
-  app.patch("/api/transactions/:id/combine-bill-items", requireMerchant, async (req, res) => {
-    try {
-      const merchantId = req.user!.merchantId!;
-      const userId = req.user!.id;
-      const transactionId = parseInt(req.params.id);
-      if (isNaN(transactionId)) {
-        return res.status(400).json({ message: "Invalid transaction id" });
-      }
-
-      const existingTxn = await storage.getTransactionById(transactionId, merchantId);
-      if (!existingTxn) {
-        return res.status(404).json({ message: "Transaction not found" });
-      }
-      if (existingTxn.transactionType !== "loading") {
-        return res.status(400).json({ message: "Only loading transactions can combine bill rows" });
-      }
-
-      const { combineBillItems } = req.body;
-      const resolved = combineBillItems === true || combineBillItems === "true";
-      const previous = existingTxn.combineBillItems === true;
-
-      if (resolved !== previous) {
-        await storage.updateTransaction(transactionId, merchantId, { combineBillItems: resolved });
-        await storage.createTransactionEditHistory({
-          transactionId,
-          merchantId,
-          userId,
-          changeSet: [{ field: "combineBillItems", oldValue: String(previous), newValue: String(resolved) }],
-        });
-      }
-
-      res.json({ combineBillItems: resolved });
-    } catch (error) {
-      console.error("Error updating combineBillItems:", error);
-      res.status(500).json({ message: "Failed to update bill row setting" });
-    }
-  });
 
   app.patch("/api/transactions/:id", requireMerchant, async (req, res) => {
     try {
@@ -3734,6 +3709,7 @@ export async function registerRoutes(
           const existingItem = await storage.getTransactionItemById(itemChange.id, merchantId);
           const existingNetWeight = parseFloat(existingItem?.netWeight || "0");
           const existingRevenue = parseFloat(existingItem?.revenue || "0");
+          const markaChange = resolveMarkaChange(itemChange.marka, existingItem?.marka ?? null);
           const hasChanges = existingItem && (
             itemChange.bagsMoved !== existingItem.bagsMoved || 
             (typeof itemChange.netWeight === 'number' && itemChange.netWeight !== existingNetWeight) ||
@@ -3795,6 +3771,7 @@ export async function registerRoutes(
               pricePerKgSnapshot: editCost.snapshot.toString(),
               revenue: itemRevenue.toString()
             };
+            if (markaChange) updateFields.marka = markaChange.next;
             if (existingTxn.transactionType === "loading") {
               if (typeof itemChange.pricePerKg === 'number') updateFields.pricePerKg = itemChange.pricePerKg.toString();
               if (typeof itemChange.amount === 'number') {
@@ -3829,6 +3806,18 @@ export async function registerRoutes(
             const keepBreakdowns = await storage.getBagBreakdownsByLot(existingItem.lotId, merchantId);
             const noChangeUpdate: Partial<TransactionItem> = {};
             let noChangeHas = false;
+
+            // Marka is a label, not a figure, so it can be the only edit on a
+            // row the client still sent as an 'update'.
+            if (markaChange) {
+              noChangeUpdate.marka = markaChange.next;
+              noChangeHas = true;
+              changes.push({
+                field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_marka`,
+                oldValue: existingItem.marka ?? "",
+                newValue: markaChange.next,
+              });
+            }
 
             // One-time backfill (loading only): Net Weight / ₹/Kg / Amount that were
             // never set (stored 0/empty) are filled from the CURRENT stock register.
@@ -3928,14 +3917,18 @@ export async function registerRoutes(
           // Calculate available bags
           let availableBags = 0;
           let size = lot.size;
+          // Falls back to the stock entry's mark when the client sent none.
+          let defaultMarka: string | null = (lot.marka && lot.marka.trim()) ? lot.marka : null;
           
           if (breakdownId) {
             const breakdown = await storage.getBagBreakdownById(breakdownId, merchantId);
             availableBags = breakdown?.remainingBags ?? breakdown?.numberOfBags ?? 0;
             size = breakdown?.size || null;
+            if (breakdown?.marka && breakdown.marka.trim()) defaultMarka = breakdown.marka;
           } else {
             availableBags = lot.remainingBags;
           }
+          const addMarka = typeof itemChange.marka === "string" ? itemChange.marka.trim() : defaultMarka;
           
           if (itemChange.bagsMoved > availableBags) {
             return res.status(400).json({ message: `Not enough bags available (${availableBags})` });
@@ -3967,6 +3960,7 @@ export async function registerRoutes(
             coldStoreName: lot.coldStoreName || "",
             potatoType: lot.potatoType || "",
             size,
+            marka: addMarka,
             bagsMoved: itemChange.bagsMoved,
             netWeight: netWeight.toString(),
             netWeightOverridden: addNetWeightOverridden,
@@ -3999,6 +3993,19 @@ export async function registerRoutes(
             const keepUpdateFields: Partial<TransactionItem> = {};
             let hasKeepChanges = false;
             let revenueChanged = false;
+
+            // Marka is a plain label edit, so it arrives on rows the client
+            // still considers unchanged otherwise.
+            const keepMarkaChange = resolveMarkaChange(itemChange.marka, existingItem.marka ?? null);
+            if (keepMarkaChange) {
+              keepUpdateFields.marka = keepMarkaChange.next;
+              hasKeepChanges = true;
+              changes.push({
+                field: `item_S#${existingItem.serialNumber}_${existingItem.size || 'Mixed'}_marka`,
+                oldValue: existingItem.marka ?? "",
+                newValue: keepMarkaChange.next,
+              });
+            }
 
             if (typeof itemChange.revenue === 'number' && itemChange.revenue !== existingRevenue) {
               keepUpdateFields.revenue = newItemRevenue.toString();

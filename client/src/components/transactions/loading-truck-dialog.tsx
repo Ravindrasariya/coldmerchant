@@ -52,6 +52,7 @@ interface UnsoldInventoryItem {
   totalWeight: string | null;
   netWeight: number;
   breakdownWeight: string | null;
+  marka: string | null;
   costPerBag: number;
   mandiCommissionPercent: string | null;
   aadhatCommissionPercent: string | null;
@@ -67,6 +68,9 @@ interface LoadingLotItem {
   // True once the user types a weight by hand. Cleared whenever the weight is
   // re-derived from the lot (lot selected, or bag count changed).
   netWeightOverridden: boolean;
+  // Bag mark printed on the buyer's bill. Defaults to the lot's marka on
+  // selection and is editable per transaction from here on.
+  marka: string;
   pricePerKg: number;
   amount: number;
 }
@@ -123,7 +127,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   };
 
   const [items, setItems] = useState<LoadingLotItem[]>([
-    { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, pricePerKg: 0, amount: 0 },
+    { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, marka: "", pricePerKg: 0, amount: 0 },
   ]);
 
   // Tnx# preview + group id. Single-buyer dialog, but still uses a group id
@@ -136,10 +140,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
   });
   const [totalFreight, setTotalFreight] = useState<number | null>(null);
   const [freightPaidSeparately, setFreightPaidSeparately] = useState(false);
-  // PRINT-ONLY: when every lot carries the same rate, the merchant can ask for
-  // the buyer's bill and challan to show one combined row instead of one row
-  // per lot. Affects nothing that is calculated or stored as a figure.
-  const [combineBillItems, setCombineBillItems] = useState(false);
   const [driverAdvance, setDriverAdvance] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [debit, setDebit] = useState(0);
@@ -369,27 +369,12 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     };
   }, [items, lineCostOfGoods, totalMandiCharges, computedSalesComm, totalAdditionalCharges, driverAdvance, advanceAmount, debit, freightPaidSeparately, totalFreight]);
 
-  // The combined-row option only makes sense when there is a single rate to
-  // print. Rates are compared as numbers so 14 and 14.00 count as the same.
-  const canCombineBill = useMemo(() => {
-    const rates = items
-      .filter((i) => i.inventoryKey && (Number(i.bagsMoved) || 0) > 0)
-      .map((i) => Number(i.pricePerKg) || 0);
-    return rates.length > 1 && rates.every((r) => r > 0) && rates.every((r) => r === rates[0]);
-  }, [items]);
-
-  // Never leave the flag set once the rates diverge — the documents would fall
-  // back to per-lot rows anyway, and a stored true would be misleading.
-  useEffect(() => {
-    if (!canCombineBill && combineBillItems) setCombineBillItems(false);
-  }, [canCombineBill, combineBillItems]);
-
   const updateItem = (index: number, updates: Partial<LoadingLotItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...updates } : item)));
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, pricePerKg: 0, amount: 0 }]);
+    setItems((prev) => [...prev, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, marka: "", pricePerKg: 0, amount: 0 }]);
   };
 
   const removeItem = (index: number) => {
@@ -415,6 +400,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
           totalWeight: item.totalWeight,
           netWeight: item.netWeight,
           netWeightOverridden: item.netWeightOverridden,
+          marka: item.marka,
           pricePerKg: item.pricePerKg,
           amount: item.amount,
         }));
@@ -448,7 +434,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
         purchaseOrder: purchaseOrder.trim() || undefined,
         location: location.trim() || undefined,
         freightPaidSeparately,
-        combineBillItems: canCombineBill && combineBillItems,
         // Lock the previewed Tnx# for this loading row.
         transactionNumber: upcomingTnxNumber,
         tnxGroupId,
@@ -483,13 +468,12 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
     setBuyerId(null);
     setPartyName("");
     setPartyAddress("");
-    setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, pricePerKg: 0, amount: 0 }]);
+    setItems([{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, netWeightOverridden: false, marka: "", pricePerKg: 0, amount: 0 }]);
     // Roll a fresh group id for the next loading session.
     setTnxGroupId(crypto.randomUUID());
     setSalesCommissionPct(Number(localStorage.getItem("vyapar_sales_comm_pct")) || 0);
     setTotalFreight(null);
     setFreightPaidSeparately(false);
-    setCombineBillItems(false);
     setDriverAdvance(0);
     setAdvanceAmount(0);
     setAdditionalCharges({ tulai: 0, majduri: 0, thelaBhada: 0, palaKarai: 0, bardan: 0 });
@@ -777,7 +761,8 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                 </div>
 
                 <div className="hidden md:grid md:grid-cols-12 gap-1 px-2 py-1 bg-muted/50 rounded text-xs font-medium items-center">
-                  <div className="col-span-3">{t("Lot", "लॉट")}</div>
+                  <div className="col-span-2">{t("Lot", "लॉट")}</div>
+                  <div className="col-span-1 text-center">{t("Marka", "मार्का")}</div>
                   <div className="col-span-1 text-center">{t("Bags", "बोरी")}</div>
                   <div className="col-span-2 text-center">{t("Net Wt", "शुद्ध वजन")}</div>
                   <div className="col-span-1 text-center">{t("₹/Kg", "₹/किग्रा")}</div>
@@ -794,7 +779,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
 
                   return (
                     <div key={itemIndex} className="grid grid-cols-12 gap-1 items-center">
-                      <div className="col-span-12 md:col-span-3 min-w-0 overflow-hidden">
+                      <div className="col-span-12 md:col-span-2 min-w-0 overflow-hidden">
                         <Popover
                           open={lotPopoverOpen[`${itemIndex}`] || false}
                           onOpenChange={(isOpen) => setLotPopoverOpen(prev => ({ ...prev, [`${itemIndex}`]: isOpen }))}
@@ -869,6 +854,9 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                                 totalWeight: Math.round(netWeight * 10) / 10,
                                                 netWeight: Math.round(netWeight * 10) / 10,
                                                 netWeightOverridden: false,
+                                                // Seed the marka from the stock entry; the user
+                                                // can still change it for this transaction.
+                                                marka: selectedInvItem.marka || "",
                                                 pricePerKg,
                                                 amount,
                                               });
@@ -879,6 +867,7 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                                                 totalWeight: 0,
                                                 netWeight: 0,
                                                 netWeightOverridden: false,
+                                                marka: "",
                                                 pricePerKg: 0,
                                                 amount: 0,
                                               });
@@ -917,7 +906,19 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                       <div className="col-span-3 md:col-span-1">
                         <Input
                           type="text"
+                          value={item.marka}
+                          onChange={(e) => updateItem(itemIndex, { marka: e.target.value })}
+                          placeholder={t("Marka", "मार्का")}
+                          className="text-center px-1"
+                          data-testid={`input-loading-marka-${itemIndex}`}
+                        />
+                      </div>
+
+                      <div className="col-span-2 md:col-span-1">
+                        <Input
+                          type="text"
                           inputMode="numeric"
+                          maxLength={3}
                           value={item.bagsMoved || ""}
                           onChange={(e) => {
                             const bags = Number(e.target.value) || 0;
@@ -1022,29 +1023,12 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                   );
                   const plClass = totalPLRow >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
                   const plText = `${totalPLRow >= 0 ? "+" : ""}₹${parseFloat(Math.abs(totalPLRow).toFixed(1)).toLocaleString('en-IN')}`;
-                  // Print-only option: collapse the lots into one bill row.
-                  // Shown only while every lot carries the same rate.
-                  // Rendered twice (desktop + mobile), so each copy needs its
-                  // own element id for the label association to work.
-                  const combineTick = (suffix: string) => (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`loading-combine-bill-items-${suffix}`}
-                        checked={combineBillItems}
-                        onCheckedChange={(checked) => setCombineBillItems(checked === true)}
-                        data-testid={`checkbox-loading-combine-bill-items-${suffix}`}
-                      />
-                      <Label htmlFor={`loading-combine-bill-items-${suffix}`} className="text-xs font-normal cursor-pointer">
-                        {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
-                      </Label>
-                    </div>
-                  );
-
                   return (
                     <>
                       {/* Desktop totals row — columns line up with the header above */}
                       <div className="hidden md:grid md:grid-cols-12 gap-1 items-center text-sm font-medium border-t pt-2 mt-2">
-                        <div className="col-span-3">{t("Total", "कुल")}</div>
+                        <div className="col-span-2">{t("Total", "कुल")}</div>
+                        <div className="col-span-1"></div>
                         <div className="col-span-1 text-center">{totalBagsRow}</div>
                         <div className="col-span-2 text-center">{totalWeightRow.toFixed(1)}</div>
                         <div className="col-span-1"></div>
@@ -1054,9 +1038,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                         <div className={`col-span-2 text-center ${plClass}`}>{plText}</div>
                         <div className="col-span-1"></div>
                       </div>
-                      {canCombineBill && (
-                        <div className="hidden md:flex items-center justify-end pt-2">{combineTick("d")}</div>
-                      )}
 
                       {/* Mobile totals */}
                       <div className="md:hidden border-t pt-2 mt-2">
@@ -1078,9 +1059,6 @@ export function LoadingTruckDialog({ open, onOpenChange, selectedCrop = "potato"
                             <span className={plClass}>{plText}</span>
                           </div>
                         </div>
-                        {canCombineBill && (
-                          <div className="pt-2 mt-2 border-t">{combineTick("m")}</div>
-                        )}
                       </div>
                     </>
                   );

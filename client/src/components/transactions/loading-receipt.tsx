@@ -10,7 +10,7 @@ import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
 import { defaultLoadingTemplate } from "@/lib/default-loading-template";
-import { shouldCombineBillItems } from "@/lib/combine-bill-items";
+import { groupBillRows } from "@/lib/group-bill-rows";
 
 interface TransactionItem {
   id: number;
@@ -50,7 +50,6 @@ interface LoadingTransaction {
   revenue: string | null;
   totalBags: number;
   totalNetWeight: string | null;
-  combineBillItems?: boolean;
   totalCostOfGoods: string | null;
   salesCommission: string | null;
   totalMandiCommission: string | null;
@@ -225,11 +224,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
 
   const buildCustomHtml = () => {
     if (!transaction || !merchant) return null;
-    // Print-only: collapse the lots into a single row when the merchant asked
-    // for it and every lot really does share one rate. Marka is left blank —
-    // a combined row can span several markas, so none of them applies.
-    const combineRows = shouldCombineBillItems(transaction.combineBillItems, transaction.items);
-    const printedRowCount = combineRows ? 1 : transaction.items.length;
+    // Print-only: lots sharing the same marka AND the same rate print as one
+    // row, so the buyer sees the mark on the bags rather than the lots behind
+    // it. Rows with different rates stay separate — the row prints a rate.
+    const groupedRows = groupBillRows(transaction.items, true);
+    const printedRowCount = groupedRows.length;
     // Priority 1: custom per-merchant HTML template
     // Priority 2: built-in Indore default template (with header image if set)
     let html: string;
@@ -275,12 +274,11 @@ export function LoadingReceiptDialog({ transactionId, merchantId, open, onOpenCh
     const cropLabel = distinctCrops.map(cropToLabel).join(", ");
     const dateStr = resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 6;
-    const combinedRate = combineRows ? parseFloat(transaction.items[0].pricePerKg || "0") : 0;
-    const itemsDataRows = combineRows
-      ? `<tr><td>${escHtml(cropLabel)}</td><td></td><td>${transaction.totalBags}</td><td>${parseFloat(transaction.totalNetWeight || "0").toFixed(1)}</td><td>₹${combinedRate.toFixed(2)}</td><td style="text-align:right">₹${parseFloat(totalAmount.toFixed(1)).toLocaleString("en-IN")}</td></tr>`
-      : transaction.items.map((item) =>
-      `<tr><td>${escHtml(cropToLabel(item.crop || txnCrop))}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td>${item.pricePerKg ? `₹${parseFloat(item.pricePerKg).toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(parseFloat(item.amount || "0").toFixed(1)).toLocaleString("en-IN")}</td></tr>`
-    ).join("");
+    const itemsDataRows = groupedRows.map((row) => {
+      // A merged row can span several crops; list each one once.
+      const rowCrops = Array.from(new Set(row.items.map((it) => cropToLabel(it.crop || txnCrop)))).join(", ");
+      return `<tr><td>${escHtml(rowCrops)}</td><td>${escHtml(row.marka)}</td><td>${row.bagsMoved}</td><td>${row.netWeight.toFixed(1)}</td><td>${row.pricePerKg > 0 ? `₹${row.pricePerKg.toFixed(2)}` : "-"}</td><td style="text-align:right">₹${parseFloat(row.amount.toFixed(1)).toLocaleString("en-IN")}</td></tr>`;
+    }).join("");
     const blankCount = Math.max(0, minRows - printedRowCount);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
     const itemRowsHtml = itemsDataRows + blankRows;

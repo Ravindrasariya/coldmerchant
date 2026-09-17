@@ -215,11 +215,6 @@ export const transactions = pgTable("transactions", {
   purchaseOrder: text("purchase_order"), // optional purchase order / reference number (loading only)
   location: text("location"), // optional delivery location for this transaction — a buyer can have several, so it belongs to the transaction, not the buyer
   freightPaidSeparately: boolean("freight_paid_separately").notNull().default(false), // loading only: freight paid by user, not billed to buyer
-  // Loading only, PRINT-ONLY setting: collapse every item into a single row on
-  // the buyer receipt and challan so the buyer cannot see the load came from
-  // several lots. Only meaningful when all items share one ₹/Kg; consumers must
-  // re-check that at print time. Never affects stored figures or any register.
-  combineBillItems: boolean("combine_bill_items").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   // Lookup index for "find all rows in this loading session" queries used by
@@ -239,6 +234,12 @@ export const transactionItems = pgTable("transaction_items", {
   coldStoreName: text("cold_store_name").notNull(), // cached
   potatoType: text("potato_type"), // cached potato type for display
   size: text("size"), // cached size for display
+  // Bag mark shown on the buyer's bill and challan, and the key rows are
+  // grouped by when printing. Defaults to the lot / bag-breakdown marka when
+  // the transaction is created but is editable per transaction afterwards.
+  // NULL means "never set on this row" — those rows fall back to the lot's
+  // current marka. An empty string means the user deliberately cleared it.
+  marka: text("marka"),
   bagsMoved: integer("bags_moved").notNull(),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   // True when the user typed the net weight by hand instead of accepting the

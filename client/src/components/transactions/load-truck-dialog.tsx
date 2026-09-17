@@ -54,6 +54,7 @@ interface UnsoldInventoryItem {
   totalWeight: string | null;
   netWeight: number;
   breakdownWeight: string | null;
+  marka: string | null;
   costPerBag: number;
 }
 
@@ -62,6 +63,9 @@ interface LotItem {
   bagsMoved: number;
   totalWeight: number;
   netWeight: number;
+  // Bag mark printed on the buyer's bill. Defaults to the lot's marka on
+  // selection and is editable per transaction from here on.
+  marka: string;
 }
 
 interface BuyerSection {
@@ -90,7 +94,7 @@ const createEmptyBuyerSection = (): BuyerSection => ({
   buyerId: null,
   partyName: "",
   partyAddress: "",
-  items: [{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0 }],
+  items: [{ inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, marka: "" }],
   mandiCommissionPct: 0,
   hammaliPerBag: 0,
   totalFreight: null,
@@ -328,7 +332,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
     setBuyerSections((prev) =>
       prev.map((s) =>
         s.id === sectionId
-          ? { ...s, items: [...s.items, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0 }] }
+          ? { ...s, items: [...s.items, { inventoryKey: "", bagsMoved: 0, totalWeight: 0, netWeight: 0, marka: "" }] }
           : s
       )
     );
@@ -376,6 +380,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
             bagsMoved: item.bagsMoved,
             totalWeight: item.totalWeight,
             netWeight: item.netWeight,
+            marka: item.marka,
           }));
 
         if (items.length === 0) return null;
@@ -769,7 +774,8 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
 
                           {/* Lot Header */}
                           <div className="hidden md:grid md:grid-cols-12 gap-1 px-2 py-1 bg-muted/50 rounded text-xs font-medium items-center">
-                            <div className="col-span-4">{t("Lot", "लॉट")}</div>
+                            <div className="col-span-3">{t("Lot", "लॉट")}</div>
+                            <div className="col-span-1 text-center">{t("Marka", "मार्का")}</div>
                             <div className="col-span-1 text-center">{t("Bags", "बोरी")}</div>
                             <div className="col-span-2 text-center">{t("Total Weight", "कुल वजन")}</div>
                             <div className="col-span-2 text-center">{t("Net Weight", "शुद्ध वजन")}</div>
@@ -787,7 +793,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                 key={itemIndex}
                                 className="grid grid-cols-12 gap-1 items-center"
                               >
-                                <div className="col-span-12 md:col-span-4 min-w-0 overflow-hidden">
+                                <div className="col-span-12 md:col-span-3 min-w-0 overflow-hidden">
                                   <Popover
                                     open={lotPopoverOpen[`${section.id}-${itemIndex}`] || false}
                                     onOpenChange={(isOpen) => setLotPopoverOpen(prev => ({ ...prev, [`${section.id}-${itemIndex}`]: isOpen }))}
@@ -861,6 +867,9 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                                           bagsMoved: bags,
                                                           totalWeight: Math.round(grossWeight * 10) / 10,
                                                           netWeight: Math.round(netWeight * 10) / 10,
+                                                          // Seed the marka from the stock entry; the
+                                                          // user can still change it for this bill.
+                                                          marka: selectedInvItem.marka || "",
                                                         });
                                                       } else {
                                                         updateLotItem(section.id, itemIndex, {
@@ -868,6 +877,7 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                                           bagsMoved: 0,
                                                           totalWeight: 0,
                                                           netWeight: 0,
+                                                          marka: "",
                                                         });
                                                       }
                                                       setLotPopoverOpen(prev => ({ ...prev, [`${section.id}-${itemIndex}`]: false }));
@@ -903,7 +913,19 @@ export function LoadTruckDialog({ open, onOpenChange, selectedCrop = "potato" }:
                                 <div className="col-span-3 md:col-span-1">
                                   <Input
                                     type="text"
+                                    value={item.marka}
+                                    onChange={(e) => updateLotItem(section.id, itemIndex, { marka: e.target.value })}
+                                    placeholder={t("Marka", "मार्का")}
+                                    className="text-center px-1"
+                                    data-testid={`input-marka-${sectionIndex}-${itemIndex}`}
+                                  />
+                                </div>
+
+                                <div className="col-span-2 md:col-span-1">
+                                  <Input
+                                    type="text"
                                     inputMode="numeric"
+                                    maxLength={3}
                                     value={item.bagsMoved || ""}
                                     onChange={(e) => {
                                       const bags = Number(e.target.value) || 0;

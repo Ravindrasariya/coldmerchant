@@ -1266,11 +1266,21 @@ export class DatabaseStorage implements IStorage {
       const enrichedItems = await Promise.all(items.map(async (item) => {
         const lot = await db.select().from(lots).where(and(eq(lots.id, item.lotId), eq(lots.merchantId, merchantId))).limit(1);
         if (lot.length > 0) {
+          // Same precedence as getTransactionById: the row's own marka wins,
+          // and only rows predating that column fall back to the lot.
+          let marka: string | null = item.marka;
+          if (marka === null) {
+            marka = (lot[0].marka && lot[0].marka.trim()) ? lot[0].marka : null;
+            if (item.breakdownId) {
+              const [bd] = await db.select().from(bagBreakdowns).where(and(eq(bagBreakdowns.id, item.breakdownId), eq(bagBreakdowns.merchantId, merchantId))).limit(1);
+              if (bd?.marka && bd.marka.trim()) marka = bd.marka;
+            }
+          }
           const entry = await db.select().from(stockEntries).where(and(eq(stockEntries.id, lot[0].stockEntryId), eq(stockEntries.merchantId, merchantId))).limit(1);
           if (entry.length > 0) {
-            return { ...item, crop: lot[0].crop || "potato", place: lot[0].place, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
+            return { ...item, marka, crop: lot[0].crop || "potato", place: lot[0].place, farmerName: entry[0].farmerName, farmerVillage: entry[0].village ?? undefined };
           }
-          return { ...item, crop: lot[0].crop || "potato", place: lot[0].place, farmerName: undefined, farmerVillage: undefined };
+          return { ...item, marka, crop: lot[0].crop || "potato", place: lot[0].place, farmerName: undefined, farmerVillage: undefined };
         }
         return { ...item, crop: undefined, place: undefined, farmerName: undefined, farmerVillage: undefined };
       }));
@@ -1618,6 +1628,7 @@ export class DatabaseStorage implements IStorage {
             totalWeight: breakdown.weight || lot.totalWeight || null,
             netWeight: bdNetWeight,
             breakdownWeight: breakdown.weight || null,
+            marka: (breakdown.marka && breakdown.marka.trim()) ? breakdown.marka : ((lot.marka && lot.marka.trim()) ? lot.marka : null),
             costPerBag: breakdownCosts.get(breakdown.id) || 0,
             ...mandiCharges,
           });
@@ -1647,6 +1658,7 @@ export class DatabaseStorage implements IStorage {
             totalWeight: lot.totalWeight || null,
             netWeight: lotNetWeight,
             breakdownWeight: null,
+            marka: (lot.marka && lot.marka.trim()) ? lot.marka : null,
             costPerBag: breakdownCosts.get(null) || 0,
             ...mandiCharges,
           });
@@ -1685,9 +1697,13 @@ export class DatabaseStorage implements IStorage {
       let lotSourceBags = 0;
       let costPerBag = 0;
       let lotPricePerKg = 0;
-      let marka: string | null = null;
+      // The row's own marka wins whenever it was ever set on the transaction
+      // (an empty string means the user deliberately cleared it). Only rows
+      // predating that column fall back to the lot / breakdown marka.
+      let marka: string | null = item.marka;
+      let lotMarka: string | null = null;
       if (lot.length > 0) {
-        marka = (lot[0].marka && lot[0].marka.trim()) ? lot[0].marka : null;
+        lotMarka = (lot[0].marka && lot[0].marka.trim()) ? lot[0].marka : null;
         if (item.breakdownId) {
           const [bd] = await db.select().from(bagBreakdowns).where(and(eq(bagBreakdowns.id, item.breakdownId), eq(bagBreakdowns.merchantId, merchantId))).limit(1);
           if (bd) {
@@ -1695,9 +1711,10 @@ export class DatabaseStorage implements IStorage {
             lotSourceBags = bd.numberOfBags || 0;
             costPerBag = bd.costPerBag ? parseFloat(bd.costPerBag) : 0;
             lotPricePerKg = bd.pricePerKg ? parseFloat(bd.pricePerKg) : 0;
-            if (bd.marka && bd.marka.trim()) marka = bd.marka;
+            if (bd.marka && bd.marka.trim()) lotMarka = bd.marka;
           }
         }
+        if (marka === null) marka = lotMarka;
         if (lotSourceBags === 0) {
           lotSourceWeight = lot[0].totalWeight ? parseFloat(lot[0].totalWeight) : 0;
           lotSourceBags = lot[0].originalBags || 0;

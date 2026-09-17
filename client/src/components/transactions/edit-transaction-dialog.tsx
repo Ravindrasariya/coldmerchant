@@ -39,6 +39,7 @@ interface TransactionItem {
   coldStoreName: string;
   potatoType: string | null;
   size: string | null;
+  marka: string | null;
   bagsMoved: number;
   netWeight: string | null;
   netWeightOverridden: boolean | null;
@@ -78,6 +79,7 @@ interface UnsoldInventoryItem {
   totalWeight: string | null;
   netWeight: number;
   breakdownWeight: string | null;
+  marka: string | null;
   costPerBag: number;
   mandiCommissionPercent: string | null;
   aadhatCommissionPercent: string | null;
@@ -121,6 +123,13 @@ interface EditableItem {
   mandiExtraCharges: string | null;
   lotOriginalBags: number;
   costPerBag: number;
+  // Bag mark printed on the buyer's bill. Read from the transaction row (not
+  // the stock entry), so an edit made here survives reopening the dialog.
+  marka: string;
+  // What the row showed when the dialog opened. Marka is only sent back when
+  // the user actually changed it, so a legacy row that never stored one keeps
+  // falling back to its lot's marka instead of being frozen on an unrelated save.
+  originalMarka: string;
   action: 'keep' | 'update' | 'add' | 'remove';
 }
 
@@ -177,7 +186,6 @@ interface TransactionWithHistory {
   purchaseOrder: string | null;
   location: string | null;
   freightPaidSeparately: boolean;
-  combineBillItems?: boolean;
   // Freight already paid (unreversed) from the Cash tab against this truck.
   // Anything above zero freezes the freight fields until the payment is reversed.
   freightPaidAmount?: number;
@@ -390,33 +398,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     },
   });
 
-  // PRINT-ONLY setting, kept OUT of the edit form on purpose. Saving the form
-  // recomputes cost of goods and profit/loss from live lot prices, so a
-  // presentation toggle must not ride along with it. It saves on its own
-  // through a dedicated endpoint that writes nothing but this one column.
-  const [combineBillItems, setCombineBillItems] = useState(false);
-  const combineBillItemsMutation = useMutation({
-    mutationFn: async (value: boolean) =>
-      apiRequest("PATCH", `/api/transactions/${transactionId}/combine-bill-items`, { combineBillItems: value }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions", transactionId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-    },
-    onError: (error: any) => {
-      // Put the box back where it was so it never shows a state that was not saved.
-      setCombineBillItems((prev) => !prev);
-      toast({
-        title: t("Could not save", "सहेजा नहीं जा सका"),
-        description: error?.message || t("Please try again", "कृपया पुनः प्रयास करें"),
-        variant: "destructive",
-      });
-    },
-  });
-  const toggleCombineBillItems = (value: boolean) => {
-    setCombineBillItems(value);
-    combineBillItemsMutation.mutate(value);
-  };
-
   useEffect(() => {
     if (transaction) {
       // Reset the freightPaidSeparately prev-ref so the checkbox-toggle
@@ -448,7 +429,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
         location: transaction.location || "",
         freightPaidSeparately: transaction.freightPaidSeparately === true,
       });
-      setCombineBillItems(transaction.combineBillItems === true);
       // For loading transactions with freightPaidSeparately=true, immediately
       // recompute revenue so the form value (and therefore PATCH body) is correct
       // even if the user opens and saves without toggling the checkbox.
@@ -573,6 +553,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           mandiExtraCharges: item.mandiExtraCharges || null,
           lotOriginalBags: item.lotOriginalBags || 0,
           costPerBag: liveCpb,
+          marka: item.marka || "",
+          originalMarka: item.marka || "",
           action: 'keep' as const
         };
       });
@@ -830,6 +812,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
           // Omitted (not sent as false) for pre-flag rows so the server keeps
           // its legacy tolerance rule instead of re-deriving their weight.
           ...(item.netWeightOverridden === null ? {} : { netWeightOverridden: item.netWeightOverridden }),
+          // Only sent when touched — see EditableItem.originalMarka.
+          ...(item.marka !== item.originalMarka ? { marka: item.marka } : {}),
           revenue: item.revenue,
           action: item.action
         };
@@ -956,6 +940,13 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
     applyItems(nextItems);
   };
 
+  // Marka is a label only: it changes no money, so it never re-derives weight
+  // or cost. A row whose marka is the only edit still has to be sent, so it
+  // keeps its 'keep' action and the server picks the change up from there.
+  const handleMarkaChange = (index: number, value: string) => {
+    applyItems(editableItemsRef.current.map((item, i) => (i === index ? { ...item, marka: value } : item)));
+  };
+
   const handleRemoveItem = (index: number) => {
     setDeleteConfirmIndex(index);
   };
@@ -1046,6 +1037,8 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
       mandiExtraCharges: inv.mandiExtraCharges || null,
       lotOriginalBags: inv.lotOriginalBags || 0,
       costPerBag: costPerBag,
+      marka: inv.marka || "",
+      originalMarka: inv.marka || "",
       action: 'add' as const
     };
 
@@ -1508,8 +1501,9 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
               )}
 
               {/* Desktop header row - hidden on mobile */}
-              <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
+              <div className="hidden md:grid grid-cols-[1fr,70px,56px,80px,70px,90px,90px,32px] gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
                 <span>{t("Lot Details", "लॉट विवरण")}</span>
+                <span className="text-right">{t("Marka", "मार्का")}</span>
                 <span className="text-right">{t("Bags", "बोरी")}</span>
                 <span className="text-right">{t("Net Weight", "शुद्ध वजन")}</span>
                 <span className="text-right">{isLoadingType ? t("₹/Kg", "₹/किग्रा") : t("Cost/Bag", "लागत/बोरी")}</span>
@@ -1533,7 +1527,7 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                 return (
                   <div key={item.id || `new-${index}`}>
                     {/* Desktop row */}
-                    <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
+                    <div className="hidden md:grid grid-cols-[1fr,70px,56px,80px,70px,90px,90px,32px] gap-2 items-center text-sm py-1">
                       <div className="flex flex-col gap-0.5 min-w-0">
                         {(() => {
                           const c = item.crop || "potato";
@@ -1546,8 +1540,17 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                         </span>
                       </div>
                       <Input
+                        type="text"
+                        value={item.marka}
+                        onChange={(e) => handleMarkaChange(index, e.target.value)}
+                        className="h-8 text-center"
+                        placeholder={t("Marka", "मार्का")}
+                        data-testid={`input-item-marka-${index}`}
+                      />
+                      <Input
                         type="number"
                         min="1"
+                        max="999"
                         value={item.bagsMoved || ""}
                         onChange={(e) => handleBagCountChange(index, parseInt(e.target.value) || 0)}
                         className="h-8 text-right no-spinner"
@@ -1640,7 +1643,18 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">{t("Marka", "मार्का")}</Label>
+                          <Input
+                            type="text"
+                            value={item.marka}
+                            onChange={(e) => handleMarkaChange(index, e.target.value)}
+                            className="h-8 text-center"
+                            placeholder={t("Marka", "मार्का")}
+                            data-testid={`input-item-marka-m-${index}`}
+                          />
+                        </div>
                         <div>
                           <Label className="text-[10px] text-muted-foreground">{t("Bags", "बोरी")}</Label>
                           <Input
@@ -1734,19 +1748,12 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                     : i.costOfGoods;
                   return sum + ((isLoadingType ? i.loadingAmount : i.revenue) - cogs);
                 }, 0);
-                // The "combine into one row on the bill" option only makes sense
-                // when there is a single rate to print. Rates are compared as
-                // numbers so 14 and 14.00 count as the same.
-                const rates = activeItems.map(i => Number(i.loadingPricePerKg) || 0);
-                const canCombineBill = isLoadingType
-                  && activeItems.length > 1
-                  && rates.every(r => r > 0)
-                  && rates.every(r => r === rates[0]);
                 return (
                   <>
                     {/* Desktop totals row */}
-                    <div className="hidden md:grid grid-cols-[1fr,70px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
+                    <div className="hidden md:grid grid-cols-[1fr,70px,56px,80px,70px,90px,90px,32px] gap-2 items-center text-sm font-medium border-t pt-2 mt-2">
                       <span>{t("Total", "कुल")}</span>
+                      <span></span>
                       <span className="text-right h-8 flex items-center justify-end">{totalBags}</span>
                       <span className="text-right h-8 flex items-center justify-end">{totalWeight.toFixed(1)}</span>
                       <span></span>
@@ -1758,22 +1765,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                       </span>
                       <span></span>
                     </div>
-                    {/* Print-only option: collapse the lots into one bill row.
-                        Shown only while every lot carries the same rate. */}
-                    {canCombineBill && (
-                      <div className="hidden md:flex items-center justify-end gap-2 pt-2">
-                        <Checkbox
-                          id="combine-bill-items"
-                          checked={combineBillItems}
-                          onCheckedChange={(checked) => toggleCombineBillItems(checked === true)}
-                          disabled={combineBillItemsMutation.isPending}
-                          data-testid="checkbox-combine-bill-items"
-                        />
-                        <Label htmlFor="combine-bill-items" className="text-xs font-normal cursor-pointer">
-                          {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
-                        </Label>
-                      </div>
-                    )}
                     {/* Mobile totals */}
                     <div className="md:hidden border-t pt-2 mt-2">
                       <div className="grid grid-cols-4 gap-2 text-xs font-medium">
@@ -1796,20 +1787,6 @@ export function EditTransactionDialog({ transactionId, open, onOpenChange }: Edi
                           </span>
                         </div>
                       </div>
-                      {canCombineBill && (
-                        <div className="flex items-center gap-2 pt-2 mt-2 border-t">
-                          <Checkbox
-                            id="combine-bill-items-mobile"
-                            checked={combineBillItems}
-                            onCheckedChange={(checked) => toggleCombineBillItems(checked === true)}
-                            disabled={combineBillItemsMutation.isPending}
-                            data-testid="checkbox-combine-bill-items-mobile"
-                          />
-                          <Label htmlFor="combine-bill-items-mobile" className="text-xs font-normal cursor-pointer">
-                            {t("Show as a single row on the bill & challan", "बिल और चालान में एक ही पंक्ति दिखाएँ")}
-                          </Label>
-                        </div>
-                      )}
                     </div>
                   </>
                 );

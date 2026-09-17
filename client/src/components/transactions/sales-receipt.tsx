@@ -11,6 +11,7 @@ import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
 import { numberToIndianWords } from "@/lib/number-to-words";
 import { defaultBikriTemplate } from "@/lib/default-bikri-template";
+import { groupBillRows } from "@/lib/group-bill-rows";
 
 interface TransactionItem {
   id: number;
@@ -227,6 +228,11 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     if (!transaction || !merchant) return null;
     // Priority 1: custom per-merchant Bikri/sales HTML template
     // Priority 2: built-in default Bikri template (with header image if set)
+    // Print-only: lots sharing the same marka print as one row, so the buyer
+    // sees the mark on the bags rather than the lots behind it. A blank marka
+    // is a normal marka and groups with the other blank rows.
+    const groupedRows = groupBillRows(transaction.items);
+    const printedRowCount = groupedRows.length;
     let html: string;
     let minRows: number;
     if (merchant?.salesReceiptHtmlTemplate) {
@@ -243,7 +249,7 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
       // nominal 24px `height` in the CSS, which table cells treat as a
       // minimum rather than a cap. Subtract 3 rows so the bill keeps some
       // breathing space at the bottom and never spills onto a second page.
-      minRows = Math.max(transaction.items.length, Math.floor(_availPx / 29) - 9);
+      minRows = Math.max(printedRowCount, Math.floor(_availPx / 29) - 9);
     }
     const txnCrop = transaction.crop || cropType || "potato";
     const distinctCrops = transaction.items.length > 0
@@ -252,11 +258,14 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     const cropLabel = distinctCrops.map(cropToLabel).join(", ");
     const dateStr = resolveTxnDate(transaction).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
     const numCols = 5;
-    const itemsDataRows = transaction.items.map((item) => {
-      const rev = parseFloat(item.revenue || "0");
-      return `<tr><td>${escHtml(cropToLabel(item.crop || txnCrop))}${item.potatoType ? ` (${escHtml(item.potatoType)})` : ""}</td><td>${item.marka ? escHtml(item.marka) : ""}</td><td>${item.bagsMoved}</td><td>${parseFloat(item.netWeight || "0").toFixed(1)}</td><td style="text-align:right">${rev > 0 ? fmtInr(rev) : "&nbsp;"}</td></tr>`;
+    const itemsDataRows = groupedRows.map((row) => {
+      // A merged row can span several crops / potato types; list each once.
+      const names = Array.from(new Set(row.items.map((item) =>
+        `${cropToLabel(item.crop || txnCrop)}${item.potatoType ? ` (${item.potatoType})` : ""}`
+      ))).join(", ");
+      return `<tr><td>${escHtml(names)}</td><td>${escHtml(row.marka)}</td><td>${row.bagsMoved}</td><td>${row.netWeight.toFixed(1)}</td><td style="text-align:right">${row.revenue > 0 ? fmtInr(row.revenue) : "&nbsp;"}</td></tr>`;
     }).join("");
-    const blankCount = Math.max(0, minRows - transaction.items.length);
+    const blankCount = Math.max(0, minRows - printedRowCount);
     const blankRows = Array(blankCount).fill(`<tr>${"<td>&nbsp;</td>".repeat(numCols)}</tr>`).join("");
     const itemRowsHtml = itemsDataRows + blankRows;
     const fmtFinal = (v: number) => `₹${Math.round(v).toLocaleString("en-IN")}`;
