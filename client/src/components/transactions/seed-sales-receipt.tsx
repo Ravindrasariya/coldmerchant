@@ -235,12 +235,12 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
       onOpenChange(false);
     } else if (autoAction === "share") {
       const timer = setTimeout(async () => {
-        if (!printRef.current) {
+        try {
+          if (!printRef.current) return;
+          await handleShare();
+        } finally {
           onOpenChange(false);
-          return;
         }
-        await handleShare();
-        onOpenChange(false);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -258,49 +258,10 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
     return null;
   }
 
-  const isAutoShare = autoAction === "share";
-
   const transportCharges = parseFloat(transaction?.transportCharges || "0");
   const otherCharges = parseFloat(transaction?.otherCharges || "0");
 
-  return (
-    <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined} style={isAutoShare ? { pointerEvents: "none" } : undefined}>
-        {isAutoShare ? (
-          <DialogTitle className="sr-only">Generating PDF</DialogTitle>
-        ) : (
-          <DialogHeader>
-            <div className="flex items-center justify-between pr-8">
-              <DialogTitle>Seed Sales Receipt</DialogTitle>
-              <div className="flex gap-2">
-                <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-seed-receipt">
-                  {sharing ? (
-                    <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <Share2 className="h-4 w-4 mr-2" />
-                  )}
-                  {sharing ? "..." : "Share"}
-                </Button>
-                <Button onClick={handlePrint} size="sm" data-testid="button-print-seed-receipt">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print
-                </Button>
-              </div>
-            </div>
-            <DialogDescription>
-              Preview and print the seed sales receipt
-            </DialogDescription>
-          </DialogHeader>
-        )}
-
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </div>
-        ) : transaction && merchant ? (
-          <div className="overflow-x-auto -mx-4 px-4">
+  const receiptContent = transaction && merchant ? (
           <div ref={printRef} className="space-y-2 p-3 bg-white text-black text-xs min-w-[600px]">
             <div className="header text-center border-b border-black pb-2">
               {merchant.receiptHeaderImage ? (
@@ -412,6 +373,62 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
               <p>No signature/stamp required for online receipt | ऑनलाइन रसीद पर हस्ताक्षर/मुहर आवश्यक नहीं</p>
             </div>
           </div>
+  ) : null;
+
+  if (autoAction === "share") {
+    // Share never shows an interactive dialog: it only needs the receipt
+    // markup mounted somewhere so handleShare (above) can read it via
+    // printRef. An earlier version rendered a real Dialog here with
+    // onOpenChange disabled and pointerEvents:none so the "Generating PDF"
+    // placeholder couldn't be dismissed -- if the share flow ever stalled or
+    // errored, the dialog was stuck open and, on mobile, frozen and
+    // unscrollable, forcing a refresh. Keeping the content off-screen and
+    // non-interactive avoids that failure mode entirely: nothing modal is
+    // ever shown, so there is nothing to get stuck. The effect above always
+    // calls onOpenChange(false) in a finally block, so this unmounts as soon
+    // as sharing finishes or fails.
+    return (
+      <div aria-hidden="true" style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none" }}>
+        {receiptContent}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle>Seed Sales Receipt</DialogTitle>
+            <div className="flex gap-2">
+              <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing || isLoading} data-testid="button-share-seed-receipt">
+                {sharing ? (
+                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <Share2 className="h-4 w-4 mr-2" />
+                )}
+                {sharing ? "..." : "Share"}
+              </Button>
+              <Button onClick={handlePrint} size="sm" data-testid="button-print-seed-receipt">
+                <Printer className="h-4 w-4 mr-2" />
+                Print
+              </Button>
+            </div>
+          </div>
+          <DialogDescription>
+            Preview and print the seed sales receipt
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : receiptContent ? (
+          <div className="overflow-x-auto -mx-4 px-4">
+            {receiptContent}
           </div>
         ) : (
           <div className="text-center text-muted-foreground py-8">
