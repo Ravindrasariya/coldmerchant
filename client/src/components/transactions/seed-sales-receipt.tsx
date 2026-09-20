@@ -73,10 +73,13 @@ export function SeedSalesReceiptDialog({ transactionId, merchantId, open, onOpen
     if (!printRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(printRef.current, `Seed-Sales-Receipt-${transaction?.transactionNumber || ""}`);
+      const outcome = await shareReceiptAsPdf(printRef.current, `Seed-Sales-Receipt-${transaction?.transactionNumber || ""}`);
+      if (outcome.method === "download" && outcome.reason) {
+        toast({ title: "Receipt downloaded", description: outcome.reason });
+      }
     } catch (err: any) {
       if (err?.name !== "AbortError") {
-        toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
+        toast({ title: "PDF generation failed", description: String(err?.message || err), variant: "destructive" });
       }
     } finally {
       setSharing(false);

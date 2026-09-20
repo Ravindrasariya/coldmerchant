@@ -61,7 +61,10 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     if (!billRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(billRef.current, `Seed-Purchase-Receipt-${entry.serialNumber}`);
+      const outcome = await shareReceiptAsPdf(billRef.current, `Seed-Purchase-Receipt-${entry.serialNumber}`);
+      if (outcome.method === "download" && outcome.reason) {
+        toast({ title: "Receipt downloaded", description: outcome.reason });
+      }
     } catch (err: any) {
       console.error("Share/PDF error:", err);
       if (err?.name !== "AbortError") {

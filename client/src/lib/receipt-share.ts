@@ -1,5 +1,9 @@
-const HTML2CANVAS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-const JSPDF_CDN = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+// html2canvas and jsPDF are bundled with the app rather than fetched from a
+// CDN at click time. An earlier version loaded both from cdnjs on every share;
+// on a self-hosted VPS (or any restricted network) those requests fail, PDF
+// generation silently gave up, and the user saw nothing happen at all.
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 const RECEIPT_BASE_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -180,21 +184,66 @@ const RECEIPT_BASE_STYLES = `
   .rounded-lg { border-radius: 8px; }
 `;
 
-function loadScript(doc: Document, src: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const script = doc.createElement("script");
-    script.src = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load ${src}`));
-    doc.head.appendChild(script);
+/** Resolve once every image inside `doc` has loaded (or failed), with a cap. */
+function waitForImages(doc: Document, timeoutMs = 5000): Promise<void> {
+  const imgs = Array.from(doc.images);
+  if (imgs.length === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    let remaining = imgs.length;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    const settle = () => {
+      remaining -= 1;
+      if (remaining <= 0) finish();
+    };
+    imgs.forEach((img) => {
+      if (img.complete) settle();
+      else {
+        img.addEventListener("load", settle);
+        img.addEventListener("error", settle);
+      }
+    });
+    setTimeout(finish, timeoutMs);
   });
+}
+
+export type ShareOutcome =
+  /** The OS share sheet was opened and the user picked a destination app. */
+  | { method: "share" }
+  /** The user dismissed the share sheet without choosing anything. */
+  | { method: "cancelled" }
+  /** The PDF was downloaded. `reason` is set when sharing was wanted but unavailable. */
+  | { method: "download"; reason?: string };
+
+/**
+ * Why the native share sheet can't be used right now, or null when it can.
+ *
+ * `navigator.share` only exists in a secure context, so a site served over
+ * plain HTTP has no share sheet at all — the user needs to be told that rather
+ * than left wondering why nothing was offered.
+ */
+function shareUnavailableReason(file: File): string | null {
+  if (typeof navigator.share !== "function") {
+    if (!window.isSecureContext) {
+      return "Sharing needs a secure (https) connection, so the receipt was downloaded instead.";
+    }
+    return "This browser can't open a share sheet, so the receipt was downloaded instead.";
+  }
+  if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+    return "This browser can't share PDF files, so the receipt was downloaded instead.";
+  }
+  return null;
 }
 
 export async function shareReceiptAsPdf(
   contentElement: HTMLElement,
   filename: string,
   customHtml?: string | null
-): Promise<void> {
+): Promise<ShareOutcome> {
   const receiptHTML = contentElement.outerHTML;
   const isCustomTemplate = !!customHtml;
   const captureWidth = isCustomTemplate ? 794 : 800;
@@ -243,29 +292,17 @@ export async function shareReceiptAsPdf(
   iframeDoc.close();
 
   await new Promise((r) => setTimeout(r, 300));
+  await waitForImages(iframeDoc);
 
   const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   try {
-    await loadScript(iframeDoc, HTML2CANVAS_CDN);
-    await loadScript(iframeDoc, JSPDF_CDN);
-
-    await new Promise((r) => setTimeout(r, 200));
-
-    const iframeWindow = iframe.contentWindow as any;
-    const html2canvasFn = iframeWindow.html2canvas;
-    const jsPDFClass = iframeWindow.jspdf?.jsPDF;
-
-    if (!html2canvasFn || !jsPDFClass) {
-      throw new Error("Libraries not available");
-    }
-
     const receiptRoot = iframeDoc.getElementById("receipt-root");
     if (!receiptRoot) {
-      throw new Error("Receipt root not found");
+      throw new Error("Receipt content could not be prepared for the PDF.");
     }
 
-    const canvas = await html2canvasFn(receiptRoot, {
+    const canvas = await html2canvas(receiptRoot, {
       scale: isMobileDevice ? 1.5 : 2,
       useCORS: true,
       backgroundColor: "#ffffff",
@@ -278,7 +315,7 @@ export async function shareReceiptAsPdf(
 
     const imgWidth = 210;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const pdf = new jsPDFClass("p", "mm", "a4");
+    const pdf = new jsPDF("p", "mm", "a4");
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     if (imgHeight <= pageHeight) {
@@ -308,45 +345,43 @@ export async function shareReceiptAsPdf(
       URL.revokeObjectURL(url);
     };
 
-    if (isMobileDevice && navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
-      try {
-        await navigator.share({
-          files: [pdfFile],
-          title: filename,
-        });
-      } catch (shareErr: any) {
-        if (shareErr?.name !== "AbortError") {
-          downloadPdf();
-        }
-      }
-    } else {
+    if (!isMobileDevice) {
       downloadPdf();
+      return { method: "download" };
     }
-  } catch (cdnError) {
-    console.warn("PDF generation failed, falling back to print:", cdnError);
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      if (isCustomTemplate) {
-        printWindow.document.write(customHtml!);
-      } else {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8">
-              <title>${filename}</title>
-              <style>
-                ${RECEIPT_BASE_STYLES}
-                @media print { body { padding: 10px; } }
-              </style>
-            </head>
-            <body>${receiptHTML}</body>
-          </html>
-        `);
+
+    // Mobile: hand the PDF to the OS share sheet so the user picks the
+    // destination app themselves (personal WhatsApp, WhatsApp Business, email,
+    // ...). No `text`/`url` is sent alongside the file: some targets drop the
+    // attachment when extra fields are present.
+    const reason = shareUnavailableReason(pdfFile);
+    if (reason) {
+      downloadPdf();
+      return { method: "download", reason };
+    }
+
+    try {
+      await navigator.share({ files: [pdfFile], title: filename });
+      return { method: "share" };
+    } catch (shareErr: any) {
+      if (shareErr?.name === "AbortError") {
+        return { method: "cancelled" };
       }
-      printWindow.document.close();
-      printWindow.print();
+      downloadPdf();
+      return {
+        method: "download",
+        reason: "The share sheet could not be opened, so the receipt was downloaded instead.",
+      };
     }
+  } catch (err: any) {
+    // Never fail silently. The old code fell back to `window.open`, which
+    // popup blockers reject without a word, so the button simply did nothing.
+    console.error("Receipt PDF generation failed:", err);
+    throw new Error(
+      err?.message
+        ? `Could not create the receipt PDF: ${err.message}`
+        : "Could not create the receipt PDF."
+    );
   } finally {
     if (iframe.parentNode) {
       document.body.removeChild(iframe);

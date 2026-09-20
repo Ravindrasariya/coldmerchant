@@ -153,7 +153,10 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     if (!billRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(billRef.current, buildReceiptFilename());
+      const outcome = await shareReceiptAsPdf(billRef.current, buildReceiptFilename());
+      if (outcome.method === "download" && outcome.reason) {
+        toast({ title: "Receipt downloaded", description: outcome.reason });
+      }
     } catch (err: any) {
       console.error("Share/PDF error:", err);
       if (err?.name !== "AbortError") {

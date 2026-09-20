@@ -103,10 +103,13 @@ export function SalesReceiptDialog({ transactionId, merchantId, open, onOpenChan
     if (!printRef.current) return;
     setSharing(true);
     try {
-      await shareReceiptAsPdf(printRef.current, receiptFilename(), customHtml);
+      const outcome = await shareReceiptAsPdf(printRef.current, receiptFilename(), customHtml);
+      if (outcome.method === "download" && outcome.reason) {
+        toast({ title: "Receipt downloaded", description: outcome.reason });
+      }
     } catch (err: any) {
       if (err?.name !== "AbortError") {
-        toast({ title: "PDF generation failed", description: "Please try again", variant: "destructive" });
+        toast({ title: "PDF generation failed", description: String(err?.message || err), variant: "destructive" });
       }
     } finally {
       setSharing(false);
