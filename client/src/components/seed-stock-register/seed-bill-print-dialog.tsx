@@ -297,12 +297,12 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     } else if (autoAction === "share") {
       autoActionDone.current = true;
       const timer = setTimeout(async () => {
-        if (!billRef.current) {
+        try {
+          if (!billRef.current) return;
+          await handleShare();
+        } finally {
           onOpenChange(false);
-          return;
         }
-        await handleShare();
-        onOpenChange(false);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -318,24 +318,37 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
     return null;
   }
 
-  const isAutoShare = autoAction === "share";
+  if (autoAction === "share") {
+    // Share never shows an interactive dialog: it only needs the bill markup
+    // mounted somewhere so handleShare (above) can read it via billRef. An
+    // earlier version rendered a real Dialog here with onOpenChange disabled
+    // and pointerEvents:none so the "Generating PDF" placeholder couldn't be
+    // dismissed — if the share flow ever stalled or errored, the dialog was
+    // stuck open and, on mobile, frozen and unscrollable, forcing a refresh.
+    // Keeping the content off-screen and non-interactive avoids that failure
+    // mode entirely: nothing modal is ever shown, so there is nothing to
+    // get stuck. The effect above always calls onOpenChange(false) in a
+    // finally block, so this unmounts as soon as sharing finishes or fails.
+    return (
+      <div aria-hidden="true" style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none" }}>
+        <div ref={billRef} className="bg-white p-4 rounded-lg text-black min-w-[600px]" data-testid="seed-bill-preview">
+          {renderBillContent()}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined} style={isAutoShare ? { pointerEvents: "none" } : undefined}>
-        {isAutoShare ? (
-          <DialogTitle className="sr-only">Generating PDF</DialogTitle>
-        ) : (
-          <DialogHeader>
-            <DialogTitle>Seed Purchase Receipt / बीज खरीद रसीद #{entry.serialNumber}</DialogTitle>
-          </DialogHeader>
-        )}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Seed Purchase Receipt / बीज खरीद रसीद #{entry.serialNumber}</DialogTitle>
+        </DialogHeader>
 
         <div className="overflow-x-auto -mx-4 px-4">
           <div ref={billRef} className="space-y-3 min-w-[600px]">
             {renderBillContent()}
 
-            {!isAutoShare && (
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-seed-print-close">
                 Close / बंद करें
@@ -355,7 +368,6 @@ export function SeedBillPrintDialog({ entry, open, onOpenChange, autoAction }: S
                 Print / प्रिंट
               </Button>
             </div>
-            )}
           </div>
         </div>
       </DialogContent>
