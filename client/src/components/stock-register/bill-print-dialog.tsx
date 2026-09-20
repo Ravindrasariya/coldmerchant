@@ -1050,12 +1050,12 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     } else if (autoAction === "share") {
       autoActionDone.current = true;
       const timer = setTimeout(async () => {
-        if (!billRef.current) {
+        try {
+          if (!billRef.current) return;
+          await handleShare();
+        } finally {
           onOpenChange(false);
-          return;
         }
-        await handleShare();
-        onOpenChange(false);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -1071,36 +1071,50 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
     return null;
   }
 
-  const isAutoShare = autoAction === "share";
+  if (autoAction === "share") {
+    // Share never shows an interactive dialog: it only needs the bill markup
+    // mounted somewhere so handleShare (above) can read it via billRef. An
+    // earlier version rendered a real Dialog here with onOpenChange disabled
+    // and pointerEvents:none so the "Generating PDF" placeholder couldn't be
+    // dismissed — if the share flow ever stalled or errored, the dialog was
+    // stuck open and, on mobile, frozen and unscrollable, forcing a refresh.
+    // Keeping the content off-screen and non-interactive avoids that failure
+    // mode entirely: nothing modal is ever shown, so there is nothing to
+    // get stuck. The effect above always calls onOpenChange(false) in a
+    // finally block, so this unmounts as soon as sharing finishes or fails.
+    return (
+      <div aria-hidden="true" style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none" }}>
+        <div ref={billRef} className="bg-white p-4 rounded-lg text-black min-w-[700px]" data-testid="bill-preview">
+          {renderBillContent()}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={isAutoShare ? undefined : onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined} style={isAutoShare ? { pointerEvents: "none" } : undefined}>
-        {isAutoShare ? (
-          <DialogTitle className="sr-only">Generating PDF</DialogTitle>
-        ) : (
-          <DialogHeader>
-            <div className="flex items-center justify-between pr-8">
-              <DialogTitle>Bill Preview</DialogTitle>
-              <div className="flex gap-2">
-                <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing} data-testid="button-share-bill">
-                  {sharing ? (
-                    <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : isMobile ? (
-                    <Share2 className="h-4 w-4 mr-2" />
-                  ) : (
-                    <Download className="h-4 w-4 mr-2" />
-                  )}
-                  {sharing ? "..." : isMobile ? "Share" : "PDF"}
-                </Button>
-                <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Print Bill
-                </Button>
-              </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogHeader>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle>Bill Preview</DialogTitle>
+            <div className="flex gap-2">
+              <Button onClick={handleShare} size="sm" variant="outline" disabled={sharing} data-testid="button-share-bill">
+                {sharing ? (
+                  <span className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : isMobile ? (
+                  <Share2 className="h-4 w-4 mr-2" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                {sharing ? "..." : isMobile ? "Share" : "PDF"}
+              </Button>
+              <Button onClick={handlePrint} size="sm" data-testid="button-print-bill">
+                <Printer className="h-4 w-4 mr-2" />
+                Print Bill
+              </Button>
             </div>
-          </DialogHeader>
-        )}
+          </div>
+        </DialogHeader>
 
         <div className="overflow-x-auto -mx-4 px-4">
           <div ref={billRef} className="bg-white p-4 rounded-lg text-black min-w-[700px]" data-testid="bill-preview">
