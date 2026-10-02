@@ -7530,11 +7530,15 @@ export async function registerRoutes(
               bagType: lotData.bagType,
               size: lotData.size,
               pricePerBag: lotData.pricePerBag?.toString(),
-              coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString() || null,
-              coldStoreChargesPaid: lotData.coldStoreChargesPaid?.toString() || "0",
-              hammaliCharges: lotData.hammaliCharges?.toString() || null,
-              gradingCharges: lotData.gradingCharges?.toString() || null,
-              transportCharges: lotData.transportCharges?.toString() || null,
+              // PATCH omissions leave saved charges/payments untouched. In
+              // particular, the stock edit dialog never submits paid amounts.
+              // Do not copy a client snapshot or default an omitted payment to
+              // zero; cash payment/reversal routes own the allocation history.
+              coldStoreChargesPerBag: lotData.coldStoreChargesPerBag?.toString(),
+              coldStoreChargesPaid: lotData.coldStoreChargesPaid?.toString(),
+              hammaliCharges: lotData.hammaliCharges?.toString(),
+              gradingCharges: lotData.gradingCharges?.toString(),
+              transportCharges: lotData.transportCharges?.toString(),
               // Derive remainingBags from persistent soldBags rather than
               // trusting client. Sold history is the source of truth — the
               // client field is read-only display only.
@@ -7543,7 +7547,7 @@ export async function registerRoutes(
                 (lotData.originalBags ?? existingLot?.originalBags ?? 0)
                   - ((existingLot as any)?.soldBags ?? 0),
               ),
-              remarks: lotData.remarks || null,
+              remarks: lotData.remarks === undefined ? undefined : lotData.remarks || null,
             });
             if (updatedLot && updatedLot.remainingBags !== existingLot.remainingBags) {
               lotChanges.push({ field: "Remaining Bags", oldValue: existingLot.remainingBags, newValue: updatedLot.remainingBags });

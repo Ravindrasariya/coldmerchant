@@ -23,6 +23,7 @@ import {
 } from "@shared/schema";
 import { hashPassword } from "../server/auth";
 import { db, pool } from "../server/db";
+import { checkSeedStockPaymentEdits } from "./seed-stock-payment-edit-checks";
 
 const appUrl = new URL(
   process.env.APP_URL ||
@@ -379,6 +380,19 @@ try {
   const userCheck = await api("GET", "/api/user");
   assert.equal(userCheck.status, 200);
   assert.equal(userCheck.body.merchantId, merchantId, "Browser session must belong to the isolated disposable merchant");
+
+  await checkSeedStockPaymentEdits({
+    merchantId: merchantId!,
+    serialBase,
+    api,
+    evaluate,
+    waitFor,
+    click: clickVisibleTestId,
+    reloadRegister: async () => {
+      await loginAs(username);
+      await goToRegister();
+    },
+  });
 
   const soldLotPath = `/api/seed-stock-entries/${disposable.id}/lots/${disposable.lotId}`;
   const soldDelete = await api("DELETE", soldLotPath);
