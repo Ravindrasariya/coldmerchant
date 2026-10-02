@@ -3522,10 +3522,11 @@ ${summaryHtml}
                           const totalSettled = cashAmount + seedPettyAdjustment;
                           return (
                             <div className="space-y-3">
-                              <FormItem>
-                                <FormLabel>
+                              <div className="grid grid-cols-2 gap-3">
+                              <FormItem className="min-w-0">
+                                <FormLabel className="block text-xs sm:text-sm">
                                   {t("Amount", "राशि")} (₹)
-                                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                  <span className="block text-xs font-normal text-muted-foreground">
                                     ({t("Max", "अधिकतम")}: ₹{currentDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
                                   </span>
                                 </FormLabel>
@@ -3538,8 +3539,8 @@ ${summaryHtml}
                                 control={inwardForm.control}
                                 name="pettyAdjustment"
                                 render={({ field: pettyField }) => (
-                                  <FormItem>
-                                    <FormLabel>{t("Petty Adj", "पेटी समायोजन")} (₹) <span className="text-xs font-normal text-muted-foreground">{t("Optional · non-cash", "वैकल्पिक · गैर-नकद")}</span></FormLabel>
+                                  <FormItem className="min-w-0">
+                                    <FormLabel className="block text-xs sm:text-sm">{t("Petty Adj", "पेटी समायोजन")} (₹) <span className="block text-xs font-normal text-muted-foreground">{t("Optional · non-cash", "वैकल्पिक · गैर-नकद")}</span></FormLabel>
                                     <FormControl>
                                       <Input
                                         type="number"
@@ -3555,6 +3556,7 @@ ${summaryHtml}
                                   </FormItem>
                                 )}
                               />
+                              </div>
                               <div className="space-y-2 rounded-md bg-muted p-3">
                                 <div className="flex justify-between text-sm">
                                   <span>{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
