@@ -12,3 +12,5 @@
 - [Harvest bag counts](harvest-bag-counts.md) — soldBags is authoritative; remainingBags is derived, never hand-adjusted, or the register and the lot dropdown drift apart.
 - [Seed receipt layout](seed-receipt-layout.md) — seed transaction bills should match the harvest transaction bill layout, while retaining seed-specific fields and totals.
 - [Seed payment petty settlement](seed-payment-petty.md) — cash and petty settle due together; deletion restores both, but cash movement excludes petty; exact paise deltas are intentional.
+- [Legacy seed deletion safety](legacy-seed-deletion-safety.md) — missing payment destinations are not evidence of no payment; block conservatively and retain reversed cash audit history.
+- [Seed inventory write isolation](seed-inventory-write-isolation.md) — deletion safety requires the same lock across edits and their initial reads, not only deletion/payment/creation.

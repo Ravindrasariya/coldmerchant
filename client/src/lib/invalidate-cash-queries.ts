@@ -32,8 +32,11 @@ export const CASH_RELATED_QUERY_KEYS: string[] = [
   // Registers the dues are derived from
   "/api/transactions",
   "/api/seed-transactions",
+  "/api/seed-transactions/next-number",
+  "/api/seed-transactions/unsold-inventory",
   "/api/stock-entries",
   "/api/seed-stock-entries",
+  "/api/seed-stock-entries/next-serial",
   // Parties
   "/api/farmers",
   "/api/buyers",

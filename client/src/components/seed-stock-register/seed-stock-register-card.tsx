@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter, Share2, ChevronDown, Check, ChevronsUpDown } from "lucide-react";
+import { X, Phone, MapPin, Calendar, Snowflake, Boxes, Users, Building2, Download, Leaf, Package, Clock, Edit, Printer, Filter, Share2, ChevronDown, Check, ChevronsUpDown, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -23,11 +23,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { SeedStockEntryWithLots, SEED_POTATO_TYPES } from "@shared/schema";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
+import { queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { SeedStockEntryEditDialog } from "./seed-stock-entry-edit-dialog";
 import { SeedBillPrintDialog } from "./seed-bill-print-dialog";
 
@@ -77,9 +90,30 @@ interface SeedStockRegisterCardProps {
   onDownloadDialogClose?: () => void;
 }
 
+interface SeedDeleteError extends Error {
+  code?: string;
+}
+
+// Preserve structured server error codes: the shared apiRequest helper currently
+// reduces non-2xx JSON responses to their message string.
+async function deleteSeedStockEntry(id: number): Promise<{ message?: string }> {
+  const response = await fetch(`/api/seed-stock-entries/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.message || response.statusText) as SeedDeleteError;
+    error.code = payload.code;
+    throw error;
+  }
+  return payload;
+}
+
 export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen, onDownloadDialogClose }: SeedStockRegisterCardProps = {}) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [filterSerial, setFilterSerial] = useState<string>("");
   const [serialPopoverOpenDesktop, setSerialPopoverOpenDesktop] = useState(false);
   const [serialPopoverOpenMobile, setSerialPopoverOpenMobile] = useState(false);
@@ -90,8 +124,60 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
   
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<SeedStockEntryWithLots | null>(null);
+  const [deleteEntry, setDeleteEntry] = useState<SeedStockEntryWithLots | null>(null);
   const [printEntry, setPrintEntry] = useState<SeedStockEntryWithLots | null>(null);
   const [billAction, setBillAction] = useState<"print" | "share" | undefined>(undefined);
+  const deleteMutation = useMutation({
+    mutationFn: deleteSeedStockEntry,
+    onSuccess: (_response, id) => {
+      invalidateCashRelatedQueries(queryClient);
+      setDeleteEntry(null);
+      toast({
+        title: t("Seed stock entry deleted", "बीज स्टॉक प्रविष्टि हटा दी गई"),
+        description: t(
+          `Entry #${entries?.find(entry => entry.id === id)?.serialNumber ?? ""} was permanently deleted.`,
+          `प्रविष्टि #${entries?.find(entry => entry.id === id)?.serialNumber ?? ""} स्थायी रूप से हटा दी गई।`,
+        ),
+        variant: "success",
+      });
+    },
+    onError: (error: SeedDeleteError) => {
+      const descriptions: Record<string, [string, string]> = {
+        SEED_PAYMENT_ACTIVE: [
+          "This entry has an active payment. Reverse the payment before deleting.",
+          "इस प्रविष्टि का भुगतान सक्रिय है। हटाने से पहले भुगतान वापस लें।",
+        ],
+        SEED_TRANSACTIONS_LINKED: [
+          "This entry is linked to seed transactions. Delete those transactions first.",
+          "यह प्रविष्टि बीज लेनदेन से जुड़ी है। पहले वे लेनदेन हटाएं।",
+        ],
+        SEED_SUPPLIER_PAYMENT_ACTIVE: [
+          "A supplier payment is active for this entry. Reverse it before deleting.",
+          "इस प्रविष्टि के लिए आपूर्तिकर्ता भुगतान सक्रिय है। हटाने से पहले भुगतान वापस लें।",
+        ],
+        SEED_COLD_STORE_PAYMENT_ACTIVE: [
+          "A cold-store payment is active for this entry. Reverse it before deleting.",
+          "इस प्रविष्टि के लिए कोल्ड स्टोर भुगतान सक्रिय है। हटाने से पहले भुगतान वापस लें।",
+        ],
+        SEED_ENTRY_NOT_FOUND: ["This seed stock entry no longer exists.", "यह बीज स्टॉक प्रविष्टि अब मौजूद नहीं है।"],
+        SEED_TRANSACTION_NOT_FOUND: ["This seed transaction no longer exists.", "यह बीज लेनदेन अब मौजूद नहीं है।"],
+        SEED_RECORD_LINKED: [
+          "Please delete the linked transaction or reverse its payment before deleting this entry.",
+          "कृपया इस प्रविष्टि को हटाने से पहले जुड़े लेनदेन को हटाएं या उसका भुगतान वापस लें।",
+        ],
+        FORBIDDEN: ["You do not have permission to delete entries.", "आपको प्रविष्टियां हटाने की अनुमति नहीं है।"],
+      };
+      const explanation = error.code ? descriptions[error.code] : undefined;
+      toast({
+        title: t("Could not delete seed stock entry", "बीज स्टॉक प्रविष्टि नहीं हटा सके"),
+        description: explanation ? t(explanation[0], explanation[1]) : t(
+          "The entry could not be deleted. Please try again.",
+          "प्रविष्टि हटाई नहीं जा सकी। कृपया फिर से प्रयास करें।",
+        ),
+        variant: "destructive",
+      });
+    },
+  });
   
   const downloadDialogOpen = externalDownloadOpen || internalDownloadOpen;
   const setDownloadDialogOpen = (open: boolean) => {
@@ -773,6 +859,20 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                         <Edit className="h-3.5 w-3.5" />
                         {t("Edit", "संपादित")}
                       </Button>
+                      {user?.canEdit && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-8 gap-1.5 justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeleteEntry(entry)}
+                          aria-label={t("Delete entry", "प्रविष्टि हटाएं")}
+                          data-testid={`button-seed-delete-${entry.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {t("Delete", "हटाएं")}
+                        </Button>
+                      )}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -893,6 +993,46 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
           onOpenChange={(open) => !open && setEditEntry(null)}
         />
       )}
+
+      <AlertDialog
+        open={deleteEntry !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleteEntry(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-delete-seed-stock-entry">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                `Delete seed stock entry #${deleteEntry?.serialNumber ?? ""}?`,
+                `बीज स्टॉक प्रविष्टि #${deleteEntry?.serialNumber ?? ""} हटाएं?`,
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                "This action cannot be undone. This entry and its seed lots will be permanently removed.",
+                "यह क्रिया पूर्ववत नहीं की जा सकती। यह प्रविष्टि और इसके बीज लॉट स्थायी रूप से हटा दिए जाएंगे।",
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending} data-testid="button-cancel-delete-seed-stock-entry">
+              {t("Cancel", "रद्द करें")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                if (user?.canEdit && deleteEntry) deleteMutation.mutate(deleteEntry.id);
+              }}
+              disabled={!user?.canEdit || deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-seed-stock-entry"
+            >
+              {deleteMutation.isPending ? t("Deleting…", "हटा रहे हैं…") : t("Delete permanently", "स्थायी रूप से हटाएं")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {printEntry && (
         <SeedBillPrintDialog

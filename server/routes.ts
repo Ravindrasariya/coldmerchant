@@ -2,6 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberError, StockEntryDeletionBlockedError, TransactionDeletionBlockedError } from "./storage";
 import { setupAuth } from "./auth";
+import { registerSeedDeleteRoutes } from "./seed-delete-routes";
+import { seedWriteHandler } from "./seed-write-handler";
+import type { IStorage } from "./storage";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers, seedLots, validateLotBagBreakdowns } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
@@ -336,12 +339,12 @@ function computeSeedLotCharges(lot: any) {
 }
 
 // After creating/updating seed lots, recompute and store totalCharges, netPayable, avgCostPerBag
-async function recomputeSeedLotCharges(entryId: number, merchantId: number) {
-  const entry = await storage.getSeedEntryById(entryId, merchantId);
+async function recomputeSeedLotCharges(entryId: number, merchantId: number, seedStorage: IStorage = storage) {
+  const entry = await seedStorage.getSeedEntryById(entryId, merchantId);
   if (!entry) return;
   for (const lot of entry.seedLots) {
     const { totalCharges, netPayable, avgCostPerBag } = computeSeedLotCharges(lot);
-    await storage.updateSeedLot(lot.id, merchantId, {
+    await seedStorage.updateSeedLot(lot.id, merchantId, {
       totalCharges,
       netPayable,
       avgCostPerBag,
@@ -379,6 +382,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
+  registerSeedDeleteRoutes(app, requireMerchant);
 
   // One-time backfill: compute per-breakdown costPerBag and lot totalCogs
   (async () => {
@@ -7396,7 +7400,7 @@ export async function registerRoutes(
   });
 
   // PATCH /api/seed-stock-entries/:id - Update a seed stock entry
-  app.patch("/api/seed-stock-entries/:id", requireMerchant, async (req, res) => {
+  app.patch("/api/seed-stock-entries/:id", requireMerchant, seedWriteHandler(async (req, res, storage) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
@@ -7582,7 +7586,7 @@ export async function registerRoutes(
       }
 
       // Recompute and store totalCharges, netPayable, avgCostPerBag for all seed lots
-      await recomputeSeedLotCharges(id, merchantId);
+      await recomputeSeedLotCharges(id, merchantId, storage);
 
       // Fetch and return the updated entry
       const updatedEntry = await storage.getSeedEntryById(id, merchantId);
@@ -7591,7 +7595,7 @@ export async function registerRoutes(
       console.error("Error updating seed stock entry:", error);
       res.status(500).json({ message: "Failed to update seed stock entry" });
     }
-  });
+  }));
 
   // GET /api/seed-stock-entries/:id/edit-history - Get edit history for a seed stock entry
   app.get("/api/seed-stock-entries/:id/edit-history", requireMerchant, async (req, res) => {
@@ -7949,7 +7953,7 @@ export async function registerRoutes(
 
   // PATCH /api/seed-transactions/:id - Update a seed transaction
   // Note: Farmer fields are now read-only - they are managed via Farmer Ledger
-  app.patch("/api/seed-transactions/:id", requireMerchant, async (req, res) => {
+  app.patch("/api/seed-transactions/:id", requireMerchant, seedWriteHandler(async (req, res, storage) => {
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
@@ -8197,7 +8201,7 @@ export async function registerRoutes(
       console.error("Error updating seed transaction:", error);
       res.status(500).json({ message: "Failed to update seed transaction" });
     }
-  });
+  }));
 
   // POST /api/seed-transactions - Create a new seed transaction
   app.post("/api/seed-transactions", requireMerchant, async (req, res) => {

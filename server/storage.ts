@@ -53,11 +53,13 @@ import { eq, and, or, desc, asc, sql, gt, ne, isNull, isNotNull, inArray } from 
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, exceedsDue } from "@shared/utils";
 import { getFreightPaidForTruck } from "./freight-utils";
 import { settleSeedPayment } from "./seed-payment-settlement";
+import { lockSeedActivity, deleteSeedTransactionAtomic, deleteSeedEntryAtomic } from "./seed-deletion";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 
 const PostgresSessionStore = connectPg(session);
+const seedRootDb = db;
 
 // RUPEE_TOLERANCE / roundRupee / exceedsDue are imported from @shared/utils so
 // the server (routes + storage) shares one definition. Sub-rupee gaps are ignored
@@ -211,23 +213,6 @@ async function applyHarvestSoldDelta(
   await syncHarvestLotRemaining(client, merchantId, lotId);
 }
 
-async function applySeedSoldDelta(
-  client: any,
-  merchantId: number,
-  seedLotId: number,
-  delta: number,
-): Promise<void> {
-  const [lot] = await client.select().from(seedLots)
-    .where(and(eq(seedLots.id, seedLotId), eq(seedLots.merchantId, merchantId)));
-  if (!lot) return;
-  const cap = lot.originalBags ?? 0;
-  const cur = lot.soldBags ?? 0;
-  const next = Math.max(0, Math.min(cap, cur + delta));
-  await client.update(seedLots)
-    .set({ soldBags: next })
-    .where(and(eq(seedLots.id, seedLotId), eq(seedLots.merchantId, merchantId)));
-}
-
 // Helper function to normalize names for case-insensitive, space-trimmed matching
 function normalizeName(name: string | null | undefined): string {
   if (!name) return "";
@@ -308,11 +293,11 @@ function isSeedTransactionNumberYearUniqueViolation(error: any): boolean {
   );
 }
 
-async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any, retryOffset: number = 0): Promise<string> {
+async function generateUniqueId(prefix: string, dateStr: string, table: any, uniqueIdColumn: any, retryOffset: number = 0, client: any = db): Promise<string> {
   const fullPrefix = `${prefix}${dateStr}`;
   const prefixLength = fullPrefix.length;
   
-  const [result] = await db.select({
+  const [result] = await client.select({
     maxSeq: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${uniqueIdColumn} FROM ${prefixLength + 1}) AS INTEGER)), 0)`
   })
     .from(table)
@@ -323,6 +308,7 @@ async function generateUniqueId(prefix: string, dateStr: string, table: any, uni
 }
 
 export interface IStorage {
+  withSeedWriteTransaction<T>(merchantId: number, work: (scoped: IStorage) => Promise<T>): Promise<T>;
   sessionStore: session.Store;
   
   // User operations
@@ -523,6 +509,8 @@ export interface IStorage {
   getSeedLotsByEntry(seedEntryId: number, merchantId: number): Promise<SeedLot[]>;
   getSeedLotById(id: number, merchantId: number): Promise<SeedLot | undefined>;
   deleteSeedLot(id: number, merchantId: number): Promise<void>;
+  deleteSeedTransaction(id: number, merchantId: number): Promise<void>;
+  deleteSeedEntry(id: number, merchantId: number): Promise<void>;
   
   // Seed Edit History operations
   createSeedEditHistory(seedEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<SeedStockEntryEditHistory>;
@@ -530,7 +518,7 @@ export interface IStorage {
   
   // Seed Transaction operations
   getSeedTransactionsByMerchant(merchantId: number): Promise<any[]>;
-  getSeedTransactionById(id: number, merchantId: number): Promise<any | undefined>;
+  getSeedTransactionById(id: number, merchantId: number): Promise<SeedTransactionWithItems | undefined>;
   createSeedTransaction(transaction: any, items: any[]): Promise<any>;
   updateSeedTransaction(id: number, merchantId: number, data: any, items: any[], userId?: number): Promise<any>;
   updateSeedTransactionFarmerId(id: number, merchantId: number, farmerId: number): Promise<void>;
@@ -621,6 +609,19 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Only this scoped instance sees the transaction client. The shared storage
+  // singleton is never mutated, so unrelated requests cannot leak into it.
+  private seedWriteDb?: Pick<typeof db, "select" | "insert" | "update" | "delete">;
+
+  async withSeedWriteTransaction<T>(merchantId: number, work: (scoped: IStorage) => Promise<T>): Promise<T> {
+    if (this.seedWriteDb) return work(this);
+    return db.transaction(async (tx) => {
+      await lockSeedActivity(tx, merchantId);
+      const scoped = Object.create(this) as DatabaseStorage;
+      scoped.seedWriteDb = tx;
+      return work(scoped);
+    });
+  }
   sessionStore: session.Store;
 
   constructor() {
@@ -2557,6 +2558,7 @@ export class DatabaseStorage implements IStorage {
   ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     // Use a transaction to ensure atomicity of FIFO allocation
     return await db.transaction(async (tx) => {
+      await lockSeedActivity(tx, entry.merchantId);
       // Create the cash entry
       const { seedSettlementTargets: _ignoredSeedTargets, ...cashEntryValues } = entry;
       const [createdEntry] = await tx.insert(cashEntries).values(cashEntryValues).returning();
@@ -3980,6 +3982,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSeedEntryById(id: number, merchantId: number): Promise<SeedStockEntryWithLots | undefined> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [entry] = await db.select().from(seedStockEntries)
       .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)));
     
@@ -4047,6 +4050,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSeedEntry(id: number, merchantId: number, data: Partial<SeedStockEntry>): Promise<SeedStockEntry | undefined> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [updated] = await db.update(seedStockEntries)
       .set({ ...data, updatedAt: new Date() })
       .where(and(eq(seedStockEntries.id, id), eq(seedStockEntries.merchantId, merchantId)))
@@ -4145,11 +4149,13 @@ export class DatabaseStorage implements IStorage {
   // ===================== SEED LOT OPERATIONS =====================
 
   async createSeedLot(lot: InsertSeedLot): Promise<SeedLot> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [created] = await db.insert(seedLots).values(lot).returning();
     return created;
   }
 
   async updateSeedLot(id: number, merchantId: number, data: Partial<SeedLot>): Promise<SeedLot | undefined> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [updated] = await db.update(seedLots)
       .set(data)
       .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)))
@@ -4158,11 +4164,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSeedLotsByEntry(seedEntryId: number, merchantId: number): Promise<SeedLot[]> {
+    const db = this.seedWriteDb ?? seedRootDb;
     return await db.select().from(seedLots)
       .where(and(eq(seedLots.seedEntryId, seedEntryId), eq(seedLots.merchantId, merchantId)));
   }
 
   async getSeedLotById(id: number, merchantId: number): Promise<SeedLot | undefined> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [lot] = await db.select().from(seedLots)
       .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)));
     return lot || undefined;
@@ -4176,6 +4184,7 @@ export class DatabaseStorage implements IStorage {
   // ===================== SEED EDIT HISTORY OPERATIONS =====================
 
   async createSeedEditHistory(seedEntryId: number, merchantId: number, userId: number | null, changeSet: ChangeSet): Promise<SeedStockEntryEditHistory> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [created] = await db.insert(seedStockEntryEditHistory).values({
       seedEntryId,
       merchantId,
@@ -4257,6 +4266,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSeedTransactionById(id: number, merchantId: number): Promise<SeedTransactionWithItems | undefined> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [txn] = await db.select().from(seedTransactions)
       .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)));
     
@@ -4298,25 +4308,18 @@ export class DatabaseStorage implements IStorage {
     data: Partial<InsertSeedTransaction>,
     items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
   ): Promise<SeedTransactionWithItems | undefined> {
+    if (!this.seedWriteDb) {
+      return this.withSeedWriteTransaction(merchantId,
+        scoped => scoped.updateSeedTransaction(id, merchantId, data, items));
+    }
+    const db = this.seedWriteDb;
     // Get existing transaction and items
     const existingTxn = await this.getSeedTransactionById(id, merchantId);
     if (!existingTxn) return undefined;
 
-    // Restore bags from old items to seed lots
-    for (const oldItem of existingTxn.items) {
-      const seedLot = await this.getSeedLotById(oldItem.seedLotId, merchantId);
-      if (seedLot) {
-        await this.updateSeedLot(oldItem.seedLotId, merchantId, {
-          remainingBags: seedLot.remainingBags + oldItem.bagsMoved,
-        });
-        // Unwind sold history for the items we're about to delete.
-        await applySeedSoldDelta(db, merchantId, oldItem.seedLotId, -oldItem.bagsMoved);
-      }
-    }
-
     // Delete old items
     await db.delete(seedTransactionItems)
-      .where(eq(seedTransactionItems.seedTransactionId, id));
+      .where(and(eq(seedTransactionItems.seedTransactionId, id), eq(seedTransactionItems.merchantId, merchantId)));
 
     // Update transaction
     const [updatedTxn] = await db.update(seedTransactions)
@@ -4324,20 +4327,33 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(seedTransactions.id, id), eq(seedTransactions.merchantId, merchantId)))
       .returning();
 
-    // Create new items and deduct from seed lots
+    // Replace items atomically. Inventory is rebuilt from surviving history,
+    // never incremented from a snapshot read before another sale was deleted.
     for (const item of items) {
+      if (item.merchantId !== merchantId || !Number.isInteger(item.bagsMoved) || item.bagsMoved <= 0) {
+        throw new Error("Invalid seed transaction item");
+      }
+      if (!await this.getSeedLotById(item.seedLotId, merchantId)) {
+        throw new Error("Seed stock was removed; please refresh the available lots");
+      }
       await db.insert(seedTransactionItems).values({
         ...item,
         seedTransactionId: id,
       }).returning();
 
-      const seedLot = await this.getSeedLotById(item.seedLotId, merchantId);
-      if (seedLot) {
-        await this.updateSeedLot(item.seedLotId, merchantId, {
-          remainingBags: seedLot.remainingBags - item.bagsMoved,
-        });
-        await applySeedSoldDelta(db, merchantId, item.seedLotId, item.bagsMoved);
-      }
+    }
+    const affected = new Set([...existingTxn.items, ...items].map(item => item.seedLotId));
+    for (const lotId of affected) {
+      const seedLot = await this.getSeedLotById(lotId, merchantId);
+      if (!seedLot) throw new Error("Seed lot not found");
+      const [history] = await db.select({ sold: sql<number>`COALESCE(SUM(${seedTransactionItems.bagsMoved}), 0)::int` })
+        .from(seedTransactionItems)
+        .where(and(eq(seedTransactionItems.seedLotId, lotId), eq(seedTransactionItems.merchantId, merchantId)));
+      if (history.sold > seedLot.originalBags) throw new Error("Not enough seed bags available");
+      await this.updateSeedLot(lotId, merchantId, {
+        soldBags: history.sold,
+        remainingBags: Math.max(0, seedLot.originalBags - history.sold),
+      });
     }
 
     const enrichedResult = await this.getSeedTransactionById(id, merchantId);
@@ -4399,48 +4415,55 @@ export class DatabaseStorage implements IStorage {
     transaction: Omit<InsertSeedTransaction, 'uniqueId'> & { transactionNumber: number },
     items: Omit<InsertSeedTransactionItem, 'seedTransactionId'>[]
   ): Promise<SeedTransactionWithItems> {
-    const dateStr = getISTDateYYYYMMDD();
-    
-    // Retry loop for handling concurrent unique ID collisions
-    const maxRetries = 3;
-    let createdTxn: any;
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const uniqueId = await generateUniqueId("STE", dateStr, seedTransactions, seedTransactions.uniqueId, attempt);
-      try {
-        const [result] = await db.insert(seedTransactions).values({ ...transaction, uniqueId }).returning();
-        createdTxn = result;
-        break;
-      } catch (error: any) {
-        if (isSeedTransactionNumberYearUniqueViolation(error)) {
-          // Two concurrent loads picked the same Tnx# and the in-app
-          // duplicate check raced past us. Surface as a friendly 409.
-          throw new DuplicateSeedTransactionNumberError(transaction.transactionNumber);
+    let createdId: number;
+    try {
+      createdId = await db.transaction(async (tx) => {
+        await lockSeedActivity(tx, transaction.merchantId);
+        const requested = new Map<number, number>();
+        for (const item of items) {
+          if (item.merchantId !== transaction.merchantId || !Number.isInteger(item.bagsMoved) || item.bagsMoved <= 0) {
+            throw new Error("Invalid seed transaction item");
+          }
+          requested.set(item.seedLotId, (requested.get(item.seedLotId) || 0) + item.bagsMoved);
         }
-        if (error?.code === '23505' && error?.constraint?.includes('unique_id') && attempt < maxRetries - 1) {
-          continue;
+        for (const [lotId, bags] of requested) {
+          const [lot] = await tx.select().from(seedLots)
+            .where(and(eq(seedLots.id, lotId), eq(seedLots.merchantId, transaction.merchantId))).for("update");
+          if (!lot) throw new Error("Seed stock was removed; please refresh the available lots");
+          if (bags > Math.max(0, lot.originalBags - lot.soldBags)) {
+            throw new Error("Not enough seed bags available; please refresh the available lots");
+          }
         }
-        throw error;
+        const uniqueId = await generateUniqueId("STE", getISTDateYYYYMMDD(), seedTransactions, seedTransactions.uniqueId, 0, tx);
+        const [created] = await tx.insert(seedTransactions).values({ ...transaction, uniqueId }).returning();
+        for (const item of items) {
+          await tx.insert(seedTransactionItems).values({ ...item, seedTransactionId: created.id });
+        }
+        for (const [lotId, bags] of requested) {
+          await tx.update(seedLots).set({
+            soldBags: sql`${seedLots.soldBags} + ${bags}`,
+            remainingBags: sql`GREATEST(0, ${seedLots.originalBags} - ${seedLots.soldBags} - ${bags})`,
+          }).where(and(eq(seedLots.id, lotId), eq(seedLots.merchantId, transaction.merchantId)));
+        }
+        return created.id;
+      });
+    } catch (error: any) {
+      if (isSeedTransactionNumberYearUniqueViolation(error)) {
+        throw new DuplicateSeedTransactionNumberError(transaction.transactionNumber);
       }
+      throw error;
     }
-    if (!createdTxn) throw new Error("Failed to generate unique ID after multiple attempts");
-    
-    for (const item of items) {
-      await db.insert(seedTransactionItems).values({
-        ...item,
-        seedTransactionId: createdTxn.id,
-      }).returning();
-      
-      const seedLot = await this.getSeedLotById(item.seedLotId, transaction.merchantId);
-      if (seedLot) {
-        await this.updateSeedLot(item.seedLotId, transaction.merchantId, {
-          remainingBags: seedLot.remainingBags - item.bagsMoved,
-        });
-        await applySeedSoldDelta(db, transaction.merchantId, item.seedLotId, item.bagsMoved);
-      }
-    }
+    return (await this.getSeedTransactionById(createdId, transaction.merchantId))!;
+  }
 
-    const enrichedResult = await this.getSeedTransactionById(createdTxn.id, transaction.merchantId);
-    return enrichedResult || { ...createdTxn, items: [] };
+  async deleteSeedTransaction(id: number, merchantId: number): Promise<void> {
+    if (this.seedWriteDb) return deleteSeedTransactionAtomic(this.seedWriteDb, id, merchantId);
+    await db.transaction(tx => deleteSeedTransactionAtomic(tx, id, merchantId));
+  }
+
+  async deleteSeedEntry(id: number, merchantId: number): Promise<void> {
+    if (this.seedWriteDb) return deleteSeedEntryAtomic(this.seedWriteDb, id, merchantId);
+    await db.transaction(tx => deleteSeedEntryAtomic(tx, id, merchantId));
   }
 
   async getNextSeedTransactionNumber(merchantId: number): Promise<number> {
@@ -4553,6 +4576,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSeedTransactionEditHistory(data: { seedTransactionId: number; merchantId: number; userId: number; changeSet: any }): Promise<SeedTransactionEditHistory> {
+    const db = this.seedWriteDb ?? seedRootDb;
     const [created] = await db.insert(seedTransactionEditHistory).values(data).returning();
     return created;
   }
@@ -4588,6 +4612,7 @@ export class DatabaseStorage implements IStorage {
     
     return await db.transaction(async (tx) => {
       const { seedSettlementTargets: _ignoredSeedTargets, ...cashEntryValues } = entry;
+      await lockSeedActivity(tx, entry.merchantId);
       const [createdEntry] = await tx.insert(cashEntries).values(cashEntryValues).returning();
       const allocations: CashEntryAllocation[] = [];
       const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
@@ -5103,6 +5128,7 @@ export class DatabaseStorage implements IStorage {
 
   async reverseCashEntry(cashEntryId: number, merchantId: number): Promise<CashEntry> {
     return await db.transaction(async (tx) => {
+      await lockSeedActivity(tx, merchantId);
       // 1. Fetch the cash entry
       const [entry] = await tx.select().from(cashEntries)
         .where(and(eq(cashEntries.id, cashEntryId), eq(cashEntries.merchantId, merchantId)))

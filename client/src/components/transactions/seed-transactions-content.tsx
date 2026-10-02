@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,13 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock } from "lucide-react";
+import { Truck, Package, TrendingUp, TrendingDown, Filter, X, Download, MapPin, Phone, IndianRupee, Printer, Edit, FileText, ChevronsUpDown, Check, Receipt, Clock, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
+import { useAuth } from "@/hooks/use-auth";
+import { queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { LoadSeedTruckDialog } from "./load-seed-truck-dialog";
 import { EditSeedTransactionDialog } from "./edit-seed-transaction-dialog";
 import { SeedSalesReceiptDialog } from "./seed-sales-receipt";
@@ -67,6 +80,27 @@ interface SeedTransaction {
   items: SeedTransactionItem[];
 }
 
+interface SeedDeleteError extends Error {
+  code?: string;
+}
+
+// apiRequest currently reduces error responses to `message`, which drops the
+// structured code needed to explain these delete constraints. Keep the same
+// authenticated request behavior while retaining the response contract.
+async function deleteSeedTransaction(id: number): Promise<{ message?: string }> {
+  const response = await fetch(`/api/seed-transactions/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.message || response.statusText) as SeedDeleteError;
+    error.code = payload.code;
+    throw error;
+  }
+  return payload;
+}
+
 interface SeedTransactionsContentProps {
   downloadDialogOpen?: boolean;
   onDownloadDialogClose?: () => void;
@@ -75,9 +109,62 @@ interface SeedTransactionsContentProps {
 export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOpen, onDownloadDialogClose }: SeedTransactionsContentProps = {}) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [editTransactionId, setEditTransactionId] = useState<number | null>(null);
   const [receiptTransactionId, setReceiptTransactionId] = useState<number | null>(null);
+  const [deleteTransaction, setDeleteTransaction] = useState<SeedTransaction | null>(null);
+  const deleteMutation = useMutation({
+    mutationFn: deleteSeedTransaction,
+    onSuccess: (_response, id) => {
+      invalidateCashRelatedQueries(queryClient);
+      setDeleteTransaction(null);
+      toast({
+        title: t("Transaction deleted", "लेनदेन हटा दिया गया"),
+        description: t(
+          `Seed transaction #${transactions?.find(txn => txn.id === id)?.transactionNumber ?? ""} was permanently deleted.`,
+          `बीज लेनदेन #${transactions?.find(txn => txn.id === id)?.transactionNumber ?? ""} स्थायी रूप से हटा दिया गया।`,
+        ),
+        variant: "success",
+      });
+    },
+    onError: (error: SeedDeleteError) => {
+      const descriptions: Record<string, [string, string]> = {
+        SEED_PAYMENT_ACTIVE: [
+          "Please reverse the payment before deleting this transaction",
+          "कृपया इस लेनदेन को हटाने से पहले भुगतान वापस लें",
+        ],
+        SEED_TRANSACTIONS_LINKED: [
+          "This stock entry is linked to seed transactions. Delete those transactions first.",
+          "यह स्टॉक प्रविष्टि बीज लेनदेन से जुड़ी है। पहले वे लेनदेन हटाएं।",
+        ],
+        SEED_SUPPLIER_PAYMENT_ACTIVE: [
+          "A supplier payment is active for this entry. Reverse it before deleting.",
+          "इस प्रविष्टि के लिए आपूर्तिकर्ता भुगतान सक्रिय है। हटाने से पहले भुगतान वापस लें।",
+        ],
+        SEED_COLD_STORE_PAYMENT_ACTIVE: [
+          "A cold-store payment is active for this entry. Reverse it before deleting.",
+          "इस प्रविष्टि के लिए कोल्ड स्टोर भुगतान सक्रिय है। हटाने से पहले भुगतान वापस लें।",
+        ],
+        SEED_ENTRY_NOT_FOUND: ["This seed stock entry no longer exists.", "यह बीज स्टॉक प्रविष्टि अब मौजूद नहीं है।"],
+        SEED_TRANSACTION_NOT_FOUND: ["This seed transaction no longer exists.", "यह बीज लेनदेन अब मौजूद नहीं है।"],
+        SEED_RECORD_LINKED: [
+          "Please delete the linked transaction or reverse its payment before deleting this entry.",
+          "कृपया इस प्रविष्टि को हटाने से पहले जुड़े लेनदेन को हटाएं या उसका भुगतान वापस लें।",
+        ],
+        FORBIDDEN: ["You do not have permission to delete entries.", "आपको प्रविष्टियां हटाने की अनुमति नहीं है।"],
+      };
+      const explanation = error.code ? descriptions[error.code] : undefined;
+      toast({
+        title: t("Could not delete transaction", "लेनदेन नहीं हटा सका"),
+        description: explanation ? t(explanation[0], explanation[1]) : t(
+          "The transaction could not be deleted. Please try again.",
+          "लेनदेन हटाया नहीं जा सका। कृपया फिर से प्रयास करें।",
+        ),
+        variant: "destructive",
+      });
+    },
+  });
   
   // Download dialog state - can be controlled externally or internally
   const [internalDownloadOpen, setInternalDownloadOpen] = useState(false);
@@ -709,6 +796,20 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
                         <Edit className="h-3.5 w-3.5 mr-1.5" />
                         {t("Edit", "संपादित")}
                       </Button>
+                      {user?.canEdit && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none h-8 sm:h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeleteTransaction(txn)}
+                          aria-label={t("Delete transaction", "लेनदेन हटाएं")}
+                          data-testid={`button-delete-seed-txn-${txn.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          {t("Delete", "हटाएं")}
+                        </Button>
+                      )}
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -727,6 +828,45 @@ export function SeedTransactionsContent({ downloadDialogOpen: externalDownloadOp
           })}
         </div>
       )}
+      <AlertDialog
+        open={deleteTransaction !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleteTransaction(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-confirm-delete-seed-transaction">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                `Delete seed transaction #${deleteTransaction?.transactionNumber ?? ""}?`,
+                `बीज लेनदेन #${deleteTransaction?.transactionNumber ?? ""} हटाएं?`,
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                "This action cannot be undone. The transaction and its recorded details will be permanently removed.",
+                "यह क्रिया पूर्ववत नहीं की जा सकती। लेनदेन और उससे जुड़े विवरण स्थायी रूप से हटा दिए जाएंगे।",
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending} data-testid="button-cancel-delete-seed-transaction">
+              {t("Cancel", "रद्द करें")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                if (user?.canEdit && deleteTransaction) deleteMutation.mutate(deleteTransaction.id);
+              }}
+              disabled={!user?.canEdit || deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-seed-transaction"
+            >
+              {deleteMutation.isPending ? t("Deleting…", "हटा रहे हैं…") : t("Delete permanently", "स्थायी रूप से हटाएं")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
