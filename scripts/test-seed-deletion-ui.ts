@@ -24,6 +24,7 @@ import {
 import { hashPassword } from "../server/auth";
 import { db, pool } from "../server/db";
 import { checkSeedStockPaymentEdits } from "./seed-stock-payment-edit-checks";
+import { checkSeedStockActions } from "./seed-stock-action-checks";
 
 const appUrl = new URL(
   process.env.APP_URL ||
@@ -381,6 +382,13 @@ try {
   assert.equal(userCheck.status, 200);
   assert.equal(userCheck.body.merchantId, merchantId, "Browser session must belong to the isolated disposable merchant");
 
+  if (process.env.SEED_ACTIONS_ONLY === "1") {
+    await checkSeedStockActions({
+      entryId: disposable.id, readOnlyUsername, evaluate, waitFor,
+      click: clickVisibleTestId, cdp, setViewport, saveScreenshot, loginAs, goToRegister,
+    });
+    console.log(`Screenshots saved under ${screenshotDir}`);
+  } else {
   await checkSeedStockPaymentEdits({
     merchantId: merchantId!,
     serialBase,
@@ -782,6 +790,7 @@ try {
   await evaluate(`fetch("/api/logout", { method: "POST", credentials: "include" })`);
   console.log("Seed deletion authenticated UI verification passed: stock/transaction PATCHes, preserved transaction lots/bags/prices, rejected sold-bag reduction with remarks/history rollback, dialogs/cancel/refetch, English/Hindi blockers, create/edit lot restoration, read-only and merchant isolation, malformed/unauthenticated requests.");
   console.log(`Desktop, phone, and dialog screenshots saved under ${screenshotDir}`);
+  }
   }
 } finally {
   if (socket && socket.readyState === WebSocket.OPEN) {

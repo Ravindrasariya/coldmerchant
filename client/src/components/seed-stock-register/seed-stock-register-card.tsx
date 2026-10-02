@@ -853,30 +853,31 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
                     </div>
                     
                     <div className="flex flex-col gap-1.5 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 gap-1.5 justify-start"
-                        onClick={() => setEditEntry(entry)}
-                        data-testid={`button-seed-edit-${entry.id}`}
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                        {t("Edit", "संपादित")}
-                      </Button>
-                      {user?.canEdit && (
+                      <div className="flex gap-1.5">
                         <Button
-                          type="button"
                           variant="outline"
                           size="sm"
-                          className="text-xs h-8 gap-1.5 justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteEntry(entry)}
-                          aria-label={t("Delete entry", "प्रविष्टि हटाएं")}
-                          data-testid={`button-seed-delete-${entry.id}`}
+                          className="text-xs h-8 gap-1.5 justify-start flex-1"
+                          onClick={() => setEditEntry(entry)}
+                          data-testid={`button-seed-edit-${entry.id}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          {t("Delete", "हटाएं")}
+                          <Edit className="h-3.5 w-3.5" />
+                          {t("Edit", "संपादित")}
                         </Button>
-                      )}
+                        {user?.canEdit && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setDeleteEntry(entry)}
+                            aria-label={t("Delete entry", "प्रविष्टि हटाएं")}
+                            data-testid={`button-seed-delete-${entry.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
