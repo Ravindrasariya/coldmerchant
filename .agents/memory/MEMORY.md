@@ -11,3 +11,4 @@
 - [Loading P&L consumers](loading-pl-consumers.md) — every place recomputing loading P&L must branch on freightPaidSeparately; startup backfills silently rewrite rows that miss it.
 - [Harvest bag counts](harvest-bag-counts.md) — soldBags is authoritative; remainingBags is derived, never hand-adjusted, or the register and the lot dropdown drift apart.
 - [Seed receipt layout](seed-receipt-layout.md) — seed transaction bills should match the harvest transaction bill layout, while retaining seed-specific fields and totals.
+- [Seed payment petty settlement](seed-payment-petty.md) — cash and petty settle due together; deletion restores both, but cash movement excludes petty; exact paise deltas are intentional.

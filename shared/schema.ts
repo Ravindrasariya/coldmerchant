@@ -268,6 +268,14 @@ export const transactionEditHistory = pgTable("transaction_edit_history", {
   changeSet: jsonb("change_set").notNull(), // Array of { field, oldValue, newValue }
 });
 
+// Persist original seed settlement destinations; null marks legacy payments.
+export interface SeedSettlementTarget {
+  farmerId?: number;
+  seedTransactionId?: number;
+  amount: string;
+  pettyAdjustment: string;
+}
+
 // Cash Entries - for Cash Management (inward, outflow, and transfer)
 export const cashEntries = pgTable("cash_entries", {
   id: serial("id").primaryKey(),
@@ -314,6 +322,8 @@ export const cashEntries = pgTable("cash_entries", {
   capitalAssetId: integer("capital_asset_id"), // Reference to auto-created asset in asset register
   chequeNumber: text("cheque_number"),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  pettyAdjustment: decimal("petty_adjustment", { precision: 12, scale: 2 }).notNull().default("0"),
+  seedSettlementTargets: jsonb("seed_settlement_targets").$type<SeedSettlementTarget[]>(),
   entryDate: date("entry_date").notNull(),
   remarks: text("remarks"),
   isReversed: boolean("is_reversed").default(false), // soft delete flag

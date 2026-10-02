@@ -52,6 +52,7 @@ import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST } f
 import { eq, and, or, desc, asc, sql, gt, ne, isNull, isNotNull, inArray } from "drizzle-orm";
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, exceedsDue } from "@shared/utils";
 import { getFreightPaidForTruck } from "./freight-utils";
+import { settleSeedPayment } from "./seed-payment-settlement";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -402,7 +403,7 @@ export interface IStorage {
   getTransactionsWithDueByParty(merchantId: number, partyName: string, buyerId?: number | null): Promise<Transaction[]>;
   getDistinctCropsByTransactionIds(merchantId: number, transactionIds: number[]): Promise<Record<number, string[]>>;
   getColdStoresWithDue(merchantId: number): Promise<{ coldStoreName: string; coldStoreDbId: number | null; totalDue: number; lotCount: number }[]>;
-  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]>;
+  getSeedFarmersWithDue(merchantId: number): Promise<{ farmerId: number | null; farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; outstandingDue: string; transactionCount: number; receivables: number }[]>;
   getSeedSuppliersWithDue(merchantId: number): Promise<{ supplierName: string; district: string | null; totalDue: number; entryCount: number }[]>;
   createCashEntryWithFIFO(entry: InsertCashEntry, applyFIFO: boolean): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }>;
   
@@ -2356,7 +2357,7 @@ export class DatabaseStorage implements IStorage {
       }));
   }
 
-  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; transactionCount: number; receivables: number }[]> {
+  async getSeedFarmersWithDue(merchantId: number): Promise<{ farmerId: number | null; farmerName: string; farmerContact: string | null; village: string | null; totalDue: number; outstandingDue: string; transactionCount: number; receivables: number }[]> {
     // Get all seed transactions for this merchant
     const txns = await db.select().from(seedTransactions)
       .where(eq(seedTransactions.merchantId, merchantId));
@@ -2377,13 +2378,19 @@ export class DatabaseStorage implements IStorage {
       if (!n) return null;
       const c = normalizeName(contact);
       const v = normalizeName(village);
+      const matchingFarmers = allFarmerRecords.filter(f =>
+        normalizeName(f.name) === n &&
+        normalizeName(f.contact) === c &&
+        normalizeName(f.village) === v
+      );
+      if (matchingFarmers.length === 1) return `id:${matchingFarmers[0].id}`;
       return `composite:${n}|${c}|${v}`;
     };
     
     for (const txn of txns) {
       const dueToFarmer = parseFloat(txn.totalDueToFarmer || "0");
       
-      if (dueToFarmer < RUPEE_TOLERANCE) continue;
+      if (dueToFarmer <= 0) continue;
       
       const key = getSeedFarmerKey(txn.farmerId, txn.farmerName, txn.farmerContact, txn.village);
       if (!key) continue;
@@ -2410,7 +2417,7 @@ export class DatabaseStorage implements IStorage {
     // Add receivables from farmer ledger (remainingReceivable = finalAmount minus payments)
     for (const farmerRecord of allFarmerRecords) {
       const receivables = parseFloat(farmerRecord.remainingReceivable || "0");
-      if (receivables < RUPEE_TOLERANCE) continue;
+      if (receivables <= 0) continue;
       
       const key = `id:${farmerRecord.id}`;
       
@@ -2430,16 +2437,17 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Return farmers with remaining due (already reduced by FIFO payments).
-    // Hide sub-₹1 residue and round totals for display alignment with the other
-    // pending/dues endpoints (the stored remainingReceivable itself stays precise).
+    // Return every positive exact due so payment selection can use outstandingDue.
+    // totalDue and receivables retain their legacy rounded presentation.
     return Array.from(farmerMap.entries())
-      .filter(([_, data]) => data.totalDue >= RUPEE_TOLERANCE)
-      .map(([_, data]) => ({
+      .filter(([_, data]) => data.totalDue > 0)
+      .map(([key, data]) => ({
+        farmerId: key.startsWith("id:") ? Number(key.slice(3)) : null,
         farmerName: data.displayName,
         farmerContact: data.farmerContact,
         village: data.village,
         totalDue: roundRupee(data.totalDue),
+        outstandingDue: (Math.round(data.totalDue * 100) / 100).toFixed(2),
         transactionCount: data.transactionCount,
         receivables: roundRupee(data.receivables),
       })).sort((a, b) => b.totalDue - a.totalDue);
@@ -2550,13 +2558,14 @@ export class DatabaseStorage implements IStorage {
     // Use a transaction to ensure atomicity of FIFO allocation
     return await db.transaction(async (tx) => {
       // Create the cash entry
-      const [createdEntry] = await tx.insert(cashEntries).values(entry).returning();
+      const { seedSettlementTargets: _ignoredSeedTargets, ...cashEntryValues } = entry;
+      const [createdEntry] = await tx.insert(cashEntries).values(cashEntryValues).returning();
       
       const allocations: CashEntryAllocation[] = [];
       const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
       
       // If this is an inward payment and has a partyName, apply FIFO to transactions
-      if (applyFIFO && entry.direction === "inward" && entry.partyName) {
+      if (applyFIFO && entry.direction === "inward" && entry.revenueType !== "seed_sale" && entry.partyName) {
         let remainingAmount = parseFloat(entry.amount);
         const entryBuyerId = entry.buyerId || null;
         const normalizedPartyName = normalizeName(entry.partyName);
@@ -2604,13 +2613,13 @@ export class DatabaseStorage implements IStorage {
           
           for (const txn of transactionsWithDue) {
             if (remainingAmount <= 0) break;
-            
+
             const revenue = parseFloat(txn.revenue || "0");
             const currentReceived = parseFloat(txn.amountReceived || "0");
             const due = revenue - currentReceived;
-            
+
             if (due < RUPEE_TOLERANCE) continue;
-            
+
             const toApply = Math.min(remainingAmount, due);
             
             const [allocation] = await tx.insert(cashEntryAllocations).values({
@@ -2632,81 +2641,9 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // If this is a seed sale inward payment, apply FIFO to seed transactions (reduce totalDueToFarmer)
-      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
-        let remainingAmount = parseFloat(entry.amount);
-        const entryFarmerId = entry.farmerId || null;
-        const normalizedFarmerName = normalizeName(entry.farmerName);
-        const normalizedFarmerContact = entry.farmerContact ? normalizeName(entry.farmerContact) : null;
-        const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
-        
-        const farmerCompositeMatch = (name: string | null, contact: string | null, village: string | null) => {
-          if (normalizeName(name) !== normalizedFarmerName) return false;
-          if (normalizeName(contact) !== normalizedFarmerContact) return false;
-          if (normalizeName(village) !== normalizedFarmerVillage) return false;
-          return true;
-        };
-        
-        // Resolve farmerId
-        let matchedFarmerId = entryFarmerId;
-        if (!matchedFarmerId) {
-          const allFarmerRecords = await tx.select().from(farmers)
-            .where(eq(farmers.merchantId, entry.merchantId));
-          const matchedFarmer = allFarmerRecords.find(f => farmerCompositeMatch(f.name, f.contact, f.village));
-          matchedFarmerId = matchedFarmer?.id || null;
-        }
-        
-        // STEP 1: First reduce farmer's remainingReceivable in farmer ledger
-        // Only remainingReceivable is reduced by payments (pyReceivable and pyReceivableFinalAmount stay unchanged)
-        if (matchedFarmerId && remainingAmount > 0) {
-          const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
-          if (matchedFarmer) {
-            const currentRemaining = parseFloat(matchedFarmer.remainingReceivable || "0");
-            if (currentRemaining > 0) {
-              const toApply = Math.min(remainingAmount, currentRemaining);
-              const newRemaining = currentRemaining - toApply;
-              await tx.update(farmers)
-                .set({ 
-                  remainingReceivable: newRemaining > 0 ? newRemaining.toFixed(2) : "0.00",
-                })
-                .where(eq(farmers.id, matchedFarmerId));
-              remainingAmount -= toApply;
-            }
-          }
-        }
-        
-        // STEP 2: Apply remaining to seed transactions using FIFO (oldest first)
-        if (remainingAmount > 0) {
-          const allSeedTxns = await tx.select().from(seedTransactions)
-            .where(eq(seedTransactions.merchantId, entry.merchantId))
-            .orderBy(asc(seedTransactions.createdAt));
-          
-          const seedTxnsWithDue = allSeedTxns.filter(txn => {
-            const matchesFarmer = matchedFarmerId
-              ? (txn.farmerId === matchedFarmerId)
-              : farmerCompositeMatch(txn.farmerName, txn.farmerContact || null, txn.village);
-            if (!matchesFarmer) return false;
-            const totalDue = parseFloat(txn.totalDueToFarmer || "0");
-            return totalDue > 0;
-          });
-          
-          for (const seedTxn of seedTxnsWithDue) {
-            if (remainingAmount <= 0) break;
-            
-            const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-            
-            if (currentDue < RUPEE_TOLERANCE) continue;
-            
-            const toApply = Math.min(remainingAmount, currentDue);
-            
-            const newDue = roundRupee(currentDue - toApply);
-            await tx.update(seedTransactions)
-              .set({ totalDueToFarmer: newDue.toString() })
-              .where(and(eq(seedTransactions.id, seedTxn.id), eq(seedTransactions.merchantId, entry.merchantId)));
-            
-            remainingAmount -= toApply;
-          }
-        }
+      // Seed payments use a shared, locked settlement routine in both cash-entry paths.
+      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale") {
+        createdEntry.seedSettlementTargets = await settleSeedPayment(tx, createdEntry);
       }
       
       // If this is a farmer payment, apply FIFO to stock entries
@@ -4650,7 +4587,8 @@ export class DatabaseStorage implements IStorage {
   ): Promise<CashEntry & { allocations: CashEntryAllocation[]; coldStoreAllocations?: ColdStoreChargeAllocation[] }> {
     
     return await db.transaction(async (tx) => {
-      const [createdEntry] = await tx.insert(cashEntries).values(entry).returning();
+      const { seedSettlementTargets: _ignoredSeedTargets, ...cashEntryValues } = entry;
+      const [createdEntry] = await tx.insert(cashEntries).values(cashEntryValues).returning();
       const allocations: CashEntryAllocation[] = [];
       const coldStoreAllocations: ColdStoreChargeAllocation[] = [];
 
@@ -4718,82 +4656,9 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // Seed sale FIFO - update totalDueToFarmer on seed transactions
-      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
-        let remainingAmount = parseFloat(entry.amount);
-        
-        if (remainingAmount > 0) {
-          const entryFarmerId = entry.farmerId || null;
-          const normalizedFarmerName = normalizeName(entry.farmerName);
-          const normalizedFarmerContact = entry.farmerContact ? normalizeName(entry.farmerContact) : null;
-          const normalizedFarmerVillage = entry.farmerVillage ? normalizeName(entry.farmerVillage) : null;
-          
-          const farmerCompositeMatch = (name: string | null, contact: string | null, village: string | null) => {
-            if (normalizeName(name) !== normalizedFarmerName) return false;
-            if (normalizeName(contact) !== normalizedFarmerContact) return false;
-            if (normalizeName(village) !== normalizedFarmerVillage) return false;
-            return true;
-          };
-          
-          // Resolve farmerId if not directly available
-          let matchedFarmerId = entryFarmerId;
-          if (!matchedFarmerId) {
-            const allFarmers = await tx.select().from(farmers)
-              .where(eq(farmers.merchantId, entry.merchantId));
-            const matchedFarmer = allFarmers.find(f => farmerCompositeMatch(f.name, f.contact, f.village));
-            matchedFarmerId = matchedFarmer?.id || null;
-          }
-          
-          // STEP 1: First reduce farmer's remainingReceivable in farmer ledger
-          // Only remainingReceivable is reduced by payments (pyReceivable and pyReceivableFinalAmount stay unchanged)
-          if (matchedFarmerId && remainingAmount > 0) {
-            const [matchedFarmer] = await tx.select().from(farmers).where(eq(farmers.id, matchedFarmerId));
-            if (matchedFarmer) {
-              const currentRemaining = parseFloat(matchedFarmer.remainingReceivable || "0");
-              if (currentRemaining > 0) {
-                const toApply = Math.min(remainingAmount, currentRemaining);
-                const newRemaining = currentRemaining - toApply;
-                await tx.update(farmers)
-                  .set({ 
-                    remainingReceivable: newRemaining > 0 ? newRemaining.toFixed(2) : "0.00",
-                  })
-                  .where(eq(farmers.id, matchedFarmerId));
-                remainingAmount -= toApply;
-              }
-            }
-          }
-          
-          // STEP 2: Apply remaining to seed transactions FIFO
-          if (remainingAmount > 0) {
-            const allSeedTxns = await tx.select().from(seedTransactions)
-              .where(eq(seedTransactions.merchantId, entry.merchantId))
-              .orderBy(asc(seedTransactions.createdAt));
-            
-            const seedTxnsWithDue = allSeedTxns.filter(txn => {
-              const matchesFarmer = matchedFarmerId
-                ? (txn.farmerId === matchedFarmerId)
-                : farmerCompositeMatch(txn.farmerName, txn.farmerContact || null, txn.village);
-              if (!matchesFarmer) return false;
-              const totalDue = parseFloat(txn.totalDueToFarmer || "0");
-              return totalDue > 0;
-            });
-            
-            for (const seedTxn of seedTxnsWithDue) {
-              if (remainingAmount <= 0) break;
-              
-              const currentDue = parseFloat(seedTxn.totalDueToFarmer || "0");
-              if (currentDue < RUPEE_TOLERANCE) continue;
-              
-              const toApply = Math.min(remainingAmount, currentDue);
-              const newDue = roundRupee(currentDue - toApply);
-              await tx.update(seedTransactions)
-                .set({ totalDueToFarmer: newDue.toString() })
-                .where(eq(seedTransactions.id, seedTxn.id));
-              
-              remainingAmount -= toApply;
-            }
-          }
-        }
+      // Shared seed-payment settlement preserves exact paise and records reversal targets.
+      if (applyFIFO && entry.direction === "inward" && entry.revenueType === "seed_sale") {
+        createdEntry.seedSettlementTargets = await settleSeedPayment(tx, createdEntry);
       }
       
       // Farmer payment FIFO (for raw potatoes)
@@ -5240,7 +5105,8 @@ export class DatabaseStorage implements IStorage {
     return await db.transaction(async (tx) => {
       // 1. Fetch the cash entry
       const [entry] = await tx.select().from(cashEntries)
-        .where(and(eq(cashEntries.id, cashEntryId), eq(cashEntries.merchantId, merchantId)));
+        .where(and(eq(cashEntries.id, cashEntryId), eq(cashEntries.merchantId, merchantId)))
+        .for("update");
       
       if (!entry) {
         throw new Error("Cash entry not found");
@@ -5355,49 +5221,86 @@ export class DatabaseStorage implements IStorage {
         }
       }
       
-      // 4b. Reverse seed sale inflow (add back dues to seedTransactions.totalDueToFarmer)
-      if (entry.direction === "inward" && entry.revenueType === "seed_sale" && entry.farmerName) {
-        const allSeedTxns = await tx.select().from(seedTransactions)
-          .where(eq(seedTransactions.merchantId, merchantId))
-          .orderBy(asc(seedTransactions.createdAt));
-        
-        const matchingTxns = allSeedTxns.filter(txn => matchesFarmerForReversal(txn));
-        
-        let amountToRestore = parseFloat(entry.amount);
-        
-        // Restore dues in reverse FIFO order (most recent first, distributed across transactions)
-        for (const txn of matchingTxns.reverse()) {
-          if (amountToRestore <= 0) break;
-          
-          // Calculate original total due for this transaction to determine max restoreable
-          const originalDue = parseFloat(txn.totalRevenue || "0") + parseFloat(txn.transportCharges || "0") + parseFloat(txn.otherCharges || "0");
-          const currentDue = parseFloat(txn.totalDueToFarmer || "0");
-          
-          // Max we can restore is originalDue - currentDue (what was already paid/reduced)
-          const alreadyPaid = originalDue - currentDue;
-          const toRestore = Math.min(amountToRestore, alreadyPaid);
-          
-          if (toRestore > 0) {
-            const newDue = roundRupee(currentDue + toRestore);
-            
-            await tx.update(seedTransactions)
-              .set({ totalDueToFarmer: newDue.toString() })
-              .where(eq(seedTransactions.id, txn.id));
-            
-            amountToRestore -= toRestore;
+      // 4b. Reverse seed sale inflow. New entries restore their saved settlement
+      // targets exactly; only legacy entries (null target marker) use FIFO fallback.
+      if (entry.direction === "inward" && entry.revenueType === "seed_sale") {
+        if (entry.seedSettlementTargets !== null) {
+          const targets = entry.seedSettlementTargets || [];
+          if (!targets.length) {
+            throw new Error("Seed settlement targets are missing for this payment");
           }
-        }
-        
-        // Restore farmer receivable for any amount that was originally applied to remainingReceivable
-        if (amountToRestore > 0 && entryFarmerId) {
-          const [farmer] = await tx.select().from(farmers).where(eq(farmers.id, entryFarmerId));
-          if (farmer) {
-            const currentRemaining = parseFloat(farmer.remainingReceivable || "0");
-            await tx.update(farmers)
-              .set({ 
-                remainingReceivable: (currentRemaining + amountToRestore).toFixed(2),
-              })
-              .where(eq(farmers.id, entryFarmerId));
+          for (const target of targets) {
+            const amount = Number(target.amount);
+            const pettyAdjustment = Number(target.pettyAdjustment);
+            if (
+              !Number.isFinite(amount) || amount < 0 ||
+              !Number.isFinite(pettyAdjustment) || pettyAdjustment < 0 ||
+              !/^\d+(?:\.\d{1,2})?$/.test(String(target.amount)) ||
+              !/^\d+(?:\.\d{1,2})?$/.test(String(target.pettyAdjustment))
+            ) {
+              throw new Error("Invalid saved seed settlement target");
+            }
+            if (target.farmerId != null && target.seedTransactionId == null) {
+              const increment = sql`coalesce(${farmers.remainingReceivable}, 0) + ${target.amount}::numeric + ${target.pettyAdjustment}::numeric`;
+              const restored = await tx.update(farmers)
+                .set({ remainingReceivable: increment })
+                .where(and(eq(farmers.id, target.farmerId), eq(farmers.merchantId, merchantId)))
+                .returning({ id: farmers.id });
+              if (!restored.length) throw new Error(`Saved farmer settlement target ${target.farmerId} no longer exists`);
+            } else if (target.seedTransactionId != null && target.farmerId == null) {
+              const seedIncrement = sql`coalesce(${seedTransactions.totalDueToFarmer}, 0) + ${target.amount}::numeric + ${target.pettyAdjustment}::numeric`;
+              const restored = await tx.update(seedTransactions)
+                .set({ totalDueToFarmer: seedIncrement })
+                .where(and(eq(seedTransactions.id, target.seedTransactionId), eq(seedTransactions.merchantId, merchantId)))
+                .returning({ id: seedTransactions.id });
+              if (!restored.length) throw new Error(`Saved seed transaction target ${target.seedTransactionId} no longer exists`);
+            } else {
+              throw new Error("Saved seed settlement target must identify exactly one due balance");
+            }
+          }
+        } else if (entry.farmerName) {
+          const allSeedTxns = await tx.select().from(seedTransactions)
+            .where(eq(seedTransactions.merchantId, merchantId))
+            .orderBy(asc(seedTransactions.createdAt));
+          
+          const matchingTxns = allSeedTxns.filter(txn => matchesFarmerForReversal(txn));
+          
+          let amountToRestore = parseFloat(entry.amount);
+          
+          // Restore dues in reverse FIFO order (most recent first, distributed across transactions)
+          for (const txn of matchingTxns.reverse()) {
+            if (amountToRestore <= 0) break;
+            
+            // Calculate original total due for this transaction to determine max restoreable
+            const originalDue = parseFloat(txn.totalRevenue || "0") + parseFloat(txn.transportCharges || "0") + parseFloat(txn.otherCharges || "0");
+            const currentDue = parseFloat(txn.totalDueToFarmer || "0");
+            
+            // Max we can restore is originalDue - currentDue (what was already paid/reduced)
+            const alreadyPaid = originalDue - currentDue;
+            const toRestore = Math.min(amountToRestore, alreadyPaid);
+
+            if (toRestore > 0) {
+              const newDue = roundRupee(currentDue + toRestore);
+
+              await tx.update(seedTransactions)
+                .set({ totalDueToFarmer: newDue.toString() })
+                .where(eq(seedTransactions.id, txn.id));
+
+              amountToRestore -= toRestore;
+            }
+          }
+
+          // Restore farmer receivable for any amount that was originally applied to remainingReceivable
+          if (amountToRestore > 0 && entryFarmerId) {
+            const [farmer] = await tx.select().from(farmers).where(eq(farmers.id, entryFarmerId));
+            if (farmer) {
+              const currentRemaining = parseFloat(farmer.remainingReceivable || "0");
+              await tx.update(farmers)
+                .set({
+                  remainingReceivable: (currentRemaining + amountToRestore).toFixed(2),
+                })
+                .where(eq(farmers.id, entryFarmerId));
+            }
           }
         }
       }

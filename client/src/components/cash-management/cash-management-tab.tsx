@@ -42,7 +42,8 @@ import { useLanguage } from "@/hooks/use-language";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
-import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES, ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
+import { RECEIPT_TYPES, EXPENSE_TYPES, PAYMENT_MODES, ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES, type SeedSettlementTarget } from "@shared/schema";
+import { validateSeedPayment, SeedPaymentValidationError } from "@shared/seed-payment";
 
 type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
   value: number;
@@ -132,6 +133,8 @@ interface CashEntry {
   aadhatAllocations: AadhatPaymentAllocationDetail[];
   buyerAllocations: BuyerPaymentAllocationDetail[];
   coldStoreAllocations: ColdStorePaymentAllocationDetail[];
+  pettyAdjustment?: string | null;
+  seedSettlementTargets?: SeedSettlementTarget[] | null;
 }
 
 interface CashEntryAllocation {
@@ -214,10 +217,12 @@ interface ColdStoreWithDue {
 }
 
 interface SeedFarmerWithDue {
+  farmerId?: number | null;
   farmerName: string;
   farmerContact: string | null;
   village: string | null;
   totalDue: number;
+  outstandingDue?: number | string;
   transactionCount: number;
   receivables: number;
 }
@@ -227,6 +232,21 @@ interface SeedSupplierWithDue {
   district: string | null;
   totalDue: number;
   entryCount: number;
+}
+
+function getSeedFarmerOutstandingDue(farmer: LedgerFarmer, seedFarmers: SeedFarmerWithDue[]): number {
+  const byId = seedFarmers.filter(row => row.farmerId === farmer.id);
+  const normalize = (value: string | null | undefined) => (value || "").trim().toLocaleLowerCase();
+  const matches = byId.length > 0 ? byId : seedFarmers.filter(row =>
+    normalize(row.farmerName) === normalize(farmer.name) &&
+    normalize(row.farmerContact) === normalize(farmer.contact) &&
+    normalize(row.village) === normalize(farmer.village),
+  );
+  const totalDueCents = matches.reduce((sum, row) => {
+    const due = Number(row.outstandingDue ?? row.totalDue);
+    return sum + (Number.isFinite(due) && due > 0 ? Math.round(due * 100) : 0);
+  }, 0);
+  return totalDueCents / 100;
 }
 
 interface AadhatWithDue {
@@ -376,11 +396,16 @@ const inwardFormSchema = z.object({
   revenueType: z.string().min(1, "Revenue type is required"),
   partyName: z.string().optional(),
   seedFarmerName: z.string().optional(),
+  seedFarmerId: z.coerce.number().optional(),
+  pettyAdjustment: z.preprocess(
+    value => value === "" || value === undefined ? 0 : typeof value === "string" && value.trim() !== "" ? Number(value) : value,
+    z.number().finite().min(0, "Petty adjustment cannot be negative"),
+  ),
   sundryPayName: z.string().optional(),
   sundryPayDbId: z.coerce.number().optional(),
   bankAccountId: z.coerce.number().optional(),
   chequeNumber: z.string().optional(),
-  amount: z.coerce.number().min(0, "Amount cannot be negative"),
+  amount: z.coerce.number().finite().min(0, "Amount cannot be negative"),
   entryDate: z.string().min(1, "Date is required"),
   remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -719,6 +744,8 @@ export function CashManagementTab() {
       revenueType: "raw_potato",
       partyName: "",
       seedFarmerName: "",
+      seedFarmerId: undefined,
+      pettyAdjustment: 0,
       bankAccountId: undefined,
       chequeNumber: "",
       amount: "" as unknown as number,
@@ -735,7 +762,8 @@ export function CashManagementTab() {
   const revenueType = inwardForm.watch("revenueType");
   const receiptType = inwardForm.watch("receiptType");
   const selectedPartyName = inwardForm.watch("partyName");
-  const selectedSeedFarmerName = inwardForm.watch("seedFarmerName");
+  const selectedSeedFarmerId = inwardForm.watch("seedFarmerId");
+  const seedPettyAdjustment = Number(inwardForm.watch("pettyAdjustment")) || 0;
 
   const outflowForm = useForm<OutflowFormValues>({
     resolver: zodResolver(outflowFormSchema),
@@ -786,7 +814,12 @@ export function CashManagementTab() {
     if (receiptType !== "account_received") {
       inwardForm.setValue("bankAccountId", undefined);
     }
+    inwardForm.setValue("pettyAdjustment", 0);
   }, [receiptType]);
+
+  useEffect(() => {
+    inwardForm.setValue("pettyAdjustment", 0);
+  }, [revenueType, selectedSeedFarmerId]);
 
   // Reset bankAccountId when paymentMode changes (outflow form)
   useEffect(() => {
@@ -825,6 +858,8 @@ export function CashManagementTab() {
           revenueType: "raw_potato",
           partyName: "",
           seedFarmerName: "",
+          seedFarmerId: undefined,
+          pettyAdjustment: 0,
           sundryPayName: "",
           sundryPayDbId: undefined,
           chequeNumber: "",
@@ -1344,34 +1379,6 @@ export function CashManagementTab() {
     return Array.from(partyMap.values());
   })();
 
-  // Merge managed farmers with stock-entry-derived farmers (de-duplicate by name)
-  const mergedFarmers = (() => {
-    const farmerMap = new Map<string, { name: string; contact: string | null; address: string | null; pendingDues: number }>();
-    
-    // Add stock-entry-derived farmers first
-    farmers.forEach(f => {
-      farmerMap.set(f.farmerName.toLowerCase(), {
-        name: f.farmerName,
-        contact: f.farmerContact,
-        address: f.village,
-        pendingDues: f.totalDue,
-      });
-    });
-    
-    // Add/override with managed farmers (they take precedence)
-    managedFarmers.forEach(f => {
-      const existing = farmerMap.get(f.name.toLowerCase());
-      farmerMap.set(f.name.toLowerCase(), {
-        name: f.name,
-        contact: f.contactNumber || existing?.contact || null,
-        address: f.address || existing?.address || null,
-        pendingDues: parseFloat(f.pendingDueToBePaid || "0") + (existing?.pendingDues || 0),
-      });
-    });
-    
-    return Array.from(farmerMap.values());
-  })();
-
   const inwardPartyDue = useMemo(() => {
     if (!selectedPartyName) return 0;
     const party = mergedPartiesForRawPotato.find(p => p.name.toLowerCase() === selectedPartyName.toLowerCase());
@@ -1379,10 +1386,11 @@ export function CashManagementTab() {
   }, [selectedPartyName, mergedPartiesForRawPotato]);
 
   const inwardSeedFarmerDue = useMemo(() => {
-    if (!selectedSeedFarmerName) return 0;
-    const farmer = ledgerFarmers.find(f => f.name.toLowerCase() === selectedSeedFarmerName.toLowerCase());
-    return farmer ? Math.abs(Math.min(farmer.netDue, 0)) : 0;
-  }, [selectedSeedFarmerName, ledgerFarmers]);
+    if (!selectedSeedFarmerId) return 0;
+    const farmer = ledgerFarmers.find(f => f.id === selectedSeedFarmerId);
+    if (!farmer) return 0;
+    return getSeedFarmerOutstandingDue(farmer, seedFarmers);
+  }, [selectedSeedFarmerId, ledgerFarmers, seedFarmers]);
 
   const outflowFarmerDue = useMemo(() => {
     if (!selectedOutflowFarmerName) return 0;
@@ -1461,22 +1469,27 @@ export function CashManagementTab() {
         })),
       });
     } else if (values.revenueType === "seed_sale") {
-      const selectedLedgerFarmer = ledgerFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
-      
-      if (!values.amount || values.amount <= 0) {
-        inwardForm.setError("amount", { 
-          type: "manual", 
-          message: t("Amount must be greater than 0", "राशि 0 से अधिक होनी चाहिए") 
+      const selectedLedgerFarmer = ledgerFarmers.find(f => f.id === values.seedFarmerId);
+      const pettyAdjustment = values.pettyAdjustment || 0;
+      if (!selectedLedgerFarmer) {
+        inwardForm.setError("seedFarmerName", {
+          type: "manual",
+          message: t("Please select a valid farmer", "कृपया मान्य किसान चुनें"),
         });
         return;
       }
-
-      const selectedMergedFarmer = mergedFarmers.find(f => f.name.toLowerCase() === values.seedFarmerName?.toLowerCase());
-      const farmerDue = selectedMergedFarmer?.pendingDues || 0;
-      if (farmerDue > 0 && values.amount > farmerDue) {
-        inwardForm.setError("amount", {
+      try {
+        validateSeedPayment(values.amount, pettyAdjustment, inwardSeedFarmerDue);
+      } catch (error) {
+        const message = error instanceof SeedPaymentValidationError
+          ? error.message
+          : t("Invalid seed payment amount", "बीज भुगतान राशि अमान्य है");
+        const field = message.startsWith("Petty Adj") || (message.startsWith("Total Settled") && pettyAdjustment > 0)
+          ? "pettyAdjustment"
+          : "amount";
+        inwardForm.setError(field, {
           type: "manual",
-          message: t(`Amount cannot exceed due amount (₹${farmerDue.toLocaleString('en-IN')})`, `राशि बकाया राशि (₹${farmerDue.toLocaleString('en-IN')}) से अधिक नहीं हो सकती`),
+          message,
         });
         return;
       }
@@ -1488,10 +1501,11 @@ export function CashManagementTab() {
         farmerName: values.seedFarmerName,
         farmerVillage: selectedLedgerFarmer?.village || null,
         farmerContact: selectedLedgerFarmer?.contact || null,
-        farmerId: selectedLedgerFarmer?.id || null,
+        farmerId: selectedLedgerFarmer.id,
         bankAccountId: (values.receiptType === "account_received" || values.receiptType === "cheque_received") ? values.bankAccountId : null,
         chequeNumber: values.receiptType === "cheque_received" ? (values.chequeNumber || null) : null,
         amount: values.amount,
+        pettyAdjustment,
         entryDate: values.entryDate,
         remarks: values.remarks || null,
       };
@@ -1984,6 +1998,7 @@ export function CashManagementTab() {
       t("From Account", "स्रोत खाता"),
       t("To Account", "गंतव्य खाता"),
       t("Amount", "राशि"),
+      t("Petty Adj (non-cash)", "पेटी समायोजन (गैर-नकद)"),
       t("Status", "स्थिति"),
       t("Cheque Number", "चेक नंबर"),
       t("Remarks", "टिप्पणी"),
@@ -2051,6 +2066,9 @@ export function CashManagementTab() {
       getFromAccountLabel(entry),
       getToAccountLabel(entry),
       entry.amount,
+      entry.revenueType === "seed_sale" && Number(entry.pettyAdjustment || "0") > 0
+        ? `₹${Number(entry.pettyAdjustment).toLocaleString("en-IN")}`
+        : "",
       entry.isReversed ? t("Reversed", "उलट दिया गया") : t("Active", "सक्रिय"),
       entry.chequeNumber || "",
       entry.remarks || "",
@@ -2204,7 +2222,11 @@ export function CashManagementTab() {
         : isIn
           ? (entry.receiptType === "cash_received" ? t("Cash", "नकद") : entry.receiptType === "account_received" ? t("Account", "खाता") : entry.receiptType === "cheque_received" ? t("Cheque", "चेक") : "")
           : (entry.paymentMode ? getPaymentModeLabel(entry.paymentMode) : "");
-      const remarks = entry.remarks ? esc(entry.remarks) : "";
+      const pettyAdjustment = entry.revenueType === "seed_sale" ? Number(entry.pettyAdjustment || "0") : 0;
+      const remarks = [
+        entry.remarks,
+        pettyAdjustment > 0 ? `${t("Petty Adj (non-cash)", "पेटी समायोजन (गैर-नकद)")}: ₹${fmtAmt(pettyAdjustment)}` : "",
+      ].filter((part): part is string => Boolean(part)).map(esc).join(" · ");
       const bg = idx % 2 === 0 ? "#fafafa" : "#f0f0f0";
       return `<tr style="background:${bg}">
         <td>${format(new Date(entry.entryDate), "dd/MM/yyyy")}</td>
@@ -2411,6 +2433,22 @@ ${summaryHtml}
                           <p className="font-medium">{viewDetailsEntry.farmerVillage}</p>
                         </div>
                       )}
+                    </div>
+                  )}
+                  {viewDetailsEntry.revenueType === "seed_sale" && Number(viewDetailsEntry.pettyAdjustment || "0") > 0 && (
+                    <div className="rounded-md border border-orange-200 bg-orange-50 p-3 dark:border-orange-900 dark:bg-orange-950/30">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-orange-700 dark:text-orange-400">{t("Petty Adj (non-cash)", "पेटी समायोजन (गैर-नकद)")}</span>
+                        <span className="font-semibold text-orange-700 dark:text-orange-400">
+                          ₹{Number(viewDetailsEntry.pettyAdjustment).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex justify-between border-t border-orange-200 pt-1 text-xs text-muted-foreground dark:border-orange-900">
+                        <span>{t("Total Settled", "कुल निपटान")}</span>
+                        <span>
+                          ₹{(Number(viewDetailsEntry.amount || "0") + Number(viewDetailsEntry.pettyAdjustment)).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
                     </div>
                   )}
 
@@ -3330,8 +3368,8 @@ ${summaryHtml}
                                   >
                                     {field.value
                                       ? (() => {
-                                          const f = ledgerFarmers.find(f => f.name === field.value);
-                                          const due = f ? Math.abs(Math.min(f.netDue, 0)) : 0;
+                                          const f = ledgerFarmers.find(f => f.id === selectedSeedFarmerId);
+                                          const due = inwardSeedFarmerDue;
                                           return due > 0
                                             ? `${f?.name || field.value} — ${t("Due", "बकाया")}: ₹${due.toLocaleString('en-IN')}`
                                             : f?.name || field.value;
@@ -3349,22 +3387,23 @@ ${summaryHtml}
                                     <CommandGroup>
                                       {ledgerFarmers
                                         .filter(f => !f.isArchived)
-                                        .filter(f => f.netDue < 0)
+                                        .filter(f => getSeedFarmerOutstandingDue(f, seedFarmers) > 0)
                                         .map((farmer) => {
-                                          const amountOwedToUs = Math.abs(farmer.netDue);
+                                          const amountOwedToUs = getSeedFarmerOutstandingDue(farmer, seedFarmers);
                                           return (
                                             <CommandItem
                                               key={farmer.id}
                                               value={`${farmer.name} ${farmer.village || ""} ${farmer.contact || ""}`}
                                               onSelect={() => {
                                                 field.onChange(farmer.name);
+                                                inwardForm.setValue("seedFarmerId", farmer.id);
                                                 setSeedFarmerPopoverOpen(false);
                                               }}
                                             >
                                               <Check
                                                 className={cn(
                                                   "mr-2 h-4 w-4",
-                                                  field.value === farmer.name ? "opacity-100" : "opacity-0"
+                                                  selectedSeedFarmerId === farmer.id ? "opacity-100" : "opacity-0"
                                                 )}
                                               />
                                               <div className="flex flex-col flex-1">
@@ -3376,7 +3415,7 @@ ${summaryHtml}
                                                 </span>
                                               </div>
                                               <Badge variant="secondary" className="ml-2">
-                                                {t("Due", "बकाया")}: ₹{parseFloat(amountOwedToUs.toFixed(1)).toLocaleString('en-IN')}
+                                                {t("Due", "बकाया")}: ₹{amountOwedToUs.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                               </Badge>
                                             </CommandItem>
                                           );
@@ -3478,10 +3517,67 @@ ${summaryHtml}
                       name="amount"
                       render={({ field }) => {
                         const currentDue = revenueType === "seed_sale" ? inwardSeedFarmerDue : 0;
+                        if (revenueType === "seed_sale") {
+                          const cashAmount = Number(field.value) || 0;
+                          const totalSettled = cashAmount + seedPettyAdjustment;
+                          return (
+                            <div className="space-y-3">
+                              <FormItem>
+                                <FormLabel>
+                                  {t("Amount", "राशि")} (₹)
+                                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                    ({t("Max", "अधिकतम")}: ₹{currentDue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                                  </span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input type="number" step="0.01" placeholder="0" min="0" max={Math.max(0, currentDue - seedPettyAdjustment)} {...field} data-testid="input-amount" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                              <FormField
+                                control={inwardForm.control}
+                                name="pettyAdjustment"
+                                render={({ field: pettyField }) => (
+                                  <FormItem>
+                                    <FormLabel>{t("Petty Adj", "पेटी समायोजन")} (₹) <span className="text-xs font-normal text-muted-foreground">{t("Optional · non-cash", "वैकल्पिक · गैर-नकद")}</span></FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0"
+                                        min="0"
+                                        max={Math.max(0, currentDue - cashAmount)}
+                                        {...pettyField}
+                                        data-testid="input-seed-petty-adjustment"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <div className="space-y-2 rounded-md bg-muted p-3">
+                                <div className="flex justify-between text-sm">
+                                  <span>{t("Grand Total (Cash)", "कुल योग (नकद)")}</span>
+                                  <span className="font-semibold">₹{cashAmount.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                </div>
+                                {seedPettyAdjustment > 0 && (
+                                  <div className="flex justify-between text-sm text-orange-700 dark:text-orange-400">
+                                    <span>{t("Petty Adj (non-cash)", "पेटी समायोजन (गैर-नकद)")}</span>
+                                    <span>₹{seedPettyAdjustment.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between border-t pt-2 text-sm font-semibold" data-testid="seed-total-settled">
+                                  <span>{t("Total Settled", "कुल निपटान")}</span>
+                                  <span>₹{totalSettled.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
                         return (
                           <FormItem>
                             <FormLabel>
-                              {t("Amount", "राशि")} (₹) *
+                              {t("Amount", "राशि")} (₹)
                               {currentDue > 0 && (
                                 <span className="ml-2 text-xs font-normal text-muted-foreground">
                                   ({t("Max", "अधिकतम")}: ₹{currentDue.toLocaleString('en-IN')})
@@ -4966,6 +5062,11 @@ function CashEntryCard({ entry, onViewDetails }: { entry: CashEntry; onViewDetai
           {isInward && totalApplied > 0 && !isReversed && (
             <span className="text-green-600">
               {t("Applied", "लागू")}: ₹{totalApplied.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+            </span>
+          )}
+          {entry.revenueType === "seed_sale" && Number(entry.pettyAdjustment || "0") > 0 && (
+            <span className="text-orange-700 dark:text-orange-400">
+              {t("Petty Adj (non-cash)", "पेटी (गैर-नकद)")}: ₹{Number(entry.pettyAdjustment).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </span>
           )}
           {entry.remarks && (

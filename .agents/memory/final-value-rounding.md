@@ -22,6 +22,9 @@ shared definition; never redeclare the constant locally (it silently drifts out 
 - Payment fields on EVERY settle path AND the reversal path: amount-paid / amount-received /
   cold-store-paid / seed due-to-farmer. **Reversal must round the same fields as the forward
   path** or reversals reintroduce paise (symmetry is the invariant).
+  Exception: new seed cash-entry settlements preserve exact two-decimal balance
+  deltas so deletion restores precisely Amount + Petty Adj. Their validation
+  uses the exact outstanding due; see [seed petty settlement](seed-payment-petty.md).
 - Party dues at the per-entry aggregate (`round(Σ lot netPayable) − paid`), mirrored
   IDENTICALLY in the dues-list/ledger endpoint and the payment-dialog endpoint.
 

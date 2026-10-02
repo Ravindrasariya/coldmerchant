@@ -10,6 +10,7 @@ import { formatDateForCode, generateMerchantCode, generateBuyerCode, generateTra
 import { getISTDateString, getISTDateYYYYMMDD, getISTYear, dateDiffInDaysIST, dateToISTString, calculateSimpleInterest } from './ist-utils';
 import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, roundColdStoreChargeAmounts } from "@shared/utils";
 import { advanceDiscountAmount, MAX_ADVANCE_DISCOUNT_PERCENT } from "@shared/advance-discount";
+import { validateSeedPayment, seedMoneyCents, SeedPaymentValidationError } from "@shared/seed-payment";
 import { computeOutstandingFreight, freightKey, getFreightPaidForTruck } from "./freight-utils";
 import multer from "multer";
 import path from "path";
@@ -4787,7 +4788,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Valid direction (inward/outflow/transfer) is required" });
       }
       const parsedAmount = parseFloat(amount);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      const isSeedPayment = direction === "inward" && revenueType === "seed_sale";
+      let seedPetty = "0.00";
+      if (isSeedPayment) {
+        const values = validateSeedPayment(amount, req.body.pettyAdjustment);
+        seedPetty = (values.pettyCents / 100).toFixed(2);
+        if (requestFarmerId != null &&
+            (!Number.isInteger(Number(requestFarmerId)) || Number(requestFarmerId) <= 0)) {
+          throw new SeedPaymentValidationError("Please select a valid farmer ID");
+        }
+      } else if (req.body.pettyAdjustment !== undefined &&
+          seedMoneyCents(req.body.pettyAdjustment, "Petty Adj", true) !== 0) {
+        return res.status(400).json({ message: "Entry-level Petty Adj is only available for Seed Sale" });
+      }
+      if (!isSeedPayment && (!Number.isFinite(parsedAmount) || parsedAmount <= 0)) {
         return res.status(400).json({ message: "Valid amount is required" });
       }
       if (!entryDate) {
@@ -4988,7 +5002,7 @@ export async function registerRoutes(
         }
       }
       
-      if (!resolvedFarmerId && farmerName) {
+      if (!resolvedFarmerId && farmerName && !isSeedPayment) {
         try {
           const { farmerId: fId } = await storage.lookupOrCreateFarmer(merchantId, {
             name: titleCaseKeep(farmerName),
@@ -5107,6 +5121,7 @@ export async function registerRoutes(
             capitalAssetCategory: capitalAssetCategory || null,
             chequeNumber: chequeNumber || null,
             amount: amount.toString(),
+            pettyAdjustment: seedPetty,
             entryDate,
             remarks: remarks || null,
           }, applyFIFO, userId, expenseType === "aadhtiya" && Array.isArray(aadhatAllocations) ? aadhatAllocations : undefined, revenueType === "raw_potato" && Array.isArray(buyerAllocations) ? buyerAllocations : undefined, expenseType === "cold_store_charge" && Array.isArray(coldStoreAllocations) ? coldStoreAllocations : undefined);
@@ -5141,6 +5156,9 @@ export async function registerRoutes(
       
       res.status(201).json(createdEntry);
     } catch (error) {
+      if (error instanceof SeedPaymentValidationError) {
+        return res.status(400).json({ message: error.message });
+      }
       console.error("Error creating cash entry:", error);
       res.status(500).json({ message: "Failed to create cash entry" });
     }
