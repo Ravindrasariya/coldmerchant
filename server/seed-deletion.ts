@@ -60,6 +60,10 @@ export async function checkSeedEntryDeletion(tx: any, id: number, merchantId: nu
     if (linked.length) throw new SeedDeletionError("SEED_TRANSACTIONS_LINKED",
       "Please delete the linked seed transactions before deleting this stock entry");
   }
+  if (lots.some((lot: any) => positive(lot.soldBags))) {
+    throw new SeedDeletionError("SEED_LOT_SOLD",
+      "Cannot delete this stock entry because a seed lot has already-sold bags");
+  }
   const payments = await tx.select().from(cashEntries)
     .where(eq(cashEntries.merchantId, merchantId));
   if (positive(entry.amountPaid) || payments.some((payment: any) => active(payment) &&

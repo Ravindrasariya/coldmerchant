@@ -54,6 +54,7 @@ import { computeNetWeight, roundRupee, RUPEE_TOLERANCE, exceedsDue } from "@shar
 import { getFreightPaidForTruck } from "./freight-utils";
 import { settleSeedPayment } from "./seed-payment-settlement";
 import { lockSeedActivity, deleteSeedTransactionAtomic, deleteSeedEntryAtomic } from "./seed-deletion";
+import { seedLotSoldState, validateSeedLotCapacity, SeedLotProtectionError } from "./seed-lot-protection";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -508,7 +509,7 @@ export interface IStorage {
   updateSeedLot(id: number, merchantId: number, data: Partial<SeedLot>): Promise<SeedLot | undefined>;
   getSeedLotsByEntry(seedEntryId: number, merchantId: number): Promise<SeedLot[]>;
   getSeedLotById(id: number, merchantId: number): Promise<SeedLot | undefined>;
-  deleteSeedLot(id: number, merchantId: number): Promise<void>;
+  deleteSeedLot(id: number, merchantId: number, seedEntryId?: number): Promise<void>;
   deleteSeedTransaction(id: number, merchantId: number): Promise<void>;
   deleteSeedEntry(id: number, merchantId: number): Promise<void>;
   
@@ -4155,7 +4156,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSeedLot(id: number, merchantId: number, data: Partial<SeedLot>): Promise<SeedLot | undefined> {
+    if (data.originalBags !== undefined && !this.seedWriteDb) {
+      return this.withSeedWriteTransaction(merchantId, scoped => scoped.updateSeedLot(id, merchantId, data));
+    }
     const db = this.seedWriteDb ?? seedRootDb;
+    if (data.originalBags !== undefined) {
+      const { sold } = await seedLotSoldState(db, id, merchantId);
+      validateSeedLotCapacity(data.originalBags, sold);
+      data = { ...data, soldBags: sold, remainingBags: data.originalBags - sold };
+    }
     const [updated] = await db.update(seedLots)
       .set(data)
       .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)))
@@ -4176,7 +4185,19 @@ export class DatabaseStorage implements IStorage {
     return lot || undefined;
   }
 
-  async deleteSeedLot(id: number, merchantId: number): Promise<void> {
+  async deleteSeedLot(id: number, merchantId: number, seedEntryId?: number): Promise<void> {
+    if (!this.seedWriteDb) {
+      return this.withSeedWriteTransaction(merchantId, scoped => scoped.deleteSeedLot(id, merchantId, seedEntryId));
+    }
+    const db = this.seedWriteDb;
+    const { lot, sold, links } = await seedLotSoldState(db, id, merchantId);
+    if (seedEntryId !== undefined && lot.seedEntryId !== seedEntryId) {
+      throw new SeedLotProtectionError("SEED_LOT_NOT_FOUND", "Seed lot not found in this entry", undefined, 404);
+    }
+    if (sold > 0 || links > 0) {
+      throw new SeedLotProtectionError("SEED_LOT_SOLD",
+        `Cannot delete seed lot — ${sold} bags have already been sold or linked to seed transactions.`, sold);
+    }
     await db.delete(seedLots)
       .where(and(eq(seedLots.id, id), eq(seedLots.merchantId, merchantId)));
   }

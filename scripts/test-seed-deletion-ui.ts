@@ -158,13 +158,15 @@ async function clickTestId(testId: string): Promise<void> {
 }
 
 async function clickVisibleTestId(testId: string): Promise<void> {
-  const rect = await evaluate<{ x: number; y: number } | null>(`(() => {
+  const rect = await waitFor("unobstructed control " + testId, () => evaluate<{ x: number; y: number } | null>(`(() => {
     const element = document.querySelector('[data-testid="${testId}"]');
     if (!element) return null;
     element.scrollIntoView({ block: "center", inline: "center" });
     const rect = element.getBoundingClientRect();
+    const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (!element.contains(top)) return null;
     return rect.width && rect.height ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
-  })()`);
+  })()`), Boolean);
   check(rect, `Expected visible UI control ${testId}`);
   await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: rect.x, y: rect.y });
   await cdp("Input.dispatchMouseEvent", { type: "mousePressed", x: rect.x, y: rect.y, button: "left", clickCount: 1 });
@@ -378,6 +380,96 @@ try {
   assert.equal(userCheck.status, 200);
   assert.equal(userCheck.body.merchantId, merchantId, "Browser session must belong to the isolated disposable merchant");
 
+  const soldLotPath = `/api/seed-stock-entries/${disposable.id}/lots/${disposable.lotId}`;
+  const soldDelete = await api("DELETE", soldLotPath);
+  assert.equal(soldDelete.status, 409);
+  assert.equal(soldDelete.body.code, "SEED_LOT_SOLD");
+  assert.equal((await api("DELETE", `/api/seed-stock-entries/${disposable.id}/lots/bad-id`)).status, 400);
+  assert.equal((await api("DELETE", `/api/seed-stock-entries/2147483647/lots/${disposable.lotId}`)).status, 404);
+  const wrongParentEdit = await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+    remarks: "must not change",
+    seedLots: [{ id: linked.lotId, originalBags: 9 }],
+  });
+  assert.equal(wrongParentEdit.status, 404);
+
+  // Test history independently from the denormalized sold counter through the live API.
+  await db.update(seedLots).set({ soldBags: 0, remainingBags: 10 }).where(eq(seedLots.id, disposable.lotId));
+  assert.equal((await api("DELETE", soldLotPath)).status, 409);
+  const staleCounterEdit = await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+    seedLots: [{ id: disposable.lotId, originalBags: 1, remainingBags: 100 }],
+  });
+  assert.equal(staleCounterEdit.status, 409);
+  assert.equal(staleCounterEdit.body.minimumBags, 2);
+  for (const originalBags of [2, 12, 10]) {
+    const edited = await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+      seedLots: [{ id: disposable.lotId, originalBags, remainingBags: 100 }],
+    });
+    assert.equal(edited.status, 200);
+    const lot = edited.body.seedLots.find((lot: any) => lot.id === disposable.lotId);
+    assert.equal(lot.remainingBags, originalBags - 2);
+    assert.equal(lot.soldBags, 2);
+  }
+  const unsold = await insertStockEntry(serialBase + 40);
+  await db.update(seedLots).set({ soldBags: 1 }).where(eq(seedLots.id, unsold.lotId));
+  const wholeEntryDelete = await api("DELETE", `/api/seed-stock-entries/${unsold.id}`);
+  assert.equal(wholeEntryDelete.status, 409);
+  assert.equal(wholeEntryDelete.body.code, "SEED_LOT_SOLD");
+  await db.update(seedLots).set({ soldBags: 0 }).where(eq(seedLots.id, unsold.lotId));
+  assert.equal((await api("PATCH", `/api/seed-stock-entries/${unsold.id}`, {
+    seedLots: [{ id: unsold.lotId, originalBags: 0 }],
+  })).status, 200);
+  assert.equal((await api("DELETE", `/api/seed-stock-entries/${unsold.id}/lots/${unsold.lotId}`)).status, 200);
+  assert.equal((await api("DELETE", `/api/seed-stock-entries/${unsold.id}/lots/${unsold.lotId}`)).status, 404);
+  // Keep the existing edit-history expectations relative to their original fixture.
+  await db.delete(seedStockEntryEditHistory).where(eq(seedStockEntryEditHistory.seedEntryId, disposable.id));
+
+  if (process.env.SEED_LOT_ONLY === "1") {
+    const before = await db.select().from(seedLots).where(eq(seedLots.id, disposable.lotId));
+    const sibling = await db.insert(seedLots).values({ ...before[0], id: undefined, soldBags: 0, remainingBags: 10 }).returning();
+    const mixed = await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+      remarks: "must roll back",
+      seedLots: [{ id: sibling[0].id, originalBags: 9 }, { id: disposable.lotId, originalBags: 1 }],
+    });
+    assert.equal(mixed.status, 400);
+    assert.equal((await db.select().from(seedLots).where(eq(seedLots.id, sibling[0].id)))[0].originalBags, 10);
+    assert.equal((await db.select().from(seedStockEntries).where(eq(seedStockEntries.id, disposable.id)))[0].remarks, null);
+    assert.equal((await db.select().from(seedStockEntryEditHistory).where(eq(seedStockEntryEditHistory.seedEntryId, disposable.id))).length, 0);
+    await db.delete(seedLots).where(eq(seedLots.id, sibling[0].id));
+
+    for (const language of ["en", "hi"]) {
+      await evaluate(`localStorage.setItem("language", ${JSON.stringify(language)})`);
+      await cdp("Page.reload");
+      await waitFor("authenticated navigation", () => evaluate<boolean>('!!document.querySelector("[data-testid=\\"tab-seed\\"]")?.getClientRects().length'), Boolean);
+      await clickVisibleTestId("tab-seed");
+      await waitFor("Seed section", () => evaluate<boolean>('!!document.querySelector("[data-testid=\\"tab-seed-stock-register\\"]")'), Boolean);
+      await goToRegister();
+      await waitFor("stock edit", () => evaluate<boolean>(`!!document.querySelector('[data-testid="button-seed-edit-${disposable.id}"]')`), Boolean);
+      await clickTestId(`button-seed-edit-${disposable.id}`);
+      await waitFor("sold minimum", () => evaluate<boolean>('!!document.querySelector("[data-testid=\\"seed-lot-0-sold-minimum\\"]")'), Boolean);
+      await evaluate(`(() => {
+        const input = document.querySelector('[data-testid="input-seed-lot-0-original-bags"]');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "1");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      })()`);
+      await waitFor("localized sold-bag warning", () => evaluate<string>("document.body.innerText"), text =>
+        text.includes(language === "en" ? "At least 2 bags" : "कम से कम 2 बोरियां"));
+      assert.equal(await evaluate<string>('document.querySelector("[data-testid=\\"input-seed-lot-0-original-bags\\"]").value'), "2");
+      await saveScreenshot(`sold-bag-minimum-${language}.png`);
+      await clickTestId("button-seed-edit-cancel");
+      await waitFor("edit closed", () => evaluate<boolean>('!document.querySelector("[data-testid=\\"input-seed-lot-0-original-bags\\"]")'), Boolean);
+    }
+    for (const account of [readOnlyUsername, otherUsername]) {
+      await evaluate(`fetch("/api/logout", { method: "POST", credentials: "include" })`);
+      await loginAs(account);
+      const expected = account === readOnlyUsername ? 403 : 404;
+      assert.equal((await api("DELETE", soldLotPath)).status, expected);
+      assert.equal((await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+        seedLots: [{ id: disposable.lotId, originalBags: 1 }],
+      })).status, expected);
+    }
+    console.log("Sold seed lot verification passed: sold/stale-history deletion blockers, equal/higher edits, unsold deletion, mixed-lot rollback, ownership, permissions, English/Hindi minimum hints and warning toasts.");
+    console.log(`Screenshots saved under ${screenshotDir}`);
+  } else {
   const editedRemarks = `Seed deletion UI remarks ${suffix}`;
   const stockPatch = await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, { remarks: editedRemarks });
   assert.equal(stockPatch.status, 200, "Authenticated seed stock remarks PATCH should succeed");
@@ -466,6 +558,19 @@ try {
   await goToRegister();
   await waitFor("disposable stock card", () => evaluate<boolean>(`!!document.querySelector('[data-testid="button-seed-delete-${disposable.id}"]')`), Boolean);
   await saveScreenshot("desktop-stock-register.png");
+  await clickTestId(`button-seed-edit-${disposable.id}`);
+  await waitFor("sold minimum hint", () => evaluate<boolean>('!!document.querySelector("[data-testid=\\"seed-lot-0-sold-minimum\\"]")'), Boolean);
+  assert.match(await evaluate<string>('document.querySelector("[data-testid=\\"seed-lot-0-sold-minimum\\"]").textContent'), /Already sold: 2/);
+  await evaluate(`(() => {
+    const input = document.querySelector('[data-testid="input-seed-lot-0-original-bags"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "1");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`);
+  await waitFor("below-sold toast", () => evaluate<string>("document.body.innerText"), text => text.includes("At least 2 bags"));
+  assert.equal(await evaluate<string>('document.querySelector("[data-testid=\\"input-seed-lot-0-original-bags\\"]").value'), "2");
+  await saveScreenshot("sold-bag-minimum-edit.png");
+  await clickTestId("button-seed-edit-cancel");
+  await waitFor("stock edit cancelled", () => evaluate<boolean>('!document.querySelector("[data-testid=\\"input-seed-lot-0-original-bags\\"]")'), Boolean);
   await clickTestId(`button-seed-delete-${disposable.id}`);
   await waitFor("stock delete confirmation", () => evaluate<boolean>('!!document.querySelector("[data-testid=\\"dialog-delete-seed-stock-entry\\"]")'), Boolean);
   const stockDialog = await evaluate<{ text: string; rect: { width: number; height: number }; cancelVisible: boolean; deleteVisible: boolean }>(`(() => {
@@ -623,6 +728,10 @@ try {
   // enforces the same permission boundary for both resource kinds.
   await evaluate(`fetch("/api/logout", { method: "POST", credentials: "include" })`);
   await loginAs(readOnlyUsername);
+  assert.equal((await api("DELETE", soldLotPath)).status, 403);
+  assert.equal((await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+    seedLots: [{ id: disposable.lotId, originalBags: 1 }],
+  })).status, 403);
   await goToRegister();
   const readOnlyStock = await evaluate<boolean>(`!document.querySelector('[data-testid="button-seed-delete-${linked.id}"]')`);
   check(readOnlyStock, "Read-only user must not see seed stock delete controls");
@@ -636,6 +745,10 @@ try {
 
   await evaluate(`fetch("/api/logout", { method: "POST", credentials: "include" })`);
   await loginAs(otherUsername);
+  assert.equal((await api("DELETE", soldLotPath)).status, 404);
+  assert.equal((await api("PATCH", `/api/seed-stock-entries/${disposable.id}`, {
+    seedLots: [{ id: disposable.lotId, originalBags: 1 }],
+  })).status, 404);
   const crossMerchantTxn = await api("DELETE", `/api/seed-transactions/${paymentTransactionId}`);
   const crossMerchantStock = await api("DELETE", `/api/seed-stock-entries/${linked.id}`);
   assert.equal(crossMerchantTxn.status, 404, "Another merchant cannot delete this transaction");
@@ -655,6 +768,7 @@ try {
   await evaluate(`fetch("/api/logout", { method: "POST", credentials: "include" })`);
   console.log("Seed deletion authenticated UI verification passed: stock/transaction PATCHes, preserved transaction lots/bags/prices, rejected sold-bag reduction with remarks/history rollback, dialogs/cancel/refetch, English/Hindi blockers, create/edit lot restoration, read-only and merchant isolation, malformed/unauthenticated requests.");
   console.log(`Desktop, phone, and dialog screenshots saved under ${screenshotDir}`);
+  }
 } finally {
   if (socket && socket.readyState === WebSocket.OPEN) {
     try {

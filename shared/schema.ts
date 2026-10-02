@@ -1361,10 +1361,10 @@ export type SeedStockEntryForm = z.infer<typeof seedStockEntryFormSchema>;
 
 // Seed update schema for PATCH endpoint
 export const seedLotUpdateSchema = z.object({
-  id: z.number(),
+  id: z.number().int().min(0).max(2147483647),
   coldStoreName: z.string().min(1).optional(),
   coldStoreDbId: z.coerce.number().optional().nullable(),
-  originalBags: z.coerce.number().min(1).optional(),
+  originalBags: z.coerce.number().int().min(0).max(2147483647).optional(),
   remainingBags: z.coerce.number().min(0).optional(),
   potatoType: z.string().min(1).optional(),
   bagType: z.string().optional(),

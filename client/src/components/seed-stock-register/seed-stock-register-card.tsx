@@ -143,6 +143,10 @@ export function SeedStockRegisterCard({ downloadDialogOpen: externalDownloadOpen
     },
     onError: (error: SeedDeleteError) => {
       const descriptions: Record<string, [string, string]> = {
+        SEED_LOT_SOLD: [
+          "Cannot delete this entry: a seed lot has already-sold bags.",
+          "यह प्रविष्टि नहीं हटा सकते: बीज लॉट की बोरियां पहले ही बिक चुकी हैं।",
+        ],
         SEED_PAYMENT_ACTIVE: [
           "This entry has an active payment. Reverse the payment before deleting.",
           "इस प्रविष्टि का भुगतान सक्रिय है। हटाने से पहले भुगतान वापस लें।",

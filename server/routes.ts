@@ -4,6 +4,7 @@ import { storage, DuplicateSerialNumberError, DuplicateSeedTransactionNumberErro
 import { setupAuth } from "./auth";
 import { registerSeedDeleteRoutes } from "./seed-delete-routes";
 import { seedWriteHandler } from "./seed-write-handler";
+import { SeedLotProtectionError } from "./seed-lot-protection";
 import type { IStorage } from "./storage";
 import { stockEntryFormSchema, lotFormSchema, seedStockEntryFormSchema, seedStockEntryUpdateSchema, insertBuyerSchema, insertFarmerSchema, type ChangeSet, type ChangeItem, type FieldChange, ASSET_DEPRECIATION_RATES, insertAssetSchema, insertLiabilitySchema, insertLiabilityPaymentSchema, type InsertTransactionItem, type TransactionItem, cashEntries, sundryPayStakeholders, farmers, seedLots, validateLotBagBreakdowns } from "@shared/schema";
 import { db } from "./db";
@@ -7404,7 +7405,9 @@ export async function registerRoutes(
     try {
       const merchantId = req.user!.merchantId!;
       const userId = req.user!.id;
-      const id = parseInt(req.params.id);
+      if (!req.user!.canEdit) return res.status(403).json({ code: "FORBIDDEN", message: "You do not have permission to edit entries" });
+      const id = Number(req.params.id);
+      if (!Number.isSafeInteger(id) || id <= 0 || id > 2147483647) return res.status(400).json({ message: "Invalid seed entry id" });
       
       // Validate request body
       const validatedData = seedStockEntryUpdateSchema.safeParse(req.body);
@@ -7462,6 +7465,9 @@ export async function registerRoutes(
           if (lotData.id) {
             // Find existing lot to compare changes
             const existingLot = existingEntry.seedLots.find(l => l.id === lotData.id);
+            if (!existingLot) {
+              return res.status(404).json({ code: "SEED_LOT_NOT_FOUND", message: "Seed lot not found in this entry" });
+            }
             const lotChanges: FieldChange[] = [];
             
             if (existingLot) {
@@ -7471,6 +7477,7 @@ export async function registerRoutes(
               const sold = (existingLot as any).soldBags ?? 0;
               if (lotData.originalBags !== undefined && (lotData.originalBags ?? 0) < sold) {
                 return res.status(400).json({
+                  code: "SEED_BAGS_BELOW_SOLD", minimumBags: sold,
                   message: `Cannot reduce original bags below ${sold} — that many bags have already been sold via seed transactions.`,
                 });
               }
@@ -7480,9 +7487,6 @@ export async function registerRoutes(
               }
               if (lotData.originalBags !== undefined && lotData.originalBags !== existingLot.originalBags) {
                 lotChanges.push({ field: "Original Bags", oldValue: existingLot.originalBags, newValue: lotData.originalBags });
-              }
-              if (lotData.remainingBags !== undefined && lotData.remainingBags !== existingLot.remainingBags) {
-                lotChanges.push({ field: "Remaining Bags", oldValue: existingLot.remainingBags, newValue: lotData.remainingBags });
               }
               if (lotData.potatoType !== undefined && lotData.potatoType !== existingLot.potatoType) {
                 lotChanges.push({ field: "Potato Type", oldValue: existingLot.potatoType, newValue: lotData.potatoType });
@@ -7515,21 +7519,13 @@ export async function registerRoutes(
                 lotChanges.push({ field: "Remarks", oldValue: existingLot.remarks || "", newValue: lotData.remarks || "" });
               }
 
-              if (lotChanges.length > 0) {
-                changeSet.push({ 
-                  scope: "lot", 
-                  entityId: lotData.id, 
-                  label: `${existingLot.coldStoreName} (${existingLot.potatoType})`, 
-                  changes: lotChanges 
-                });
-              }
             }
 
             // Update existing lot
-            await storage.updateSeedLot(lotData.id, merchantId, {
+            const updatedLot = await storage.updateSeedLot(lotData.id, merchantId, {
               coldStoreName: titleCase(lotData.coldStoreName) || lotData.coldStoreName,
               coldStoreDbId: lotData.coldStoreDbId !== undefined ? (lotData.coldStoreDbId || null) : undefined,
-              originalBags: lotData.originalBags,
+              originalBags: lotData.originalBags ?? existingLot.originalBags,
               potatoType: lotData.potatoType,
               bagType: lotData.bagType,
               size: lotData.size,
@@ -7549,6 +7545,15 @@ export async function registerRoutes(
               ),
               remarks: lotData.remarks || null,
             });
+            if (updatedLot && updatedLot.remainingBags !== existingLot.remainingBags) {
+              lotChanges.push({ field: "Remaining Bags", oldValue: existingLot.remainingBags, newValue: updatedLot.remainingBags });
+            }
+            if (lotChanges.length > 0) {
+              changeSet.push({
+                scope: "lot", entityId: lotData.id,
+                label: `${existingLot.coldStoreName} (${existingLot.potatoType})`, changes: lotChanges,
+              });
+            }
           } else if (lotData.coldStoreName && lotData.originalBags && lotData.potatoType && lotData.bagType && lotData.size && lotData.pricePerBag !== undefined) {
             // Create new lot - track as structural change
             changeSet.push({
@@ -7592,6 +7597,9 @@ export async function registerRoutes(
       const updatedEntry = await storage.getSeedEntryById(id, merchantId);
       res.json(updatedEntry);
     } catch (error) {
+      if (error instanceof SeedLotProtectionError) {
+        return res.status(error.status).json({ code: error.code, message: error.message, minimumBags: error.minimumBags });
+      }
       console.error("Error updating seed stock entry:", error);
       res.status(500).json({ message: "Failed to update seed stock entry" });
     }
@@ -7615,23 +7623,21 @@ export async function registerRoutes(
   app.delete("/api/seed-stock-entries/:id/lots/:lotId", requireMerchant, async (req, res) => {
     try {
       const merchantId = req.user!.merchantId!;
-      const lotId = parseInt(req.params.lotId);
-
-      // Block deletion of a seed lot with sold history — would orphan
-      // seed_transaction_items.seedLotId and silently lose sold bags.
-      const [existingLot] = await db
-        .select()
-        .from(seedLots)
-        .where(and(eq(seedLots.id, lotId), eq(seedLots.merchantId, merchantId)));
-      if (existingLot && (existingLot.soldBags ?? 0) > 0) {
-        return res.status(400).json({
-          message: `Cannot delete seed lot — ${existingLot.soldBags} bags have already been sold via seed transactions.`,
-        });
+      if (!req.user!.canEdit) return res.status(403).json({ code: "FORBIDDEN", message: "You do not have permission to delete lots" });
+      const lotId = Number(req.params.lotId);
+      const entryId = Number(req.params.id);
+      if (![lotId, entryId].every(id => Number.isSafeInteger(id) && id > 0 && id <= 2147483647)) {
+        return res.status(400).json({ code: "INVALID_ID", message: "Invalid seed lot or entry id" });
       }
-
-      await storage.deleteSeedLot(lotId, merchantId);
+      await storage.deleteSeedLot(lotId, merchantId, entryId);
       res.json({ message: "Seed lot deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof SeedLotProtectionError) {
+        return res.status(error.status).json({ code: error.code, message: error.message, minimumBags: error.minimumBags });
+      }
+      if (error?.code === "23503") {
+        return res.status(409).json({ code: "SEED_RECORD_LINKED", message: "This seed lot is linked to another record and cannot be deleted" });
+      }
       console.error("Error deleting seed lot:", error);
       res.status(500).json({ message: "Failed to delete seed lot" });
     }

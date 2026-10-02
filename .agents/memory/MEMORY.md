@@ -14,3 +14,4 @@
 - [Seed payment petty settlement](seed-payment-petty.md) — cash and petty settle due together; deletion restores both, but cash movement excludes petty; exact paise deltas are intentional.
 - [Legacy seed deletion safety](legacy-seed-deletion-safety.md) — missing payment destinations are not evidence of no payment; block conservatively and retain reversed cash audit history.
 - [Seed inventory write isolation](seed-inventory-write-isolation.md) — deletion safety requires the same lock across edits and their initial reads, not only deletion/payment/creation.
+- [Browser dialog verification](browser-dialog-verification.md) — programmatic clicks can bypass modal layers; verify unobstructed controls and close the exact dialog before navigating.

@@ -21,6 +21,7 @@ import { Save, Loader2, Snowflake, ChevronDown, ChevronRight, History, Pencil, C
 import { InlineEditableDate } from "@/components/ui/inline-editable-date";
 import { InlinePartyPicker, type PartyOption } from "@/components/ui/inline-party-picker";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashRelatedQueries } from "@/lib/invalidate-cash-queries";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/use-language";
 import { SeedStockEntryWithLots, SEED_SIZE_OPTIONS, type SeedStockEntryEditHistory, type ChangeSet } from "@shared/schema";
@@ -165,8 +166,17 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
 
   const updateMutation = useMutation({
     mutationFn: async (data: { remarks: string; seedLots: SeedLotUpdate[] }) => {
-      const res = await apiRequest("PATCH", `/api/seed-stock-entries/${entry.id}`, data);
-      return await res.json();
+      const res = await fetch(`/api/seed-stock-entries/${entry.id}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw Object.assign(new Error(payload.message || res.statusText), {
+          code: payload.code, minimumBags: payload.minimumBags,
+        });
+      }
+      return payload;
     },
     onSuccess: () => {
       toast({
@@ -174,20 +184,21 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
         description: t("The seed stock entry has been updated successfully.", "बीज स्टॉक एंट्री सफलतापूर्वक अपडेट हो गई।"),
         variant: "success",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries"] });
+      invalidateCashRelatedQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["/api/seed-stock-entries", entry.id, "edit-history"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seed-transactions/unsold-inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/timeseries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/balance-sheet"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/books/profit-loss"] });
       onOpenChange(false);
     },
-    onError: (error: Error) => {
+    onError: (error: Error & { code?: string; minimumBags?: number }) => {
       toast({
         title: t("Error", "त्रुटि"),
-        description: error.message,
+        description: error.code === "SEED_BAGS_BELOW_SOLD"
+          ? t(`Cannot reduce bags below ${error.minimumBags}: those bags have already been sold.`,
+              `${error.minimumBags} से कम बोरी नहीं कर सकते: ये बोरियां पहले ही बिक चुकी हैं।`)
+          : error.code === "SEED_LOT_NOT_FOUND"
+            ? t("This lot no longer belongs to this entry. Please refresh.", "यह लॉट अब इस प्रविष्टि में नहीं है। कृपया रीफ्रेश करें।")
+            : error.code === "FORBIDDEN"
+              ? t("You do not have permission to edit entries.", "आपको प्रविष्टियां संपादित करने की अनुमति नहीं है।")
+              : error.message,
         variant: "destructive",
       });
     },
@@ -473,17 +484,32 @@ export function SeedStockEntryEditDialog({ entry, open, onOpenChange }: SeedStoc
                       <Label className="text-xs">{t("Original Bags", "मूल बोरी")}</Label>
                       <Input
                         type="number"
+                        step={1}
                         value={lot.originalBags || ""}
                         min={(lot as any).soldBags ?? 0}
                         onChange={(e) => {
                           const requested = parseInt(e.target.value) || 0;
                           const sold = (lot as any).soldBags ?? Math.max(0, (lot.originalBags || 0) - (lot.remainingBags || 0));
+                          if (e.target.value !== "" && requested < sold) {
+                            toast({
+                              title: t("Cannot reduce bags", "बोरियां कम नहीं कर सकते"),
+                              description: t(`At least ${sold} bags are required: those bags have already been sold.`,
+                                `कम से कम ${sold} बोरियां आवश्यक हैं: ये बोरियां पहले ही बिक चुकी हैं।`),
+                              variant: "destructive",
+                            });
+                          }
                           // Floor at soldBags — capacity can never drop below sold history.
                           handleLotChange(lotIndex, "originalBags", Math.max(requested, sold));
                         }}
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         data-testid={`input-seed-lot-${lotIndex}-original-bags`}
                       />
+                      {lot.soldBags > 0 && (
+                        <p className="text-xs text-muted-foreground" data-testid={`seed-lot-${lotIndex}-sold-minimum`}>
+                          {t(`Already sold: ${lot.soldBags} · Minimum: ${lot.soldBags}`,
+                            `बिक चुकी: ${lot.soldBags} · न्यूनतम: ${lot.soldBags}`)}
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">{t("Remaining Bags", "बचे बोरी")}</Label>

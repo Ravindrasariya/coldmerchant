@@ -19,3 +19,14 @@ same transaction client. Do not mutate the singleton storage object's client.
 Send success only after commit and roll back all earlier writes on a late
 validation failure. Test both orderings of sale-edit/delete and stock-edit/delete,
 not only payment/create races.
+
+Capacity edits and deletion must conservatively retain evidence of already-sold
+bags: use the greater of the saved sold count and linked sale history. Ordinary
+stock edits must not silently lower the saved sold count to an incomplete history.
+An explicit sale edit/deletion may rebuild counts from surviving transactions.
+
+**Why:** Older records can have either stale counters or missing sale items.
+Treating either source alone as proof of unsold stock risks erasing sold inventory.
+
+**How to apply:** Keep this conservative rule across individual-lot and
+whole-entry deletion, capacity changes, and any future inventory reconciliation.
