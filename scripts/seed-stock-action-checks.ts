@@ -96,6 +96,7 @@ export async function checkSeedStockActions({
     }
   }
 
+  await setViewport(1365, 1000, false);
   await evaluate('fetch("/api/logout", { method: "POST", credentials: "include" })');
   await loginAs(readOnlyUsername);
   await goToRegister();
