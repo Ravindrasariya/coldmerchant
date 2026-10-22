@@ -21,6 +21,18 @@ For PM2 cluster-mode apps, a per-app interpreter setting is insufficient to chan
 
 **How to apply:** Verify the manager and worker executable versions. Isolate the manager if migrating only this application, or obtain separate approval for a shared-manager migration. Do not silently replace cluster mode with fork mode.
 
+Initial process-environment inspection can omit database settings for the VPS's cluster apps, even when those apps have working connections.
+
+**Why:** Filtered live PM2 settings supplied the cluster database targets that initial process inspection missed.
+
+**How to apply:** Do not infer missing configuration from an empty process-environment result. Inspect PM2 settings privately on the VPS and return only sanitized metadata, never raw environment dumps.
+
+The PostgreSQL database named `postgres` is CSM-App's configured live database on this VPS.
+
+**Why:** The user-provided filtered process and PM2 inventories both identified this target.
+
+**How to apply:** Include it in backup and recovery scope. Never assume the default database is empty or safe for disposable tests.
+
 Vyapar Vriddhi passed isolated patched-runtime checks in Replit. The user prefers considering a controlled live VPS maintenance window with rollback instead of a separate VPS staging deployment.
 
 **Why:** The user requested the coordinated live approach after discussing the downtime and database rollback limitations.
