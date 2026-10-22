@@ -9,8 +9,14 @@ Production is hosted on a Hostinger VPS.
 
 **How to apply:** Verify production runtime and service details on the VPS; do not infer live versions or deployment behavior from the Replit workspace.
 
-The VPS hosts multiple PM2-managed applications behind Nginx. Scope app runtime upgrades to this application's interpreter and process rather than replacing a shared runtime or restarting every app.
+The VPS hosts multiple PM2-managed applications behind Nginx. Scope runtime changes to this application rather than replacing a shared runtime or restarting every app.
 
 **Why:** The provided VPS inventory showed several PM2 app processes; this project’s changes must not disrupt the other applications.
 
 **How to apply:** Inventory each relevant executable before rollout and prefer staged, app-specific runtime changes. Treat patching other hosted apps as separate work requiring approval.
+
+For PM2 cluster-mode apps, a per-app interpreter setting is insufficient to change the worker runtime: cluster workers use their manager's Node runtime.
+
+**Why:** The VPS uses cluster mode for this application; PM2 documentation, maintainer guidance, and its cluster implementation confirm this limitation.
+
+**How to apply:** Verify the manager and worker executable versions. Isolate the manager if migrating only this application, or obtain separate approval for a shared-manager migration. Do not silently replace cluster mode with fork mode.
