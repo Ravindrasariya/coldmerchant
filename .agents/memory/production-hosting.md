@@ -21,6 +21,12 @@ For PM2 cluster-mode apps, a per-app interpreter setting is insufficient to chan
 
 **How to apply:** Verify the manager and worker executable versions. Isolate the manager if migrating only this application, or obtain separate approval for a shared-manager migration. Do not silently replace cluster mode with fork mode.
 
+For an approved full-fleet cutover, retain one production PM2 home and startup-service identity. Separate empty managers are for compatibility preflight, not a second independently resurrectable production fleet.
+
+**Why:** Leaving two production process lists and startup services risks duplicate writers, port collisions, or ordinary management commands reconnecting to the old fleet.
+
+**How to apply:** Stage recovery first, stop the shared service before replacing its profile, pin the manager runtime, and account for both fork interpreters and the PATH used by npm-spawned children.
+
 Initial process-environment inspection can omit database settings for the VPS's cluster apps, even when those apps have working connections.
 
 **Why:** Filtered live PM2 settings supplied the cluster database targets that initial process inspection missed.
