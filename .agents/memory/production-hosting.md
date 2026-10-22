@@ -32,3 +32,9 @@ Available runtime modules can lag an advisory's patched minimum even when the ma
 **Why:** The module catalog offered versions below the verified October 2026 patch baseline. The checksummed official side-by-side binary worked without replacing the preview runtime.
 
 **How to apply:** Verify the actual candidate executable against the current advisory. Do not label a module secure based only on its major version, or change production configuration before candidate validation.
+
+Daily database backups already exist, according to the user.
+
+**Why:** The user stated this while discussing recovery for the coordinated VPS runtime upgrade.
+
+**How to apply:** Inspect the existing backup arrangement before proposing another system. Coverage, location, latest success and restorability are not yet verified; do not assume these backups include every app or uploaded files.
