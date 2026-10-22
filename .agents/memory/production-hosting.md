@@ -26,3 +26,9 @@ For the Node security upgrade, test compatibility in Replit first, then validate
 **Why:** The user agreed to this order to keep the live app unchanged during testing.
 
 **How to apply:** Use a verified patched runtime and isolated test database. Replit testing does not replace checks of Ubuntu, PM2 cluster behavior, Nginx, or boot persistence on the VPS.
+
+Available runtime modules can lag an advisory's patched minimum even when the major version is supported.
+
+**Why:** The module catalog offered versions below the verified October 2026 patch baseline. The checksummed official side-by-side binary worked without replacing the preview runtime.
+
+**How to apply:** Verify the actual candidate executable against the current advisory. Do not label a module secure based only on its major version, or change production configuration before candidate validation.
