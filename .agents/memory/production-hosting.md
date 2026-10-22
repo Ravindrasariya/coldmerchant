@@ -50,3 +50,9 @@ Daily backups already exist and are accessed through a backup dashboard, accordi
 **Why:** The user stated this while discussing recovery and provided a dashboard screenshot showing automatic daily backups with operating-system details.
 
 **How to apply:** Inspect the existing backup arrangement before proposing another system. Do not assume dashboard backups are separate database dumps or provide quick app-specific recovery; verify coverage, freshness and restorability.
+
+Validate the exact user-facing maintenance command wrapper and argument passing, not just the script body's syntax.
+
+**Why:** A syntax-checked backup body still failed before execution because its inline shell invocation interpreted the directory argument as a script.
+
+**How to apply:** Test the complete invocation with a harmless stub before giving the user a command batch; do not test production operations merely to validate the wrapper.
