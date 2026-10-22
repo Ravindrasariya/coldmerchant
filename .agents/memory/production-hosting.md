@@ -9,11 +9,11 @@ Production is hosted on a Hostinger VPS.
 
 **How to apply:** Verify production runtime and service details on the VPS; do not infer live versions or deployment behavior from the Replit workspace.
 
-The VPS hosts multiple PM2-managed applications behind Nginx. Scope runtime changes to this application rather than replacing a shared runtime or restarting every app.
+The VPS hosts multiple PM2-managed applications behind Nginx. The user now wants step-by-step guidance for a coordinated runtime upgrade covering all hosted apps in one maintenance window, with rollback if checks fail.
 
-**Why:** The provided VPS inventory showed several PM2 app processes; this project’s changes must not disrupt the other applications.
+**Why:** After the isolated Replit checks, the user explicitly broadened the requested approach from Vyapar Vriddhi alone to all apps sharing the VPS.
 
-**How to apply:** Inventory each relevant executable before rollout and prefer staged, app-specific runtime changes. Treat patching other hosted apps as separate work requiring approval.
+**How to apply:** Refresh the full inventory, review command batches with the user, preserve each app's recovery assets, and check apps sequentially within the coordinated window. This request for guidance is not approval for immediate downtime or destructive actions.
 
 For PM2 cluster-mode apps, a per-app interpreter setting is insufficient to change the worker runtime: cluster workers use their manager's Node runtime.
 
@@ -21,11 +21,11 @@ For PM2 cluster-mode apps, a per-app interpreter setting is insufficient to chan
 
 **How to apply:** Verify the manager and worker executable versions. Isolate the manager if migrating only this application, or obtain separate approval for a shared-manager migration. Do not silently replace cluster mode with fork mode.
 
-For the Node security upgrade, test compatibility in Replit first, then validate separately on Hostinger before an explicitly approved production switch.
+Vyapar Vriddhi passed isolated patched-runtime checks in Replit. The user prefers considering a controlled live VPS maintenance window with rollback instead of a separate VPS staging deployment.
 
-**Why:** The user agreed to this order to keep the live app unchanged during testing.
+**Why:** The user requested the coordinated live approach after discussing the downtime and database rollback limitations.
 
-**How to apply:** Use a verified patched runtime and isolated test database. Replit testing does not replace checks of Ubuntu, PM2 cluster behavior, Nginx, or boot persistence on the VPS.
+**How to apply:** Keep Replit results distinct from unverified Hostinger behavior and other apps. Before a live switch, confirm write inactivity, assess startup writers, verify recovery, and obtain maintenance approval; verify Ubuntu, PM2, Nginx and boot settings.
 
 Available runtime modules can lag an advisory's patched minimum even when the major version is supported.
 
