@@ -33,8 +33,8 @@ Available runtime modules can lag an advisory's patched minimum even when the ma
 
 **How to apply:** Verify the actual candidate executable against the current advisory. Do not label a module secure based only on its major version, or change production configuration before candidate validation.
 
-Daily database backups already exist, according to the user.
+Daily backups already exist and are accessed through a backup dashboard, according to the user.
 
-**Why:** The user stated this while discussing recovery for the coordinated VPS runtime upgrade.
+**Why:** The user stated this while discussing recovery and provided a dashboard screenshot showing automatic daily backups with operating-system details.
 
-**How to apply:** Inspect the existing backup arrangement before proposing another system. Coverage, location, latest success and restorability are not yet verified; do not assume these backups include every app or uploaded files.
+**How to apply:** Inspect the existing backup arrangement before proposing another system. Do not assume dashboard backups are separate database dumps or provide quick app-specific recovery; verify coverage, freshness and restorability.
