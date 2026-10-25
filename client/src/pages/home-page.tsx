@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type ComponentType, type DragEvent, type TouchEvent as ReactTouchEvent } from "react";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import vyaparVriddhiLogo from "@assets/Screenshot_2026-01-17_at_10.27.58_AM_1768625967467.png";
+import vyaparVriddhiLogo from "@/assets/vyapar-vriddhi-logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

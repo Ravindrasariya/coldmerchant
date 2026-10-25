@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { shareReceiptAsPdf } from "@/lib/receipt-share";
 import { printHtmlDocument } from "@/lib/print-receipt";
 import { useToast } from "@/hooks/use-toast";
-import krashuvedLogo from "@assets/Gemini_Generated_Image_lu75dlu75dlu75dl(1)_1777315339846.png";
+import krashuvedLogo from "@/assets/krashuved-logo.png";
 
 interface StockEntryWithLots {
   id: number;
