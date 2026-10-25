@@ -587,13 +587,13 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
   });
 
   const buildLotSection = (lot: StockEntryWithLots["lots"][0]): BillSection => {
-    const weightHeader = lot.place !== "mandi" ? "Net Wt (kg) / शुद्ध वजन" : "Weight (kg) / वजन";
     const columns: BillColumn[] = [
-      { label: "Crop / फसल", align: "left" },
-      { label: "# Bags / बोरी", align: "right" },
-      { label: weightHeader, align: "right" },
-      { label: "Price/kg / मूल्य", align: "right" },
-      { label: "Amount / राशि", align: "right" },
+      { label: "Crop", align: "left" },
+      { label: "# Bags", align: "right" },
+      { label: "Total WT (kg)", align: "right" },
+      { label: "Net Wt (kg)", align: "right" },
+      { label: "Price/kg", align: "right" },
+      { label: "Amount", align: "right" },
     ];
 
     const rows: BillSection["rows"] = [];
@@ -606,7 +606,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
             cells: buildRowCells(
               buildCropCell(lot.crop, c.dominantSize, getLotMarkaValue(lot)),
               c.totalBags,
-              [c.totalNetWeight],
+              [c.totalGrossWeight, c.totalNetWeight],
               c.dominantPrice,
               c.totalAmount,
             ),
@@ -624,7 +624,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
               cells: buildRowCells(
                 buildCropCell(lot.crop, null, (bd.marka || "").trim() || getLotMarkaValue(lot)),
                 bd.numberOfBags,
-                [netWeight],
+                [weight, netWeight],
                 price,
                 netWeight * price,
               ),
@@ -640,7 +640,7 @@ export function BillPrintDialog({ entry, open, onOpenChange, autoAction }: BillP
         cells: buildRowCells(
           buildCropCell(lot.crop, null, getLotMarkaValue(lot)),
           lot.originalBags,
-          [lotNetWeight],
+          [lotWeight, lotNetWeight],
           lotPrice,
           lotNetWeight * lotPrice,
         ),
