@@ -1,5 +1,7 @@
 # Memory Index
 
+- [Uploaded asset tracking](asset-tracking.md) — locally present uploads may be absent from Git; check imported images and global ignores before pushing.
+
 - [Production hosting](production-hosting.md) — production is on a Hostinger VPS; workspace runtime details do not establish live versions.
 
 - [Harvest Tnx# numbering](harvest-tnx-numbering.md) — harvest Tnx# is global per account per IST year (crop-agnostic); only Sr#/seed counters are per-crop.
