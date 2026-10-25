@@ -1,1 +1,4 @@
 /generated-artifacts/
+/scripts/node-upgrade/
+/docs/node-security-upgrade.md
+/.agents/memory/production-hosting.md

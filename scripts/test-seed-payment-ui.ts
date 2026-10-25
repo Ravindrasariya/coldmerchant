@@ -11,9 +11,6 @@ import WebSocket from "ws";
 import { cashEntries, farmers, merchants, seedTransactions, session as sessions, users } from "@shared/schema";
 import { hashPassword } from "../server/auth";
 import { db, pool } from "../server/db";
-import { assertIsolatedRuntimeTest } from "./node-upgrade/assert-isolated";
-
-if (process.env.RUNTIME_UPGRADE_TEST === "1") assertIsolatedRuntimeTest();
 
 const appUrl = new URL(process.env.APP_URL || "http://127.0.0.1:5000");
 const suffix = randomUUID();
@@ -271,10 +268,6 @@ try {
   await connectToPage();
   await cdp("Page.enable");
   await cdp("Runtime.enable");
-  if (process.env.RUNTIME_UPGRADE_TEST === "1") {
-    await cdp("Network.enable");
-    await cdp("Network.setExtraHTTPHeaders", { headers: { "X-Forwarded-Proto": "https" } });
-  }
   await cdp("Emulation.setDeviceMetricsOverride", { width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
   await cdp("Page.navigate", { url: appUrl.toString() });
   await waitFor("app page load", () => evaluate<string>("document.readyState"), (state) => state === "complete");

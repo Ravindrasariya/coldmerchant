@@ -6,3 +6,7 @@ vite.config.ts.*
 *.tar.gz
 uploads/
 /generated-artifacts/
+/scripts/node-upgrade/
+/docs/node-security-upgrade.md
+/.agents/memory/production-hosting.md
+/.agents/agent_assets_metadata.toml

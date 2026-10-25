@@ -25,9 +25,6 @@ import { hashPassword } from "../server/auth";
 import { db, pool } from "../server/db";
 import { checkSeedStockPaymentEdits } from "./seed-stock-payment-edit-checks";
 import { checkSeedStockActions } from "./seed-stock-action-checks";
-import { assertIsolatedRuntimeTest } from "./node-upgrade/assert-isolated";
-
-if (process.env.RUNTIME_UPGRADE_TEST === "1") assertIsolatedRuntimeTest();
 
 const appUrl = new URL(
   process.env.APP_URL ||
@@ -373,10 +370,6 @@ try {
   await connectToPage();
   await cdp("Page.enable");
   await cdp("Runtime.enable");
-  if (process.env.RUNTIME_UPGRADE_TEST === "1") {
-    await cdp("Network.enable");
-    await cdp("Network.setExtraHTTPHeaders", { headers: { "X-Forwarded-Proto": "https" } });
-  }
   await setViewport(1365, 1000, false);
   await cdp("Page.navigate", { url: appUrl.toString() });
   await waitFor("initial app document", () => evaluate<string>("document.readyState"), (state) => state === "complete");
