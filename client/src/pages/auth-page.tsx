@@ -2,7 +2,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import ReCAPTCHA from "react-google-recaptcha";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +18,8 @@ import {
 } from "@/components/ui/form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
+import { useLanguage } from "@/hooks/use-language";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2, PackagePlus, TrendingUp, Users, ClipboardList, Eye, EyeOff } from "lucide-react";
 
 const loginSchema = z.object({
@@ -29,6 +33,24 @@ export default function AuthPage() {
   const [, setLocation] = useLocation();
   const { user, loginMutation } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const { t, language } = useLanguage();
+  const isMobile = useIsMobile();
+  const captchaRef = useRef<ReCAPTCHA>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState("");
+  const captchaConfig = useQuery<{ siteKey: string | null; required: boolean }>({
+    queryKey: ["/api/recaptcha-config"],
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const siteKey = captchaConfig.data?.siteKey;
+  const captchaUnavailable = captchaConfig.isError
+    || (!!captchaConfig.data?.required && !siteKey);
+
+  useEffect(() => {
+    setCaptchaToken(null);
+    setCaptchaError("");
+  }, [siteKey, language, isMobile]);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -49,7 +71,20 @@ export default function AuthPage() {
   }
 
   const onLoginSubmit = (data: LoginForm) => {
-    loginMutation.mutate(data);
+    if (captchaConfig.isPending || captchaUnavailable || (siteKey && !captchaToken)) return;
+    setCaptchaError("");
+    loginMutation.mutate({ ...data, ...(captchaToken ? { captchaToken } : {}) }, {
+      onError: (error) => {
+        captchaRef.current?.reset();
+        setCaptchaToken(null);
+        if (error.message.includes("CAPTCHA")) {
+          setCaptchaError(t(
+            "CAPTCHA verification failed. Please try again.",
+            "कैप्चा सत्यापन विफल रहा। कृपया फिर से प्रयास करें।",
+          ));
+        }
+      },
+    });
   };
 
   return (
@@ -131,10 +166,59 @@ export default function AuthPage() {
                   )}
                 />
 
+                {captchaUnavailable && (
+                  <div role="alert" className="text-sm text-destructive">
+                    <p>{t(
+                      "CAPTCHA configuration could not be loaded. Please retry or contact the administrator.",
+                      "कैप्चा की जानकारी लोड नहीं हो सकी। कृपया फिर प्रयास करें या व्यवस्थापक से संपर्क करें।",
+                    )}</p>
+                    <Button type="button" size="sm" variant="outline" className="mt-2"
+                      onClick={() => void captchaConfig.refetch()}>
+                      {t("Retry", "फिर प्रयास करें")}
+                    </Button>
+                  </div>
+                )}
+                {siteKey && (
+                  <div className="flex flex-col items-center gap-2" data-testid="login-recaptcha">
+                    <ReCAPTCHA
+                      key={`${siteKey}-${language}-${isMobile}`}
+                      ref={captchaRef}
+                      sitekey={siteKey}
+                      size={isMobile ? "compact" : "normal"}
+                      hl={language}
+                      onChange={(token) => {
+                        setCaptchaToken(token);
+                        setCaptchaError("");
+                      }}
+                      onExpired={() => {
+                        setCaptchaToken(null);
+                        setCaptchaError(t(
+                          "CAPTCHA expired. Please verify again.",
+                          "कैप्चा की समय सीमा समाप्त हो गई। कृपया फिर सत्यापित करें।",
+                        ));
+                      }}
+                      onErrored={() => {
+                        setCaptchaToken(null);
+                        setCaptchaError(t(
+                          "CAPTCHA could not load. Check your connection and try again.",
+                          "कैप्चा लोड नहीं हो सका। कनेक्शन जाँचें और फिर प्रयास करें।",
+                        ));
+                      }}
+                    />
+                    {!captchaToken && !captchaError && (
+                      <p className="text-xs text-muted-foreground">{t(
+                        "Please complete the CAPTCHA to log in.",
+                        "लॉगिन करने के लिए कृपया कैप्चा पूरा करें।",
+                      )}</p>
+                    )}
+                  </div>
+                )}
+                {captchaError && <p role="alert" className="text-sm text-destructive">{captchaError}</p>}
                 <Button 
                   type="submit" 
                   className="w-full" 
-                  disabled={loginMutation.isPending}
+                  disabled={loginMutation.isPending || captchaConfig.isPending
+                    || captchaUnavailable || (!!siteKey && !captchaToken)}
                   data-testid="button-login"
                 >
                   {loginMutation.isPending ? (

@@ -1,5 +1,7 @@
 # Memory Index
 
+- [Login CAPTCHA rollout](recaptcha-rollout.md) — optional activation follows the user's other app; distinguish implemented code from configured Hostinger protection.
+
 - [Uploaded asset tracking](asset-tracking.md) — locally present uploads may be absent from Git; check imported images and global ignores before pushing.
 
 - [Production hosting](production-hosting.md) — production is on a Hostinger VPS; workspace runtime details do not establish live versions.

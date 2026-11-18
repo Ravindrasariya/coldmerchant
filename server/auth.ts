@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { captchaLoginGuard, getRecaptchaConfig } from "./recaptcha";
 
 declare global {
   namespace Express {
@@ -114,7 +115,12 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
+  app.get("/api/recaptcha-config", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json(getRecaptchaConfig());
+  });
+
+  app.post("/api/login", captchaLoginGuard(), (req, res, next) => {
     passport.authenticate("local", async (err: any, user: SelectUser | false, info: any) => {
       if (err) return next(err);
       if (!user) {
